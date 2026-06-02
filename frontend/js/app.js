@@ -644,8 +644,10 @@ const FsBrowser = {
                 </div>
                 <div class="fs-browser-footer">
                     <span style="font-size:10px;color:var(--text-dim);white-space:nowrap">Folder:</span>
-                    <span style="font-size:11px;color:var(--text2);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--font-mono)" id="fs-selected-path">${this._currentPath}/</span>
-                    <button class="btn-primary btn-sm" onclick="FsBrowser.confirm()">Select this folder</button>
+                    <code style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;color:var(--text2)" id="fs-selected-path">${this._currentPath}/</code>
+                    <button class="btn-primary btn-sm" id="fs-select-btn"
+                            data-dir="${this._currentPath}/"
+                            onclick="FsBrowser.confirm(this.dataset.dir)">Select this folder</button>
                     <button class="btn-secondary btn-sm" onclick="FsBrowser.close()">Cancel</button>
                 </div>
             </div>`;
@@ -660,8 +662,11 @@ const FsBrowser = {
         try {
             const data = await API.fsBrowse(path);
             this._currentPath = data.current;
+            const dir = data.current.replace(/\/$/, '') + '/';
             const selPath = document.getElementById('fs-selected-path');
-            if (selPath) selPath.textContent = data.current + '/';
+            if (selPath) selPath.textContent = dir;
+            const btn = document.getElementById('fs-select-btn');
+            if (btn) btn.dataset.dir = dir;
 
             // Breadcrumb
             if (breadcrumb) {
@@ -715,13 +720,9 @@ const FsBrowser = {
         // Le footer garde le dossier courant — le fichier sélectionné est juste mis en évidence
     },
 
-    confirm() {
-        // Lire le dossier affiché dans le footer (toujours à jour, se termine par /)
-        const folderEl = document.getElementById('fs-selected-path');
-        let dirPath = folderEl ? folderEl.textContent.trim() : this._currentPath + '/';
-        // Sécurité : si le chemin contient un .json, tronquer au dernier /
-        if (dirPath.match(/\.json$/i)) dirPath = dirPath.substring(0, dirPath.lastIndexOf('/') + 1);
-        if (!dirPath.endsWith('/')) dirPath += '/';
+    confirm(dirFromBtn) {
+        // dirFromBtn est passé directement depuis le data-dir du bouton — source fiable
+        let dirPath = (dirFromBtn || this._currentPath + '/').replace(/\/$/, '') + '/';
 
         const pathField = document.getElementById(this._targetFieldId);
         if (pathField) pathField.value = dirPath;
