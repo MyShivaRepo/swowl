@@ -1,0 +1,421 @@
+{
+  "id": "htpps://example.org/test",
+  "prefix": "onto",
+  "version": "1.0.0",
+  "annotations": {
+    "labels": [],
+    "comments": [],
+    "other": []
+  },
+  "classes": [
+    {
+      "id": "WhoItem",
+      "annotations": {
+        "labels": [],
+        "comments": [],
+        "other": []
+      },
+      "subClassOf": [
+        {
+          "type": "_marker",
+          "property": "name"
+        },
+        {
+          "type": "_marker",
+          "property": "surname"
+        },
+        {
+          "type": "allValuesFrom",
+          "property": "testProperty",
+          "filler": "WhoItem"
+        }
+      ],
+      "equivalentClass": [],
+      "disjointWith": []
+    },
+    {
+      "id": "Person",
+      "annotations": {
+        "labels": [
+          {
+            "lang": "en",
+            "value": "Person"
+          },
+          {
+            "lang": "fr",
+            "value": "Personne"
+          }
+        ],
+        "comments": [],
+        "other": []
+      },
+      "subClassOf": [
+        "WhoItem",
+        {
+          "type": "someValuesFrom",
+          "property": "employedBy",
+          "filler": "Organization"
+        }
+      ],
+      "equivalentClass": [],
+      "disjointWith": []
+    },
+    {
+      "id": "Organization",
+      "annotations": {
+        "labels": [
+          {
+            "lang": "en",
+            "value": "Organization"
+          },
+          {
+            "lang": "fr",
+            "value": "Organisation"
+          }
+        ],
+        "comments": [],
+        "other": []
+      },
+      "subClassOf": [
+        "WhoItem",
+        {
+          "type": "_marker",
+          "property": "employs"
+        }
+      ],
+      "equivalentClass": [],
+      "disjointWith": []
+    },
+    {
+      "id": "Company",
+      "annotations": {
+        "labels": [],
+        "comments": [],
+        "other": []
+      },
+      "subClassOf": [
+        "Organization"
+      ],
+      "equivalentClass": [],
+      "disjointWith": []
+    },
+    {
+      "id": "Administration",
+      "annotations": {
+        "labels": [],
+        "comments": [],
+        "other": []
+      },
+      "subClassOf": [
+        "Organization"
+      ],
+      "equivalentClass": [],
+      "disjointWith": []
+    },
+    {
+      "id": "University",
+      "annotations": {
+        "labels": [],
+        "comments": [],
+        "other": []
+      },
+      "subClassOf": [
+        "Organization"
+      ],
+      "equivalentClass": [],
+      "disjointWith": []
+    }
+  ],
+  "object_properties": [
+    {
+      "id": "employs",
+      "annotations": {
+        "labels": [],
+        "comments": [],
+        "other": []
+      },
+      "domain": [
+        "Organization"
+      ],
+      "range": [
+        "Person"
+      ],
+      "subPropertyOf": [],
+      "inverseOf": "employedBy",
+      "characteristics": {
+        "functional": false,
+        "inverseFunctional": false,
+        "transitive": false,
+        "symmetric": false,
+        "asymmetric": false,
+        "reflexive": false,
+        "irreflexive": false
+      },
+      "propertyChainAxiom": []
+    },
+    {
+      "id": "employedBy",
+      "annotations": {
+        "labels": [],
+        "comments": [],
+        "other": []
+      },
+      "domain": [],
+      "range": [],
+      "subPropertyOf": [],
+      "inverseOf": "employs",
+      "characteristics": {
+        "functional": true,
+        "inverseFunctional": false,
+        "transitive": false,
+        "symmetric": false,
+        "asymmetric": false,
+        "reflexive": false,
+        "irreflexive": false
+      },
+      "propertyChainAxiom": []
+    },
+    {
+      "id": "testProperty",
+      "annotations": {
+        "labels": [],
+        "comments": [],
+        "other": []
+      },
+      "domain": [],
+      "range": [],
+      "subPropertyOf": [],
+      "inverseOf": null,
+      "characteristics": {
+        "functional": false,
+        "inverseFunctional": false,
+        "transitive": false,
+        "symmetric": false,
+        "asymmetric": false,
+        "reflexive": false,
+        "irreflexive": false
+      },
+      "propertyChainAxiom": []
+    },
+    {
+      "id": "NewObjectProperty",
+      "annotations": {
+        "labels": [],
+        "comments": [],
+        "other": []
+      },
+      "domain": [],
+      "range": [],
+      "subPropertyOf": [
+        "testProperty"
+      ],
+      "inverseOf": null,
+      "characteristics": {
+        "functional": false,
+        "inverseFunctional": false,
+        "transitive": false,
+        "symmetric": false,
+        "asymmetric": false,
+        "reflexive": false,
+        "irreflexive": false
+      },
+      "propertyChainAxiom": []
+    }
+  ],
+  "datatype_properties": [
+    {
+      "id": "name",
+      "annotations": {
+        "labels": [],
+        "comments": [],
+        "other": []
+      },
+      "domain": [
+        "WhoItem"
+      ],
+      "range": [
+        "xsd:string"
+      ],
+      "subPropertyOf": [],
+      "functional": true
+    },
+    {
+      "id": "surname",
+      "annotations": {
+        "labels": [],
+        "comments": [],
+        "other": []
+      },
+      "domain": [
+        "WhoItem"
+      ],
+      "range": [
+        "xsd:string"
+      ],
+      "subPropertyOf": [],
+      "functional": false
+    },
+    {
+      "id": "NewDatatypeProperty",
+      "annotations": {
+        "labels": [],
+        "comments": [],
+        "other": []
+      },
+      "domain": [],
+      "range": [],
+      "subPropertyOf": [
+        "surname"
+      ],
+      "functional": false
+    }
+  ],
+  "individuals": [
+    {
+      "id": "Bernard",
+      "annotations": {
+        "labels": [],
+        "comments": [],
+        "other": []
+      },
+      "types": [
+        "Person"
+      ],
+      "objectAssertions": [
+        {
+          "property": "employedBy",
+          "target": "PcoInnovation"
+        }
+      ],
+      "dataAssertions": [
+        {
+          "property": "name",
+          "value": "Ber",
+          "datatype": "xsd:string"
+        },
+        {
+          "property": "surname",
+          "value": "Chabot",
+          "datatype": "xsd:string"
+        }
+      ],
+      "sameAs": [],
+      "differentFrom": []
+    },
+    {
+      "id": "Michel",
+      "annotations": {
+        "labels": [],
+        "comments": [],
+        "other": []
+      },
+      "types": [
+        "Person"
+      ],
+      "objectAssertions": [
+        {
+          "property": "employedBy",
+          "target": "ODASE"
+        }
+      ],
+      "dataAssertions": [
+        {
+          "property": "name",
+          "value": "Mich",
+          "datatype": "xsd:string"
+        },
+        {
+          "property": "surname",
+          "value": "VdbM",
+          "datatype": "xsd:string"
+        }
+      ],
+      "sameAs": [],
+      "differentFrom": []
+    },
+    {
+      "id": "Standford",
+      "annotations": {
+        "labels": [],
+        "comments": [],
+        "other": []
+      },
+      "types": [
+        "University"
+      ],
+      "objectAssertions": [],
+      "dataAssertions": [],
+      "sameAs": [],
+      "differentFrom": []
+    },
+    {
+      "id": "PcoInnovation",
+      "annotations": {
+        "labels": [],
+        "comments": [],
+        "other": []
+      },
+      "types": [
+        "Company"
+      ],
+      "objectAssertions": [
+        {
+          "property": "employs",
+          "target": "Bernard"
+        }
+      ],
+      "dataAssertions": [
+        {
+          "property": "name",
+          "value": "PCO Innovation",
+          "datatype": "xsd:string"
+        }
+      ],
+      "sameAs": [],
+      "differentFrom": []
+    },
+    {
+      "id": "EU_Admin",
+      "annotations": {
+        "labels": [],
+        "comments": [],
+        "other": []
+      },
+      "types": [
+        "Administration"
+      ],
+      "objectAssertions": [],
+      "dataAssertions": [],
+      "sameAs": [],
+      "differentFrom": []
+    },
+    {
+      "id": "ODASE",
+      "annotations": {
+        "labels": [],
+        "comments": [],
+        "other": []
+      },
+      "types": [
+        "Company"
+      ],
+      "objectAssertions": [
+        {
+          "property": "employs",
+          "target": "Michel"
+        }
+      ],
+      "dataAssertions": [
+        {
+          "property": "name",
+          "value": "ODASE Ontologies",
+          "datatype": "xsd:string"
+        }
+      ],
+      "sameAs": [],
+      "differentFrom": []
+    }
+  ],
+  "swrl_rules": [],
+  "sword_rules": []
+}

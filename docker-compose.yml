@@ -1,0 +1,25 @@
+services:
+  backend:
+    build: ./backend
+    container_name: owl-editor-backend
+    ports:
+      - "8001:8000"
+    volumes:
+      - ./data:/app/data
+      - ./backend:/app
+    environment:
+      - DATA_DIR=/app/data/ontologies
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
+
+  frontend:
+    image: nginx:alpine
+    container_name: owl-editor-frontend
+    ports:
+      - "12345:80"
+    volumes:
+      - ./frontend:/usr/share/nginx/html:ro
+      - ./frontend/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - backend
+    restart: unless-stopped

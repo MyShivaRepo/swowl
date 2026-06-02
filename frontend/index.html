@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SWOWL : A Best In Class OWL/SWRL Editor</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+<div class="app-layout">
+
+  <!-- ── Topbar ── -->
+  <header class="topbar">
+    <span class="topbar-logo">🦉 SWOWL : A Best In Class OWL/SWRL Editor</span>
+    <div class="topbar-nav-hist">
+      <button id="nav-back" class="btn-nav-hist" onclick="APP.navigateBack()"    disabled title="Back">◀</button>
+      <button id="nav-fwd"  class="btn-nav-hist" onclick="APP.navigateForward()" disabled title="Forward">▶</button>
+    </div>
+    <span class="topbar-subtitle">OWL 2 DL · SWRL · Real-time Inferences</span>
+    <span id="nav-stats"></span>
+  </header>
+
+  <!-- ── Tab Nav horizontal ── -->
+  <nav class="tab-nav">
+    <div class="nav-item" data-section="ontologies" onclick="APP.navigate('ontologies')"><svg width="14" height="12" viewBox="0 0 14 12" fill="currentColor" style="vertical-align:middle;margin-right:3px"><circle cx="7" cy="1.5" r="1.5"/><circle cx="1.5" cy="10.5" r="1.5"/><circle cx="12.5" cy="10.5" r="1.5"/><line x1="7" y1="3" x2="2.5" y2="9" stroke="currentColor" stroke-width="1"/><line x1="7" y1="3" x2="11.5" y2="9" stroke="currentColor" stroke-width="1"/><line x1="3" y1="10.5" x2="11" y2="10.5" stroke="currentColor" stroke-width="1"/></svg> Ontologies</div>
+
+    <span class="tab-sep"></span>
+
+    <div class="nav-item" data-section="classes" onclick="APP.navigate('classes')">
+      <span class="cls-dot"></span> Classes <span class="nav-count" id="nc-classes">0</span>
+    </div>
+    <div class="nav-item" data-section="object-properties" onclick="APP.navigate('object-properties')">
+      <span class="op-prop-dot"></span> ObjectProperties <span class="nav-count" id="nc-ops">0</span>
+    </div>
+    <div class="nav-item" data-section="datatype-properties" onclick="APP.navigate('datatype-properties')">
+      <span class="dp-prop-dot"></span> DatatypeProperties <span class="nav-count" id="nc-dps">0</span>
+    </div>
+    <div class="nav-item" data-section="annotation-properties" onclick="APP.navigate('annotation-properties')">
+      <span class="anno-prop-dot"></span> AnnotationProperties <span class="nav-count" id="nc-annos">0</span>
+    </div>
+    <div class="nav-item" data-section="individuals" onclick="APP.navigate('individuals')">
+      <span class="xsd-dot" style="margin:0"></span> Individuals <span class="nav-count" id="nc-inds">0</span>
+    </div>
+
+    <span class="tab-sep"></span>
+
+<div class="nav-item" data-section="sword-rules" onclick="APP.navigate('sword-rules')">
+      ⚙️ SWRL Rules <span class="nav-count" id="nc-sword">0</span>
+    </div>
+    <div class="nav-item" data-section="inferences" onclick="APP.navigate('inferences')">
+      🧠 Inferences
+    </div>
+  </nav>
+
+  <!-- ── Main ── -->
+  <main id="main-content">
+    <p class="empty">Loading…</p>
+  </main>
+
+  <!-- ── Inference Sidebar ── -->
+  <aside class="inference-sidebar">
+    <div class="inf-sidebar-title">
+      <span>🧠 Inferences</span>
+      <button class="btn-sm" onclick="InferenceUI.refresh()" title="Recalculate">↻</button>
+    </div>
+    <div id="inference-panel">
+      <p class="empty">Loading…</p>
+    </div>
+  </aside>
+
+</div>
+
+<!-- ── Scripts ── -->
+<script src="/js/api.js"></script>
+<script src="/js/owl_editor.js"></script>
+<script src="/js/swrl_editor.js"></script>
+<script src="/js/sword_editor.js"></script>
+<script src="/js/inference_ui.js"></script>
+<script src="/js/app.js"></script>
+
+<script>
+// Update navigation counters
+function _updateNavCounters() {
+  document.getElementById('nc-classes').textContent = APP.state.classes.length;
+  document.getElementById('nc-ops').textContent     = APP.state.object_properties.length;
+  document.getElementById('nc-dps').textContent     = APP.state.datatype_properties.length;
+  document.getElementById('nc-inds').textContent    = APP.state.individuals.length;
+  const _ncRules = document.getElementById('nc-rules'); if (_ncRules) _ncRules.textContent = APP.state.swrl_rules.length;
+  document.getElementById('nc-sword').textContent   = (APP.state.sword_rules||[]).length;
+  document.getElementById('nc-annos').textContent   = ALL_ANNO_PROPS.length;
+}
+
+// Patch APP.refresh pour mettre à jour les compteurs après chaque refresh
+var _origRefresh = APP.refresh.bind(APP);
+APP.refresh = async function() {
+  await _origRefresh();
+  _updateNavCounters();
+};
+
+// Patch APP.init pour mettre à jour les compteurs après l'initialisation
+var _origInit = APP.init.bind(APP);
+APP.init = async function() {
+  await _origInit();
+  _updateNavCounters();
+};
+</script>
+
+</body>
+</html>
