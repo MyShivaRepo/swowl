@@ -285,11 +285,11 @@ const SWRLEditor = {
                            data-field="var" ${chg}>
                     <select class="swrl-op-select" data-field="operator"
                             onchange="SWRLEditor.updateField('${path}',this.dataset.field,this.value)"
-                            style="flex-shrink:0;background:var(--bg3);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:2px 4px;font-size:11px;font-family:var(--font-mono)">
+                            style="width:46px;flex-shrink:0;background:var(--bg3);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:1px 2px;font-size:11px;font-family:var(--font-mono);height:20px">
                         ${opSel}
                     </select>
                     <input class="swrl-inp" value="${atom.value||''}" placeholder="variable or value"
-                           data-field="value" ${chg} style="flex:2">
+                           data-field="value" ${chg}>
                     ${del}
                 </div>`;
             }
