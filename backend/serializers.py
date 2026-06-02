@@ -23,6 +23,16 @@ def export_owl_xml(store: TripleStore) -> bytes:
         f'     xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#">'
     )
     xml_str = re.sub(r'<rdf:RDF[^>]*>', header, xml_str, count=1, flags=re.DOTALL)
+
+    # OWLAPI 4 (Protégé 5) exige que owl:Ontology soit le PREMIER élément
+    onto_match = re.search(r'[ \t]*<owl:Ontology[^>]*/>\n?', xml_str)
+    if onto_match:
+        onto_tag = onto_match.group(0).strip()
+        xml_str = xml_str[:onto_match.start()] + xml_str[onto_match.end():]
+        # Insérer juste après la balise fermante de <rdf:RDF ...>
+        rdf_tag_end = re.search(r'<rdf:RDF[^>]*>', xml_str).end()
+        xml_str = xml_str[:rdf_tag_end] + '\n  ' + onto_tag + xml_str[rdf_tag_end:]
+
     return xml_str.encode("utf-8")
 
 
