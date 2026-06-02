@@ -44,6 +44,12 @@ const APP = {
             this.state.sword_rules         = onto.sword_rules         || [];
         } catch (e) {
             this.state.ontology = null;
+            this.state.classes             = [];
+            this.state.object_properties   = [];
+            this.state.datatype_properties = [];
+            this.state.individuals         = [];
+            this.state.swrl_rules          = [];
+            this.state.sword_rules         = [];
         }
     },
 
@@ -201,10 +207,25 @@ const APP = {
         }
     },
 
+    _noOntoMsg() {
+        return `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:200px;gap:12px;color:var(--text-dim)">
+            <span style="font-size:32px">🔌</span>
+            <span style="font-size:14px">No ontology connected.</span>
+            <button class="btn-primary btn-sm" onclick="APP.navigate('ontologies')">Go to Ontologies</button>
+        </div>`;
+    },
+
     renderSection(section) {
         this.currentSection = section;
         this.renderNav();
         const main = document.getElementById('main-content');
+
+        // Bloquer les onglets d'édition si aucune ontologie n'est connectée
+        const editSections = ['classes','object-properties','datatype-properties','individuals','swrl-rules','sword-rules','inferences'];
+        if (!this.state.ontology && editSections.includes(section)) {
+            main.innerHTML = this._noOntoMsg();
+            return;
+        }
 
         switch (section) {
             case 'ontologies':
@@ -463,7 +484,7 @@ const APP = {
             await API.disconnectOntology();
             UI.success('Ontology disconnected.');
             await this.refresh();
-            this.renderOntologies();
+            this.renderSection(this.currentSection);
         } catch (e) { UI.error(e.message); }
     },
 
