@@ -639,7 +639,7 @@ const SWRLEditor = {
             await APP.refresh();
             const listEl = document.getElementById('swrl-list');
             if (listEl) listEl.innerHTML = this.renderList(APP.state.swrl_rules || []);
-        } catch (e) { UI.error(`Save error: ${e.message}`); }
+        } catch (e) { UI.error(e.message); }
     },
 
     async delete(id) {
