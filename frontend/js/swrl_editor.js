@@ -1,5 +1,5 @@
 /**
- * sword_editor.js — SWRL rule editor
+ * swrl_editor.js — SWRL rule editor
  * SWRL = SWRL extended with NAF (Negation As Failure) and conditional consequents
  *
  * Atom types:
@@ -27,15 +27,15 @@ const SWRLEditor = {
     renderSplit(rules) {
         return `
         <div class="section-split">
-            <div class="tree-panel" id="sword-list-panel">
+            <div class="tree-panel" id="swrl-list-panel">
                 <div class="tree-panel-header">
                     <h3>SWRL Rules</h3>
                     <button class="btn-sm" onclick="SWRLEditor.newRule()" title="New SWRL rule">➕</button>
                 </div>
-                <div class="tree-scroll" id="sword-list">${this.renderList(rules)}</div>
+                <div class="tree-scroll" id="swrl-list">${this.renderList(rules)}</div>
             </div>
-            <div class="split-handle" id="sword-split-h"></div>
-            <div class="detail-panel" id="sword-detail">
+            <div class="split-handle" id="swrl-split-h"></div>
+            <div class="detail-panel" id="swrl-detail">
                 <div class="detail-panel-empty">
                     <span style="font-size:36px">⚙️</span>
                     <span>Select an existing SWRL Rule or create a new one</span>
@@ -63,7 +63,7 @@ const SWRLEditor = {
     restoreSelection() {
         this._initSplitHandle();
         if (this._selectedId) {
-            document.querySelectorAll('#sword-list .tree-item').forEach(el =>
+            document.querySelectorAll('#swrl-list .tree-item').forEach(el =>
                 el.classList.toggle('selected', el.dataset.id === this._selectedId));
         }
     },
@@ -76,7 +76,7 @@ const SWRLEditor = {
         this._isNew       = false;
         this._editingRule = JSON.parse(JSON.stringify(rule));
         this._renderDetail();
-        document.querySelectorAll('#sword-list .tree-item').forEach(el =>
+        document.querySelectorAll('#swrl-list .tree-item').forEach(el =>
             el.classList.toggle('selected', el.dataset.id === id));
     },
 
@@ -85,16 +85,16 @@ const SWRLEditor = {
         this._isNew       = true;
         this._editingRule = { id: '', label: '', comment: '', body: [], head: [], enabled: true };
         this._renderDetail();
-        document.querySelectorAll('#sword-list .tree-item').forEach(el => el.classList.remove('selected'));
+        document.querySelectorAll('#swrl-list .tree-item').forEach(el => el.classList.remove('selected'));
     },
 
     _renderDetail() {
-        const detail = document.getElementById('sword-detail');
+        const detail = document.getElementById('swrl-detail');
         if (!detail) return;
         detail.innerHTML = this._renderForm(this._editingRule, this._isNew);
-        _initHResizers('sword-detail');
+        _initHResizers('swrl-detail');
         if (this._isNew) {
-            const idInp = document.getElementById('sword-id');
+            const idInp = document.getElementById('swrl-id');
             if (idInp) {
                 idInp.focus();
                 idInp.addEventListener('blur', function handler() {
@@ -103,7 +103,7 @@ const SWRLEditor = {
                 });
             }
         }
-        detail.querySelectorAll('input.sword-var').forEach(inp => {
+        detail.querySelectorAll('input.swrl-var').forEach(inp => {
             inp.addEventListener('focus', function handler() {
                 inp.removeEventListener('focus', handler);
                 requestAnimationFrame(() => inp.setSelectionRange(inp.value.length, inp.value.length));
@@ -122,7 +122,7 @@ const SWRLEditor = {
             <div class="cls-editor-hdr">
                 <div class="cls-editor-title" style="gap:6px;flex-wrap:wrap">
                     ID&nbsp;
-                    <input type="text" class="cls-id-inp" id="sword-id"
+                    <input type="text" class="cls-id-inp" id="swrl-id"
                            value="${rule.id}" placeholder="ruleName"
                            oninput="this.value=this.value.replace(/\\s+/g,'_')"
                            ${isNew ? '' : 'onchange="SWRLEditor._syncAndSave()"'}
@@ -130,10 +130,10 @@ const SWRLEditor = {
                     <span class="cls-editor-meta">NAME</span>
                 </div>
                 <div style="margin-top:4px;display:flex;gap:4px">
-                    <input type="text" id="sword-label" value="${rule.label||''}" placeholder="Label"
+                    <input type="text" id="swrl-label" value="${rule.label||''}" placeholder="Label"
                            class="cls-id-inp" style="flex:1;font-size:11px"
                            onchange="SWRLEditor._syncAndSave()">
-                    <input type="text" id="sword-comment" value="${rule.comment||''}" placeholder="Comment"
+                    <input type="text" id="swrl-comment" value="${rule.comment||''}" placeholder="Comment"
                            class="cls-id-inp" style="flex:2;font-size:11px"
                            onchange="SWRLEditor._syncAndSave()">
                 </div>
@@ -150,7 +150,7 @@ const SWRLEditor = {
                         <button class="btn-ftool" onclick="SWRLEditor.addAtom('body','naf_block')"     title="Add NAF block">${ico}&thinsp;NAF</button>
                     </div>
                 </div>
-                <div class="cls-frame-body" id="sword-body">
+                <div class="cls-frame-body" id="swrl-body">
                     ${body || '<div class="cls-list-empty" style="font-style:italic">— add antecedents —</div>'}
                 </div>
             </div>
@@ -168,7 +168,7 @@ const SWRLEditor = {
                         <button class="btn-ftool" onclick="SWRLEditor.addAtom('head','conditional')"   title="Add conditional consequent">${ico}&thinsp;If … Then</button>
                     </div>
                 </div>
-                <div class="cls-frame-body" id="sword-head">
+                <div class="cls-frame-body" id="swrl-head">
                     ${head || '<div class="cls-list-empty" style="font-style:italic">— add consequents —</div>'}
                 </div>
             </div>
@@ -199,7 +199,7 @@ const SWRLEditor = {
 
         // La poignée porte draggable="true" — seule elle initie le drag, sans conflit de niveaux
         const handle = isDraggable ? `
-            <span class="sword-drag-handle" title="Drag to reorder"
+            <span class="swrl-drag-handle" title="Drag to reorder"
                   draggable="true"
                   ondragstart="event.stopPropagation();SWRLEditor.onDragStart(event,'${listPath}',${idx})"
                   ondragend="SWRLEditor.onDragEnd()">⠿</span>` : '';
@@ -212,13 +212,13 @@ const SWRLEditor = {
             case 'type_atom': {
                 const clsId    = atom.class_id || '';
                 const safePath = path.replace(/,/g, '__');
-                const pickerId = `sword-cls-picker-${safePath}`;
+                const pickerId = `swrl-cls-picker-${safePath}`;
                 const tree     = _classTreePickerItems('SWRLEditor.onClassPickerSelect');
-                return `<div class="sword-atom" data-path="${path}" ${dragAttrs}>
+                return `<div class="swrl-atom" data-path="${path}" ${dragAttrs}>
                     ${handle}
-                    <input class="sword-var" value="${atom.var||''}" placeholder="?var"
+                    <input class="swrl-var" value="${atom.var||''}" placeholder="?var"
                            data-field="var" ${chg}>
-                    <span class="sword-kw">is a</span>
+                    <span class="swrl-kw">is a</span>
                     <div style="position:relative;flex:1;min-width:0">
                         <div class="tree-item restr-filler-btn" style="margin:0;padding:2px 6px;cursor:pointer"
                              title="${clsId ? 'Left-click: navigate · Right-click: change class' : 'Click to select a class'}"
@@ -247,10 +247,10 @@ const SWRLEditor = {
                 const isOP      = (APP.state.object_properties  || []).some(p => p.id === propId);
                 const isDP      = (APP.state.datatype_properties || []).some(p => p.id === propId);
                 const propDot   = isOP ? 'op-prop-dot' : isDP ? 'dp-prop-dot' : null;
-                const propPickId = `sword-prop-picker-${path.replace(/,/g,'__')}`;
-                return `<div class="sword-atom" data-path="${path}" ${dragAttrs}>
+                const propPickId = `swrl-prop-picker-${path.replace(/,/g,'__')}`;
+                return `<div class="swrl-atom" data-path="${path}" ${dragAttrs}>
                     ${handle}
-                    <input class="sword-var" value="${atom.subject||''}" placeholder="?subj"
+                    <input class="swrl-var" value="${atom.subject||''}" placeholder="?subj"
                            data-field="subject" ${chg}>
                     <div style="position:relative;flex:0 1 auto;min-width:80px">
                         <div class="tree-item restr-filler-btn" style="margin:0;padding:2px 6px;cursor:pointer;width:max-content;max-width:200px"
@@ -269,19 +269,19 @@ const SWRLEditor = {
                         </div>
                         <div id="${propPickId}" class="cls-tree-picker" style="display:none"></div>
                     </div>
-                    <input class="sword-inp" value="${atom.object||''}" placeholder="?obj / ?_"
+                    <input class="swrl-inp" value="${atom.object||''}" placeholder="?obj / ?_"
                            data-field="object" ${chg} style="width:60px;flex-shrink:0">
                     ${del}
                 </div>`;
             }
 
             case 'equality_atom':
-                return `<div class="sword-atom" data-path="${path}" ${dragAttrs}>
+                return `<div class="swrl-atom" data-path="${path}" ${dragAttrs}>
                     ${handle}
-                    <input class="sword-var" value="${atom.var||''}" placeholder="?var"
+                    <input class="swrl-var" value="${atom.var||''}" placeholder="?var"
                            data-field="var" ${chg}>
-                    <span class="sword-kw">=</span>
-                    <input class="sword-inp" value="${atom.value||''}" placeholder="value or IRI"
+                    <span class="swrl-kw">=</span>
+                    <input class="swrl-inp" value="${atom.value||''}" placeholder="value or IRI"
                            data-field="value" ${chg} style="flex:2">
                     ${del}
                 </div>`;
@@ -289,10 +289,10 @@ const SWRLEditor = {
             case 'naf_block': {
                 const ico = this._ico;
                 const inner = this._renderAtomList(atom.atoms || [], `${path},atoms`);
-                return `<div class="sword-naf-block" data-path="${path}" ${dragAttrs}>
-                    <div class="sword-naf-hdr">
+                return `<div class="swrl-naf-block" data-path="${path}" ${dragAttrs}>
+                    <div class="swrl-naf-hdr">
                     ${handle}
-                        <span class="sword-naf-label">NAF</span>
+                        <span class="swrl-naf-label">NAF</span>
                         <div style="display:flex;gap:2px;align-items:center;margin-left:auto">
                             <button class="btn-ftool" style="font-size:9px" title="Add type atom"
                                     onclick="SWRLEditor.addAtom('${path},atoms','type_atom')">${ico}&thinsp;Class</button>
@@ -304,7 +304,7 @@ const SWRLEditor = {
                                     onclick="SWRLEditor.removeAtom('${path}')">✕</button>
                         </div>
                     </div>
-                    <div class="sword-naf-body">
+                    <div class="swrl-naf-body">
                         ${inner || '<div class="cls-list-empty" style="font-size:10px;font-style:italic">— add atoms —</div>'}
                     </div>
                 </div>`;
@@ -319,7 +319,7 @@ const SWRLEditor = {
                 const condHtml = this._renderAtomList(condList, `${path},condition`);
                 const consHtml = this._renderAtomList(consList, `${path},consequent`);
                 const ico = this._ico;
-                return `<div class="sword-conditional" data-path="${path}" ${dragAttrs}>
+                return `<div class="swrl-conditional" data-path="${path}" ${dragAttrs}>
                     <div style="display:flex;align-items:flex-start;gap:4px;width:100%">
                         ${handle}
                         <div style="flex:1;min-width:0">
@@ -370,7 +370,7 @@ const SWRLEditor = {
     toggleClassPicker(pickerId, atomPath, btnEl) {
         this._currentPickerPath = atomPath;
         // Fermer tous les autres pickers
-        document.querySelectorAll('[id^="sword-cls-picker-"]').forEach(p => {
+        document.querySelectorAll('[id^="swrl-cls-picker-"]').forEach(p => {
             if (p.id !== pickerId) p.style.display = 'none';
         });
         const el  = document.getElementById(pickerId);
@@ -407,7 +407,7 @@ const SWRLEditor = {
         const atom = this._navAtom(this._currentPickerPath);
         if (atom) atom['class_id'] = classId;
         // Fermer tous les pickers
-        document.querySelectorAll('[id^="sword-cls-picker-"]').forEach(p => p.style.display = 'none');
+        document.querySelectorAll('[id^="swrl-cls-picker-"]').forEach(p => p.style.display = 'none');
         this._currentPickerPath = null;
         // Re-rendre le formulaire pour afficher la classe sélectionnée
         this._renderDetail();
@@ -418,7 +418,7 @@ const SWRLEditor = {
     /** Ouvre/ferme le tree picker de propriété (position:fixed) */
     togglePropPicker(pickerId, atomPath, btnEl) {
         this._currentPropPickerPath = atomPath;
-        document.querySelectorAll('[id^="sword-prop-picker-"]').forEach(p => {
+        document.querySelectorAll('[id^="swrl-prop-picker-"]').forEach(p => {
             if (p.id !== pickerId) p.style.display = 'none';
         });
         const el  = document.getElementById(pickerId);
@@ -474,7 +474,7 @@ const SWRLEditor = {
         if (!this._currentPropPickerPath) return;
         const atom = this._navAtom(this._currentPropPickerPath);
         if (atom) atom['property_id'] = propId;
-        document.querySelectorAll('[id^="sword-prop-picker-"]').forEach(p => p.style.display = 'none');
+        document.querySelectorAll('[id^="swrl-prop-picker-"]').forEach(p => p.style.display = 'none');
         this._currentPropPickerPath = null;
         this._renderDetail();
         if (!this._isNew && this._editingRule?.id) this.save(false);
@@ -490,7 +490,7 @@ const SWRLEditor = {
         const atomEl = event.target.closest('[data-path]');
         if (atomEl) {
             event.dataTransfer.setDragImage(atomEl, 0, 0);
-            setTimeout(() => atomEl.classList.add('sword-dragging'), 0);
+            setTimeout(() => atomEl.classList.add('swrl-dragging'), 0);
         }
     },
 
@@ -499,18 +499,18 @@ const SWRLEditor = {
         if (!this._drag?.listPath || this._drag.listPath !== listPath) return;
         event.preventDefault();
         event.dataTransfer.dropEffect = 'move';
-        document.querySelectorAll('.sword-drag-target').forEach(e => e.classList.remove('sword-drag-target'));
-        el.classList.add('sword-drag-target');
+        document.querySelectorAll('.swrl-drag-target').forEach(e => e.classList.remove('swrl-drag-target'));
+        el.classList.add('swrl-drag-target');
     },
 
     onDragLeave(el) {
-        el.closest('[data-path]')?.classList.remove('sword-drag-target');
+        el.closest('[data-path]')?.classList.remove('swrl-drag-target');
     },
 
     onDrop(event, listPath, toIdx) {
         event.preventDefault();
         event.stopPropagation();
-        document.querySelectorAll('.sword-drag-target').forEach(e => e.classList.remove('sword-drag-target'));
+        document.querySelectorAll('.swrl-drag-target').forEach(e => e.classList.remove('swrl-drag-target'));
         const { listPath: fromPath, fromIdx } = this._drag;
         if (!fromPath || fromIdx === null || fromPath !== listPath) return;
         toIdx = parseInt(toIdx);
@@ -529,8 +529,8 @@ const SWRLEditor = {
         this._drag = { listPath: null, fromIdx: null };
         document.body.classList.remove('resizing');
         document.querySelectorAll('[data-path]').forEach(e => e.style.opacity = '');
-        document.querySelectorAll('.sword-drag-target').forEach(e => e.classList.remove('sword-drag-target'));
-        document.querySelectorAll('.sword-dragging').forEach(e => e.classList.remove('sword-dragging'));
+        document.querySelectorAll('.swrl-drag-target').forEach(e => e.classList.remove('swrl-drag-target'));
+        document.querySelectorAll('.swrl-dragging').forEach(e => e.classList.remove('swrl-dragging'));
     },
 
     // ── Manipulation des atomes ──────────────────────────────────
@@ -610,11 +610,11 @@ const SWRLEditor = {
     // ── Sync meta ────────────────────────────────────────────────
     _syncFromDom() {
         if (!this._editingRule) return;
-        const idEl = document.getElementById('sword-id');
+        const idEl = document.getElementById('swrl-id');
         const id   = (idEl?.value || '').trim().replace(/\s+/g, '_');
         if (id) { this._editingRule.id = id; if (idEl) idEl.value = id; }
-        this._editingRule.label   = document.getElementById('sword-label')?.value   || '';
-        this._editingRule.comment = document.getElementById('sword-comment')?.value || '';
+        this._editingRule.label   = document.getElementById('swrl-label')?.value   || '';
+        this._editingRule.comment = document.getElementById('swrl-comment')?.value || '';
     },
 
     _syncAndSave() {
@@ -637,7 +637,7 @@ const SWRLEditor = {
                 await API.updateSWRLRule(rule.id, rule);
             }
             await APP.refresh();
-            const listEl = document.getElementById('sword-list');
+            const listEl = document.getElementById('swrl-list');
             if (listEl) listEl.innerHTML = this.renderList(APP.state.swrl_rules || []);
         } catch (e) { if (isNew) UI.error(e.message); }
     },
@@ -656,7 +656,7 @@ const SWRLEditor = {
         this._editingRule = null;
         this._isNew       = false;
         await APP.refresh();
-        const listEl = document.getElementById('sword-list');
+        const listEl = document.getElementById('swrl-list');
         if (listEl) listEl.innerHTML = this.renderList(APP.state.swrl_rules || []);
         this._cancel();
     },
@@ -664,7 +664,7 @@ const SWRLEditor = {
     _cancel() {
         this._editingRule = null;
         this._isNew       = false;
-        const detail = document.getElementById('sword-detail');
+        const detail = document.getElementById('swrl-detail');
         if (detail) detail.innerHTML = `<div class="detail-panel-empty">
             <span style="font-size:36px;font-weight:300">⊢¬</span>
             <span>Select a SWRL rule or create a new one</span>
@@ -673,8 +673,8 @@ const SWRLEditor = {
 
     // ── Split handle ─────────────────────────────────────────────
     _initSplitHandle() {
-        const handle = document.getElementById('sword-split-h');
-        const panel  = document.getElementById('sword-list-panel');
+        const handle = document.getElementById('swrl-split-h');
+        const panel  = document.getElementById('swrl-list-panel');
         if (!handle || !panel) return;
         let dragging = false;
         handle.addEventListener('mousedown', e => {
