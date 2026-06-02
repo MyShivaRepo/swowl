@@ -615,10 +615,10 @@ const FsBrowser = {
         if (current) {
             const parts = current.split('/');
             parts.pop();                              // enlever le nom de fichier
-            this._currentPath = parts.join('/') || '/Users/bernard';
+            this._currentPath = parts.join('/') || '/Users/bernard/AppData';
             this._pendingFilename = current.split('/').pop() || '';
         } else {
-            this._currentPath = '/Users/bernard';
+            this._currentPath = '/Users/bernard/AppData';
             this._pendingFilename = '';
         }
         this._renderModal();
@@ -636,7 +636,7 @@ const FsBrowser = {
                     <span style="font-weight:600;font-size:13px">📁 Browse Filesystem</span>
                     <button class="btn-sm" onclick="FsBrowser.close()">✕</button>
                 </div>
-                <div class="fs-browser-breadcrumb" id="fs-breadcrumb">…</div>
+                <div class="fs-browser-breadcrumb" id="fs-breadcrumb">${this._currentPath}</div>
                 <div class="fs-browser-list" id="fs-list">
                     <div class="fs-loading">Loading…</div>
                 </div>
