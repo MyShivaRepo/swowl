@@ -690,7 +690,8 @@ const FsBrowser = {
             });
             data.files.forEach(f => {
                 const safePath = f.path.replace(/'/g, "\\'");
-                html += `<div class="fs-item fs-item-file" onclick="FsBrowser._selectFile('${safePath}','${f.name}')">
+                const safeName = f.name.replace(/'/g, "\\'");
+                html += `<div class="fs-item fs-item-file" onclick="FsBrowser._selectFile('${safePath}','${safeName}',this)">
                     <span class="fs-icon">📄</span><span>${f.name}</span></div>`;
             });
             if (!html) html = '<div class="fs-loading" style="color:var(--text-dim)">Empty folder</div>';
@@ -703,19 +704,30 @@ const FsBrowser = {
         }
     },
 
-    _selectFile(path, name) {
-        const input = document.getElementById('fs-filename');
-        if (input) input.value = name;
-        // Highlight selected
-        document.querySelectorAll('.fs-item').forEach(el => el.classList.remove('fs-item-selected'));
-        event.currentTarget.classList.add('fs-item-selected');
+    _selectedFile: null,   // { name, dir } du fichier cliqué
+
+    _selectFile(path, name, el) {
+        this._selectedFile = { name, dir: this._currentPath };
+        // Highlight
+        document.querySelectorAll('.fs-item').forEach(e => e.classList.remove('fs-item-selected'));
+        el.classList.add('fs-item-selected');
+        // Afficher le chemin complet dans le footer
+        const selPath = document.getElementById('fs-selected-path');
+        if (selPath) selPath.textContent = this._currentPath.replace(/\/$/, '') + '/' + name;
     },
 
     confirm() {
-        // Injecte uniquement le répertoire courant dans le champ Path
         const dirPath = this._currentPath.replace(/\/$/, '') + '/';
         const pathField = document.getElementById(this._targetFieldId);
         if (pathField) pathField.value = dirPath;
+        // Si un fichier existant a été sélectionné, pré-remplir le champ Name
+        if (this._selectedFile) {
+            const nameField = document.getElementById('onto-new-name');
+            if (nameField && !nameField.value.trim()) {
+                nameField.value = this._selectedFile.name.replace(/\.json$/, '');
+            }
+            this._selectedFile = null;
+        }
         this.close();
     },
 
