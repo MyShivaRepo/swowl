@@ -195,6 +195,9 @@ const APP = {
         if (section === 'individuals') {
             IndividualEditor.selectIndividual(entityId);
         }
+        if (section === 'swrl-rules' && entityId) {
+            SWRLEditor.selectRule(entityId);
+        }
     },
 
     _noOntoMsg() {
