@@ -26,7 +26,7 @@ docker compose up --build
 ## Structure du projet
 
 ```
-swowl/
+📁 (racine du dépôt)
 ├── docker-compose.yml
 ├── backend/
 │   ├── Dockerfile
