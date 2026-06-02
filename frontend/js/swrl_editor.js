@@ -455,8 +455,12 @@ const SWRLEditor = {
             const rect = btnEl.getBoundingClientRect();
             el.style.position  = 'fixed';
             el.style.top       = (rect.bottom + 2) + 'px';
-            el.style.left      = rect.left + 'px';
             el.style.zIndex    = '9000';
+            // Aligner à droite du bouton, mais rester dans la fenêtre
+            const pickerW = 200;
+            const leftPos = Math.max(4, Math.min(rect.right - pickerW, window.innerWidth - pickerW - 4));
+            el.style.left  = leftPos + 'px';
+            el.style.width = pickerW + 'px';
         }
         el.style.display = '';
         const close = (e) => {
