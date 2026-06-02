@@ -321,7 +321,7 @@ const APP = {
         <div class="onto-page">
 
             <div class="section-header">
-                <h2>⚙️ Ontologies</h2>
+                <h2><svg width="18" height="15" viewBox="0 0 14 12" fill="currentColor" style="vertical-align:middle;margin-right:6px"><circle cx="7" cy="1.5" r="1.5"/><circle cx="1.5" cy="10.5" r="1.5"/><circle cx="12.5" cy="10.5" r="1.5"/><line x1="7" y1="3" x2="2.5" y2="9" stroke="currentColor" stroke-width="1"/><line x1="7" y1="3" x2="11.5" y2="9" stroke="currentColor" stroke-width="1"/><line x1="3" y1="10.5" x2="11" y2="10.5" stroke="currentColor" stroke-width="1"/></svg> Ontologies</h2>
                 <div class="section-actions">
                     <button class="btn-primary" onclick="APP.toggleOntoPanel('onto-new-panel')">✨ New Ontology</button>
                 </div>
