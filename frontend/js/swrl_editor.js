@@ -279,6 +279,14 @@ const SWRLEditor = {
                 const opSel = ops.map(o =>
                     `<option value="${o}"${(atom.operator||'=')===o?' selected':''}>${o}</option>`
                 ).join('');
+                const safePath = path.replace(/,/g, '__');
+                const indPickId = `swrl-ind-picker-${safePath}`;
+                const inds = (APP.state.individuals || []);
+                const indItems = inds.length
+                    ? inds.map(i => `<div class="cls-tree-picker-item" onclick="SWRLEditor.onIndPickerSelect('${i.id}')">
+                        <span class="xsd-dot" style="flex-shrink:0"></span>
+                        <span>${i.id}</span></div>`).join('')
+                    : '<div style="padding:6px 10px;font-size:11px;color:var(--text-dim)">No individuals</div>';
                 return `<div class="swrl-atom" data-path="${path}" ${dragAttrs}>
                     ${handle}
                     <input class="swrl-var" value="${atom.var||''}" placeholder="?var"
@@ -288,8 +296,18 @@ const SWRLEditor = {
                             style="width:46px;flex-shrink:0;background:var(--bg3);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:1px 2px;font-size:11px;font-family:var(--font-mono);height:20px">
                         ${opSel}
                     </select>
-                    <input class="swrl-inp" value="${atom.value||''}" placeholder="variable or value"
-                           data-field="value" ${chg}>
+                    <div style="position:relative;flex:1;min-width:0;display:flex;gap:2px">
+                        <input class="swrl-inp" value="${atom.value||''}" placeholder="individual, variable or value"
+                               data-field="value" ${chg} style="flex:1;min-width:0">
+                        <button class="btn-frame-del" style="flex-shrink:0;padding:1px 4px;background:var(--bg3);border-color:var(--border)"
+                                title="Pick an individual"
+                                onclick="SWRLEditor.toggleIndPicker('${indPickId}','${path}',this)">
+                            <span class="xsd-dot" style="pointer-events:none"></span>
+                        </button>
+                        <div id="${indPickId}" class="cls-tree-picker" style="display:none;min-width:180px;max-height:220px;overflow-y:auto">
+                            ${indItems}
+                        </div>
+                    </div>
                     ${del}
                 </div>`;
             }
@@ -420,6 +438,44 @@ const SWRLEditor = {
         // Re-rendre le formulaire pour afficher la classe sélectionnée
         this._renderDetail();
         // Sauvegarder si la règle existe déjà
+        if (!this._isNew && this._editingRule?.id) this.save(false);
+    },
+
+    /** Ouvre/ferme le picker d'individu (losange violet) */
+    toggleIndPicker(pickerId, atomPath, btnEl) {
+        this._currentIndPickerPath = atomPath;
+        document.querySelectorAll('[id^="swrl-ind-picker-"]').forEach(p => {
+            if (p.id !== pickerId) p.style.display = 'none';
+        });
+        const el = document.getElementById(pickerId);
+        if (!el) return;
+        const visible = el.style.display !== 'none';
+        if (visible) { el.style.display = 'none'; return; }
+        if (btnEl) {
+            const rect = btnEl.getBoundingClientRect();
+            el.style.position  = 'fixed';
+            el.style.top       = (rect.bottom + 2) + 'px';
+            el.style.left      = rect.left + 'px';
+            el.style.zIndex    = '9000';
+        }
+        el.style.display = '';
+        const close = (e) => {
+            if (!el.contains(e.target) && e.target !== btnEl) {
+                el.style.display = 'none';
+                document.removeEventListener('click', close);
+            }
+        };
+        setTimeout(() => document.addEventListener('click', close), 0);
+    },
+
+    /** Appelé quand un individu est sélectionné dans le picker */
+    onIndPickerSelect(indId) {
+        if (!this._currentIndPickerPath) return;
+        const atom = this._navAtom(this._currentIndPickerPath);
+        if (atom) atom['value'] = indId;
+        document.querySelectorAll('[id^="swrl-ind-picker-"]').forEach(p => p.style.display = 'none');
+        this._currentIndPickerPath = null;
+        this._renderDetail();
         if (!this._isNew && this._editingRule?.id) this.save(false);
     },
 
