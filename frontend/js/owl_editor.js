@@ -1577,6 +1577,21 @@ function _makeAnnotRow(type, editor, ac, propId = null) {
     return tr;
 }
 
+function _ruleUsesIndividual(rule, indId) {
+    const search = (atom) => {
+        if (!atom) return false;
+        if (Array.isArray(atom)) return atom.some(search);
+        switch (atom.type) {
+            case 'equality_atom':   return atom.value === indId;
+            case 'property_atom':   return atom.subject === indId || atom.object === indId;
+            case 'naf_block':       return (atom.atoms || []).some(search);
+            case 'conditional':     return search(atom.condition) || search(atom.consequent);
+            default:                return false;
+        }
+    };
+    return [...(rule.body || []), ...(rule.head || [])].some(search);
+}
+
 function _ruleUsesClass(rule, classId) {
     const search = (atom) => {
         if (!atom) return false;
@@ -3791,6 +3806,8 @@ const IndividualEditor = {
             </div>
 
             ${hasProps ? `<div class="h-resizer"></div>${propPanelsHtml}` : ''}
+
+            ${ind ? _whereUsedFrame(r => _ruleUsesIndividual(r, ind.id)) : ''}
 
         </div>`;
     },

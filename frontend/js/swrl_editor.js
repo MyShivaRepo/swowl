@@ -297,6 +297,8 @@ const SWRLEditor = {
                            <span class="xsd-dot" style="flex-shrink:0;margin-right:4px"></span>
                            <span class="restr-filler-lbl" style="cursor:pointer;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
                                  onclick="APP.navigateTo('individuals','${atom.value}')"
+                                 onmouseover="this.style.textDecoration='underline'"
+                                 onmouseout="this.style.textDecoration=''"
                                  title="Navigate to ${atom.value}">${atom.value}</span>
                        </div>`
                     : `<input class="swrl-inp" value="${atom.value||''}" placeholder="individual, variable or value"
