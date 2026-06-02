@@ -321,15 +321,18 @@ const APP = {
             <div id="onto-new-panel" class="cls-frame onto-collapsible" style="display:none">
                 <div class="cls-frame-bar"><span class="cls-frame-tag">✨ New Ontology</span></div>
                 <div class="cls-frame-body" style="padding:12px;display:flex;flex-direction:column;gap:10px">
-                    <!-- Row 1 : Name + File path -->
+                    <!-- Row 1 : Name + Path -->
                     <div style="display:flex;gap:10px;flex-wrap:wrap">
                         <div class="form-group" style="margin:0;flex:1;min-width:160px">
                             <label>Name *</label>
                             <input type="text" id="onto-new-name" placeholder="e.g. MyOntology" style="width:100%">
                         </div>
                         <div class="form-group" style="margin:0;flex:2;min-width:260px">
-                            <label>File path * <span style="font-size:10px;color:var(--text-dim)">(absolute path on your Mac)</span></label>
-                            <input type="text" id="onto-new-path" placeholder="/Users/bernard/Documents/my_ontology.json" style="width:100%">
+                            <label>Path * <span style="font-size:10px;color:var(--text-dim)">(absolute path on your Mac)</span></label>
+                            <div style="display:flex;gap:4px">
+                                <input type="text" id="onto-new-path" placeholder="/Users/bernard/Documents/my_ontology.json" style="flex:1;min-width:0">
+                                <button class="btn-sm btn-secondary" onclick="FsBrowser.open('onto-new-path')" title="Browse filesystem">📁</button>
+                            </div>
                         </div>
                     </div>
                     <!-- Row 2 : Prefix + URI -->
@@ -594,6 +597,128 @@ const UI = {
             document.getElementById('ui-modal-cancel').onclick  = () => close(false);
             overlay.addEventListener('click', e => { if (e.target === overlay) close(false); });
         });
+    },
+};
+
+
+// ── Filesystem Browser ───────────────────────────────────────
+
+const FsBrowser = {
+    _targetFieldId: null,
+    _currentPath: '/Users/bernard',
+    _pendingFilename: '',   // filename typed in the bottom bar
+
+    open(targetFieldId) {
+        this._targetFieldId = targetFieldId;
+        // Pré-positionner sur le chemin déjà saisi si valide
+        const current = document.getElementById(targetFieldId)?.value.trim();
+        if (current) {
+            const parts = current.split('/');
+            parts.pop();                              // enlever le nom de fichier
+            this._currentPath = parts.join('/') || '/Users/bernard';
+            this._pendingFilename = current.split('/').pop() || '';
+        } else {
+            this._currentPath = '/Users/bernard';
+            this._pendingFilename = '';
+        }
+        this._renderModal();
+        this._load(this._currentPath);
+    },
+
+    _renderModal() {
+        document.getElementById('fs-browser-overlay')?.remove();
+        const overlay = document.createElement('div');
+        overlay.id = 'fs-browser-overlay';
+        overlay.className = 'fs-browser-overlay';
+        overlay.innerHTML = `
+            <div class="fs-browser-modal">
+                <div class="fs-browser-header">
+                    <span style="font-weight:600;font-size:13px">📁 Browse Filesystem</span>
+                    <button class="btn-sm" onclick="FsBrowser.close()">✕</button>
+                </div>
+                <div class="fs-browser-breadcrumb" id="fs-breadcrumb">…</div>
+                <div class="fs-browser-list" id="fs-list">
+                    <div class="fs-loading">Loading…</div>
+                </div>
+                <div class="fs-browser-footer">
+                    <span style="font-size:11px;color:var(--text-dim);white-space:nowrap">Filename:</span>
+                    <input type="text" id="fs-filename" class="fs-filename-input"
+                           placeholder="my_ontology.json"
+                           value="${this._pendingFilename}"
+                           onkeydown="if(event.key==='Enter') FsBrowser.confirm()">
+                    <button class="btn-primary btn-sm" onclick="FsBrowser.confirm()">Select</button>
+                    <button class="btn-secondary btn-sm" onclick="FsBrowser.close()">Cancel</button>
+                </div>
+            </div>`;
+        overlay.addEventListener('click', e => { if (e.target === overlay) this.close(); });
+        document.body.appendChild(overlay);
+    },
+
+    async _load(path) {
+        const list = document.getElementById('fs-list');
+        const breadcrumb = document.getElementById('fs-breadcrumb');
+        if (list) list.innerHTML = '<div class="fs-loading">Loading…</div>';
+        try {
+            const data = await API.fsBrowse(path);
+            this._currentPath = data.current;
+
+            // Breadcrumb
+            if (breadcrumb) {
+                const parts = data.current.split('/').filter(Boolean);
+                let built = '';
+                const crumbs = parts.map((part, i) => {
+                    built += '/' + part;
+                    const p = built;
+                    return `<span class="fs-crumb" onclick="FsBrowser._load('${p}')">${part}</span>`;
+                });
+                breadcrumb.innerHTML =
+                    `<span class="fs-crumb" onclick="FsBrowser._load('/Users/bernard')">🏠</span>` +
+                    (crumbs.length ? ' / ' + crumbs.join(' / ') : '');
+            }
+
+            // List
+            if (!list) return;
+            let html = '';
+            if (data.parent && data.current !== '/Users/bernard') {
+                html += `<div class="fs-item fs-item-dir" onclick="FsBrowser._load('${data.parent}')">
+                    <span class="fs-icon">⬆️</span><span>..</span></div>`;
+            }
+            data.dirs.forEach(d => {
+                const safePath = d.path.replace(/'/g, "\\'");
+                html += `<div class="fs-item fs-item-dir" onclick="FsBrowser._load('${safePath}')">
+                    <span class="fs-icon">📁</span><span>${d.name}</span></div>`;
+            });
+            data.files.forEach(f => {
+                const safePath = f.path.replace(/'/g, "\\'");
+                html += `<div class="fs-item fs-item-file" onclick="FsBrowser._selectFile('${safePath}','${f.name}')">
+                    <span class="fs-icon">📄</span><span>${f.name}</span></div>`;
+            });
+            if (!html) html = '<div class="fs-loading" style="color:var(--text-dim)">Empty folder</div>';
+            list.innerHTML = html;
+        } catch (e) {
+            if (list) list.innerHTML = `<div class="fs-loading" style="color:#c55">Cannot open this folder.</div>`;
+        }
+    },
+
+    _selectFile(path, name) {
+        const input = document.getElementById('fs-filename');
+        if (input) input.value = name;
+        // Highlight selected
+        document.querySelectorAll('.fs-item').forEach(el => el.classList.remove('fs-item-selected'));
+        event.currentTarget.classList.add('fs-item-selected');
+    },
+
+    confirm() {
+        const filename = document.getElementById('fs-filename')?.value.trim();
+        if (!filename) { UI.error('Enter a filename.'); return; }
+        const fullPath = this._currentPath.replace(/\/$/, '') + '/' + filename;
+        const field = document.getElementById(this._targetFieldId);
+        if (field) field.value = fullPath;
+        this.close();
+    },
+
+    close() {
+        document.getElementById('fs-browser-overlay')?.remove();
     },
 };
 

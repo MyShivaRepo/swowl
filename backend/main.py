@@ -773,6 +773,36 @@ def delete_sword_rule(rule_id: str):
     return {"deleted": rule_id}
 
 
+# ════════════════════════════════════════════════════════════════
+# FILESYSTEM BROWSER
+# ════════════════════════════════════════════════════════════════
+
+from pathlib import Path as FSPath
+from triple_store import host_to_container, container_to_host
+
+@app.get("/api/fs/browse", tags=["Système"])
+def fs_browse(path: str = Query("/Users/bernard")):
+    """Liste le contenu d'un répertoire (traduit chemin hôte → container)."""
+    container_path = host_to_container(path)
+    p = FSPath(container_path)
+    if not p.exists() or not p.is_dir():
+        raise HTTPException(404, f"Répertoire introuvable : {path}")
+    dirs, files = [], []
+    try:
+        for entry in sorted(p.iterdir(), key=lambda e: (not e.is_dir(), e.name.lower())):
+            if entry.name.startswith('.'):
+                continue
+            host_entry = container_to_host(str(entry))
+            if entry.is_dir():
+                dirs.append({"name": entry.name, "path": host_entry})
+            elif entry.suffix == ".json":
+                files.append({"name": entry.name, "path": host_entry})
+    except PermissionError:
+        pass
+    parent = str(FSPath(path).parent) if path != "/" else None
+    return {"current": path, "parent": parent, "dirs": dirs, "files": files}
+
+
 @app.get("/api/health", tags=["Système"])
 def health():
     onto = store.get()
