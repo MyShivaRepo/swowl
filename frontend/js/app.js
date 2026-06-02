@@ -330,7 +330,7 @@ const APP = {
                         <div class="form-group" style="margin:0;flex:2;min-width:260px">
                             <label>Path * <span style="font-size:10px;color:var(--text-dim)">(absolute path on your Mac)</span></label>
                             <div style="display:flex;gap:4px">
-                                <input type="text" id="onto-new-path" placeholder="/Users/bernard/Documents/my_ontology.json" style="flex:1;min-width:0">
+                                <input type="text" id="onto-new-path" placeholder="/Users/bernard/AppData/Ontologies/" style="flex:1;min-width:0">
                                 <button class="btn-sm btn-secondary" onclick="FsBrowser.open('onto-new-path')" title="Browse filesystem">📁</button>
                             </div>
                         </div>
@@ -417,17 +417,19 @@ const APP = {
         const uriInput = document.getElementById('onto-new-uri');
         if (uriInput && !uriInput.value) uriInput.value = `https://example.org/${base}`;
         const pathInput = document.getElementById('onto-new-path');
-        if (pathInput && !pathInput.value) pathInput.value = `/Users/bernard/Documents/${base}.json`;
+        if (pathInput && !pathInput.value) pathInput.value = `/Users/bernard/Documents/`;
     },
 
     async doCreateOntology() {
         const name   = document.getElementById('onto-new-name')?.value.trim();
-        const path   = document.getElementById('onto-new-path')?.value.trim();
+        const dir    = document.getElementById('onto-new-path')?.value.trim();
         const uri    = document.getElementById('onto-new-uri')?.value.trim();
         const prefix = document.getElementById('onto-new-prefix')?.value.trim() || 'onto';
         if (!name) return UI.error('Name is required.');
-        if (!path) return UI.error('File path is required.');
+        if (!dir)  return UI.error('Path is required.');
         if (!uri)  return UI.error('URI is required.');
+        // Construire le chemin complet : dossier + nom.json
+        const path = dir.replace(/\/$/, '') + '/' + name + '.json';
         try {
             if (this._importFile) {
                 // Import from file
@@ -641,11 +643,7 @@ const FsBrowser = {
                     <div class="fs-loading">Loading…</div>
                 </div>
                 <div class="fs-browser-footer">
-                    <span style="font-size:11px;color:var(--text-dim);white-space:nowrap">Filename:</span>
-                    <input type="text" id="fs-filename" class="fs-filename-input"
-                           placeholder="my_ontology.json"
-                           value="${this._pendingFilename}"
-                           onkeydown="if(event.key==='Enter') FsBrowser.confirm()">
+                    <span style="font-size:11px;color:var(--text-dim);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" id="fs-selected-path">${this._currentPath}</span>
                     <button class="btn-primary btn-sm" onclick="FsBrowser.confirm()">Select</button>
                     <button class="btn-secondary btn-sm" onclick="FsBrowser.close()">Cancel</button>
                 </div>
@@ -661,6 +659,8 @@ const FsBrowser = {
         try {
             const data = await API.fsBrowse(path);
             this._currentPath = data.current;
+            const selPath = document.getElementById('fs-selected-path');
+            if (selPath) selPath.textContent = data.current + '/';
 
             // Breadcrumb
             if (breadcrumb) {
@@ -712,19 +712,10 @@ const FsBrowser = {
     },
 
     confirm() {
-        let filename = document.getElementById('fs-filename')?.value.trim();
-        if (!filename) { UI.error('Enter a filename.'); return; }
-        // Ajouter .json si absent
-        if (!filename.endsWith('.json')) filename += '.json';
-        const fullPath = this._currentPath.replace(/\/$/, '') + '/' + filename;
-        // Remplir le champ Path cible
+        // Injecte uniquement le répertoire courant dans le champ Path
+        const dirPath = this._currentPath.replace(/\/$/, '') + '/';
         const pathField = document.getElementById(this._targetFieldId);
-        if (pathField) pathField.value = fullPath;
-        // Remplir le champ Name avec le label (sans extension)
-        const nameField = document.getElementById('onto-new-name');
-        if (nameField && !nameField.value.trim()) {
-            nameField.value = filename.replace(/\.json$/, '');
-        }
+        if (pathField) pathField.value = dirPath;
         this.close();
     },
 
