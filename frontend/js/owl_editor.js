@@ -1581,7 +1581,7 @@ function _makeAnnotRow(type, editor, ac, propId = null) {
 /** Génère la frame "Where Used in SWRL Rules" pour un élément donné.
  *  @param {Function} testFn  (rule) => boolean — retourne true si la règle référence l'élément */
 function _whereUsedFrame(testFn) {
-    const used = (APP.state.sword_rules || []).filter(testFn);
+    const used = (APP.state.swrl_rules || []).filter(testFn);
     if (!used.length) return '';
     const rows = used.map(r => `
         <div class="cls-list-item" style="cursor:default">

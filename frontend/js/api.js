@@ -70,12 +70,12 @@ const API = {
     deleteIndividual:  (id)      => API._fetch('DELETE', `/individuals/${id}`),
 
 
-    // ── SWORD ──────────────────────────────────────────────
-    listSWORDRules:    ()      => API._fetch('GET',    '/sword-rules'),
-    createSWORDRule:   (r)     => API._fetch('POST',   '/sword-rules', r),
-    getSWORDRule:      (id)    => API._fetch('GET',    `/sword-rules/${id}`),
-    updateSWORDRule:   (id, r) => API._fetch('PUT',    `/sword-rules/${id}`, r),
-    deleteSWORDRule:   (id)    => API._fetch('DELETE', `/sword-rules/${id}`),
+    // ── SWRL ──────────────────────────────────────────────
+    listSWRLRules:    ()      => API._fetch('GET',    '/swrl-rules'),
+    createSWRLRule:   (r)     => API._fetch('POST',   '/swrl-rules', r),
+    getSWRLRule:      (id)    => API._fetch('GET',    `/swrl-rules/${id}`),
+    updateSWRLRule:   (id, r) => API._fetch('PUT',    `/swrl-rules/${id}`, r),
+    deleteSWRLRule:   (id)    => API._fetch('DELETE', `/swrl-rules/${id}`),
 
     // ── Inférences ─────────────────────────────────────────
     getInferences:      ()   => API._fetch('GET', '/inferences'),

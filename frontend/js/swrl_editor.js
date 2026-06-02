@@ -1,13 +1,13 @@
 /**
- * sword_editor.js — SWORD rule editor
- * SWORD = SWRL extended with NAF (Negation As Failure) and conditional consequents
+ * sword_editor.js — SWRL rule editor
+ * SWRL = SWRL extended with NAF (Negation As Failure) and conditional consequents
  *
  * Atom types:
  *   body: type_atom | property_atom | equality_atom | naf_block
  *   head: type_atom | property_atom | equality_atom | conditional
  */
 
-const SWORDEditor = {
+const SWRLEditor = {
 
     _selectedId:   null,
     _editingRule:           null,
@@ -30,7 +30,7 @@ const SWORDEditor = {
             <div class="tree-panel" id="sword-list-panel">
                 <div class="tree-panel-header">
                     <h3>SWRL Rules</h3>
-                    <button class="btn-sm" onclick="SWORDEditor.newRule()" title="New SWORD rule">➕</button>
+                    <button class="btn-sm" onclick="SWRLEditor.newRule()" title="New SWRL rule">➕</button>
                 </div>
                 <div class="tree-scroll" id="sword-list">${this.renderList(rules)}</div>
             </div>
@@ -50,12 +50,12 @@ const SWORDEditor = {
         const sel = this._selectedId;
         return rules.map(r => `
             <div class="tree-item${r.id === sel ? ' selected' : ''}" data-id="${r.id}"
-                 onclick="SWORDEditor.selectRule('${r.id}')">
+                 onclick="SWRLEditor.selectRule('${r.id}')">
                 <span class="tree-leaf">◦</span>
                 <span class="tree-label">${r.id}</span>
                 ${r.label ? `<span class="restr-prop-summary" style="margin-left:4px;flex:1">${r.label}</span>` : '<span style="flex:1"></span>'}
                 <button class="btn-icon btn-icon-danger" style="flex-shrink:0;padding:2px 4px"
-                        onclick="event.stopPropagation();SWORDEditor.delete('${r.id}')"
+                        onclick="event.stopPropagation();SWRLEditor.delete('${r.id}')"
                         title="Delete rule">${ClassEditor._svgDelete}</button>
             </div>`).join('');
     },
@@ -70,7 +70,7 @@ const SWORDEditor = {
 
     // ── Sélection / création ─────────────────────────────────────
     selectRule(id) {
-        const rule = (APP.state.sword_rules || []).find(r => r.id === id);
+        const rule = (APP.state.swrl_rules || []).find(r => r.id === id);
         if (!rule) return;
         this._selectedId  = id;
         this._isNew       = false;
@@ -99,7 +99,7 @@ const SWORDEditor = {
                 idInp.focus();
                 idInp.addEventListener('blur', function handler() {
                     idInp.removeEventListener('blur', handler);
-                    if (idInp.value.trim()) SWORDEditor.save(true);
+                    if (idInp.value.trim()) SWRLEditor.save(true);
                 });
             }
         }
@@ -125,17 +125,17 @@ const SWORDEditor = {
                     <input type="text" class="cls-id-inp" id="sword-id"
                            value="${rule.id}" placeholder="ruleName"
                            oninput="this.value=this.value.replace(/\\s+/g,'_')"
-                           ${isNew ? '' : 'onchange="SWORDEditor._syncAndSave()"'}
+                           ${isNew ? '' : 'onchange="SWRLEditor._syncAndSave()"'}
                            title="Rule identifier">
                     <span class="cls-editor-meta">NAME</span>
                 </div>
                 <div style="margin-top:4px;display:flex;gap:4px">
                     <input type="text" id="sword-label" value="${rule.label||''}" placeholder="Label"
                            class="cls-id-inp" style="flex:1;font-size:11px"
-                           onchange="SWORDEditor._syncAndSave()">
+                           onchange="SWRLEditor._syncAndSave()">
                     <input type="text" id="sword-comment" value="${rule.comment||''}" placeholder="Comment"
                            class="cls-id-inp" style="flex:2;font-size:11px"
-                           onchange="SWORDEditor._syncAndSave()">
+                           onchange="SWRLEditor._syncAndSave()">
                 </div>
             </div>
 
@@ -144,10 +144,10 @@ const SWORDEditor = {
                 <div class="cls-frame-bar">
                     <span style="font-size:13px;font-weight:700;color:#f59e0b;font-family:var(--font-mono)">if</span>
                     <div style="display:flex;gap:3px;margin-left:auto;flex-wrap:wrap">
-                        <button class="btn-ftool" onclick="SWORDEditor.addAtom('body','type_atom')"     title="Add type atom">${ico}&thinsp;Class</button>
-                        <button class="btn-ftool" onclick="SWORDEditor.addAtom('body','property_atom')" title="Add property atom">${ico}&thinsp;Property</button>
-                        <button class="btn-ftool" onclick="SWORDEditor.addAtom('body','equality_atom')" title="Add equality">${ico}&thinsp;=</button>
-                        <button class="btn-ftool" onclick="SWORDEditor.addAtom('body','naf_block')"     title="Add NAF block">${ico}&thinsp;NAF</button>
+                        <button class="btn-ftool" onclick="SWRLEditor.addAtom('body','type_atom')"     title="Add type atom">${ico}&thinsp;Class</button>
+                        <button class="btn-ftool" onclick="SWRLEditor.addAtom('body','property_atom')" title="Add property atom">${ico}&thinsp;Property</button>
+                        <button class="btn-ftool" onclick="SWRLEditor.addAtom('body','equality_atom')" title="Add equality">${ico}&thinsp;=</button>
+                        <button class="btn-ftool" onclick="SWRLEditor.addAtom('body','naf_block')"     title="Add NAF block">${ico}&thinsp;NAF</button>
                     </div>
                 </div>
                 <div class="cls-frame-body" id="sword-body">
@@ -162,10 +162,10 @@ const SWORDEditor = {
                 <div class="cls-frame-bar">
                     <span style="font-size:13px;font-weight:700;color:#10b981;font-family:var(--font-mono)">then</span>
                     <div style="display:flex;gap:3px;margin-left:auto;flex-wrap:wrap">
-                        <button class="btn-ftool" onclick="SWORDEditor.addAtom('head','type_atom')"     title="Add type atom">${ico}&thinsp;Class</button>
-                        <button class="btn-ftool" onclick="SWORDEditor.addAtom('head','property_atom')" title="Add property atom">${ico}&thinsp;Property</button>
-                        <button class="btn-ftool" onclick="SWORDEditor.addAtom('head','equality_atom')" title="Add equality">${ico}&thinsp;=</button>
-                        <button class="btn-ftool" onclick="SWORDEditor.addAtom('head','conditional')"   title="Add conditional consequent">${ico}&thinsp;If … Then</button>
+                        <button class="btn-ftool" onclick="SWRLEditor.addAtom('head','type_atom')"     title="Add type atom">${ico}&thinsp;Class</button>
+                        <button class="btn-ftool" onclick="SWRLEditor.addAtom('head','property_atom')" title="Add property atom">${ico}&thinsp;Property</button>
+                        <button class="btn-ftool" onclick="SWRLEditor.addAtom('head','equality_atom')" title="Add equality">${ico}&thinsp;=</button>
+                        <button class="btn-ftool" onclick="SWRLEditor.addAtom('head','conditional')"   title="Add conditional consequent">${ico}&thinsp;If … Then</button>
                     </div>
                 </div>
                 <div class="cls-frame-body" id="sword-head">
@@ -193,27 +193,27 @@ const SWORDEditor = {
         // Le conteneur reçoit seulement les événements de DROP (pas draggable lui-même)
         // onDragOver ne fait event.preventDefault() que si listPath correspond → empêche le drop sur un mauvais parent
         const dragAttrs = isDraggable ? `
-            ondragover="SWORDEditor.onDragOver(event,this,'${listPath}')"
-            ondragleave="SWORDEditor.onDragLeave(this)"
-            ondrop="event.preventDefault();event.stopPropagation();SWORDEditor.onDrop(event,'${listPath}',${idx})"` : '';
+            ondragover="SWRLEditor.onDragOver(event,this,'${listPath}')"
+            ondragleave="SWRLEditor.onDragLeave(this)"
+            ondrop="event.preventDefault();event.stopPropagation();SWRLEditor.onDrop(event,'${listPath}',${idx})"` : '';
 
         // La poignée porte draggable="true" — seule elle initie le drag, sans conflit de niveaux
         const handle = isDraggable ? `
             <span class="sword-drag-handle" title="Drag to reorder"
                   draggable="true"
-                  ondragstart="event.stopPropagation();SWORDEditor.onDragStart(event,'${listPath}',${idx})"
-                  ondragend="SWORDEditor.onDragEnd()">⠿</span>` : '';
+                  ondragstart="event.stopPropagation();SWRLEditor.onDragStart(event,'${listPath}',${idx})"
+                  ondragend="SWRLEditor.onDragEnd()">⠿</span>` : '';
 
         const del = `<button class="btn-frame-del" style="flex-shrink:0;margin-left:auto"
-                             onclick="SWORDEditor.removeAtom('${path}')">✕</button>`;
-        const chg = `onchange="SWORDEditor.updateField('${path}',this.dataset.field,this.value)"`;
+                             onclick="SWRLEditor.removeAtom('${path}')">✕</button>`;
+        const chg = `onchange="SWRLEditor.updateField('${path}',this.dataset.field,this.value)"`;
 
         switch (atom.type) {
             case 'type_atom': {
                 const clsId    = atom.class_id || '';
                 const safePath = path.replace(/,/g, '__');
                 const pickerId = `sword-cls-picker-${safePath}`;
-                const tree     = _classTreePickerItems('SWORDEditor.onClassPickerSelect');
+                const tree     = _classTreePickerItems('SWRLEditor.onClassPickerSelect');
                 return `<div class="sword-atom" data-path="${path}" ${dragAttrs}>
                     ${handle}
                     <input class="sword-var" value="${atom.var||''}" placeholder="?var"
@@ -222,8 +222,8 @@ const SWORDEditor = {
                     <div style="position:relative;flex:1;min-width:0">
                         <div class="tree-item restr-filler-btn" style="margin:0;padding:2px 6px;cursor:pointer"
                              title="${clsId ? 'Left-click: navigate · Right-click: change class' : 'Click to select a class'}"
-                             onclick="${clsId ? '' : `SWORDEditor.toggleClassPicker('${pickerId}','${path}',this)`}"
-                             oncontextmenu="event.preventDefault();SWORDEditor.toggleClassPicker('${pickerId}','${path}',this)">
+                             onclick="${clsId ? '' : `SWRLEditor.toggleClassPicker('${pickerId}','${path}',this)`}"
+                             oncontextmenu="event.preventDefault();SWRLEditor.toggleClassPicker('${pickerId}','${path}',this)">
                             ${clsId
                                 ? `<span class="cls-dot tree-cls-dot" style="flex-shrink:0;margin-right:4px"></span>
                                    <span class="restr-filler-lbl" style="cursor:pointer"
@@ -255,8 +255,8 @@ const SWORDEditor = {
                     <div style="position:relative;flex:0 1 auto;min-width:80px">
                         <div class="tree-item restr-filler-btn" style="margin:0;padding:2px 6px;cursor:pointer;width:max-content;max-width:200px"
                              title="${propId ? 'Left-click: navigate · Right-click: change property' : 'Click to select a property'}"
-                             onclick="${propId ? '' : `SWORDEditor.togglePropPicker('${propPickId}','${path}',this)`}"
-                             oncontextmenu="event.preventDefault();SWORDEditor.togglePropPicker('${propPickId}','${path}',this)">
+                             onclick="${propId ? '' : `SWRLEditor.togglePropPicker('${propPickId}','${path}',this)`}"
+                             oncontextmenu="event.preventDefault();SWRLEditor.togglePropPicker('${propPickId}','${path}',this)">
                             ${propId
                                 ? `<span class="${propDot||'op-prop-dot'}" style="flex-shrink:0;margin-right:4px"></span>
                                    <span style="white-space:nowrap;cursor:pointer"
@@ -295,13 +295,13 @@ const SWORDEditor = {
                         <span class="sword-naf-label">NAF</span>
                         <div style="display:flex;gap:2px;align-items:center;margin-left:auto">
                             <button class="btn-ftool" style="font-size:9px" title="Add type atom"
-                                    onclick="SWORDEditor.addAtom('${path},atoms','type_atom')">${ico}&thinsp;Class</button>
+                                    onclick="SWRLEditor.addAtom('${path},atoms','type_atom')">${ico}&thinsp;Class</button>
                             <button class="btn-ftool" style="font-size:9px" title="Add property atom"
-                                    onclick="SWORDEditor.addAtom('${path},atoms','property_atom')">${ico}&thinsp;Property</button>
+                                    onclick="SWRLEditor.addAtom('${path},atoms','property_atom')">${ico}&thinsp;Property</button>
                             <button class="btn-ftool" style="font-size:9px" title="Add equality"
-                                    onclick="SWORDEditor.addAtom('${path},atoms','equality_atom')">${ico}&thinsp;=</button>
+                                    onclick="SWRLEditor.addAtom('${path},atoms','equality_atom')">${ico}&thinsp;=</button>
                             <button class="btn-frame-del" style="flex-shrink:0;margin-left:4px"
-                                    onclick="SWORDEditor.removeAtom('${path}')">✕</button>
+                                    onclick="SWRLEditor.removeAtom('${path}')">✕</button>
                         </div>
                     </div>
                     <div class="sword-naf-body">
@@ -327,10 +327,10 @@ const SWORDEditor = {
                                 <div class="cls-frame-bar">
                                     <span style="font-size:13px;font-weight:700;color:#f59e0b;font-family:var(--font-mono)">if</span>
                                     <div style="display:flex;gap:3px;margin-left:auto;flex-wrap:wrap">
-                                        <button class="btn-ftool" onclick="SWORDEditor.addAtom('${path},condition','type_atom')">${ico}&thinsp;Class</button>
-                                        <button class="btn-ftool" onclick="SWORDEditor.addAtom('${path},condition','property_atom')">${ico}&thinsp;Property</button>
-                                        <button class="btn-ftool" onclick="SWORDEditor.addAtom('${path},condition','equality_atom')">${ico}&thinsp;=</button>
-                                        <button class="btn-ftool" onclick="SWORDEditor.addAtom('${path},condition','naf_block')">${ico}&thinsp;NAF</button>
+                                        <button class="btn-ftool" onclick="SWRLEditor.addAtom('${path},condition','type_atom')">${ico}&thinsp;Class</button>
+                                        <button class="btn-ftool" onclick="SWRLEditor.addAtom('${path},condition','property_atom')">${ico}&thinsp;Property</button>
+                                        <button class="btn-ftool" onclick="SWRLEditor.addAtom('${path},condition','equality_atom')">${ico}&thinsp;=</button>
+                                        <button class="btn-ftool" onclick="SWRLEditor.addAtom('${path},condition','naf_block')">${ico}&thinsp;NAF</button>
                                     </div>
                                 </div>
                                 <div class="cls-frame-body">
@@ -342,10 +342,10 @@ const SWORDEditor = {
                                 <div class="cls-frame-bar">
                                     <span style="font-size:13px;font-weight:700;color:#10b981;font-family:var(--font-mono)">then</span>
                                     <div style="display:flex;gap:3px;margin-left:auto;flex-wrap:wrap">
-                                        <button class="btn-ftool" onclick="SWORDEditor.addAtom('${path},consequent','type_atom')">${ico}&thinsp;Class</button>
-                                        <button class="btn-ftool" onclick="SWORDEditor.addAtom('${path},consequent','property_atom')">${ico}&thinsp;Property</button>
-                                        <button class="btn-ftool" onclick="SWORDEditor.addAtom('${path},consequent','equality_atom')">${ico}&thinsp;=</button>
-                                        <button class="btn-ftool" onclick="SWORDEditor.addAtom('${path},consequent','conditional')">${ico}&thinsp;If&nbsp;…&nbsp;Then</button>
+                                        <button class="btn-ftool" onclick="SWRLEditor.addAtom('${path},consequent','type_atom')">${ico}&thinsp;Class</button>
+                                        <button class="btn-ftool" onclick="SWRLEditor.addAtom('${path},consequent','property_atom')">${ico}&thinsp;Property</button>
+                                        <button class="btn-ftool" onclick="SWRLEditor.addAtom('${path},consequent','equality_atom')">${ico}&thinsp;=</button>
+                                        <button class="btn-ftool" onclick="SWRLEditor.addAtom('${path},consequent','conditional')">${ico}&thinsp;If&nbsp;…&nbsp;Then</button>
                                     </div>
                                 </div>
                                 <div class="cls-frame-body">
@@ -433,13 +433,13 @@ const SWORDEditor = {
         const alpha = (a, b) => a.id.localeCompare(b.id);
         const opItems = [...ops].sort(alpha).map(p =>
             `<div class="tree-item" data-id="${p.id}" style="padding:3px 8px"
-                  onclick="SWORDEditor.onPropPickerSelect('${p.id}')">
+                  onclick="SWRLEditor.onPropPickerSelect('${p.id}')">
                 <span class="op-prop-dot" style="flex-shrink:0;margin-right:5px"></span>
                 <span class="tree-label">${p.id}</span>
              </div>`).join('');
         const dpItems = [...dps].sort(alpha).map(p =>
             `<div class="tree-item" data-id="${p.id}" style="padding:3px 8px"
-                  onclick="SWORDEditor.onPropPickerSelect('${p.id}')">
+                  onclick="SWRLEditor.onPropPickerSelect('${p.id}')">
                 <span class="dp-prop-dot" style="flex-shrink:0;margin-right:5px"></span>
                 <span class="tree-label">${p.id}</span>
              </div>`).join('');
@@ -629,23 +629,23 @@ const SWORDEditor = {
         if (!rule?.id) { if (isNew) UI.error('Rule identifier is required'); return; }
         try {
             if (isNew) {
-                await API.createSWORDRule(rule);
-                UI.success(`SWORD rule '${rule.id}' created`);
+                await API.createSWRLRule(rule);
+                UI.success(`SWRL rule '${rule.id}' created`);
                 this._isNew      = false;
                 this._selectedId = rule.id;
             } else {
-                await API.updateSWORDRule(rule.id, rule);
+                await API.updateSWRLRule(rule.id, rule);
             }
             await APP.refresh();
             const listEl = document.getElementById('sword-list');
-            if (listEl) listEl.innerHTML = this.renderList(APP.state.sword_rules || []);
+            if (listEl) listEl.innerHTML = this.renderList(APP.state.swrl_rules || []);
         } catch (e) { if (isNew) UI.error(e.message); }
     },
 
     async delete(id) {
         if (!await UI.confirm(`Delete SWRL rule <strong>${id}</strong>?`)) return;
         try {
-            await API.deleteSWORDRule(id);
+            await API.deleteSWRLRule(id);
         } catch (e) {
             if (!e.message.includes('404') && !e.message.toLowerCase().includes('not found')) {
                 UI.error(e.message); return;
@@ -657,7 +657,7 @@ const SWORDEditor = {
         this._isNew       = false;
         await APP.refresh();
         const listEl = document.getElementById('sword-list');
-        if (listEl) listEl.innerHTML = this.renderList(APP.state.sword_rules || []);
+        if (listEl) listEl.innerHTML = this.renderList(APP.state.swrl_rules || []);
         this._cancel();
     },
 
@@ -667,7 +667,7 @@ const SWORDEditor = {
         const detail = document.getElementById('sword-detail');
         if (detail) detail.innerHTML = `<div class="detail-panel-empty">
             <span style="font-size:36px;font-weight:300">⊢¬</span>
-            <span>Select a SWORD rule or create a new one</span>
+            <span>Select a SWRL rule or create a new one</span>
         </div>`;
     },
 

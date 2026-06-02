@@ -11,7 +11,7 @@ const APP = {
         object_properties: [],
         datatype_properties: [],
         individuals: [],
-        sword_rules: [],
+        swrl_rules: [],
     },
     currentSection: 'ontologies',
     _importFile: null,   // fichier en attente d'import
@@ -39,14 +39,14 @@ const APP = {
             this.state.object_properties   = onto.object_properties   || [];
             this.state.datatype_properties = onto.datatype_properties || [];
             this.state.individuals         = onto.individuals         || [];
-            this.state.sword_rules         = onto.sword_rules         || [];
+            this.state.swrl_rules         = onto.swrl_rules         || [];
         } catch (e) {
             this.state.ontology = null;
             this.state.classes             = [];
             this.state.object_properties   = [];
             this.state.datatype_properties = [];
             this.state.individuals         = [];
-            this.state.sword_rules         = [];
+            this.state.swrl_rules         = [];
         }
     },
 
@@ -211,7 +211,7 @@ const APP = {
         const main = document.getElementById('main-content');
 
         // Bloquer les onglets d'édition si aucune ontologie n'est connectée
-        const editSections = ['classes','object-properties','datatype-properties','individuals','sword-rules','inferences'];
+        const editSections = ['classes','object-properties','datatype-properties','individuals','swrl-rules','inferences'];
         if (!this.state.ontology && editSections.includes(section)) {
             main.innerHTML = this._noOntoMsg();
             return;
@@ -240,9 +240,9 @@ const APP = {
             case 'annotation-properties':
                 main.innerHTML = this._renderAnnotationProperties();
                 break;
-            case 'sword-rules':
-                main.innerHTML = SWORDEditor.renderSplit(this.state.sword_rules || []);
-                SWORDEditor.restoreSelection();
+            case 'swrl-rules':
+                main.innerHTML = SWRLEditor.renderSplit(this.state.swrl_rules || []);
+                SWRLEditor.restoreSelection();
                 break;
             case 'inferences':
                 main.innerHTML = `

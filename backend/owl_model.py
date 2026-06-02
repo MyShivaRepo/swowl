@@ -181,14 +181,14 @@ class OWLIndividual(BaseModel):
 
 # ── SWORD — SWRL + Negation As Failure ───────────────────────
 
-class SWORDTypeAtom(BaseModel):
+class SWRLTypeAtom(BaseModel):
     """?var is a ClassName"""
     type: Literal["type_atom"] = "type_atom"
     var: str = ""
     class_id: str = ""
 
 
-class SWORDPropertyAtom(BaseModel):
+class SWRLPropertyAtom(BaseModel):
     """?subject property ?object  (?_ = wildcard/don't-care)"""
     type: Literal["property_atom"] = "property_atom"
     subject: str = ""
@@ -196,24 +196,24 @@ class SWORDPropertyAtom(BaseModel):
     object: str = "?_"
 
 
-class SWORDEqualityAtom(BaseModel):
+class SWRLEqualityAtom(BaseModel):
     """?var = value"""
     type: Literal["equality_atom"] = "equality_atom"
     var: str = ""
     value: str = ""
 
 
-class SWORDNAFBlock(BaseModel):
+class SWRLNAFBlock(BaseModel):
     """NAF(atoms...)  — Negation As Failure block"""
     type: Literal["naf_block"] = "naf_block"
-    atoms: List["SWORDBodyAtom"] = []
+    atoms: List["SWRLBodyAtom"] = []
 
 
-class SWORDConditional(BaseModel):
+class SWRLConditional(BaseModel):
     """(if conditions then consequents)  — conditional consequent in head"""
     type: Literal["conditional"] = "conditional"
-    condition:  List["SWORDBodyAtom"] = Field(default_factory=lambda: [SWORDEqualityAtom()])
-    consequent: List["SWORDBodyAtom"] = Field(default_factory=lambda: [SWORDTypeAtom()])
+    condition:  List["SWRLBodyAtom"] = Field(default_factory=lambda: [SWRLEqualityAtom()])
+    consequent: List["SWRLBodyAtom"] = Field(default_factory=lambda: [SWRLTypeAtom()])
 
     @field_validator('condition', 'consequent', mode='before')
     @classmethod
@@ -223,25 +223,25 @@ class SWORDConditional(BaseModel):
         return v
 
 
-SWORDBodyAtom = Union[
-    SWORDTypeAtom, SWORDPropertyAtom, SWORDEqualityAtom, SWORDNAFBlock
+SWRLBodyAtom = Union[
+    SWRLTypeAtom, SWRLPropertyAtom, SWRLEqualityAtom, SWRLNAFBlock
 ]
 
-SWORDHeadAtom = Union[
-    SWORDTypeAtom, SWORDPropertyAtom, SWORDEqualityAtom,
-    SWORDNAFBlock, SWORDConditional
+SWRLHeadAtom = Union[
+    SWRLTypeAtom, SWRLPropertyAtom, SWRLEqualityAtom,
+    SWRLNAFBlock, SWRLConditional
 ]
 
-SWORDNAFBlock.model_rebuild()
-SWORDConditional.model_rebuild()
+SWRLNAFBlock.model_rebuild()
+SWRLConditional.model_rebuild()
 
 
-class SWORDRule(BaseModel):
+class SWRLRule(BaseModel):
     id: str
     label: str = ""
     comment: str = ""
-    body: List[SWORDBodyAtom] = []
-    head: List[SWORDHeadAtom] = []
+    body: List[SWRLBodyAtom] = []
+    head: List[SWRLHeadAtom] = []
     enabled: bool = True
 
 
@@ -256,7 +256,7 @@ class OWLOntology(BaseModel):
     object_properties: List[OWLObjectProperty] = []
     datatype_properties: List[OWLDatatypeProperty] = []
     individuals: List[OWLIndividual] = []
-    sword_rules: List[SWORDRule] = []
+    swrl_rules: List[SWRLRule] = []
 
 
 # ── Résultats d'inférence ─────────────────────────────────────

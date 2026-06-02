@@ -14,7 +14,7 @@ from pydantic import BaseModel as PydanticModel
 
 from owl_model import (
     OWLOntology, OWLClass, OWLObjectProperty, OWLDatatypeProperty,
-    OWLIndividual, SWORDRule, InferenceResult, PropertyPresence,
+    OWLIndividual, SWRLRule, InferenceResult, PropertyPresence,
     ObjectPropertyAssertion,
 )
 from triple_store import store
@@ -660,54 +660,54 @@ def get_subclass_closure():
 
 
 # ════════════════════════════════════════════════════════════════
-# SWORD RULES
+# SWRL RULES
 # ════════════════════════════════════════════════════════════════
 
-@app.get("/api/sword-rules", tags=["SWORD"])
-def list_sword_rules():
-    return require_onto().sword_rules
+@app.get("/api/swrl-rules", tags=["SWRL"])
+def list_swrl_rules():
+    return require_onto().swrl_rules
 
 
-@app.post("/api/sword-rules", tags=["SWORD"], status_code=201)
-def create_sword_rule(rule: SWORDRule):
+@app.post("/api/swrl-rules", tags=["SWRL"], status_code=201)
+def create_sword_rule(rule: SWRLRule):
     onto = require_onto()
-    if any(r.id == rule.id for r in onto.sword_rules):
-        raise HTTPException(409, f"SWORD rule '{rule.id}' already exists")
-    onto.sword_rules.append(rule)
+    if any(r.id == rule.id for r in onto.swrl_rules):
+        raise HTTPException(409, f"SWRL rule '{rule.id}' already exists")
+    onto.swrl_rules.append(rule)
     store.save()
     return rule
 
 
-@app.get("/api/sword-rules/{rule_id}", tags=["SWORD"])
+@app.get("/api/swrl-rules/{rule_id}", tags=["SWRL"])
 def get_sword_rule(rule_id: str):
     onto = require_onto()
-    rule = next((r for r in onto.sword_rules if r.id == rule_id), None)
+    rule = next((r for r in onto.swrl_rules if r.id == rule_id), None)
     if not rule:
-        raise HTTPException(404, f"SWORD rule '{rule_id}' not found")
+        raise HTTPException(404, f"SWRL rule '{rule_id}' not found")
     return rule
 
 
-@app.put("/api/sword-rules/{rule_id}", tags=["SWORD"])
-def update_sword_rule(rule_id: str, rule: SWORDRule):
+@app.put("/api/swrl-rules/{rule_id}", tags=["SWRL"])
+def update_sword_rule(rule_id: str, rule: SWRLRule):
     onto = require_onto()
-    idx = next((i for i, r in enumerate(onto.sword_rules) if r.id == rule_id), None)
+    idx = next((i for i, r in enumerate(onto.swrl_rules) if r.id == rule_id), None)
     if idx is None:
-        raise HTTPException(404, f"SWORD rule '{rule_id}' not found")
+        raise HTTPException(404, f"SWRL rule '{rule_id}' not found")
     if rule.id != rule_id:
-        if any(r.id == rule.id for i2, r in enumerate(onto.sword_rules) if i2 != idx):
-            raise HTTPException(409, f"SWORD rule '{rule.id}' already exists")
-    onto.sword_rules[idx] = rule
+        if any(r.id == rule.id for i2, r in enumerate(onto.swrl_rules) if i2 != idx):
+            raise HTTPException(409, f"SWRL rule '{rule.id}' already exists")
+    onto.swrl_rules[idx] = rule
     store.save()
     return rule
 
 
-@app.delete("/api/sword-rules/{rule_id}", tags=["SWORD"])
+@app.delete("/api/swrl-rules/{rule_id}", tags=["SWRL"])
 def delete_sword_rule(rule_id: str):
     onto = require_onto()
-    before = len(onto.sword_rules)
-    onto.sword_rules = [r for r in onto.sword_rules if r.id != rule_id]
-    if len(onto.sword_rules) == before:
-        raise HTTPException(404, f"SWORD rule '{rule_id}' not found")
+    before = len(onto.swrl_rules)
+    onto.swrl_rules = [r for r in onto.swrl_rules if r.id != rule_id]
+    if len(onto.swrl_rules) == before:
+        raise HTTPException(404, f"SWRL rule '{rule_id}' not found")
     store.save()
     return {"deleted": rule_id}
 
