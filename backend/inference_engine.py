@@ -19,7 +19,7 @@ from typing import Dict, List, Set, Tuple
 
 from owl_model import (
     OWLOntology, InferenceResult,
-    InheritedRestriction, InferredType, OWLViolation, SWRLConsequence,
+    InheritedRestriction, InferredType, OWLViolation,
     InferredInverseProperty, InferredInverseRestriction,
     SomeValuesFrom, AllValuesFrom, HasValue,
     ExactCardinality, MinCardinality, MaxCardinality,
@@ -484,7 +484,6 @@ class InferenceEngine:
             transitive_assertions=transitive,
             chain_assertions=all_assertions,
             violations=violations,
-            swrl_consequences=[],  # géré par swrl_engine
             inferred_inverse_properties=inv_props,
             inferred_inverse_restrictions=inv_restr,
         )

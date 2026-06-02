@@ -14,16 +14,12 @@ from rdflib.namespace import SKOS
 
 from owl_model import (
     OWLOntology, OWLClass, OWLObjectProperty, OWLDatatypeProperty,
-    OWLIndividual, SWRLRule,
+    OWLIndividual,
     SomeValuesFrom, AllValuesFrom, HasValue,
     ExactCardinality, MinCardinality, MaxCardinality,
     UnionOf, IntersectionOf, ComplementOf,
-    SWRLClassAtom, SWRLObjectPropertyAtom, SWRLDataPropertyAtom, SWRLBuiltinAtom,
     PropertyPresence,
 )
-
-SWRL_NS  = Namespace("http://www.w3.org/2003/11/swrl#")
-SWRLB_NS = Namespace("http://www.w3.org/2003/11/swrlb#")
 
 ANNO_PROP_MAP = {
     'rdfs:seeAlso':               RDFS.seeAlso,
@@ -287,8 +283,6 @@ class TripleStore:
         g.bind("rdf", RDF)
         g.bind("rdfs", RDFS)
         g.bind("xsd", XSD)
-        g.bind("swrl",  SWRL_NS)
-        g.bind("swrlb", SWRLB_NS)
 
         onto_uri = URIRef(onto.id)
         g.add((onto_uri, RDF.type, OWL.Ontology))
@@ -428,18 +422,6 @@ class TripleStore:
             for d in ind.differentFrom:
                 g.add((uri_, OWL.differentFrom, iri(d)))
 
-        for rule in onto.swrl_rules:
-            if not rule.enabled:
-                continue
-            rule_uri = iri(f"rule_{rule.id}")
-            g.add((rule_uri, RDF.type, SWRL_NS.Imp))
-            if rule.label:
-                g.add((rule_uri, RDFS.label, Literal(rule.label, lang="fr")))
-            if rule.comment:
-                g.add((rule_uri, RDFS.comment, Literal(rule.comment, lang="fr")))
-            g.add((rule_uri, SWRL_NS.body, _swrl_atom_list(g, rule.body, iri)))
-            g.add((rule_uri, SWRL_NS.head, _swrl_atom_list(g, rule.head, iri)))
-
         return g
 
     # ── Méthodes conservées pour compatibilité ───────────────
@@ -458,52 +440,6 @@ def _rdf_list(g: Graph, items: list) -> URIRef | BNode:
     g.add((head, RDF.rest, _rdf_list(g, items[1:])))
     return head
 
-
-def _swrl_var(g: Graph, name: str) -> URIRef:
-    v = URIRef(f"urn:swrl:var#{name}")
-    g.add((v, RDF.type, SWRL_NS.Variable))
-    return v
-
-
-def _swrl_arg(g: Graph, arg: str, iri_fn) -> URIRef | Literal:
-    if arg.startswith("?"):
-        return _swrl_var(g, arg[1:])
-    if arg.startswith('"') or arg.startswith("'"):
-        return Literal(arg.strip("\"'"))
-    if arg.replace(".", "").replace("-", "").isdigit():
-        return Literal(float(arg), datatype=XSD.decimal)
-    return iri_fn(arg)
-
-
-def _swrl_atom_list(g: Graph, atoms: list, iri_fn) -> URIRef | BNode:
-    if not atoms:
-        return RDF.nil
-    atom = atoms[0]
-    a = BNode()
-    g.add((a, RDF.type, SWRL_NS.AtomList))
-    node = BNode()
-    if isinstance(atom, SWRLClassAtom):
-        g.add((node, RDF.type, SWRL_NS.ClassAtom))
-        g.add((node, SWRL_NS.classPredicate, iri_fn(atom.class_iri)))
-        g.add((node, SWRL_NS.argument1, _swrl_var(g, atom.variable)))
-    elif isinstance(atom, SWRLObjectPropertyAtom):
-        g.add((node, RDF.type, SWRL_NS.IndividualPropertyAtom))
-        g.add((node, SWRL_NS.propertyPredicate, iri_fn(atom.property_iri)))
-        g.add((node, SWRL_NS.argument1, _swrl_arg(g, atom.arg1, iri_fn)))
-        g.add((node, SWRL_NS.argument2, _swrl_arg(g, atom.arg2, iri_fn)))
-    elif isinstance(atom, SWRLDataPropertyAtom):
-        g.add((node, RDF.type, SWRL_NS.DatavaluedPropertyAtom))
-        g.add((node, SWRL_NS.propertyPredicate, iri_fn(atom.property_iri)))
-        g.add((node, SWRL_NS.argument1, _swrl_arg(g, atom.arg1, iri_fn)))
-        g.add((node, SWRL_NS.argument2, _swrl_arg(g, atom.arg2, iri_fn)))
-    elif isinstance(atom, SWRLBuiltinAtom):
-        g.add((node, RDF.type, SWRL_NS.BuiltinAtom))
-        g.add((node, SWRL_NS.builtin, URIRef(atom.builtin.replace("swrlb:", str(SWRLB_NS)))))
-        arg_nodes = [_swrl_arg(g, a, iri_fn) for a in atom.args]
-        g.add((node, SWRL_NS.arguments, _rdf_list(g, arg_nodes)))
-    g.add((a, RDF.first, node))
-    g.add((a, RDF.rest, _swrl_atom_list(g, atoms[1:], iri_fn)))
-    return a
 
 
 # Singleton global

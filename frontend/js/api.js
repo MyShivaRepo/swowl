@@ -69,13 +69,6 @@ const API = {
     updateIndividual:  (id, ind) => API._fetch('PUT',    `/individuals/${id}`, ind),
     deleteIndividual:  (id)      => API._fetch('DELETE', `/individuals/${id}`),
 
-    // ── SWRL ───────────────────────────────────────────────
-    listRules:   ()          => API._fetch('GET',    '/swrl-rules'),
-    createRule:  (r)         => API._fetch('POST',   '/swrl-rules', r),
-    getRule:     (id)        => API._fetch('GET',    `/swrl-rules/${id}`),
-    updateRule:  (id, r)     => API._fetch('PUT',    `/swrl-rules/${id}`, r),
-    deleteRule:  (id)        => API._fetch('DELETE', `/swrl-rules/${id}`),
-
 
     // ── SWORD ──────────────────────────────────────────────
     listSWORDRules:    ()      => API._fetch('GET',    '/sword-rules'),

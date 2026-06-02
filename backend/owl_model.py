@@ -178,65 +178,6 @@ class OWLIndividual(BaseModel):
     differentFrom: List[str] = []
 
 
-# ── Règles SWRL ──────────────────────────────────────────────
-
-class SWRLVariable(BaseModel):
-    name: str   # ex: "x", "y", "age"
-
-
-class SWRLClassAtom(BaseModel):
-    type: Literal["ClassAtom"] = "ClassAtom"
-    class_iri: str
-    variable: str
-
-
-class SWRLObjectPropertyAtom(BaseModel):
-    type: Literal["ObjectPropertyAtom"] = "ObjectPropertyAtom"
-    property_iri: str
-    arg1: str   # variable ou IRI individu
-    arg2: str
-
-
-class SWRLDataPropertyAtom(BaseModel):
-    type: Literal["DataPropertyAtom"] = "DataPropertyAtom"
-    property_iri: str
-    arg1: str
-    arg2: str   # variable ou littéral
-
-
-SWRL_BUILTINS = [
-    "swrlb:equal", "swrlb:notEqual",
-    "swrlb:greaterThan", "swrlb:greaterThanOrEqual",
-    "swrlb:lessThan", "swrlb:lessThanOrEqual",
-    "swrlb:add", "swrlb:subtract", "swrlb:multiply", "swrlb:divide",
-    "swrlb:abs", "swrlb:floor", "swrlb:ceiling", "swrlb:round",
-    "swrlb:before", "swrlb:after",
-    "swrlb:stringConcat", "swrlb:stringLength",
-    "swrlb:matches", "swrlb:contains",
-    "swrlb:upperCase", "swrlb:lowerCase",
-]
-
-
-class SWRLBuiltinAtom(BaseModel):
-    type: Literal["BuiltinAtom"] = "BuiltinAtom"
-    builtin: str   # ex: "swrlb:greaterThan"
-    args: List[str]
-
-
-SWRLAtom = Union[
-    SWRLClassAtom, SWRLObjectPropertyAtom,
-    SWRLDataPropertyAtom, SWRLBuiltinAtom
-]
-
-
-class SWRLRule(BaseModel):
-    id: str
-    label: str = ""
-    comment: str = ""
-    body: List[SWRLAtom] = []   # antécédents
-    head: List[SWRLAtom] = []   # conséquents
-    enabled: bool = True
-
 
 # ── SWORD — SWRL + Negation As Failure ───────────────────────
 
@@ -315,7 +256,6 @@ class OWLOntology(BaseModel):
     object_properties: List[OWLObjectProperty] = []
     datatype_properties: List[OWLDatatypeProperty] = []
     individuals: List[OWLIndividual] = []
-    swrl_rules:  List[SWRLRule]  = []
     sword_rules: List[SWORDRule] = []
 
 
@@ -338,11 +278,6 @@ class OWLViolation(BaseModel):
     entity: str
     message: str
 
-
-class SWRLConsequence(BaseModel):
-    rule_id: str
-    rule_label: str
-    consequence: str
 
 
 class InferredInverseProperty(BaseModel):
@@ -372,6 +307,5 @@ class InferenceResult(BaseModel):
     transitive_assertions: List[dict]
     chain_assertions: List[dict]
     violations: List[OWLViolation]
-    swrl_consequences: List[SWRLConsequence]
     inferred_inverse_properties: List[InferredInverseProperty] = []
     inferred_inverse_restrictions: List[InferredInverseRestriction] = []

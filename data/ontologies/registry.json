@@ -1,0 +1,11 @@
+{
+  "entries": [
+    {
+      "name": "RoHS",
+      "path": "/Users/bernard/AppData/Ontologies/RoHS.json",
+      "uri": "http://example.net/plm",
+      "prefix": "plm",
+      "connected": true
+    }
+  ]
+}

@@ -1,5 +1,5 @@
 """
-main.py — FastAPI application — OWL/SWRL Editor API
+main.py — FastAPI application — OWL/SWORD Editor API
 """
 from __future__ import annotations
 import uuid
@@ -14,12 +14,11 @@ from pydantic import BaseModel as PydanticModel
 
 from owl_model import (
     OWLOntology, OWLClass, OWLObjectProperty, OWLDatatypeProperty,
-    OWLIndividual, SWRLRule, SWORDRule, InferenceResult, PropertyPresence,
+    OWLIndividual, SWORDRule, InferenceResult, PropertyPresence,
     ObjectPropertyAssertion,
 )
 from triple_store import store
 from inference_engine import InferenceEngine
-from swrl_engine import SWRLEngine
 from serializers import export_owl_xml, export_turtle, export_jsonld
 
 logger = logging.getLogger("owl_editor")
@@ -37,8 +36,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="OWL/SWRL Editor API",
-    description="API REST pour créer et éditer des ontologies OWL 2 avec règles SWRL",
+    title="OWL/SWORD Editor API",
+    description="API REST pour créer et éditer des ontologies OWL 2 avec règles SWORD",
     version="1.0.0",
     lifespan=lifespan,
 )
@@ -131,11 +130,6 @@ def _cascade_rename_property(onto: OWLOntology, old_id: str, new_id: str) -> Non
             if a.property == old_id:
                 a.property = new_id
 
-    for rule in onto.swrl_rules:
-        for atom in rule.body + rule.head:
-            if hasattr(atom, 'property_iri') and atom.property_iri == old_id:
-                atom.property_iri = new_id
-
 
 def _sync_domain_markers(onto: OWLOntology, prop_id: str,
                          old_domain: set, new_domain: set) -> None:
@@ -174,10 +168,7 @@ def require_onto():
 def run_inferences() -> InferenceResult:
     onto = require_onto()
     engine = InferenceEngine(onto)
-    result = engine.run()
-    swrl   = SWRLEngine(onto)
-    result.swrl_consequences = swrl.run()
-    return result
+    return engine.run()
 
 
 # ════════════════════════════════════════════════════════════════
@@ -641,58 +632,6 @@ def delete_individual(ind_id: str):
     store.save()
     return {"deleted": ind_id}
 
-
-# ════════════════════════════════════════════════════════════════
-# RÈGLES SWRL
-# ════════════════════════════════════════════════════════════════
-
-@app.get("/api/swrl-rules", tags=["SWRL"])
-def list_swrl_rules():
-    return require_onto().swrl_rules
-
-
-@app.post("/api/swrl-rules", tags=["SWRL"], status_code=201)
-def create_swrl_rule(rule: SWRLRule):
-    onto = require_onto()
-    if not rule.id:
-        rule.id = str(uuid.uuid4())[:8]
-    if any(r.id == rule.id for r in onto.swrl_rules):
-        raise HTTPException(409, f"Règle '{rule.id}' already exists")
-    onto.swrl_rules.append(rule)
-    store.save()
-    return rule
-
-
-@app.get("/api/swrl-rules/{rule_id}", tags=["SWRL"])
-def get_swrl_rule(rule_id: str):
-    onto = require_onto()
-    rule = next((r for r in onto.swrl_rules if r.id == rule_id), None)
-    if not rule:
-        raise HTTPException(404, f"Règle '{rule_id}' not found")
-    return rule
-
-
-@app.put("/api/swrl-rules/{rule_id}", tags=["SWRL"])
-def update_swrl_rule(rule_id: str, rule: SWRLRule):
-    onto = require_onto()
-    idx = next((i for i, r in enumerate(onto.swrl_rules) if r.id == rule_id), None)
-    if idx is None:
-        raise HTTPException(404, f"Règle '{rule_id}' not found")
-    rule.id = rule_id
-    onto.swrl_rules[idx] = rule
-    store.save()
-    return rule
-
-
-@app.delete("/api/swrl-rules/{rule_id}", tags=["SWRL"])
-def delete_swrl_rule(rule_id: str):
-    onto = require_onto()
-    before = len(onto.swrl_rules)
-    onto.swrl_rules = [r for r in onto.swrl_rules if r.id != rule_id]
-    if len(onto.swrl_rules) == before:
-        raise HTTPException(404, f"Règle '{rule_id}' not found")
-    store.save()
-    return {"deleted": rule_id}
 
 
 # ════════════════════════════════════════════════════════════════

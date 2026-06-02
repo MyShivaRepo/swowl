@@ -11,7 +11,6 @@ const APP = {
         object_properties: [],
         datatype_properties: [],
         individuals: [],
-        swrl_rules:  [],
         sword_rules: [],
     },
     currentSection: 'ontologies',
@@ -40,7 +39,6 @@ const APP = {
             this.state.object_properties   = onto.object_properties   || [];
             this.state.datatype_properties = onto.datatype_properties || [];
             this.state.individuals         = onto.individuals         || [];
-            this.state.swrl_rules          = onto.swrl_rules          || [];
             this.state.sword_rules         = onto.sword_rules         || [];
         } catch (e) {
             this.state.ontology = null;
@@ -48,7 +46,6 @@ const APP = {
             this.state.object_properties   = [];
             this.state.datatype_properties = [];
             this.state.individuals         = [];
-            this.state.swrl_rules          = [];
             this.state.sword_rules         = [];
         }
     },
@@ -65,8 +62,7 @@ const APP = {
         if (el && s.ontology) {
             el.textContent =
                 `${s.classes.length} cl · ${s.object_properties.length} op · ` +
-                `${s.datatype_properties.length} dp · ${s.individuals.length} ind · ` +
-                `${s.swrl_rules.length} rules`;
+                `${s.datatype_properties.length} dp · ${s.individuals.length} ind`;
         } else if (el) {
             el.textContent = '';
         }
@@ -215,7 +211,7 @@ const APP = {
         const main = document.getElementById('main-content');
 
         // Bloquer les onglets d'édition si aucune ontologie n'est connectée
-        const editSections = ['classes','object-properties','datatype-properties','individuals','swrl-rules','sword-rules','inferences'];
+        const editSections = ['classes','object-properties','datatype-properties','individuals','sword-rules','inferences'];
         if (!this.state.ontology && editSections.includes(section)) {
             main.innerHTML = this._noOntoMsg();
             return;
@@ -240,13 +236,6 @@ const APP = {
             case 'individuals':
                 main.innerHTML = IndividualEditor.renderSplit(this.state.individuals);
                 IndividualEditor.restoreSelection();
-                break;
-            case 'swrl-rules':
-                main.innerHTML = this._renderSectionHeader(
-                    '⊢ SWRL Rules',
-                    `<button class="btn-primary" onclick="APP.showPanel('swrl-rules', SWRLEditor.renderForm())">➕ New rule</button>`,
-                    SWRLEditor.renderList(this.state.swrl_rules)
-                );
                 break;
             case 'annotation-properties':
                 main.innerHTML = this._renderAnnotationProperties();

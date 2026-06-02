@@ -60,7 +60,6 @@ const InferenceUI = {
         ${this._renderAssertions('Inferred transitive assertions', d.transitive_assertions || [])}
         ${this._renderAssertions('Assertions (chains + inverses)', d.chain_assertions || [])}
         ${this._renderInferredInverseProperties(d.inferred_inverse_properties || [])}
-        ${this._renderSWRLConsequences(d.swrl_consequences || [])}
         `;
     },
 
@@ -227,21 +226,4 @@ const InferenceUI = {
         </div>`;
     },
 
-    _renderSWRLConsequences(consequences) {
-        if (!consequences.length) {
-            return '<div class="inf-section"><div class="inf-title">⊢ SWRL Consequences</div><p class="empty">No SWRL consequences (no active rules or insufficient individuals).</p></div>';
-        }
-        return `<div class="inf-section collapsible">
-            <div class="inf-title" onclick="this.parentElement.classList.toggle('open')">
-                ⊢ SWRL Consequences (${consequences.length}) <span class="caret">▶</span>
-            </div>
-            <div class="inf-content">
-            ${consequences.map(c => `
-            <div class="swrl-consequence">
-                <span class="swrl-rule-badge">${c.rule_label || c.rule_id}</span>
-                <span class="swrl-cons-text">${c.consequence}</span>
-            </div>`).join('')}
-            </div>
-        </div>`;
-    },
 };
