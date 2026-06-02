@@ -1,6 +1,6 @@
 """
-serializers.py — Export OWL/XML, Turtle, JSON-LD
-OWL/XML : sérialiseur custom pour compatibilité Protégé 5 (OWLAPI 4)
+serializers.py — Export OWL 2 XML, Turtle, JSON-LD
+OWL/XML : format OWL 2 XML Serialization (W3C) natif OWLAPI 4 / Protégé 5
 """
 from __future__ import annotations
 from xml.sax.saxutils import escape
@@ -13,63 +13,84 @@ from owl_model import (
     PropertyPresence,
 )
 
-OWL  = "http://www.w3.org/2002/07/owl#"
-RDF  = "http://www.w3.org/1999/02/22-rdf-syntax-ns#"
-RDFS = "http://www.w3.org/2000/01/rdf-schema#"
-XSD  = "http://www.w3.org/2001/XMLSchema#"
+OWL_NS  = "http://www.w3.org/2002/07/owl#"
+RDF_NS  = "http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+RDFS_NS = "http://www.w3.org/2000/01/rdf-schema#"
+XSD_NS  = "http://www.w3.org/2001/XMLSchema#"
 
 
-def _iri(onto: OWLOntology, local: str) -> str:
+def _full_iri(onto: OWLOntology, local: str) -> str:
     if local.startswith("http"):
         return local
     if ":" in local:
-        return local.replace("xsd:", XSD).replace("owl:", OWL).replace("rdfs:", RDFS)
+        return (local
+                .replace("xsd:", XSD_NS)
+                .replace("owl:", OWL_NS)
+                .replace("rdfs:", RDFS_NS))
     base = onto.id.rstrip("#/")
     return f"{base}#{local}"
 
 
-def _about(onto: OWLOntology, local: str) -> str:
-    return f' rdf:about="{escape(_iri(onto, local))}"'
+def _iri_attr(onto: OWLOntology, local: str) -> str:
+    """Retourne IRI="#local" si même base, sinon IRI="http://..." """
+    base = onto.id.rstrip("#/")
+    full = _full_iri(onto, local)
+    if full.startswith(base + "#"):
+        return f'IRI="#{full[len(base)+1:]}"'
+    return f'IRI="{escape(full)}"'
 
 
-def _class_expr(onto: OWLOntology, expr, lines: list, indent: int) -> str:
-    pad = "  " * indent
+def _class_expr_owlxml(onto: OWLOntology, expr, pad: str) -> list[str]:
+    sub = pad + "    "
     if isinstance(expr, str):
-        return f'<owl:Class rdf:about="{escape(_iri(onto, expr))}"/>'
+        return [f'{pad}<Class {_iri_attr(onto, expr)}/>']
     if isinstance(expr, UnionOf):
-        items = "\n".join(
-            f'{pad}  <rdf:rest rdf:parseType="Collection">\n'
-            + "\n".join(f'{pad}    {_class_expr(onto, o, lines, indent+2)}' for o in expr.operands)
-            + f'\n{pad}  </rdf:rest>'
-        )
-        return (f'<owl:Class>\n{pad}  <owl:unionOf rdf:parseType="Collection">\n'
-                + "\n".join(f'{pad}    {_class_expr(onto, o, lines, indent+2)}' for o in expr.operands)
-                + f'\n{pad}  </owl:unionOf>\n{pad}</owl:Class>')
+        lines = [f'{pad}<ObjectUnionOf>']
+        for o in expr.operands:
+            lines += _class_expr_owlxml(onto, o, sub)
+        lines.append(f'{pad}</ObjectUnionOf>')
+        return lines
     if isinstance(expr, IntersectionOf):
-        return (f'<owl:Class>\n{pad}  <owl:intersectionOf rdf:parseType="Collection">\n'
-                + "\n".join(f'{pad}    {_class_expr(onto, o, lines, indent+2)}' for o in expr.operands)
-                + f'\n{pad}  </owl:intersectionOf>\n{pad}</owl:Class>')
+        lines = [f'{pad}<ObjectIntersectionOf>']
+        for o in expr.operands:
+            lines += _class_expr_owlxml(onto, o, sub)
+        lines.append(f'{pad}</ObjectIntersectionOf>')
+        return lines
     if isinstance(expr, ComplementOf):
-        return (f'<owl:Class>\n{pad}  <owl:complementOf>\n'
-                f'{pad}    {_class_expr(onto, expr.operand, lines, indent+2)}\n'
-                f'{pad}  </owl:complementOf>\n{pad}</owl:Class>')
+        lines = [f'{pad}<ObjectComplementOf>']
+        lines += _class_expr_owlxml(onto, expr.operand, sub)
+        lines.append(f'{pad}</ObjectComplementOf>')
+        return lines
     # Restrictions
-    prop_iri = escape(_iri(onto, expr.property))
-    r = f'<owl:Restriction>\n{pad}  <owl:onProperty rdf:resource="{prop_iri}"/>\n'
+    prop_attr = _iri_attr(onto, expr.property)
     if isinstance(expr, SomeValuesFrom) and expr.filler:
-        r += f'{pad}  <owl:someValuesFrom rdf:resource="{escape(_iri(onto, expr.filler))}"/>\n'
-    elif isinstance(expr, AllValuesFrom) and expr.filler:
-        r += f'{pad}  <owl:allValuesFrom rdf:resource="{escape(_iri(onto, expr.filler))}"/>\n'
-    elif isinstance(expr, HasValue) and expr.value:
-        r += f'{pad}  <owl:hasValue rdf:resource="{escape(_iri(onto, expr.value))}"/>\n'
-    elif isinstance(expr, ExactCardinality):
-        r += f'{pad}  <owl:cardinality rdf:datatype="{XSD}nonNegativeInteger">{expr.cardinality}</owl:cardinality>\n'
-    elif isinstance(expr, MinCardinality):
-        r += f'{pad}  <owl:minCardinality rdf:datatype="{XSD}nonNegativeInteger">{expr.cardinality}</owl:minCardinality>\n'
-    elif isinstance(expr, MaxCardinality):
-        r += f'{pad}  <owl:maxCardinality rdf:datatype="{XSD}nonNegativeInteger">{expr.cardinality}</owl:maxCardinality>\n'
-    r += f'{pad}</owl:Restriction>'
-    return r
+        return [f'{pad}<ObjectSomeValuesFrom>',
+                f'{sub}<ObjectProperty {prop_attr}/>',
+                f'{sub}<Class {_iri_attr(onto, expr.filler)}/>',
+                f'{pad}</ObjectSomeValuesFrom>']
+    if isinstance(expr, AllValuesFrom) and expr.filler:
+        return [f'{pad}<ObjectAllValuesFrom>',
+                f'{sub}<ObjectProperty {prop_attr}/>',
+                f'{sub}<Class {_iri_attr(onto, expr.filler)}/>',
+                f'{pad}</ObjectAllValuesFrom>']
+    if isinstance(expr, HasValue) and expr.value:
+        return [f'{pad}<ObjectHasValue>',
+                f'{sub}<ObjectProperty {prop_attr}/>',
+                f'{sub}<NamedIndividual {_iri_attr(onto, expr.value)}/>',
+                f'{pad}</ObjectHasValue>']
+    if isinstance(expr, ExactCardinality):
+        inner = [f'{sub}<ObjectProperty {prop_attr}/>']
+        if expr.filler: inner += _class_expr_owlxml(onto, expr.filler, sub)
+        return [f'{pad}<ObjectExactCardinality cardinality="{expr.cardinality}">'] + inner + [f'{pad}</ObjectExactCardinality>']
+    if isinstance(expr, MinCardinality):
+        inner = [f'{sub}<ObjectProperty {prop_attr}/>']
+        if expr.filler: inner += _class_expr_owlxml(onto, expr.filler, sub)
+        return [f'{pad}<ObjectMinCardinality cardinality="{expr.cardinality}">'] + inner + [f'{pad}</ObjectMinCardinality>']
+    if isinstance(expr, MaxCardinality):
+        inner = [f'{sub}<ObjectProperty {prop_attr}/>']
+        if expr.filler: inner += _class_expr_owlxml(onto, expr.filler, sub)
+        return [f'{pad}<ObjectMaxCardinality cardinality="{expr.cardinality}">'] + inner + [f'{pad}</ObjectMaxCardinality>']
+    return []
 
 
 def export_owl_xml(store: TripleStore) -> bytes:
@@ -80,122 +101,163 @@ def export_owl_xml(store: TripleStore) -> bytes:
     base = onto.id.rstrip("#/")
     lines = [
         '<?xml version="1.0"?>',
-        f'<rdf:RDF xmlns="{base}#"',
+        f'<Ontology xmlns="{OWL_NS}"',
         f'     xml:base="{base}"',
-        f'     xmlns:owl="{OWL}"',
-        f'     xmlns:rdf="{RDF}"',
+        f'     xmlns:rdf="{RDF_NS}"',
         f'     xmlns:xml="http://www.w3.org/XML/1998/namespace"',
-        f'     xmlns:xsd="{XSD}"',
-        f'     xmlns:rdfs="{RDFS}">',
+        f'     xmlns:xsd="{XSD_NS}"',
+        f'     xmlns:rdfs="{RDFS_NS}"',
+        f'     ontologyIRI="{base}">',
         '',
-        f'    <!-- Ontology: {base} -->',
-        f'    <owl:Ontology rdf:about="{base}">',
     ]
-    for ann in onto.annotations.labels:
-        lines.append(f'        <rdfs:label xml:lang="{ann.lang}">{escape(ann.value)}</rdfs:label>')
-    for ann in onto.annotations.comments:
-        lines.append(f'        <rdfs:comment xml:lang="{ann.lang}">{escape(ann.value)}</rdfs:comment>')
-    lines += ['    </owl:Ontology>', '']
 
-    # ── Classes ──────────────────────────────────────────────
-    if onto.classes:
-        lines.append('    <!-- Classes -->')
+    # Annotations de l'ontologie
+    for ann in onto.annotations.labels:
+        lines += [
+            '    <Annotation>',
+            f'        <AnnotationProperty abbreviatedIRI="rdfs:label"/>',
+            f'        <Literal xml:lang="{ann.lang}">{escape(ann.value)}</Literal>',
+            '    </Annotation>',
+        ]
+    for ann in onto.annotations.comments:
+        lines += [
+            '    <Annotation>',
+            f'        <AnnotationProperty abbreviatedIRI="rdfs:comment"/>',
+            f'        <Literal xml:lang="{ann.lang}">{escape(ann.value)}</Literal>',
+            '    </Annotation>',
+        ]
+    if onto.annotations.labels or onto.annotations.comments:
         lines.append('')
+
+    # ── Declarations ─────────────────────────────────────────
     for cls in onto.classes:
-        cls_iri = escape(_iri(onto, cls.id))
-        lines.append(f'    <owl:Class rdf:about="{cls_iri}">')
+        lines.append(f'    <Declaration><Class {_iri_attr(onto, cls.id)}/></Declaration>')
+    for prop in onto.object_properties:
+        lines.append(f'    <Declaration><ObjectProperty {_iri_attr(onto, prop.id)}/></Declaration>')
+    for prop in onto.datatype_properties:
+        lines.append(f'    <Declaration><DataProperty {_iri_attr(onto, prop.id)}/></Declaration>')
+    for ind in onto.individuals:
+        lines.append(f'    <Declaration><NamedIndividual {_iri_attr(onto, ind.id)}/></Declaration>')
+    if onto.classes or onto.object_properties or onto.datatype_properties or onto.individuals:
+        lines.append('')
+
+    # ── Class Axioms ─────────────────────────────────────────
+    for cls in onto.classes:
+        cls_attr = _iri_attr(onto, cls.id)
         for ann in cls.annotations.labels:
-            lines.append(f'        <rdfs:label xml:lang="{ann.lang}">{escape(ann.value)}</rdfs:label>')
-        for ann in cls.annotations.comments:
-            lines.append(f'        <rdfs:comment xml:lang="{ann.lang}">{escape(ann.value)}</rdfs:comment>')
+            lines += [f'    <AnnotationAssertion>',
+                      f'        <AnnotationProperty abbreviatedIRI="rdfs:label"/>',
+                      f'        <IRI>{escape(_full_iri(onto, cls.id))}</IRI>',
+                      f'        <Literal xml:lang="{ann.lang}">{escape(ann.value)}</Literal>',
+                      f'    </AnnotationAssertion>']
         for sup in cls.subClassOf:
             if isinstance(sup, PropertyPresence):
                 continue
-            if isinstance(sup, str):
-                lines.append(f'        <rdfs:subClassOf rdf:resource="{escape(_iri(onto, sup))}"/>')
-            else:
-                expr_xml = _class_expr(onto, sup, lines, 4)
-                lines.append(f'        <rdfs:subClassOf>')
-                lines.append(f'            {expr_xml}')
-                lines.append(f'        </rdfs:subClassOf>')
+            lines.append(f'    <SubClassOf>')
+            lines.append(f'        <Class {cls_attr}/>')
+            lines += _class_expr_owlxml(onto, sup, '        ')
+            lines.append(f'    </SubClassOf>')
         for eq in cls.equivalentClass:
-            if isinstance(eq, str):
-                lines.append(f'        <owl:equivalentClass rdf:resource="{escape(_iri(onto, eq))}"/>')
-            else:
-                lines.append(f'        <owl:equivalentClass>')
-                lines.append(f'            {_class_expr(onto, eq, lines, 4)}')
-                lines.append(f'        </owl:equivalentClass>')
+            lines.append(f'    <EquivalentClasses>')
+            lines.append(f'        <Class {cls_attr}/>')
+            lines += _class_expr_owlxml(onto, eq, '        ')
+            lines.append(f'    </EquivalentClasses>')
         for dj in cls.disjointWith:
-            lines.append(f'        <owl:disjointWith rdf:resource="{escape(_iri(onto, dj))}"/>')
-        lines.append(f'    </owl:Class>')
-        lines.append('')
+            lines += [f'    <DisjointClasses>',
+                      f'        <Class {cls_attr}/>',
+                      f'        <Class {_iri_attr(onto, dj)}/>',
+                      f'    </DisjointClasses>']
 
-    # ── Object Properties ────────────────────────────────────
-    if onto.object_properties:
-        lines.append('    <!-- Object Properties -->')
-        lines.append('')
+    # ── Object Property Axioms ───────────────────────────────
     for prop in onto.object_properties:
-        p_iri = escape(_iri(onto, prop.id))
-        lines.append(f'    <owl:ObjectProperty rdf:about="{p_iri}">')
-        for ann in prop.annotations.labels:
-            lines.append(f'        <rdfs:label xml:lang="{ann.lang}">{escape(ann.value)}</rdfs:label>')
+        p_attr = _iri_attr(onto, prop.id)
         for d in prop.domain:
-            lines.append(f'        <rdfs:domain rdf:resource="{escape(_iri(onto, d))}"/>')
+            lines += [f'    <ObjectPropertyDomain>',
+                      f'        <ObjectProperty {p_attr}/>',
+                      f'        <Class {_iri_attr(onto, d)}/>',
+                      f'    </ObjectPropertyDomain>']
         for r in prop.range:
-            lines.append(f'        <rdfs:range rdf:resource="{escape(_iri(onto, r))}"/>')
+            lines += [f'    <ObjectPropertyRange>',
+                      f'        <ObjectProperty {p_attr}/>',
+                      f'        <Class {_iri_attr(onto, r)}/>',
+                      f'    </ObjectPropertyRange>']
         for sp in prop.subPropertyOf:
-            lines.append(f'        <rdfs:subPropertyOf rdf:resource="{escape(_iri(onto, sp))}"/>')
+            lines += [f'    <SubObjectPropertyOf>',
+                      f'        <ObjectProperty {p_attr}/>',
+                      f'        <ObjectProperty {_iri_attr(onto, sp)}/>',
+                      f'    </SubObjectPropertyOf>']
         if prop.inverseOf:
-            lines.append(f'        <owl:inverseOf rdf:resource="{escape(_iri(onto, prop.inverseOf))}"/>')
+            lines += [f'    <InverseObjectProperties>',
+                      f'        <ObjectProperty {p_attr}/>',
+                      f'        <ObjectProperty {_iri_attr(onto, prop.inverseOf)}/>',
+                      f'    </InverseObjectProperties>']
         ch = prop.characteristics
-        if ch.functional:        lines.append(f'        <rdf:type rdf:resource="{OWL}FunctionalProperty"/>')
-        if ch.inverseFunctional: lines.append(f'        <rdf:type rdf:resource="{OWL}InverseFunctionalProperty"/>')
-        if ch.transitive:        lines.append(f'        <rdf:type rdf:resource="{OWL}TransitiveProperty"/>')
-        if ch.symmetric:         lines.append(f'        <rdf:type rdf:resource="{OWL}SymmetricProperty"/>')
-        if ch.asymmetric:        lines.append(f'        <rdf:type rdf:resource="{OWL}AsymmetricProperty"/>')
-        if ch.reflexive:         lines.append(f'        <rdf:type rdf:resource="{OWL}ReflexiveProperty"/>')
-        if ch.irreflexive:       lines.append(f'        <rdf:type rdf:resource="{OWL}IrreflexiveProperty"/>')
-        lines.append(f'    </owl:ObjectProperty>')
-        lines.append('')
+        char_map = [
+            (ch.functional,        'FunctionalObjectProperty'),
+            (ch.inverseFunctional, 'InverseFunctionalObjectProperty'),
+            (ch.transitive,        'TransitiveObjectProperty'),
+            (ch.symmetric,         'SymmetricObjectProperty'),
+            (ch.asymmetric,        'AsymmetricObjectProperty'),
+            (ch.reflexive,         'ReflexiveObjectProperty'),
+            (ch.irreflexive,       'IrreflexiveObjectProperty'),
+        ]
+        for flag, tag in char_map:
+            if flag:
+                lines += [f'    <{tag}>', f'        <ObjectProperty {p_attr}/>', f'    </{tag}>']
 
-    # ── Datatype Properties ──────────────────────────────────
-    if onto.datatype_properties:
-        lines.append('    <!-- Datatype Properties -->')
-        lines.append('')
+    # ── Data Property Axioms ─────────────────────────────────
     for prop in onto.datatype_properties:
-        p_iri = escape(_iri(onto, prop.id))
-        lines.append(f'    <owl:DatatypeProperty rdf:about="{p_iri}">')
+        p_attr = _iri_attr(onto, prop.id)
         for d in prop.domain:
-            lines.append(f'        <rdfs:domain rdf:resource="{escape(_iri(onto, d))}"/>')
+            lines += [f'    <DataPropertyDomain>',
+                      f'        <DataProperty {p_attr}/>',
+                      f'        <Class {_iri_attr(onto, d)}/>',
+                      f'    </DataPropertyDomain>']
         for r in prop.range:
-            lines.append(f'        <rdfs:range rdf:resource="{escape(_iri(onto, r))}"/>')
+            dt_iri = _full_iri(onto, r)
+            lines += [f'    <DataPropertyRange>',
+                      f'        <DataProperty {p_attr}/>',
+                      f'        <Datatype IRI="{escape(dt_iri)}"/>',
+                      f'    </DataPropertyRange>']
         if prop.functional:
-            lines.append(f'        <rdf:type rdf:resource="{OWL}FunctionalProperty"/>')
-        lines.append(f'    </owl:DatatypeProperty>')
-        lines.append('')
+            lines += [f'    <FunctionalDataProperty>',
+                      f'        <DataProperty {p_attr}/>',
+                      f'    </FunctionalDataProperty>']
 
-    # ── Individuals ──────────────────────────────────────────
-    if onto.individuals:
-        lines.append('    <!-- Individuals -->')
-        lines.append('')
+    # ── Individual Assertions ────────────────────────────────
     for ind in onto.individuals:
-        i_iri = escape(_iri(onto, ind.id))
-        lines.append(f'    <owl:NamedIndividual rdf:about="{i_iri}">')
+        i_attr = _iri_attr(onto, ind.id)
         for t in ind.types:
-            lines.append(f'        <rdf:type rdf:resource="{escape(_iri(onto, t))}"/>')
+            lines += [f'    <ClassAssertion>',
+                      f'        <Class {_iri_attr(onto, t)}/>',
+                      f'        <NamedIndividual {i_attr}/>',
+                      f'    </ClassAssertion>']
         for oa in ind.objectAssertions:
-            lines.append(f'        <{escape(oa.property)} rdf:resource="{escape(_iri(onto, oa.target))}"/>')
+            lines += [f'    <ObjectPropertyAssertion>',
+                      f'        <ObjectProperty {_iri_attr(onto, oa.property)}/>',
+                      f'        <NamedIndividual {i_attr}/>',
+                      f'        <NamedIndividual {_iri_attr(onto, oa.target)}/>',
+                      f'    </ObjectPropertyAssertion>']
         for da in ind.dataAssertions:
-            dt = _iri(onto, da.datatype) if da.datatype else f"{XSD}string"
-            lines.append(f'        <{escape(da.property)} rdf:datatype="{escape(dt)}">{escape(da.value)}</{escape(da.property)}>')
+            dt = _full_iri(onto, da.datatype) if da.datatype else f"{XSD_NS}string"
+            lines += [f'    <DataPropertyAssertion>',
+                      f'        <DataProperty {_iri_attr(onto, da.property)}/>',
+                      f'        <NamedIndividual {i_attr}/>',
+                      f'        <Literal datatypeIRI="{escape(dt)}">{escape(da.value)}</Literal>',
+                      f'    </DataPropertyAssertion>']
         for s in ind.sameAs:
-            lines.append(f'        <owl:sameAs rdf:resource="{escape(_iri(onto, s))}"/>')
+            lines += [f'    <SameIndividual>',
+                      f'        <NamedIndividual {i_attr}/>',
+                      f'        <NamedIndividual {_iri_attr(onto, s)}/>',
+                      f'    </SameIndividual>']
         for d in ind.differentFrom:
-            lines.append(f'        <owl:differentFrom rdf:resource="{escape(_iri(onto, d))}"/>')
-        lines.append(f'    </owl:NamedIndividual>')
-        lines.append('')
+            lines += [f'    <DifferentIndividuals>',
+                      f'        <NamedIndividual {i_attr}/>',
+                      f'        <NamedIndividual {_iri_attr(onto, d)}/>',
+                      f'    </DifferentIndividuals>']
 
-    lines.append('</rdf:RDF>')
+    lines.append('')
+    lines.append('</Ontology>')
     return "\n".join(lines).encode("utf-8")
 
 
