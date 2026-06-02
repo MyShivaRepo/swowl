@@ -197,9 +197,10 @@ class SWRLPropertyAtom(BaseModel):
 
 
 class SWRLEqualityAtom(BaseModel):
-    """?var = value"""
+    """?var OP value  (OP: =, !=, >, >=, <, <=)"""
     type: Literal["equality_atom"] = "equality_atom"
     var: str = ""
+    operator: str = "="
     value: str = ""
 
 

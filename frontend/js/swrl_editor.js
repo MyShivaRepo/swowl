@@ -145,7 +145,7 @@ const SWRLEditor = {
                     <div style="display:flex;gap:3px;margin-left:auto;flex-wrap:wrap">
                         <button class="btn-ftool" onclick="SWRLEditor.addAtom('body','type_atom')"     title="Add type atom">${ico}&thinsp;Class</button>
                         <button class="btn-ftool" onclick="SWRLEditor.addAtom('body','property_atom')" title="Add property atom">${ico}&thinsp;Property</button>
-                        <button class="btn-ftool" onclick="SWRLEditor.addAtom('body','equality_atom')" title="Add equality">${ico}&thinsp;=</button>
+                        <button class="btn-ftool" onclick="SWRLEditor.addAtom('body','equality_atom')" title="Add comparison">${ico}&thinsp;≟</button>
                         <button class="btn-ftool" onclick="SWRLEditor.addAtom('body','naf_block')"     title="Add NAF block">${ico}&thinsp;NAF</button>
                     </div>
                 </div>
@@ -163,7 +163,7 @@ const SWRLEditor = {
                     <div style="display:flex;gap:3px;margin-left:auto;flex-wrap:wrap">
                         <button class="btn-ftool" onclick="SWRLEditor.addAtom('head','type_atom')"     title="Add type atom">${ico}&thinsp;Class</button>
                         <button class="btn-ftool" onclick="SWRLEditor.addAtom('head','property_atom')" title="Add property atom">${ico}&thinsp;Property</button>
-                        <button class="btn-ftool" onclick="SWRLEditor.addAtom('head','equality_atom')" title="Add equality">${ico}&thinsp;=</button>
+                        <button class="btn-ftool" onclick="SWRLEditor.addAtom('head','equality_atom')" title="Add comparison">${ico}&thinsp;≟</button>
                         <button class="btn-ftool" onclick="SWRLEditor.addAtom('head','conditional')"   title="Add conditional consequent">${ico}&thinsp;If … Then</button>
                     </div>
                 </div>
@@ -274,16 +274,25 @@ const SWRLEditor = {
                 </div>`;
             }
 
-            case 'equality_atom':
+            case 'equality_atom': {
+                const ops = ['=','!=','>','>=','<','<='];
+                const opSel = ops.map(o =>
+                    `<option value="${o}"${(atom.operator||'=')===o?' selected':''}>${o}</option>`
+                ).join('');
                 return `<div class="swrl-atom" data-path="${path}" ${dragAttrs}>
                     ${handle}
                     <input class="swrl-var" value="${atom.var||''}" placeholder="?var"
                            data-field="var" ${chg}>
-                    <span class="swrl-kw">=</span>
-                    <input class="swrl-inp" value="${atom.value||''}" placeholder="value or IRI"
+                    <select class="swrl-op-select" data-field="operator"
+                            onchange="SWRLEditor.updateField('${path}',this.dataset.field,this.value)"
+                            style="flex-shrink:0;background:var(--bg3);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:2px 4px;font-size:11px;font-family:var(--font-mono)">
+                        ${opSel}
+                    </select>
+                    <input class="swrl-inp" value="${atom.value||''}" placeholder="variable or value"
                            data-field="value" ${chg} style="flex:2">
                     ${del}
                 </div>`;
+            }
 
             case 'naf_block': {
                 const ico = this._ico;
@@ -566,11 +575,11 @@ const SWRLEditor = {
         switch (type) {
             case 'type_atom':     return { type: 'type_atom',     var: '?x', class_id: '' };
             case 'property_atom': return { type: 'property_atom', subject: '?x', property_id: '', object: '?_' };
-            case 'equality_atom': return { type: 'equality_atom', var: '?x', value: '' };
+            case 'equality_atom': return { type: 'equality_atom', var: '?x', operator: '=', value: '' };
             case 'naf_block':     return { type: 'naf_block',     atoms: [] };
             case 'conditional':   return {
                 type: 'conditional',
-                condition:  [{ type: 'equality_atom', var: '?x', value: '' }],
+                condition:  [{ type: 'equality_atom', var: '?x', operator: '=', value: '' }],
                 consequent: [{ type: 'type_atom',     var: '?x', class_id: '' }],
             };
             default: return { type };
