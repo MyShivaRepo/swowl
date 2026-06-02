@@ -643,8 +643,9 @@ const FsBrowser = {
                     <div class="fs-loading">Loading…</div>
                 </div>
                 <div class="fs-browser-footer">
-                    <span style="font-size:11px;color:var(--text-dim);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" id="fs-selected-path">${this._currentPath}</span>
-                    <button class="btn-primary btn-sm" onclick="FsBrowser.confirm()">Select</button>
+                    <span style="font-size:10px;color:var(--text-dim);white-space:nowrap">Folder:</span>
+                    <span style="font-size:11px;color:var(--text2);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--font-mono)" id="fs-selected-path">${this._currentPath}/</span>
+                    <button class="btn-primary btn-sm" onclick="FsBrowser.confirm()">Select this folder</button>
                     <button class="btn-secondary btn-sm" onclick="FsBrowser.close()">Cancel</button>
                 </div>
             </div>`;
@@ -711,9 +712,7 @@ const FsBrowser = {
         // Highlight
         document.querySelectorAll('.fs-item').forEach(e => e.classList.remove('fs-item-selected'));
         el.classList.add('fs-item-selected');
-        // Afficher le chemin complet dans le footer
-        const selPath = document.getElementById('fs-selected-path');
-        if (selPath) selPath.textContent = this._currentPath.replace(/\/$/, '') + '/' + name;
+        // Le footer garde le dossier courant — le fichier sélectionné est juste mis en évidence
     },
 
     confirm() {
