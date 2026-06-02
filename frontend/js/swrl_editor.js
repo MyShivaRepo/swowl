@@ -292,14 +292,14 @@ const SWRLEditor = {
                 // Champ valeur : si individu connu → pill navigable, sinon input texte
                 const valueField = isInd
                     ? `<div class="tree-item restr-filler-btn" style="flex:1;min-width:0;margin:0;padding:2px 6px;cursor:default"
-                            title="Right-click to change individual"
+                            title="Left-click: navigate · Right-click: change individual"
                             oncontextmenu="event.preventDefault();SWRLEditor.toggleIndPicker('${indPickId}','${path}',this)">
                            <span class="xsd-dot" style="flex-shrink:0;margin-right:4px"></span>
                            <span class="restr-filler-lbl" style="cursor:pointer;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
                                  onclick="APP.navigateTo('individuals','${atom.value}')"
-                                 onmouseover="this.style.textDecoration='underline'"
-                                 onmouseout="this.style.textDecoration=''"
-                                 title="Navigate to ${atom.value}">${atom.value}</span>
+                                 onmouseover="this.style.textDecoration='underline';this.style.color='var(--accent)'"
+                                 onmouseout="this.style.textDecoration='';this.style.color=''"
+                                 title="Left-click: navigate · Right-click: change individual">${atom.value}</span>
                        </div>`
                     : `<input class="swrl-inp" value="${atom.value||''}" placeholder="individual, variable or value"
                               data-field="value" ${chg} style="flex:1;min-width:0">`;
