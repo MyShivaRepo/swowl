@@ -6,7 +6,7 @@ from triple_store import TripleStore
 
 def export_owl_xml(store: TripleStore) -> bytes:
     g = store.to_rdf_graph()
-    return g.serialize(format="xml").encode("utf-8")
+    return g.serialize(format="pretty-xml").encode("utf-8")
 
 
 def export_turtle(store: TripleStore) -> bytes:
