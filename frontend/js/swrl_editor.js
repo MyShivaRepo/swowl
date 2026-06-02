@@ -63,8 +63,7 @@ const SWRLEditor = {
     restoreSelection() {
         this._initSplitHandle();
         if (this._selectedId) {
-            document.querySelectorAll('#swrl-list .tree-item').forEach(el =>
-                el.classList.toggle('selected', el.dataset.id === this._selectedId));
+            this.selectRule(this._selectedId);
         }
     },
 

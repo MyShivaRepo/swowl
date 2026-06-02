@@ -191,12 +191,12 @@ const APP = {
                 break;
             }
         }
+        if (section === 'swrl-rules' && entityId) {
+            SWRLEditor._selectedId = entityId;
+        }
         this.renderSection(section);
         if (section === 'individuals') {
             IndividualEditor.selectIndividual(entityId);
-        }
-        if (section === 'swrl-rules' && entityId) {
-            SWRLEditor.selectRule(entityId);
         }
     },
 
