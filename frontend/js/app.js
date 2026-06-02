@@ -721,6 +721,7 @@ const FsBrowser = {
     },
 
     confirm(dirFromBtn) {
+        alert('DEBUG confirm()\ndirFromBtn = ' + JSON.stringify(dirFromBtn) + '\n_currentPath = ' + this._currentPath);
         // dirFromBtn est passé directement depuis le data-dir du bouton — source fiable
         let dirPath = (dirFromBtn || this._currentPath + '/').replace(/\/$/, '') + '/';
 
