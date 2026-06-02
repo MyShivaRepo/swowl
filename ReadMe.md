@@ -11,8 +11,9 @@ Application Docker — frontend Nginx + backend FastAPI + triple store rdflib.
 ## Lancement
 
 ```bash
-# Cloner / dézipper le projet
-cd owl-editor
+# Cloner le projet
+git clone https://github.com/MyShivaRepo/swowl.git
+cd swowl
 
 # Builder et lancer
 docker compose up --build
@@ -25,7 +26,7 @@ docker compose up --build
 ## Structure du projet
 
 ```
-owl-editor/
+swowl/
 ├── docker-compose.yml
 ├── backend/
 │   ├── Dockerfile
