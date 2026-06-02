@@ -716,15 +716,21 @@ const FsBrowser = {
     },
 
     confirm() {
-        const dirPath = this._currentPath.replace(/\/$/, '') + '/';
+        // Lire le dossier affiché dans le footer (toujours à jour, se termine par /)
+        const folderEl = document.getElementById('fs-selected-path');
+        let dirPath = folderEl ? folderEl.textContent.trim() : this._currentPath + '/';
+        // Sécurité : si le chemin contient un .json, tronquer au dernier /
+        if (dirPath.match(/\.json$/i)) dirPath = dirPath.substring(0, dirPath.lastIndexOf('/') + 1);
+        if (!dirPath.endsWith('/')) dirPath += '/';
+
         const pathField = document.getElementById(this._targetFieldId);
         if (pathField) pathField.value = dirPath;
-        // Si un fichier existant a été sélectionné, pré-remplir le champ Name
+
+        // Pré-remplir le champ Name si un fichier a été sélectionné
         if (this._selectedFile) {
             const nameField = document.getElementById('onto-new-name');
-            if (nameField && !nameField.value.trim()) {
+            if (nameField && !nameField.value.trim())
                 nameField.value = this._selectedFile.name.replace(/\.json$/, '');
-            }
             this._selectedFile = null;
         }
         this.close();
