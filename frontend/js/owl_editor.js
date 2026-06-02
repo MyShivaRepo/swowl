@@ -1577,7 +1577,34 @@ function _makeAnnotRow(type, editor, ac, propId = null) {
     return tr;
 }
 
-/** HTML des items d'une liste (propriétés/classes/XSD) */
+function _ruleUsesClass(rule, classId) {
+    const search = (atom) => {
+        if (!atom) return false;
+        if (Array.isArray(atom)) return atom.some(search);
+        switch (atom.type) {
+            case 'type_atom':   return atom.class_id === classId;
+            case 'naf_block':   return (atom.atoms || []).some(search);
+            case 'conditional': return search(atom.condition) || search(atom.consequent);
+            default:            return false;
+        }
+    };
+    return [...(rule.body || []), ...(rule.head || [])].some(search);
+}
+
+function _ruleUsesProperty(rule, propId) {
+    const search = (atom) => {
+        if (!atom) return false;
+        if (Array.isArray(atom)) return atom.some(search);
+        switch (atom.type) {
+            case 'property_atom': return atom.property_id === propId;
+            case 'naf_block':     return (atom.atoms || []).some(search);
+            case 'conditional':   return search(atom.condition) || search(atom.consequent);
+            default:              return false;
+        }
+    };
+    return [...(rule.body || []), ...(rule.head || [])].some(search);
+}
+
 /** Génère la frame "Where Used in SWRL Rules" pour un élément donné.
  *  @param {Function} testFn  (rule) => boolean — retourne true si la règle référence l'élément */
 function _whereUsedFrame(testFn) {
