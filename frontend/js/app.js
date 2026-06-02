@@ -290,10 +290,12 @@ const APP = {
             const connectBtn = isConn
                 ? `<button class="btn-sm btn-warn" onclick="APP.doDisconnect()" title="Disconnect">⏏ Disconnect</button>`
                 : `<button class="btn-sm btn-edit" onclick="APP.doConnect('${safeName}')" title="Connect">▶ Connect</button>`;
+            // Afficher uniquement le dossier dans la colonne Path (pas le nom de fichier)
+            const displayPath = o.path.substring(0, o.path.lastIndexOf('/') + 1);
             return `<tr class="${isConn ? 'onto-current-row' : ''}">
                 <td>${statusBadge}</td>
                 <td><strong>${o.name}</strong></td>
-                <td class="onto-iri-cell" title="${o.path}">${o.path}</td>
+                <td class="onto-iri-cell" title="${o.path}">${displayPath}</td>
                 <td><code>${o.prefix}</code></td>
                 <td><code>${o.uri}</code></td>
                 <td class="actions" style="white-space:nowrap">
@@ -721,7 +723,6 @@ const FsBrowser = {
     },
 
     confirm(dirFromBtn) {
-        alert('DEBUG confirm()\ndirFromBtn = ' + JSON.stringify(dirFromBtn) + '\n_currentPath = ' + this._currentPath);
         // dirFromBtn est passé directement depuis le data-dir du bouton — source fiable
         let dirPath = (dirFromBtn || this._currentPath + '/').replace(/\/$/, '') + '/';
 
