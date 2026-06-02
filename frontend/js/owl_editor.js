@@ -348,8 +348,9 @@ const ClassEditor = {
             <div class="split-handle" id="split-handle"></div>
             <div class="detail-panel" id="class-detail">
                 <div class="detail-panel-empty">
-                    <span class="cls-dot" style="width:36px;height:36px"></span>
-                    <span>Select an existing Class or create a new one</span>
+                    <span class="cls-dot" style="width:32px;height:32px"></span>
+                    <span>Select an existing <strong>Class</strong> or create a new one</span>
+                    <button class="btn-primary btn-sm" onclick="ClassEditor.createChild()">＋ Create Class</button>
                 </div>
             </div>
         </div>`;
@@ -435,10 +436,11 @@ const ClassEditor = {
         const detail = document.getElementById('class-detail');
         if (detail) detail.innerHTML = `
             <div class="detail-panel-empty">
-                <span class="thing-icon-lg"></span>
-                <strong>owl:Thing</strong>
-                <span style="color:var(--text2);font-size:13px">Root of all OWL classes</span>
-                <button class="btn-primary" onclick="ClassEditor.createChild()">⬡↓ Add Child Class</button>
+                <span class="cls-dot" style="width:32px;height:32px"></span>
+                <strong style="font-family:var(--font-mono);font-size:13px">owl:Thing</strong>
+                <span style="color:var(--text-dim);font-size:12px">Root of all OWL classes</span>
+                <span style="color:var(--text2);font-size:12px">Select an existing <strong>Class</strong> or create a new one</span>
+                <button class="btn-primary btn-sm" onclick="ClassEditor.createChild()">＋ Create Class</button>
             </div>`;
         // Super classes panel : vider
         this._updateSuperPanel(null);
@@ -1954,8 +1956,9 @@ const OPEditor = {
             <div class="split-handle" id="op-split-handle"></div>
             <div class="detail-panel" id="op-detail">
                 <div class="detail-panel-empty">
-                    <span class="op-prop-dot" style="width:36px;height:24px"></span>
-                    <span>Select an existing ObjectProperty or create a new one</span>
+                    <span class="op-prop-dot" style="width:40px;height:20px"></span>
+                    <span>Select an existing <strong>Object Property</strong> or create a new one</span>
+                    <button class="btn-primary btn-sm" onclick="OPEditor.createChild()">＋ Create Object Property</button>
                 </div>
             </div>
         </div>`;
@@ -2016,10 +2019,11 @@ const OPEditor = {
         const detail = document.getElementById('op-detail');
         if (detail) detail.innerHTML = `
             <div class="detail-panel-empty">
-                <span style="font-size:36px;font-weight:300">→</span>
-                <strong>owl:topObjectProperty</strong>
-                <span style="color:var(--text2);font-size:13px">Racine de toutes les ObjectProperties OWL</span>
-                <button class="btn-primary" onclick="OPEditor.createChild()">→↓ Add Child Property</button>
+                <span class="op-prop-dot" style="width:40px;height:20px"></span>
+                <strong style="font-family:var(--font-mono);font-size:13px">owl:topObjectProperty</strong>
+                <span style="color:var(--text-dim);font-size:12px">Root of all OWL Object Properties</span>
+                <span style="color:var(--text2);font-size:12px">Select an existing <strong>Object Property</strong> or create a new one</span>
+                <button class="btn-primary btn-sm" onclick="OPEditor.createChild()">＋ Create Object Property</button>
             </div>`;
         this._updateSuperPanel(null);
         this._updateTreeButtons();
@@ -2657,8 +2661,9 @@ const DPEditor = {
             <div class="split-handle" id="dp-split-handle"></div>
             <div class="detail-panel" id="dp-detail">
                 <div class="detail-panel-empty">
-                    <span class="dp-prop-dot" style="width:36px;height:24px"></span>
-                    <span>Select an existing DatatypeProperty or create a new one</span>
+                    <span class="dp-prop-dot" style="width:40px;height:20px"></span>
+                    <span>Select an existing <strong>Datatype Property</strong> or create a new one</span>
+                    <button class="btn-primary btn-sm" onclick="DPEditor.createChild()">＋ Create Datatype Property</button>
                 </div>
             </div>
         </div>`;
@@ -2727,10 +2732,11 @@ const DPEditor = {
         const detail = document.getElementById('dp-detail');
         if (detail) detail.innerHTML = `
             <div class="detail-panel-empty">
-                <span style="font-size:36px;font-weight:300">⊨</span>
-                <strong>owl:topDataProperty</strong>
-                <span style="color:var(--text2);font-size:13px">Racine de toutes les DatatypeProperties OWL</span>
-                <button class="btn-primary" onclick="DPEditor.createChild()">⊨↓ Create sub-property</button>
+                <span class="dp-prop-dot" style="width:40px;height:20px"></span>
+                <strong style="font-family:var(--font-mono);font-size:13px">owl:topDatatypeProperty</strong>
+                <span style="color:var(--text-dim);font-size:12px">Root of all OWL Datatype Properties</span>
+                <span style="color:var(--text2);font-size:12px">Select an existing <strong>Datatype Property</strong> or create a new one</span>
+                <button class="btn-primary btn-sm" onclick="DPEditor.createChild()">＋ Create Datatype Property</button>
             </div>`;
         this._updateSuperPanel(null);
         this._updateTreeButtons();
@@ -3188,8 +3194,9 @@ const IndividualEditor = {
             <div class="split-handle" id="ind-split-h2"></div>
             <div class="detail-panel" id="ind-detail">
                 <div class="detail-panel-empty">
-                    <span class="xsd-dot" style="width:28px;height:28px;margin:4px"></span>
-                    <span>Select an existing Individual or create a new one</span>
+                    <span class="xsd-dot" style="width:28px;height:28px"></span>
+                    <span>Select an existing <strong>Individual</strong> or create a new one</span>
+                    <button class="btn-primary btn-sm" onclick="IndividualEditor.newIndividual()">＋ Create Individual</button>
                 </div>
             </div>
         </div>`;
@@ -3329,8 +3336,11 @@ const IndividualEditor = {
         // Col 3 — vider
         const detail = document.getElementById('ind-detail');
         if (detail) detail.innerHTML = `<div class="detail-panel-empty">
-            <span style="font-size:32px">🦉</span>
-            <span>Select an individual or create a new one</span>
+            <span class="cls-dot" style="width:32px;height:32px"></span>
+            <strong style="font-family:var(--font-mono);font-size:13px">owl:Thing</strong>
+            <span style="color:var(--text-dim);font-size:12px">Root of all OWL classes</span>
+            <span style="color:var(--text2);font-size:12px">Select an existing <strong>Individual</strong> or create a new one</span>
+            <button class="btn-primary btn-sm" onclick="IndividualEditor.newIndividual()">＋ Create Individual</button>
         </div>`;
         this._editingId = null;
     },
@@ -3411,8 +3421,11 @@ const IndividualEditor = {
         document.querySelectorAll('#ind-list-scroll .tree-item').forEach(el => el.classList.remove('selected'));
         const detail = document.getElementById('ind-detail');
         if (detail) detail.innerHTML = `<div class="detail-panel-empty">
-            <span style="font-size:32px">🦉</span>
-            <span>Select an individual or create a new one</span>
+            <span class="cls-dot" style="width:32px;height:32px"></span>
+            <strong style="font-family:var(--font-mono);font-size:13px">owl:Thing</strong>
+            <span style="color:var(--text-dim);font-size:12px">Root of all OWL classes</span>
+            <span style="color:var(--text2);font-size:12px">Select an existing <strong>Individual</strong> or create a new one</span>
+            <button class="btn-primary btn-sm" onclick="IndividualEditor.newIndividual()">＋ Create Individual</button>
         </div>`;
     },
 
