@@ -789,17 +789,21 @@ def fs_browse(path: str = Query("/Users/bernard")):
         raise HTTPException(404, f"Répertoire introuvable : {path}")
     dirs, files = [], []
     try:
-        for entry in sorted(p.iterdir(), key=lambda e: (not e.is_dir(), e.name.lower())):
-            if entry.name.startswith('.'):
-                continue
+        entries = sorted(p.iterdir(), key=lambda e: (not e.is_dir(), e.name.lower()))
+    except PermissionError:
+        raise HTTPException(403, f"Permission denied: {path}")
+    for entry in entries:
+        if entry.name.startswith('.'):
+            continue
+        try:
             host_entry = container_to_host(str(entry))
             if entry.is_dir():
                 dirs.append({"name": entry.name, "path": host_entry})
             elif entry.suffix == ".json":
                 files.append({"name": entry.name, "path": host_entry})
-    except PermissionError:
-        pass
-    parent = str(FSPath(path).parent) if path != "/" else None
+        except PermissionError:
+            continue
+    parent = str(FSPath(path).parent) if str(FSPath(path).parent) != path else None
     return {"current": path, "parent": parent, "dirs": dirs, "files": files}
 
 

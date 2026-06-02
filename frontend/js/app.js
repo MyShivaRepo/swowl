@@ -605,7 +605,7 @@ const UI = {
 
 const FsBrowser = {
     _targetFieldId: null,
-    _currentPath: '/Users/bernard',
+    _currentPath: '/Users/bernard/AppData',
     _pendingFilename: '',   // filename typed in the bottom bar
 
     open(targetFieldId) {
@@ -696,7 +696,10 @@ const FsBrowser = {
             if (!html) html = '<div class="fs-loading" style="color:var(--text-dim)">Empty folder</div>';
             list.innerHTML = html;
         } catch (e) {
-            if (list) list.innerHTML = `<div class="fs-loading" style="color:#c55">Cannot open this folder.</div>`;
+            const msg = e.message?.includes('403') || e.message?.includes('Permission')
+                ? 'Permission denied — this folder is not accessible from Docker.'
+                : `Cannot open this folder: ${e.message}`;
+            if (list) list.innerHTML = `<div class="fs-loading" style="color:#c55">${msg}</div>`;
         }
     },
 
