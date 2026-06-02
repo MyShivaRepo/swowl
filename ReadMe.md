@@ -18,8 +18,8 @@ cd owl-editor
 docker compose up --build
 
 # L'application est disponible sur :
-# http://localhost        ← Interface utilisateur
-# http://localhost:8000   ← API FastAPI (Swagger : /docs)
+# http://localhost:12345      ← Interface utilisateur
+# http://localhost:8001/docs  ← API FastAPI (Swagger)
 ```
 
 ## Structure du projet
@@ -84,7 +84,7 @@ owl-editor/
 
 ## API
 
-Documentation Swagger disponible sur `http://localhost:8000/docs`
+Documentation Swagger disponible sur `http://localhost:8001/docs`
 
 Endpoints principaux :
 - `POST /api/ontologies` — Créer une ontologie
@@ -102,7 +102,7 @@ Ce répertoire est un volume Docker — les données persistent entre redémarra
 ## Importer l'ontologie RoHS
 
 Si tu as le fichier `RoHS_Ontologie.owl` :
-1. Ouvrir l'application sur http://localhost
+1. Ouvrir l'application sur http://localhost:12345
 2. Cliquer "📂 Importer .owl / .ttl"
 3. Sélectionner `RoHS_Ontologie.owl`
 4. IRI de base : `https://ontologies.example.org/rohs`
