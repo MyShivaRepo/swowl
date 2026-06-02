@@ -108,6 +108,14 @@ def export_owl_xml(store: TripleStore) -> bytes:
         f'     xmlns:xsd="{XSD_NS}"',
         f'     xmlns:rdfs="{RDFS_NS}"',
         f'     ontologyIRI="{base}">',
+        # Préfixes requis par OWLAPI 4 pour résoudre les IRIs relatifs (#local)
+        f'    <Prefix name="" IRI="{base}#"/>',
+        f'    <Prefix name="owl" IRI="{OWL_NS}"/>',
+        f'    <Prefix name="rdf" IRI="{RDF_NS}"/>',
+        f'    <Prefix name="xml" IRI="http://www.w3.org/XML/1998/namespace"/>',
+        f'    <Prefix name="xsd" IRI="{XSD_NS}"/>',
+        f'    <Prefix name="{onto.prefix}" IRI="{base}#"/>',
+        f'    <Prefix name="rdfs" IRI="{RDFS_NS}"/>',
         '',
     ]
 
