@@ -48,6 +48,9 @@
 <div class="nav-item" data-section="swrl-rules" onclick="APP.navigate('swrl-rules')">
       ⚙️ SWRL Rules <span class="nav-count" id="nc-swrl">0</span>
     </div>
+    <div class="nav-item" data-section="sword-rules" onclick="APP.navigate('sword-rules')">
+      ⚙️ SWORD Rules <span class="nav-count" id="nc-sword">0</span>
+    </div>
     <div class="nav-item" data-section="inferences" onclick="APP.navigate('inferences')">
       🧠 Inferences
     </div>
@@ -75,6 +78,7 @@
 <script src="/js/api.js?v=10"></script>
 <script src="/js/owl_editor.js?v=10"></script>
 <script src="/js/swrl_editor.js?v=10"></script>
+<script src="/js/sword_editor.js?v=10"></script>
 <script src="/js/inference_ui.js?v=10"></script>
 <script src="/js/app.js?v=10"></script>
 
@@ -86,6 +90,7 @@ function _updateNavCounters() {
   document.getElementById('nc-dps').textContent     = APP.state.datatype_properties.length;
   document.getElementById('nc-inds').textContent    = APP.state.individuals.length;
   const _ncSwrl = document.getElementById('nc-swrl'); if (_ncSwrl) _ncSwrl.textContent = (APP.state.swrl_rules||[]).length;
+  const _ncSword = document.getElementById('nc-sword'); if (_ncSword) _ncSword.textContent = (APP.state.sword_rules||[]).length;
   document.getElementById('nc-annos').textContent   = ALL_ANNO_PROPS.length;
 }
 
