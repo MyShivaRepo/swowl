@@ -1588,46 +1588,16 @@ function _makeAnnotRow(type, editor, ac, propId = null) {
 }
 
 /** HTML des items d'une liste (propriétés/classes/XSD) */
-/** Retourne true si la classe classId est référencée dans une règle SWORD (récursif) */
-function _ruleUsesClass(rule, classId) {
-    const search = (atom) => {
-        if (!atom) return false;
-        if (Array.isArray(atom)) return atom.some(search);
-        switch (atom.type) {
-            case 'type_atom':   return atom.class_id === classId;
-            case 'naf_block':   return (atom.atoms || []).some(search);
-            case 'conditional': return search(atom.condition) || search(atom.consequent);
-            default:            return false;
-        }
-    };
-    return [...(rule.body || []), ...(rule.head || [])].some(search);
-}
-
-/** Retourne true si la propriété propId est référencée dans une règle SWORD (récursif) */
-function _ruleUsesProperty(rule, propId) {
-    const search = (atom) => {
-        if (!atom) return false;
-        if (Array.isArray(atom)) return atom.some(search);
-        switch (atom.type) {
-            case 'property_atom': return atom.property_id === propId;
-            case 'naf_block':     return (atom.atoms || []).some(search);
-            case 'conditional':   return search(atom.condition) || search(atom.consequent);
-            default:              return false;
-        }
-    };
-    return [...(rule.body || []), ...(rule.head || [])].some(search);
-}
-
-/** Génère la frame "Where Used in Rules" pour un élément donné.
+/** Génère la frame "Where Used in SWRL Rules" pour un élément donné.
  *  @param {Function} testFn  (rule) => boolean — retourne true si la règle référence l'élément */
 function _whereUsedFrame(testFn) {
-    const used = (APP.state.sword_rules || []).filter(testFn);
+    const used = (APP.state.swrl_rules || []).filter(testFn);
     if (!used.length) return '';
     const rows = used.map(r => `
         <div class="cls-list-item" style="cursor:default">
             <span style="font-size:11px;flex-shrink:0">⚙️</span>
             <span class="cls-list-lbl" style="cursor:pointer"
-                  onclick="APP.navigateTo('sword-rules','${r.id}')"
+                  onclick="APP.navigateTo('swrl-rules','${r.id}')"
                   onmouseover="this.style.textDecoration='underline';this.style.color='var(--accent,#5f8dd3)'"
                   onmouseout="this.style.textDecoration='';this.style.color=''">${r.id}</span>
             ${r.label ? `<span class="restr-prop-summary" style="margin-left:4px">${r.label}</span>` : ''}

@@ -238,75 +238,6 @@ class SWRLRule(BaseModel):
     enabled: bool = True
 
 
-# ── SWORD — SWRL + Negation As Failure ───────────────────────
-
-class SWORDTypeAtom(BaseModel):
-    """?var is a ClassName"""
-    type: Literal["type_atom"] = "type_atom"
-    var: str = ""
-    class_id: str = ""
-
-
-class SWORDPropertyAtom(BaseModel):
-    """?subject property ?object  (?_ = wildcard/don't-care)"""
-    type: Literal["property_atom"] = "property_atom"
-    subject: str = ""
-    property_id: str = ""
-    object: str = "?_"
-
-
-class SWORDEqualityAtom(BaseModel):
-    """?var = value"""
-    type: Literal["equality_atom"] = "equality_atom"
-    var: str = ""
-    value: str = ""
-
-
-class SWORDNAFBlock(BaseModel):
-    """NAF(atoms...)  — Negation As Failure block"""
-    type: Literal["naf_block"] = "naf_block"
-    atoms: List["SWORDBodyAtom"] = []
-
-
-class SWORDConditional(BaseModel):
-    """(if conditions then consequents)  — conditional consequent in head"""
-    type: Literal["conditional"] = "conditional"
-    condition:  List["SWORDBodyAtom"] = Field(default_factory=lambda: [SWORDEqualityAtom()])
-    consequent: List["SWORDBodyAtom"] = Field(default_factory=lambda: [SWORDTypeAtom()])
-
-    @field_validator('condition', 'consequent', mode='before')
-    @classmethod
-    def normalize_to_list(cls, v):
-        if isinstance(v, dict):
-            return [v]
-        return v
-
-
-# Body atoms: TypeAtom | PropertyAtom | EqualityAtom | NAFBlock
-SWORDBodyAtom = Union[
-    SWORDTypeAtom, SWORDPropertyAtom, SWORDEqualityAtom, SWORDNAFBlock
-]
-
-# Head atoms: body atoms + Conditional
-SWORDHeadAtom = Union[
-    SWORDTypeAtom, SWORDPropertyAtom, SWORDEqualityAtom,
-    SWORDNAFBlock, SWORDConditional
-]
-
-# Rebuild forward references
-SWORDNAFBlock.model_rebuild()
-SWORDConditional.model_rebuild()
-
-
-class SWORDRule(BaseModel):
-    id: str
-    label: str = ""
-    comment: str = ""
-    body: List[SWORDBodyAtom] = []
-    head: List[SWORDHeadAtom] = []
-    enabled: bool = True
-
-
 # ── Ontologie complète ────────────────────────────────────────
 
 class OWLOntology(BaseModel):
@@ -319,7 +250,6 @@ class OWLOntology(BaseModel):
     datatype_properties: List[OWLDatatypeProperty] = []
     individuals: List[OWLIndividual] = []
     swrl_rules:  List[SWRLRule]  = []
-    sword_rules: List[SWORDRule] = []
 
 
 # ── Résultats d'inférence ─────────────────────────────────────
