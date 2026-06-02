@@ -1,6 +1,7 @@
 """
 triple_store.py — Triple store in-memory basé sur rdflib
-Persistance via fichiers Turtle dans DATA_DIR
+Persistance via fichiers JSON à chemins arbitraires
+Registre centralisé : DATA_DIR/registry.json
 """
 from __future__ import annotations
 import os
@@ -24,7 +25,6 @@ from owl_model import (
 SWRL_NS  = Namespace("http://www.w3.org/2003/11/swrl#")
 SWRLB_NS = Namespace("http://www.w3.org/2003/11/swrlb#")
 
-# Correspondance préfixe → prédicat rdflib pour les annotations OWL 2
 ANNO_PROP_MAP = {
     'rdfs:seeAlso':               RDFS.seeAlso,
     'rdfs:isDefinedBy':           RDFS.isDefinedBy,
@@ -34,76 +34,171 @@ ANNO_PROP_MAP = {
     'owl:backwardCompatibleWith': OWL.backwardCompatibleWith,
     'owl:incompatibleWith':       OWL.incompatibleWith,
 }
+
 DATA_DIR = Path(os.environ.get("DATA_DIR", "/app/data/ontologies"))
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
+REGISTRY_FILE = DATA_DIR / "registry.json"
 
-def _onto_path(onto_id: str) -> Path:
-    safe = onto_id.replace("https://", "").replace("http://", "").replace("/", "_")
-    return DATA_DIR / f"{safe}.json"
+# Préfixe pour traduire les chemins hôte → container
+HOST_PREFIX_CONTAINER = "/host/Users/bernard"
+HOST_PREFIX_HOST       = "/Users/bernard"
+
+
+def host_to_container(path: str) -> str:
+    """Traduit un chemin hôte Mac en chemin container Docker."""
+    if path.startswith(HOST_PREFIX_HOST):
+        return HOST_PREFIX_CONTAINER + path[len(HOST_PREFIX_HOST):]
+    return path
+
+
+def container_to_host(path: str) -> str:
+    """Traduit un chemin container Docker en chemin hôte Mac."""
+    if path.startswith(HOST_PREFIX_CONTAINER):
+        return HOST_PREFIX_HOST + path[len(HOST_PREFIX_CONTAINER):]
+    return path
+
+
+class RegistryEntry:
+    def __init__(self, name: str, path: str, uri: str, prefix: str, connected: bool = False):
+        self.name = name
+        self.path = path        # chemin hôte (affiché à l'utilisateur)
+        self.uri = uri
+        self.prefix = prefix
+        self.connected = connected
+
+    def to_dict(self) -> dict:
+        return {
+            "name": self.name,
+            "path": self.path,
+            "uri": self.uri,
+            "prefix": self.prefix,
+            "connected": self.connected,
+        }
+
+    @staticmethod
+    def from_dict(d: dict) -> "RegistryEntry":
+        return RegistryEntry(
+            name=d["name"],
+            path=d["path"],
+            uri=d["uri"],
+            prefix=d.get("prefix", "onto"),
+            connected=d.get("connected", False),
+        )
 
 
 class TripleStore:
-    """
-    Wrapper autour d'un rdflib.Graph.
-    Sérialise l'ontologie en JSON pour la persistance,
-    et construit le graphe RDF à la demande pour l'export.
-    """
-
-    _LAST_FILE = DATA_DIR / ".last_ontology"
 
     def __init__(self):
         self._ontology: Optional[OWLOntology] = None
+        self._registry: dict[str, RegistryEntry] = {}
+        self._load_registry()
+        # Auto-connecter la première ontologie connectée trouvée dans le registre
+        for entry in self._registry.values():
+            if entry.connected:
+                self._load_from_entry(entry)
+                break
 
-    # ── Persistance JSON ─────────────────────────────────────
+    # ── Registre ─────────────────────────────────────────────
 
-    def _write_last(self, onto_id: str) -> None:
-        """Mémorise l'ID de la dernière ontologie active."""
-        self._LAST_FILE.write_text(onto_id, encoding="utf-8")
+    def _load_registry(self) -> None:
+        if REGISTRY_FILE.exists():
+            try:
+                data = json.loads(REGISTRY_FILE.read_text(encoding="utf-8"))
+                self._registry = {
+                    e["name"]: RegistryEntry.from_dict(e)
+                    for e in data.get("entries", [])
+                }
+            except Exception:
+                self._registry = {}
 
-    def load_last(self) -> Optional[OWLOntology]:
-        """Recharge la dernière ontologie utilisée (appelé au démarrage)."""
-        if not self._LAST_FILE.exists():
-            # Aucune trace — on tente avec la seule ontologie disponible
-            ontos = self.list_ontologies()
-            if len(ontos) == 1:
-                return self.load(ontos[0]["id"])
+    def _save_registry(self) -> None:
+        data = {"entries": [e.to_dict() for e in self._registry.values()]}
+        REGISTRY_FILE.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+
+    def list_registry(self) -> list[dict]:
+        return [e.to_dict() for e in self._registry.values()]
+
+    # ── CRUD registre ────────────────────────────────────────
+
+    def register(self, name: str, path: str, uri: str, prefix: str) -> RegistryEntry:
+        entry = RegistryEntry(name=name, path=path, uri=uri, prefix=prefix, connected=False)
+        self._registry[name] = entry
+        self._save_registry()
+        return entry
+
+    def unregister(self, name: str) -> bool:
+        if name not in self._registry:
+            return False
+        entry = self._registry[name]
+        if entry.connected:
+            self._ontology = None
+        del self._registry[name]
+        self._save_registry()
+        return True
+
+    def update_entry(self, name: str, new_name: str, path: str, uri: str, prefix: str) -> Optional[RegistryEntry]:
+        if name not in self._registry:
             return None
-        onto_id = self._LAST_FILE.read_text(encoding="utf-8").strip()
-        return self.load(onto_id)
+        was_connected = self._registry[name].connected
+        del self._registry[name]
+        entry = RegistryEntry(name=new_name, path=path, uri=uri, prefix=prefix, connected=was_connected)
+        self._registry[new_name] = entry
+        self._save_registry()
+        return entry
+
+    # ── Connexion / déconnexion ──────────────────────────────
+
+    def connect(self, name: str) -> Optional[OWLOntology]:
+        if name not in self._registry:
+            return None
+        # Déconnecter toute ontologie précédemment connectée
+        for e in self._registry.values():
+            e.connected = False
+        entry = self._registry[name]
+        entry.connected = True
+        onto = self._load_from_entry(entry)
+        self._save_registry()
+        return onto
+
+    def disconnect(self) -> None:
+        for e in self._registry.values():
+            e.connected = False
+        self._ontology = None
+        self._save_registry()
+
+    def _load_from_entry(self, entry: RegistryEntry) -> Optional[OWLOntology]:
+        container_path = host_to_container(entry.path)
+        p = Path(container_path)
+        if p.exists():
+            try:
+                data = json.loads(p.read_text(encoding="utf-8"))
+                self._ontology = OWLOntology.model_validate(data)
+                return self._ontology
+            except Exception:
+                pass
+        # Fichier inexistant → créer ontologie vide
+        onto = OWLOntology(id=entry.uri, name=entry.name, prefix=entry.prefix)
+        self._ontology = onto
+        self._save_onto(onto, entry.path)
+        return onto
+
+    # ── Persistance ontologie ────────────────────────────────
+
+    def _save_onto(self, onto: OWLOntology, host_path: str) -> None:
+        container_path = host_to_container(host_path)
+        p = Path(container_path)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(onto.model_dump_json(indent=2), encoding="utf-8")
 
     def save(self) -> None:
         if not self._ontology:
             return
-        path = _onto_path(self._ontology.id)
-        path.write_text(self._ontology.model_dump_json(indent=2), encoding="utf-8")
-
-    def load(self, onto_id: str) -> Optional[OWLOntology]:
-        path = _onto_path(onto_id)
-        if not path.exists():
-            return None
-        data = json.loads(path.read_text(encoding="utf-8"))
-        self._ontology = OWLOntology.model_validate(data)
-        self._write_last(onto_id)
-        return self._ontology
-
-    def list_ontologies(self) -> list[dict]:
-        result = []
-        for f in DATA_DIR.glob("*.json"):
-            try:
-                data = json.loads(f.read_text(encoding="utf-8"))
-                result.append({"id": data.get("id"), "prefix": data.get("prefix"),
-                                "version": data.get("version")})
-            except Exception:
-                pass
-        return result
-
-    def delete(self, onto_id: str) -> bool:
-        path = _onto_path(onto_id)
-        if path.exists():
-            path.unlink()
-            return True
-        return False
+        # Trouver l'entrée connectée pour connaître le path
+        for entry in self._registry.values():
+            if entry.connected:
+                self._save_onto(self._ontology, entry.path)
+                return
 
     # ── Accès ontologie ──────────────────────────────────────
 
@@ -113,7 +208,69 @@ class TripleStore:
     def set(self, onto: OWLOntology) -> None:
         self._ontology = onto
         self.save()
-        self._write_last(onto.id)
+
+    # ── Import depuis RDF ────────────────────────────────────
+
+    def import_from_rdf(self, content: bytes, fmt: str, name: str, host_path: str, uri: str, prefix: str = "onto") -> OWLOntology:
+        g = Graph()
+        g.parse(data=content, format=fmt)
+
+        base = uri.rstrip("#/") + "#"
+        NS = Namespace(base)
+
+        onto = OWLOntology(id=uri, name=name, prefix=prefix)
+
+        for cls_uri in g.subjects(RDF.type, OWL.Class):
+            if isinstance(cls_uri, URIRef):
+                local = str(cls_uri).replace(base, "")
+                if not local or "/" in local:
+                    continue
+                owl_cls = OWLClass(id=local)
+                for label in g.objects(cls_uri, RDFS.label):
+                    owl_cls.annotations.labels.append(
+                        {"lang": label.language or "fr", "value": str(label)}
+                    )
+                for sup in g.objects(cls_uri, RDFS.subClassOf):
+                    if isinstance(sup, URIRef):
+                        sup_local = str(sup).replace(base, "")
+                        if sup_local:
+                            owl_cls.subClassOf.append(sup_local)
+                onto.classes.append(owl_cls)
+
+        for prop_uri in g.subjects(RDF.type, OWL.ObjectProperty):
+            if isinstance(prop_uri, URIRef):
+                local = str(prop_uri).replace(base, "")
+                if not local:
+                    continue
+                prop = OWLObjectProperty(id=local)
+                for d in g.objects(prop_uri, RDFS.domain):
+                    if isinstance(d, URIRef):
+                        prop.domain.append(str(d).replace(base, ""))
+                for r in g.objects(prop_uri, RDFS.range):
+                    if isinstance(r, URIRef):
+                        prop.range.append(str(r).replace(base, ""))
+                onto.object_properties.append(prop)
+
+        for prop_uri in g.subjects(RDF.type, OWL.DatatypeProperty):
+            if isinstance(prop_uri, URIRef):
+                local = str(prop_uri).replace(base, "")
+                if not local:
+                    continue
+                prop = OWLDatatypeProperty(id=local)
+                for d in g.objects(prop_uri, RDFS.domain):
+                    if isinstance(d, URIRef):
+                        prop.domain.append(str(d).replace(base, ""))
+                for r in g.objects(prop_uri, RDFS.range):
+                    prop.range.append(str(r).replace(base, "").replace(str(XSD), "xsd:"))
+                onto.datatype_properties.append(prop)
+
+        self._ontology = onto
+        # Enregistrer dans le registre et sauver le fichier
+        self.register(name, host_path, uri, prefix)
+        self._save_onto(onto, host_path)
+        # Connecter automatiquement
+        self.connect(name)
+        return onto
 
     # ── Construction graphe RDF ───────────────────────────────
 
@@ -144,7 +301,6 @@ class TripleStore:
             if local_id.startswith("http"):
                 return URIRef(local_id)
             if ":" in local_id and not local_id.startswith(onto.prefix):
-                # ex: xsd:string, owl:Thing
                 return URIRef(local_id.replace("xsd:", str(XSD))
                               .replace("owl:", str(OWL))
                               .replace("rdfs:", str(RDFS)))
@@ -180,7 +336,6 @@ class TripleStore:
                 g.add((bn, RDF.type, OWL.Class))
                 g.add((bn, OWL.complementOf, class_expr_node(expr.operand)))
                 return bn
-            # Restrictions
             bn = BNode()
             g.add((bn, RDF.type, OWL.Restriction))
             g.add((bn, OWL.onProperty, iri(expr.property)))
@@ -207,77 +362,72 @@ class TripleStore:
                     g.add((bn, OWL.onClass, iri(expr.filler)))
             return bn
 
-        # ── Classes ──────────────────────────────────────────
         for cls in onto.classes:
-            uri = iri(cls.id)
-            g.add((uri, RDF.type, OWL.Class))
-            add_anns(uri, cls.annotations)
+            uri_ = iri(cls.id)
+            g.add((uri_, RDF.type, OWL.Class))
+            add_anns(uri_, cls.annotations)
             for sup in cls.subClassOf:
                 if isinstance(sup, PropertyPresence):
-                    continue   # marqueur UI uniquement — jamais sérialisé
-                g.add((uri, RDFS.subClassOf, class_expr_node(sup)))
+                    continue
+                g.add((uri_, RDFS.subClassOf, class_expr_node(sup)))
             for eq in cls.equivalentClass:
-                g.add((uri, OWL.equivalentClass, class_expr_node(eq)))
+                g.add((uri_, OWL.equivalentClass, class_expr_node(eq)))
             for dj in cls.disjointWith:
-                g.add((uri, OWL.disjointWith, iri(dj)))
+                g.add((uri_, OWL.disjointWith, iri(dj)))
 
-        # ── ObjectProperties ─────────────────────────────────
         for prop in onto.object_properties:
-            uri = iri(prop.id)
-            g.add((uri, RDF.type, OWL.ObjectProperty))
-            add_anns(uri, prop.annotations)
+            uri_ = iri(prop.id)
+            g.add((uri_, RDF.type, OWL.ObjectProperty))
+            add_anns(uri_, prop.annotations)
             for d in prop.domain:
-                g.add((uri, RDFS.domain, iri(d)))
+                g.add((uri_, RDFS.domain, iri(d)))
             for r in prop.range:
-                g.add((uri, RDFS.range, iri(r)))
+                g.add((uri_, RDFS.range, iri(r)))
             for sp in prop.subPropertyOf:
-                g.add((uri, RDFS.subPropertyOf, iri(sp)))
+                g.add((uri_, RDFS.subPropertyOf, iri(sp)))
             if prop.inverseOf:
-                g.add((uri, OWL.inverseOf, iri(prop.inverseOf)))
+                g.add((uri_, OWL.inverseOf, iri(prop.inverseOf)))
             ch = prop.characteristics
-            if ch.functional:        g.add((uri, RDF.type, OWL.FunctionalProperty))
-            if ch.inverseFunctional: g.add((uri, RDF.type, OWL.InverseFunctionalProperty))
-            if ch.transitive:        g.add((uri, RDF.type, OWL.TransitiveProperty))
-            if ch.symmetric:         g.add((uri, RDF.type, OWL.SymmetricProperty))
-            if ch.asymmetric:        g.add((uri, RDF.type, OWL.AsymmetricProperty))
-            if ch.reflexive:         g.add((uri, RDF.type, OWL.ReflexiveProperty))
-            if ch.irreflexive:       g.add((uri, RDF.type, OWL.IrreflexiveProperty))
+            if ch.functional:        g.add((uri_, RDF.type, OWL.FunctionalProperty))
+            if ch.inverseFunctional: g.add((uri_, RDF.type, OWL.InverseFunctionalProperty))
+            if ch.transitive:        g.add((uri_, RDF.type, OWL.TransitiveProperty))
+            if ch.symmetric:         g.add((uri_, RDF.type, OWL.SymmetricProperty))
+            if ch.asymmetric:        g.add((uri_, RDF.type, OWL.AsymmetricProperty))
+            if ch.reflexive:         g.add((uri_, RDF.type, OWL.ReflexiveProperty))
+            if ch.irreflexive:       g.add((uri_, RDF.type, OWL.IrreflexiveProperty))
             for chain in prop.propertyChainAxiom:
                 lst = _rdf_list(g, [iri(p) for p in chain.chain])
-                g.add((uri, OWL.propertyChainAxiom, lst))
+                g.add((uri_, OWL.propertyChainAxiom, lst))
 
-        # ── DatatypeProperties ───────────────────────────────
         for prop in onto.datatype_properties:
-            uri = iri(prop.id)
-            g.add((uri, RDF.type, OWL.DatatypeProperty))
-            add_anns(uri, prop.annotations)
+            uri_ = iri(prop.id)
+            g.add((uri_, RDF.type, OWL.DatatypeProperty))
+            add_anns(uri_, prop.annotations)
             for d in prop.domain:
-                g.add((uri, RDFS.domain, iri(d)))
+                g.add((uri_, RDFS.domain, iri(d)))
             for r in prop.range:
-                g.add((uri, RDFS.range, iri(r)))
+                g.add((uri_, RDFS.range, iri(r)))
             for sp in prop.subPropertyOf:
-                g.add((uri, RDFS.subPropertyOf, iri(sp)))
+                g.add((uri_, RDFS.subPropertyOf, iri(sp)))
             if prop.functional:
-                g.add((uri, RDF.type, OWL.FunctionalProperty))
+                g.add((uri_, RDF.type, OWL.FunctionalProperty))
 
-        # ── Individus ────────────────────────────────────────
         for ind in onto.individuals:
-            uri = iri(ind.id)
-            g.add((uri, RDF.type, OWL.NamedIndividual))
-            add_anns(uri, ind.annotations)
+            uri_ = iri(ind.id)
+            g.add((uri_, RDF.type, OWL.NamedIndividual))
+            add_anns(uri_, ind.annotations)
             for t in ind.types:
-                g.add((uri, RDF.type, iri(t)))
+                g.add((uri_, RDF.type, iri(t)))
             for oa in ind.objectAssertions:
-                g.add((uri, iri(oa.property), iri(oa.target)))
+                g.add((uri_, iri(oa.property), iri(oa.target)))
             for da in ind.dataAssertions:
                 dt = iri(da.datatype) if da.datatype.startswith("xsd:") else XSD.string
-                g.add((uri, iri(da.property), Literal(da.value, datatype=dt)))
+                g.add((uri_, iri(da.property), Literal(da.value, datatype=dt)))
             for s in ind.sameAs:
-                g.add((uri, OWL.sameAs, iri(s)))
+                g.add((uri_, OWL.sameAs, iri(s)))
             for d in ind.differentFrom:
-                g.add((uri, OWL.differentFrom, iri(d)))
+                g.add((uri_, OWL.differentFrom, iri(d)))
 
-        # ── Règles SWRL ──────────────────────────────────────
         for rule in onto.swrl_rules:
             if not rule.enabled:
                 continue
@@ -292,67 +442,10 @@ class TripleStore:
 
         return g
 
-    # ── Import depuis RDF ────────────────────────────────────
+    # ── Méthodes conservées pour compatibilité ───────────────
 
-    def import_from_rdf(self, content: bytes, fmt: str, onto_id: str, prefix: str = "onto") -> OWLOntology:
-        g = Graph()
-        g.parse(data=content, format=fmt)
-
-        base = onto_id.rstrip("#/") + "#"
-        NS = Namespace(base)
-
-        onto = OWLOntology(id=onto_id, prefix=prefix)
-
-        # Extraire les classes
-        for cls_uri in g.subjects(RDF.type, OWL.Class):
-            if isinstance(cls_uri, URIRef):
-                local = str(cls_uri).replace(base, "")
-                if not local or "/" in local:
-                    continue
-                owl_cls = OWLClass(id=local)
-                for label in g.objects(cls_uri, RDFS.label):
-                    owl_cls.annotations.labels.append(
-                        {"lang": label.language or "fr", "value": str(label)}
-                    )
-                for sup in g.objects(cls_uri, RDFS.subClassOf):
-                    if isinstance(sup, URIRef):
-                        sup_local = str(sup).replace(base, "")
-                        if sup_local:
-                            owl_cls.subClassOf.append(sup_local)
-                onto.classes.append(owl_cls)
-
-        # Extraire les ObjectProperties
-        for prop_uri in g.subjects(RDF.type, OWL.ObjectProperty):
-            if isinstance(prop_uri, URIRef):
-                local = str(prop_uri).replace(base, "")
-                if not local:
-                    continue
-                prop = OWLObjectProperty(id=local)
-                for d in g.objects(prop_uri, RDFS.domain):
-                    if isinstance(d, URIRef):
-                        prop.domain.append(str(d).replace(base, ""))
-                for r in g.objects(prop_uri, RDFS.range):
-                    if isinstance(r, URIRef):
-                        prop.range.append(str(r).replace(base, ""))
-                onto.object_properties.append(prop)
-
-        # Extraire les DatatypeProperties
-        for prop_uri in g.subjects(RDF.type, OWL.DatatypeProperty):
-            if isinstance(prop_uri, URIRef):
-                local = str(prop_uri).replace(base, "")
-                if not local:
-                    continue
-                prop = OWLDatatypeProperty(id=local)
-                for d in g.objects(prop_uri, RDFS.domain):
-                    if isinstance(d, URIRef):
-                        prop.domain.append(str(d).replace(base, ""))
-                for r in g.objects(prop_uri, RDFS.range):
-                    prop.range.append(str(r).replace(base, "").replace(str(XSD), "xsd:"))
-                onto.datatype_properties.append(prop)
-
-        self._ontology = onto
-        self.save()
-        return onto
+    def load_last(self) -> Optional[OWLOntology]:
+        return self._ontology
 
 
 # ── Helpers RDF ──────────────────────────────────────────────
@@ -388,7 +481,6 @@ def _swrl_atom_list(g: Graph, atoms: list, iri_fn) -> URIRef | BNode:
     atom = atoms[0]
     a = BNode()
     g.add((a, RDF.type, SWRL_NS.AtomList))
-
     node = BNode()
     if isinstance(atom, SWRLClassAtom):
         g.add((node, RDF.type, SWRL_NS.ClassAtom))
@@ -409,7 +501,6 @@ def _swrl_atom_list(g: Graph, atoms: list, iri_fn) -> URIRef | BNode:
         g.add((node, SWRL_NS.builtin, URIRef(atom.builtin.replace("swrlb:", str(SWRLB_NS)))))
         arg_nodes = [_swrl_arg(g, a, iri_fn) for a in atom.args]
         g.add((node, SWRL_NS.arguments, _rdf_list(g, arg_nodes)))
-
     g.add((a, RDF.first, node))
     g.add((a, RDF.rest, _swrl_atom_list(g, atoms[1:], iri_fn)))
     return a

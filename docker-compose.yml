@@ -7,6 +7,7 @@ services:
     volumes:
       - ./data:/app/data
       - ./backend:/app
+      - /Users/bernard:/host/Users/bernard
     environment:
       - DATA_DIR=/app/data/ontologies
       - PYTHONUNBUFFERED=1

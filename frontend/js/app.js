@@ -264,195 +264,155 @@ const APP = {
         main.innerHTML = this._renderOntologiesShell();
         try {
             const list = await API.listOntologies();
-            const tbody = document.getElementById('onto-store-body');
-            const count = document.getElementById('onto-store-count');
-            if (tbody) tbody.innerHTML = this._renderOntoTableRows(list);
-            if (count) count.textContent = `${list.length} ontolog${list.length !== 1 ? 'ies' : 'y'}`;
+            this._refreshOntoTable(list);
         } catch (e) {
-            const tbody = document.getElementById('onto-store-body');
+            const tbody = document.getElementById('onto-registry-body');
             if (tbody) tbody.innerHTML =
-                `<tr><td colspan="5" class="onto-table-empty">Cannot fetch ontologies</td></tr>`;
+                `<tr><td colspan="6" class="onto-table-empty">Impossible de charger le registre.</td></tr>`;
         }
     },
 
-    _renderOntologiesShell() {
-        const onto    = this.state.ontology;
-        const label   = onto?.annotations?.labels?.[0]   || { value: '', lang: 'en' };
-        const comment = onto?.annotations?.comments?.[0] || { value: '', lang: 'en' };
+    _refreshOntoTable(list) {
+        const tbody = document.getElementById('onto-registry-body');
+        const count = document.getElementById('onto-registry-count');
+        if (count) count.textContent = `${list.length} ontologie${list.length !== 1 ? 's' : ''}`;
+        if (!tbody) return;
+        if (!list.length) {
+            tbody.innerHTML = `<tr><td colspan="6" class="onto-table-empty">Aucune ontologie dans le registre — créez-en une ou importez un fichier.</td></tr>`;
+            return;
+        }
+        const connectedName = this.state.ontology?.name || null;
+        tbody.innerHTML = list.map(o => {
+            const isConn = o.connected;
+            const safeName = o.name.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+            const statusBadge = isConn
+                ? `<span class="onto-badge onto-badge-connected">● connectée</span>`
+                : `<span class="onto-badge onto-badge-disconnected">○ déconnectée</span>`;
+            const connectBtn = isConn
+                ? `<button class="btn-sm btn-warn" onclick="APP.doDisconnect()" title="Déconnecter">⏏ Déconnecter</button>`
+                : `<button class="btn-sm btn-edit" onclick="APP.doConnect('${safeName}')" title="Connecter">▶ Connecter</button>`;
+            return `<tr class="${isConn ? 'onto-current-row' : ''}">
+                <td>${statusBadge}</td>
+                <td><strong>${o.name}</strong></td>
+                <td class="onto-iri-cell" title="${o.path}">${o.path}</td>
+                <td><code>${o.uri}</code></td>
+                <td><code>${o.prefix}</code></td>
+                <td class="actions" style="white-space:nowrap">
+                    ${connectBtn}
+                    ${isConn ? `<button class="btn-sm" onclick="APP.exportOntology('owl')" title="Export OWL">↓ OWL</button>
+                    <button class="btn-sm" onclick="APP.exportOntology('ttl')" title="Export Turtle">↓ TTL</button>` : ''}
+                    <button class="btn-sm btn-del" onclick="APP.doUnregister('${safeName}')" title="Retirer du registre">✕</button>
+                </td>
+            </tr>`;
+        }).join('');
+    },
 
+    _renderOntologiesShell() {
         return `
         <div class="onto-page">
 
-            <!-- ── Barre d'actions ── -->
             <div class="section-header">
                 <h2>⚙️ Ontologies</h2>
                 <div class="section-actions">
-                    <button class="btn-secondary" onclick="APP.toggleOntoPanel('onto-import-panel')">
-                        📂 Import
-                    </button>
-                    <button class="btn-primary" onclick="APP.toggleOntoPanel('onto-new-panel')">
-                        ✨ New Ontology
-                    </button>
+                    <button class="btn-secondary" onclick="APP.toggleOntoPanel('onto-import-panel')">📂 Importer un fichier</button>
+                    <button class="btn-primary"   onclick="APP.toggleOntoPanel('onto-new-panel')">✨ Nouvelle ontologie</button>
                 </div>
             </div>
 
-            <!-- ── Panel Import (caché) ── -->
-            <div id="onto-import-panel" class="cls-frame onto-collapsible" style="display:none">
-                <div class="cls-frame-bar">
-                    <span class="cls-frame-tag">📂 Import Ontology</span>
-                </div>
-                <div class="cls-frame-body onto-form-row">
-                    <div class="form-group" style="margin:0">
-                        <label>File</label>
-                        <label class="btn-secondary btn-sm onto-file-btn">
-                            <span id="onto-import-fname">Choose file…</span>
-                            <input type="file" accept=".owl,.ttl,.rdf,.xml" style="display:none"
-                                   onchange="APP._onImportFileChange(event)">
-                        </label>
-                    </div>
-                    <div class="form-group" style="margin:0;flex:1;min-width:200px">
-                        <label>Base IRI *</label>
-                        <input type="text" id="onto-import-iri"
-                               placeholder="https://example.org/my-ontology" style="width:100%">
-                    </div>
-                    <div class="form-group" style="margin:0">
-                        <label>Prefix</label>
-                        <input type="text" id="onto-import-prefix" value="onto" style="width:80px">
-                    </div>
-                    <div class="onto-form-btns">
-                        <button class="btn-primary btn-sm" onclick="APP.doImport()">📂 Import</button>
-                        <button class="btn-secondary btn-sm"
-                                onclick="APP.toggleOntoPanel('onto-import-panel')">Cancel</button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- ── Panel New Ontology (caché) ── -->
+            <!-- ── Formulaire : Nouvelle ontologie from scratch ── -->
             <div id="onto-new-panel" class="cls-frame onto-collapsible" style="display:none">
-                <div class="cls-frame-bar">
-                    <span class="cls-frame-tag">✨ New Ontology</span>
-                </div>
-                <div class="cls-frame-body onto-form-row">
-                    <div class="form-group" style="margin:0;flex:1;min-width:200px">
-                        <label>Base IRI *</label>
-                        <input type="text" id="onto-new-iri"
-                               placeholder="https://example.org/my-ontology" style="width:100%">
+                <div class="cls-frame-bar"><span class="cls-frame-tag">✨ Nouvelle ontologie</span></div>
+                <div class="cls-frame-body" style="padding:12px;display:flex;flex-direction:column;gap:10px">
+                    <div style="display:flex;gap:10px;flex-wrap:wrap">
+                        <div class="form-group" style="margin:0;flex:1;min-width:160px">
+                            <label>Nom *</label>
+                            <input type="text" id="onto-new-name" placeholder="ex : MonOntologie" style="width:100%">
+                        </div>
+                        <div class="form-group" style="margin:0;flex:2;min-width:260px">
+                            <label>Chemin du fichier * <span style="font-size:10px;color:var(--text-dim)">(chemin absolu sur votre Mac)</span></label>
+                            <input type="text" id="onto-new-path" placeholder="/Users/bernard/Documents/mon_ontologie.json" style="width:100%">
+                        </div>
                     </div>
-                    <div class="form-group" style="margin:0">
-                        <label>Prefix</label>
-                        <input type="text" id="onto-new-prefix" value="onto" style="width:80px">
+                    <div style="display:flex;gap:10px;flex-wrap:wrap">
+                        <div class="form-group" style="margin:0;flex:2;min-width:260px">
+                            <label>URI (IRI de base) *</label>
+                            <input type="text" id="onto-new-uri" placeholder="https://example.org/my-ontology" style="width:100%">
+                        </div>
+                        <div class="form-group" style="margin:0;flex:0 0 auto">
+                            <label>Prefix</label>
+                            <input type="text" id="onto-new-prefix" value="onto" style="width:90px">
+                        </div>
                     </div>
-                    <div class="form-group" style="margin:0">
-                        <label>Version</label>
-                        <input type="text" id="onto-new-version" value="1.0.0" style="width:80px">
-                    </div>
-                    <div class="onto-form-btns">
-                        <button class="btn-primary btn-sm" onclick="APP.doCreateOntology()">✅ Create</button>
-                        <button class="btn-secondary btn-sm"
-                                onclick="APP.toggleOntoPanel('onto-new-panel')">Cancel</button>
+                    <div style="display:flex;gap:8px">
+                        <button class="btn-primary btn-sm" onclick="APP.doCreateOntology()">✅ Créer et connecter</button>
+                        <button class="btn-secondary btn-sm" onclick="APP.toggleOntoPanel('onto-new-panel')">Annuler</button>
                     </div>
                 </div>
             </div>
 
-            <!-- ── Triple Store ── -->
+            <!-- ── Formulaire : Import depuis fichier RDF/OWL ── -->
+            <div id="onto-import-panel" class="cls-frame onto-collapsible" style="display:none">
+                <div class="cls-frame-bar"><span class="cls-frame-tag">📂 Importer depuis un fichier RDF/OWL</span></div>
+                <div class="cls-frame-body" style="padding:12px;display:flex;flex-direction:column;gap:10px">
+                    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+                        <div class="form-group" style="margin:0">
+                            <label>Fichier (.owl / .ttl / .rdf)</label>
+                            <label class="btn-secondary btn-sm onto-file-btn">
+                                <span id="onto-import-fname">Choisir un fichier…</span>
+                                <input type="file" accept=".owl,.ttl,.rdf,.xml" style="display:none"
+                                       onchange="APP._onImportFileChange(event)">
+                            </label>
+                        </div>
+                        <div class="form-group" style="margin:0;flex:1;min-width:140px">
+                            <label>Nom *</label>
+                            <input type="text" id="onto-import-name" placeholder="ex : RoHS" style="width:100%">
+                        </div>
+                    </div>
+                    <div style="display:flex;gap:10px;flex-wrap:wrap">
+                        <div class="form-group" style="margin:0;flex:2;min-width:260px">
+                            <label>Chemin de sauvegarde * <span style="font-size:10px;color:var(--text-dim)">(où enregistrer le .json)</span></label>
+                            <input type="text" id="onto-import-path" placeholder="/Users/bernard/Documents/rohs.json" style="width:100%">
+                        </div>
+                        <div class="form-group" style="margin:0;flex:2;min-width:260px">
+                            <label>URI (IRI de base) *</label>
+                            <input type="text" id="onto-import-uri" placeholder="https://example.org/rohs" style="width:100%">
+                        </div>
+                        <div class="form-group" style="margin:0;flex:0 0 auto">
+                            <label>Prefix</label>
+                            <input type="text" id="onto-import-prefix" value="onto" style="width:90px">
+                        </div>
+                    </div>
+                    <div style="display:flex;gap:8px">
+                        <button class="btn-primary btn-sm" onclick="APP.doImport()">📂 Importer et connecter</button>
+                        <button class="btn-secondary btn-sm" onclick="APP.toggleOntoPanel('onto-import-panel')">Annuler</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── Registre ── -->
             <div class="cls-frame">
                 <div class="cls-frame-bar">
-                    <span class="cls-frame-tag">Triple Store</span>
-                    <span id="onto-store-count" style="font-size:11px;color:var(--text-dim);margin-left:6px"></span>
+                    <span class="cls-frame-tag">Registre des ontologies</span>
+                    <span id="onto-registry-count" style="font-size:11px;color:var(--text-dim);margin-left:8px"></span>
                 </div>
                 <div class="cls-frame-body" style="padding:0;overflow:hidden">
                     <table class="entity-table onto-store-table">
                         <thead><tr>
-                            <th style="width:20px"></th>
-                            <th>Prefix</th>
-                            <th>Namespace (IRI)</th>
-                            <th>Version</th>
-                            <th></th>
+                            <th style="width:110px">Statut</th>
+                            <th>Nom</th>
+                            <th>Chemin</th>
+                            <th>URI</th>
+                            <th style="width:70px">Prefix</th>
+                            <th style="width:180px"></th>
                         </tr></thead>
-                        <tbody id="onto-store-body">
-                            <tr><td colspan="5" class="onto-table-empty">Loading…</td></tr>
+                        <tbody id="onto-registry-body">
+                            <tr><td colspan="6" class="onto-table-empty">Chargement…</td></tr>
                         </tbody>
                     </table>
                 </div>
             </div>
 
-            <!-- ── Ontologie active ── -->
-            ${onto ? `
-            <div class="cls-frame">
-                <div class="cls-frame-bar">
-                    <span class="cls-frame-tag">Active Ontology</span>
-                    <span style="font-size:11px;color:var(--text-dim);margin-left:6px;font-family:var(--font-mono)">${onto.prefix}</span>
-                    <span style="margin-left:auto;font-size:11px;color:var(--text-dim)">Export :</span>
-                    <button class="btn-sm" style="margin-left:4px" onclick="APP.exportOntology('owl')">OWL/XML</button>
-                    <button class="btn-sm" onclick="APP.exportOntology('ttl')">Turtle</button>
-                    <button class="btn-sm" onclick="APP.exportOntology('jsonld')">JSON-LD</button>
-                </div>
-                <div class="cls-frame-body" style="padding:10px">
-                    <div class="form-group">
-                        <label>Base IRI *</label>
-                        <input type="text" id="onto-id" value="${onto.id}"
-                               placeholder="https://example.org/my-ontology" style="width:100%">
-                    </div>
-                    <div class="onto-form-row" style="flex-wrap:wrap">
-                        <div class="form-group" style="margin:0;flex:0 0 auto">
-                            <label>Prefix</label>
-                            <input type="text" id="onto-prefix" value="${onto.prefix || 'onto'}" style="width:100px">
-                        </div>
-                        <div class="form-group" style="margin:0;flex:0 0 auto">
-                            <label>Version</label>
-                            <input type="text" id="onto-version" value="${onto.version || '1.0.0'}" style="width:100px">
-                        </div>
-                        <div class="form-group" style="margin:0;flex:1;min-width:160px">
-                            <label>Label</label>
-                            <input type="text" id="onto-label" value="${label.value}"
-                                   placeholder="Ontology name">
-                        </div>
-                        <div class="form-group" style="margin:0;flex:0 0 auto">
-                            <label>Lang</label>
-                            <input type="text" id="onto-lang" value="${label.lang || 'en'}" style="width:50px">
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label>Description</label>
-                        <textarea id="onto-comment" rows="2" style="width:100%"
-                                  placeholder="Ontology description">${comment.value}</textarea>
-                    </div>
-                    <button class="btn-primary btn-sm" onclick="APP.saveOntologyMeta()">💾 Save</button>
-                </div>
-            </div>` : `
-            <div class="cls-frame">
-                <div class="cls-frame-bar"><span class="cls-frame-tag">Active Ontology</span></div>
-                <div class="cls-frame-body" style="padding:16px;text-align:center;color:var(--text-dim)">
-                    No active ontology — import or create one above.
-                </div>
-            </div>`}
-
         </div>`;
-    },
-
-    _renderOntoTableRows(list) {
-        if (!list.length) {
-            return `<tr><td colspan="5" class="onto-table-empty">No ontologies in the store.</td></tr>`;
-        }
-        const currentId = this.state.ontology?.id;
-        return list.map(o => {
-            const isCurrent = o.id === currentId;
-            const safeId = o.id.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
-            return `<tr${isCurrent ? ' class="onto-current-row"' : ''}>
-                <td style="text-align:center;color:var(--accent);font-size:14px">${isCurrent ? '★' : ''}</td>
-                <td><code>${o.prefix || '—'}</code></td>
-                <td class="onto-iri-cell">${o.id}</td>
-                <td style="color:var(--text-dim)">${o.version || '—'}</td>
-                <td class="actions">
-                    ${!isCurrent ? `<button class="btn-sm btn-edit"
-                        onclick="APP.loadOntologyFromStore('${safeId}')"
-                        title="Load this ontology">▶ Load</button>` : ''}
-                    <button class="btn-sm btn-del"
-                        onclick="APP.deleteOntologyFromStore('${safeId}')"
-                        title="Delete from store">🗑</button>
-                </td>
-            </tr>`;
-        }).join('');
     },
 
     // ── Actions Ontologies ───────────────────────────────────
@@ -460,6 +420,13 @@ const APP = {
     toggleOntoPanel(id) {
         const el = document.getElementById(id);
         if (!el) return;
+        // Fermer les autres panneaux ouverts
+        ['onto-new-panel','onto-import-panel'].forEach(pid => {
+            if (pid !== id) {
+                const other = document.getElementById(pid);
+                if (other) other.style.display = 'none';
+            }
+        });
         el.style.display = el.style.display === 'none' ? '' : 'none';
     },
 
@@ -469,97 +436,77 @@ const APP = {
         this._importFile = file;
         const span = document.getElementById('onto-import-fname');
         if (span) span.textContent = file.name;
-        const iriInput = document.getElementById('onto-import-iri');
-        if (iriInput && !iriInput.value)
-            iriInput.value = `https://example.org/${file.name.replace(/\.\w+$/, '')}`;
+        // Pré-remplir le nom et l'URI si vides
+        const nameInput = document.getElementById('onto-import-name');
+        if (nameInput && !nameInput.value)
+            nameInput.value = file.name.replace(/\.\w+$/, '');
+        const uriInput = document.getElementById('onto-import-uri');
+        if (uriInput && !uriInput.value)
+            uriInput.value = `https://example.org/${file.name.replace(/\.\w+$/, '')}`;
+        const pathInput = document.getElementById('onto-import-path');
+        if (pathInput && !pathInput.value)
+            pathInput.value = `/Users/bernard/Documents/${file.name.replace(/\.\w+$/, '')}.json`;
     },
 
     async doImport() {
         const file   = this._importFile;
-        const iri    = document.getElementById('onto-import-iri')?.value.trim();
+        const name   = document.getElementById('onto-import-name')?.value.trim();
+        const path   = document.getElementById('onto-import-path')?.value.trim();
+        const uri    = document.getElementById('onto-import-uri')?.value.trim();
         const prefix = document.getElementById('onto-import-prefix')?.value.trim() || 'onto';
-        if (!file) return UI.error('Please select a file');
-        if (!iri)  return UI.error('Base IRI is required');
+        if (!file)  return UI.error('Sélectionnez un fichier.');
+        if (!name)  return UI.error('Le nom est obligatoire.');
+        if (!path)  return UI.error('Le chemin de sauvegarde est obligatoire.');
+        if (!uri)   return UI.error("L'URI est obligatoire.");
         try {
-            await API.importOntology(file, iri, prefix);
-            UI.success(`Ontology imported from ${file.name}`);
+            await API.importOntology(file, name, path, uri, prefix);
+            UI.success(`Ontologie « ${name} » importée et connectée.`);
             this._importFile = null;
             await this.refresh();
             this.renderOntologies();
-        } catch (e) { UI.error(`Import error: ${e.message}`); }
+        } catch (e) { UI.error(`Erreur d'import : ${e.message}`); }
     },
 
     async doCreateOntology() {
-        const iri     = document.getElementById('onto-new-iri')?.value.trim();
-        const prefix  = document.getElementById('onto-new-prefix')?.value.trim() || 'onto';
-        const version = document.getElementById('onto-new-version')?.value.trim() || '1.0.0';
-        if (!iri) return UI.error('Base IRI is required');
-        const onto = {
-            id: iri, prefix, version,
-            annotations: { labels: [], comments: [], other: [] },
-            classes: [], object_properties: [], datatype_properties: [],
-            individuals: [], swrl_rules: [],
-        };
+        const name   = document.getElementById('onto-new-name')?.value.trim();
+        const path   = document.getElementById('onto-new-path')?.value.trim();
+        const uri    = document.getElementById('onto-new-uri')?.value.trim();
+        const prefix = document.getElementById('onto-new-prefix')?.value.trim() || 'onto';
+        if (!name) return UI.error('Le nom est obligatoire.');
+        if (!path) return UI.error('Le chemin du fichier est obligatoire.');
+        if (!uri)  return UI.error("L'URI est obligatoire.");
         try {
-            await API.createOntology(onto);
-            UI.success(`Ontology '${prefix}' created`);
+            await API.registerOntology({ name, path, uri, prefix });
+            await API.connectOntology(name);
+            UI.success(`Ontologie « ${name} » créée et connectée.`);
             await this.refresh();
             this.renderOntologies();
         } catch (e) { UI.error(e.message); }
     },
 
-    async loadOntologyFromStore(id) {
+    async doConnect(name) {
         try {
-            await API.loadOntology(id);
-            UI.success('Ontology loaded');
+            await API.connectOntology(name);
+            UI.success(`Ontologie « ${name} » connectée.`);
             await this.refresh();
             this.renderOntologies();
         } catch (e) { UI.error(e.message); }
     },
 
-    async deleteOntologyFromStore(id) {
-        if (!await UI.confirm(`Delete ontology <strong>${id}</strong> from the store?`)) return;
+    async doDisconnect() {
         try {
-            await API.deleteOntology(id);
-            UI.success('Ontology deleted');
-            if (this.state.ontology?.id === id) this.state.ontology = null;
+            await API.disconnectOntology();
+            UI.success('Ontologie déconnectée.');
             await this.refresh();
             this.renderOntologies();
         } catch (e) { UI.error(e.message); }
     },
 
-    async saveOntologyMeta() {
-        const id      = document.getElementById('onto-id').value.trim();
-        const prefix  = document.getElementById('onto-prefix').value.trim() || 'onto';
-        const version = document.getElementById('onto-version').value.trim() || '1.0.0';
-        const label   = document.getElementById('onto-label').value.trim();
-        const lang    = document.getElementById('onto-lang').value.trim() || 'en';
-        const comment = document.getElementById('onto-comment').value.trim();
-
-        if (!id) return UI.error('Base IRI is required');
-
-        const onto = {
-            id, prefix, version,
-            annotations: {
-                labels:   label   ? [{ value: label,   lang }] : [],
-                comments: comment ? [{ value: comment, lang }] : [],
-                other: [],
-            },
-            classes:             this.state.classes             || [],
-            object_properties:   this.state.object_properties   || [],
-            datatype_properties: this.state.datatype_properties || [],
-            individuals:         this.state.individuals         || [],
-            swrl_rules:          this.state.swrl_rules          || [],
-        };
-
+    async doUnregister(name) {
+        if (!await UI.confirm(`Retirer <strong>${name}</strong> du registre ?<br><small style="color:var(--text-dim)">Le fichier sur disque ne sera pas supprimé.</small>`)) return;
         try {
-            if (this.state.ontology?.id) {
-                await API.updateOntology(onto);
-                UI.success('Ontology saved');
-            } else {
-                await API.createOntology(onto);
-                UI.success('Ontology created');
-            }
+            await API.unregisterOntology(name);
+            UI.success(`« ${name} » retiré du registre.`);
             await this.refresh();
             this.renderOntologies();
         } catch (e) { UI.error(e.message); }
@@ -574,7 +521,7 @@ const APP = {
             a.download = `ontology.${fmt === 'owl' ? 'owl' : fmt === 'ttl' ? 'ttl' : 'jsonld'}`;
             a.click();
             URL.revokeObjectURL(url);
-        } catch (e) { UI.error(`Export error: ${e.message}`); }
+        } catch (e) { UI.error(`Erreur d'export : ${e.message}`); }
     },
 
     // ── Helpers sections ─────────────────────────────────────

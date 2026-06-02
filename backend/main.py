@@ -10,6 +10,7 @@ from typing import Optional
 from fastapi import FastAPI, HTTPException, UploadFile, File, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
+from pydantic import BaseModel as PydanticModel
 
 from owl_model import (
     OWLOntology, OWLClass, OWLObjectProperty, OWLDatatypeProperty,
@@ -180,18 +181,70 @@ def run_inferences() -> InferenceResult:
 
 
 # ════════════════════════════════════════════════════════════════
-# ONTOLOGIE
+# REGISTRE D'ONTOLOGIES
 # ════════════════════════════════════════════════════════════════
+
+class RegisterRequest(PydanticModel):
+    name: str
+    path: str
+    uri: str
+    prefix: str = "onto"
+
+class UpdateEntryRequest(PydanticModel):
+    name: str
+    path: str
+    uri: str
+    prefix: str = "onto"
+
 
 @app.get("/api/ontologies", tags=["Ontologie"])
 def list_ontologies():
-    return store.list_ontologies()
+    """Retourne toutes les ontologies du registre."""
+    return store.list_registry()
 
 
-@app.post("/api/ontologies", tags=["Ontologie"], status_code=201)
-def create_ontology(onto: OWLOntology):
-    store.set(onto)
+@app.post("/api/ontologies/register", tags=["Ontologie"], status_code=201)
+def register_ontology(req: RegisterRequest):
+    """Enregistre une nouvelle ontologie (from scratch) dans le registre."""
+    entries = store.list_registry()
+    if any(e["name"] == req.name for e in entries):
+        raise HTTPException(409, f"Une ontologie nommée '{req.name}' existe déjà.")
+    entry = store.register(req.name, req.path, req.uri, req.prefix)
+    return entry.to_dict()
+
+
+@app.put("/api/ontologies/{name}", tags=["Ontologie"])
+def update_ontology_entry(name: str, req: UpdateEntryRequest):
+    """Modifie les métadonnées d'une entrée du registre."""
+    entry = store.update_entry(name, req.name, req.path, req.uri, req.prefix)
+    if not entry:
+        raise HTTPException(404, f"Ontologie '{name}' introuvable dans le registre.")
+    return entry.to_dict()
+
+
+@app.delete("/api/ontologies/{name}", tags=["Ontologie"])
+def unregister_ontology(name: str):
+    """Retire une ontologie du registre (ne supprime pas le fichier)."""
+    ok = store.unregister(name)
+    if not ok:
+        raise HTTPException(404, f"Ontologie '{name}' introuvable dans le registre.")
+    return {"unregistered": name}
+
+
+@app.post("/api/ontologies/{name}/connect", tags=["Ontologie"])
+def connect_ontology(name: str):
+    """Connecte une ontologie (la rend active)."""
+    onto = store.connect(name)
+    if onto is None:
+        raise HTTPException(404, f"Ontologie '{name}' introuvable dans le registre.")
     return onto
+
+
+@app.post("/api/ontologies/disconnect", tags=["Ontologie"])
+def disconnect_ontology():
+    """Déconnecte l'ontologie active."""
+    store.disconnect()
+    return {"status": "disconnected"}
 
 
 @app.get("/api/ontologies/current", tags=["Ontologie"])
@@ -205,42 +258,28 @@ def update_ontology_meta(onto: OWLOntology):
     return onto
 
 
-@app.post("/api/ontologies/load/{onto_id:path}", tags=["Ontologie"])
-def load_ontology(onto_id: str):
-    onto = store.load(onto_id)
-    if not onto:
-        raise HTTPException(404, f"Ontology '{onto_id}' not found")
-    return onto
-
-
-@app.delete("/api/ontologies/{onto_id:path}", tags=["Ontologie"])
-def delete_ontology(onto_id: str):
-    ok = store.delete(onto_id)
-    if not ok:
-        raise HTTPException(404, f"Ontology '{onto_id}' not found")
-    return {"deleted": onto_id}
-
-
 # ── Import ───────────────────────────────────────────────────
 
 @app.post("/api/ontologies/import", tags=["Ontologie"])
 async def import_ontology(
     file: UploadFile = File(...),
-    onto_id: str = Query(..., description="IRI de base de l'ontologie"),
+    name: str = Query(..., description="Nom de l'ontologie"),
+    path: str = Query(..., description="Chemin de sauvegarde (hôte)"),
+    uri: str  = Query(..., description="IRI de base de l'ontologie"),
     prefix: str = Query("onto"),
 ):
     content = await file.read()
-    name = file.filename or ""
-    if name.endswith(".ttl"):
+    fname = file.filename or ""
+    if fname.endswith(".ttl"):
         fmt = "turtle"
-    elif name.endswith(".owl") or name.endswith(".xml") or name.endswith(".rdf"):
+    elif fname.endswith(".owl") or fname.endswith(".xml") or fname.endswith(".rdf"):
         fmt = "xml"
-    elif name.endswith(".jsonld") or name.endswith(".json"):
+    elif fname.endswith(".jsonld") or fname.endswith(".json"):
         fmt = "json-ld"
     else:
         fmt = "xml"
     try:
-        onto = store.import_from_rdf(content, fmt, onto_id, prefix)
+        onto = store.import_from_rdf(content, fmt, name, path, uri, prefix)
         return onto
     except Exception as e:
         raise HTTPException(400, f"Erreur d'import : {e}")

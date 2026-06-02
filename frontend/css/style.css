@@ -1496,6 +1496,22 @@ small { color: var(--text-faint); font-size: 10px; }
 .onto-current-row td { background: rgba(60,120,220,.06); }
 .onto-current-row code { color: var(--accent); font-weight: 600; }
 
+/* Badges statut connexion */
+.onto-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 11px; font-weight: 600; border-radius: 10px;
+  padding: 2px 8px; white-space: nowrap;
+}
+.onto-badge-connected    { background: rgba(40,180,80,.15);  color: #3a9; }
+.onto-badge-disconnected { background: rgba(120,120,140,.12); color: var(--text-dim); }
+
+/* Bouton warn (déconnecter) */
+.btn-warn {
+  background: rgba(220,120,30,.12); color: #c80;
+  border: 1px solid rgba(220,120,30,.25);
+}
+.btn-warn:hover { background: rgba(220,120,30,.22); }
+
 /* ── Scrollbar ──────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }

@@ -19,21 +19,23 @@ const API = {
         return res.json();
     },
 
-    // ── Ontologie ──────────────────────────────────────────
-    listOntologies:     ()       => API._fetch('GET',    '/ontologies'),
-    createOntology:     (data)   => API._fetch('POST',   '/ontologies', data),
-    getCurrentOntology: ()       => API._fetch('GET',    '/ontologies/current'),
-    updateOntology:     (data)   => API._fetch('PUT',    '/ontologies/current', data),
-    loadOntology:       (id)     => API._fetch('POST',   `/ontologies/load/${encodeURIComponent(id)}`),
-    deleteOntology:     (id)     => API._fetch('DELETE', `/ontologies/${encodeURIComponent(id)}`),
+    // ── Registre d'ontologies ──────────────────────────────
+    listOntologies:     ()           => API._fetch('GET',    '/ontologies'),
+    registerOntology:   (data)       => API._fetch('POST',   '/ontologies/register', data),
+    updateOntologyEntry:(name, data) => API._fetch('PUT',    `/ontologies/${encodeURIComponent(name)}`, data),
+    unregisterOntology: (name)       => API._fetch('DELETE', `/ontologies/${encodeURIComponent(name)}`),
+    connectOntology:    (name)       => API._fetch('POST',   `/ontologies/${encodeURIComponent(name)}/connect`),
+    disconnectOntology: ()           => API._fetch('POST',   '/ontologies/disconnect'),
+    getCurrentOntology: ()           => API._fetch('GET',    '/ontologies/current'),
+    updateOntology:     (data)       => API._fetch('PUT',    '/ontologies/current', data),
 
     exportOntology: (fmt) => fetch(`${API.base}/ontologies/export?fmt=${fmt}`)
         .then(r => { if (!r.ok) throw new Error(r.statusText); return r.blob(); }),
 
-    importOntology: async (file, ontoId, prefix) => {
+    importOntology: async (file, name, path, uri, prefix) => {
         const fd = new FormData();
         fd.append('file', file);
-        const url = `${API.base}/ontologies/import?onto_id=${encodeURIComponent(ontoId)}&prefix=${prefix}`;
+        const url = `${API.base}/ontologies/import?name=${encodeURIComponent(name)}&path=${encodeURIComponent(path)}&uri=${encodeURIComponent(uri)}&prefix=${encodeURIComponent(prefix)}`;
         const res = await fetch(url, { method: 'POST', body: fd });
         if (!res.ok) throw new Error((await res.json()).detail || res.statusText);
         return res.json();

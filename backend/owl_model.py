@@ -311,8 +311,8 @@ class SWORDRule(BaseModel):
 
 class OWLOntology(BaseModel):
     id: str                    # IRI base ex: "https://example.org/my-ontology"
+    name: str = ""             # Nom lisible choisi par l'utilisateur
     prefix: str = "onto"       # préfixe local
-    version: str = "1.0.0"
     annotations: EntityAnnotations = Field(default_factory=EntityAnnotations)
     classes: List[OWLClass] = []
     object_properties: List[OWLObjectProperty] = []
