@@ -626,20 +626,20 @@ const SWRLEditor = {
     async save(isNew) {
         this._syncFromDom();
         const rule = this._editingRule;
-        if (!rule?.id) { if (isNew) UI.error('Rule identifier is required'); return; }
+        if (!rule?.id) { UI.error('Rule identifier is required'); return; }
         try {
             if (isNew) {
                 await API.createSWRLRule(rule);
-                UI.success(`SWRL rule '${rule.id}' created`);
                 this._isNew      = false;
                 this._selectedId = rule.id;
+                UI.success(`SWRL rule '${rule.id}' created`);
             } else {
                 await API.updateSWRLRule(rule.id, rule);
             }
             await APP.refresh();
             const listEl = document.getElementById('swrl-list');
             if (listEl) listEl.innerHTML = this.renderList(APP.state.swrl_rules || []);
-        } catch (e) { if (isNew) UI.error(e.message); }
+        } catch (e) { UI.error(`Save error: ${e.message}`); }
     },
 
     async delete(id) {
