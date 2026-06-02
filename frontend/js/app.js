@@ -712,11 +712,19 @@ const FsBrowser = {
     },
 
     confirm() {
-        const filename = document.getElementById('fs-filename')?.value.trim();
+        let filename = document.getElementById('fs-filename')?.value.trim();
         if (!filename) { UI.error('Enter a filename.'); return; }
+        // Ajouter .json si absent
+        if (!filename.endsWith('.json')) filename += '.json';
         const fullPath = this._currentPath.replace(/\/$/, '') + '/' + filename;
-        const field = document.getElementById(this._targetFieldId);
-        if (field) field.value = fullPath;
+        // Remplir le champ Path cible
+        const pathField = document.getElementById(this._targetFieldId);
+        if (pathField) pathField.value = fullPath;
+        // Remplir le champ Name avec le label (sans extension)
+        const nameField = document.getElementById('onto-new-name');
+        if (nameField && !nameField.value.trim()) {
+            nameField.value = filename.replace(/\.json$/, '');
+        }
         this.close();
     },
 
