@@ -46,7 +46,7 @@ const SWORDEditor = {
 
     renderList(rules) {
         if (!rules || !rules.length)
-            return '<div class="cls-list-empty" style="padding:12px">No SWORD rules</div>';
+            return '<div class="cls-list-empty" style="padding:12px">No SWRL rule</div>';
         const sel = this._selectedId;
         return rules.map(r => `
             <div class="tree-item${r.id === sel ? ' selected' : ''}" data-id="${r.id}"
