@@ -32,12 +32,8 @@ def _full_iri(onto: OWLOntology, local: str) -> str:
 
 
 def _iri_attr(onto: OWLOntology, local: str) -> str:
-    """Retourne IRI="#local" si même base, sinon IRI="http://..." """
-    base = onto.id.rstrip("#/")
-    full = _full_iri(onto, local)
-    if full.startswith(base + "#"):
-        return f'IRI="#{full[len(base)+1:]}"'
-    return f'IRI="{escape(full)}"'
+    """Retourne toujours l'IRI complet — évite tout problème de résolution."""
+    return f'IRI="{escape(_full_iri(onto, local))}"'
 
 
 def _class_expr_owlxml(onto: OWLOntology, expr, pad: str) -> list[str]:
@@ -107,7 +103,8 @@ def export_owl_xml(store: TripleStore) -> bytes:
         f'     xmlns:xml="http://www.w3.org/XML/1998/namespace"',
         f'     xmlns:xsd="{XSD_NS}"',
         f'     xmlns:rdfs="{RDFS_NS}"',
-        f'     ontologyIRI="{base}">',
+        f'     ontologyIRI="{base}"',
+        f'     versionIRI="{base}">',
         # Préfixes requis par OWLAPI 4 pour résoudre les IRIs relatifs (#local)
         f'    <Prefix name="" IRI="{base}#"/>',
         f'    <Prefix name="owl" IRI="{OWL_NS}"/>',
