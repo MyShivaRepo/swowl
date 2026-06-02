@@ -282,11 +282,26 @@ const SWRLEditor = {
                 const safePath = path.replace(/,/g, '__');
                 const indPickId = `swrl-ind-picker-${safePath}`;
                 const inds = (APP.state.individuals || []);
+                const isInd = atom.value && inds.some(i => i.id === atom.value);
                 const indItems = inds.length
                     ? inds.map(i => `<div class="cls-tree-picker-item" onclick="SWRLEditor.onIndPickerSelect('${i.id}')">
                         <span class="xsd-dot" style="flex-shrink:0"></span>
                         <span>${i.id}</span></div>`).join('')
                     : '<div style="padding:6px 10px;font-size:11px;color:var(--text-dim)">No individuals</div>';
+
+                // Champ valeur : si individu connu → pill navigable, sinon input texte
+                const valueField = isInd
+                    ? `<div class="tree-item restr-filler-btn" style="flex:1;min-width:0;margin:0;padding:2px 6px;cursor:default"
+                            title="Right-click to change individual"
+                            oncontextmenu="event.preventDefault();SWRLEditor.toggleIndPicker('${indPickId}','${path}',this)">
+                           <span class="xsd-dot" style="flex-shrink:0;margin-right:4px"></span>
+                           <span class="restr-filler-lbl" style="cursor:pointer;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
+                                 onclick="APP.navigateTo('individuals','${atom.value}')"
+                                 title="Navigate to ${atom.value}">${atom.value}</span>
+                       </div>`
+                    : `<input class="swrl-inp" value="${atom.value||''}" placeholder="individual, variable or value"
+                              data-field="value" ${chg} style="flex:1;min-width:0">`;
+
                 return `<div class="swrl-atom" data-path="${path}" ${dragAttrs}>
                     ${handle}
                     <input class="swrl-var" value="${atom.var||''}" placeholder="?var"
@@ -297,8 +312,7 @@ const SWRLEditor = {
                         ${opSel}
                     </select>
                     <div style="position:relative;flex:1;min-width:0;display:flex;gap:2px">
-                        <input class="swrl-inp" value="${atom.value||''}" placeholder="individual, variable or value"
-                               data-field="value" ${chg} style="flex:1;min-width:0">
+                        ${valueField}
                         <button class="btn-frame-del" style="flex-shrink:0;padding:1px 4px;background:var(--bg3);border-color:var(--border)"
                                 title="Pick an individual"
                                 onclick="SWRLEditor.toggleIndPicker('${indPickId}','${path}',this)">
