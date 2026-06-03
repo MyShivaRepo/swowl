@@ -295,6 +295,21 @@ class TripleStore:
                     prop.range.append(str(r).replace(base, "").replace(str(XSD), "xsd:"))
                 onto.datatype_properties.append(prop)
 
+        # Synchroniser les domaines de propriétés → marqueurs PropertyPresence dans les classes
+        # (nécessaire pour que le panel "Asserted Properties" soit rempli)
+        cls_map = {c.id: c for c in onto.classes}
+        for prop in onto.object_properties + onto.datatype_properties:
+            for domain_id in prop.domain:
+                cls = cls_map.get(domain_id)
+                if cls is None:
+                    continue
+                already = any(
+                    getattr(r, 'type', None) == '_marker' and getattr(r, 'property', None) == prop.id
+                    for r in cls.subClassOf
+                )
+                if not already:
+                    cls.subClassOf.append(PropertyPresence(property=prop.id))
+
         self._ontology = onto
         # Enregistrer dans le registre et sauver le fichier
         self.register(name, host_path, uri, prefix)
