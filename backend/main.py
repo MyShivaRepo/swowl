@@ -276,6 +276,38 @@ async def import_ontology(
         raise HTTPException(400, f"Erreur d'import : {e}")
 
 
+# ── Import depuis chemin filesystem ─────────────────────────
+
+class ImportFromPathRequest(PydanticModel):
+    name: str
+    owl_path: str   # chemin hôte du fichier OWL/RDF
+    save_path: str  # chemin hôte de sauvegarde .json
+    uri: str
+    prefix: str = "onto"
+
+@app.post("/api/ontologies/import-from-path", tags=["Ontologie"])
+def import_from_path(req: ImportFromPathRequest):
+    """Importe une ontologie OWL/RDF depuis un chemin filesystem (sans upload)."""
+    from pathlib import Path as FP
+    container_owl = host_to_container(req.owl_path)
+    p = FP(container_owl)
+    if not p.exists():
+        raise HTTPException(404, f"Fichier introuvable : {req.owl_path}")
+    content = p.read_bytes()
+    name = p.name.lower()
+    if name.endswith(".ttl"):
+        fmt = "turtle"
+    elif name.endswith(".jsonld") or name.endswith(".json"):
+        fmt = "json-ld"
+    else:
+        fmt = "xml"
+    try:
+        onto = store.import_from_rdf(content, fmt, req.name, req.save_path, req.uri, req.prefix)
+        return onto
+    except Exception as e:
+        raise HTTPException(400, f"Erreur d'import : {e}")
+
+
 # ── Export ───────────────────────────────────────────────────
 
 @app.get("/api/ontologies/export", tags=["Ontologie"])
@@ -720,7 +752,8 @@ from pathlib import Path as FSPath
 from triple_store import host_to_container, container_to_host
 
 @app.get("/api/fs/browse", tags=["Système"])
-def fs_browse(path: str = Query("/Users/bernard")):
+def fs_browse(path: str = Query("/Users/bernard"),
+              ext: str = Query(".json", description="Extensions séparées par virgule")):
     """Liste le contenu d'un répertoire (traduit chemin hôte → container)."""
     container_path = host_to_container(path)
     p = FSPath(container_path)
@@ -758,9 +791,10 @@ def fs_browse(path: str = Query("/Users/bernard")):
             continue
         try:
             host_entry = container_to_host(str(entry))
+            allowed_ext = {e.strip() for e in ext.split(',') if e.strip()}
             if entry.is_dir():
                 dirs.append({"name": entry.name, "path": host_entry})
-            elif entry.suffix == ".json":
+            elif entry.suffix.lower() in allowed_ext:
                 files.append({"name": entry.name, "path": host_entry})
         except PermissionError:
             continue

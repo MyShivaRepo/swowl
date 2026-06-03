@@ -82,7 +82,9 @@ const API = {
     getViolations:      ()   => API._fetch('GET', '/inferences/violations'),
     getSubclassClosure: ()   => API._fetch('GET', '/inferences/subclass-closure'),
 
-    fsBrowse: (path) => API._fetch('GET', `/fs/browse?path=${encodeURIComponent(path)}`),
+    importFromPath: (data) => API._fetch('POST', '/ontologies/import-from-path', data),
+
+    fsBrowse: (path, ext = '.json') => API._fetch('GET', `/fs/browse?path=${encodeURIComponent(path)}&ext=${encodeURIComponent(ext)}`),
 
     health: () => API._fetch('GET', '/health'),
 };

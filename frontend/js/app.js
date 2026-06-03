@@ -14,7 +14,7 @@ const APP = {
         swrl_rules: [],
     },
     currentSection: 'ontologies',
-    _importFile: null,   // fichier en attente d'import
+    _importFilePath: null,   // chemin du fichier OWL à importer
 
     // ── Historique de navigation ─────────────────────────────────
     _navHistory: [],     // états passés (max 50)
@@ -358,13 +358,12 @@ const APP = {
                     </div>
                     <!-- Row 3 : optional import file -->
                     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
-                        <div class="form-group" style="margin:0">
+                        <div class="form-group" style="margin:0;flex:1;min-width:260px">
                             <label>Import from file <span style="font-size:10px;color:var(--text-dim)">(optional — .owl / .ttl / .rdf)</span></label>
-                            <label class="btn-secondary btn-sm onto-file-btn">
-                                <span id="onto-new-fname">Choose file…</span>
-                                <input type="file" accept=".owl,.ttl,.rdf,.xml" style="display:none"
-                                       onchange="APP._onImportFileChange(event)">
-                            </label>
+                            <input type="text" id="onto-new-fname" placeholder="Choose file…"
+                                   style="width:100%;cursor:pointer"
+                                   onclick="FsBrowser.open('onto-new-fname', ['.owl','.ttl','.rdf','.xml','.json'])"
+                                   readonly>
                         </div>
                     </div>
                     <div style="display:flex;gap:8px">
@@ -458,24 +457,12 @@ const APP = {
             const d = document.getElementById('onto-new-prefix');
             if (d) d.value = 'onto';
             const fn = document.getElementById('onto-new-fname');
-            if (fn) fn.textContent = 'Choose file…';
-            this._importFile = null;
+            if (fn) fn.value = '';
+            this._importFilePath = null;
         }
     },
 
 
-    _onImportFileChange(event) {
-        const file = event.target.files[0];
-        if (!file) return;
-        this._importFile = file;
-        const span = document.getElementById('onto-new-fname');
-        if (span) span.textContent = file.name;
-        const base = file.name.replace(/\.\w+$/, '');
-        const nameInput = document.getElementById('onto-new-name');
-        if (nameInput && !nameInput.value) nameInput.value = base;
-        const uriInput = document.getElementById('onto-new-uri');
-        if (uriInput && !uriInput.value) uriInput.value = `https://example.org/${base}`;
-    },
 
     async doCreateOntology() {
         const name   = document.getElementById('onto-new-name')?.value.trim();
@@ -488,11 +475,11 @@ const APP = {
         // Construire le chemin complet : dossier + nom.json
         const path = dir.replace(/\/$/, '') + '/' + name + '.json';
         try {
-            if (this._importFile) {
-                // Import from file
-                await API.importOntology(this._importFile, name, path, uri, prefix);
+            if (this._importFilePath) {
+                // Import depuis chemin filesystem
+                await API.importFromPath({ name, owl_path: this._importFilePath, save_path: path, uri, prefix });
                 UI.success(`Ontology "${name}" imported and connected.`);
-                this._importFile = null;
+                this._importFilePath = null;
             } else {
                 // Create from scratch
                 await API.registerOntology({ name, path, uri, prefix });
@@ -710,14 +697,19 @@ const FsBrowser = {
     _targetFieldId: null,
     _currentPath: '/Users/bernard/AppData',
     _pendingFilename: '',   // filename typed in the bottom bar
+    _fileTypes: null,       // extensions acceptées (null = .json uniquement)
 
-    open(targetFieldId) {
+    open(targetFieldId, fileTypes = null) {
+        this._fileTypes = fileTypes;
+        return this._open(targetFieldId);
+    },
+
+    _open(targetFieldId) {
         this._targetFieldId = targetFieldId;
-        // Pré-positionner sur le chemin déjà saisi si valide
         const current = document.getElementById(targetFieldId)?.value.trim();
-        if (current) {
+        if (current && current.startsWith('/')) {
             const parts = current.split('/');
-            parts.pop();                              // enlever le nom de fichier
+            parts.pop();
             this._currentPath = parts.join('/') || '/Users/bernard/AppData';
             this._pendingFilename = current.split('/').pop() || '';
         } else {
@@ -761,7 +753,8 @@ const FsBrowser = {
         const breadcrumb = document.getElementById('fs-breadcrumb');
         if (list) list.innerHTML = '<div class="fs-loading">Loading…</div>';
         try {
-            const data = await API.fsBrowse(path);
+            const extParam = (this._fileTypes || ['.json']).join(',');
+            const data = await API.fsBrowse(path, extParam);
             this._currentPath = data.current;
             const dir = data.current.replace(/\/$/, '') + '/';
             const selPath = document.getElementById('fs-selected-path');
@@ -826,14 +819,34 @@ const FsBrowser = {
         let dirPath = (dirFromBtn || this._currentPath + '/').replace(/\/$/, '') + '/';
 
         const pathField = document.getElementById(this._targetFieldId);
-        if (pathField) pathField.value = dirPath;
+        const owlExts = ['.owl','.ttl','.rdf','.xml'];
 
-        // Pré-remplir le champ Name si un fichier a été sélectionné
         if (this._selectedFile) {
-            const nameField = document.getElementById('onto-new-name');
-            if (nameField && !nameField.value.trim())
-                nameField.value = this._selectedFile.name.replace(/\.json$/, '');
+            const fname = this._selectedFile.name;
+            const isOwl = owlExts.some(e => fname.toLowerCase().endsWith(e));
+            const fullFilePath = this._currentPath.replace(/\/$/, '') + '/' + fname;
+
+            if (this._targetFieldId === 'onto-new-fname' && isOwl) {
+                // Import from file : chemin complet du fichier OWL
+                if (pathField) pathField.value = fullFilePath;
+                APP._importFilePath = fullFilePath;
+                // Auto-remplir Name et URI si vides
+                const base = fname.replace(/\.\w+$/, '');
+                const nameF = document.getElementById('onto-new-name');
+                if (nameF && !nameF.value.trim()) nameF.value = base;
+                const uriF = document.getElementById('onto-new-uri');
+                if (uriF && !uriF.value.trim()) uriF.value = `https://example.org/${base}`;
+            } else {
+                // Path (dossier) : on injecte le dossier + pré-remplit Name
+                if (pathField) pathField.value = dirPath;
+                const nameField = document.getElementById('onto-new-name');
+                if (nameField && !nameField.value.trim())
+                    nameField.value = fname.replace(/\.\w+$/, '');
+            }
             this._selectedFile = null;
+        } else {
+            // Pas de fichier sélectionné : injecter le dossier courant
+            if (pathField) pathField.value = dirPath;
         }
         this.close();
     },
