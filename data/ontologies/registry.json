@@ -5,13 +5,6 @@
       "path": "/Users/bernard/AppData/Ontologies/RoHS.json",
       "uri": "http://example.net/plm",
       "prefix": "plm",
-      "connected": false
-    },
-    {
-      "name": "RoHS_Directive",
-      "path": "/Users/bernard/Documents/RoHS_Directive.json",
-      "uri": "https://ontologies.example.org/rohs",
-      "prefix": "onto",
       "connected": true
     }
   ]
