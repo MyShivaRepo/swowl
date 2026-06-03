@@ -1,4 +1,4 @@
-# 🦉 OWL/SWRL Editor
+# 🦉 SWOWL : An OWL/SWRL Editor
 
 Éditeur d'ontologies OWL 2 DL avec règles SWRL et moteur d'inférence basique.
 Application Docker — frontend Nginx + backend FastAPI + triple store rdflib.
