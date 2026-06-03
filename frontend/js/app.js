@@ -367,7 +367,7 @@ const APP = {
                         </div>
                     </div>
                     <div style="display:flex;gap:8px">
-                        <button class="btn-primary btn-sm" onclick="APP.doCreateOntology()">✅ Create &amp; Connect</button>
+                        <button class="btn-primary btn-sm" onclick="APP.doCreateOntology()">📋 Add to registry</button>
                         <button class="btn-secondary btn-sm" onclick="APP.toggleOntoPanel('onto-new-panel')">Cancel</button>
                     </div>
                 </div>
@@ -476,15 +476,16 @@ const APP = {
         const path = dir.replace(/\/$/, '') + '/' + name + '.json';
         try {
             if (this._importFilePath) {
-                // Import depuis chemin filesystem
+                // Import depuis chemin filesystem (enregistre sans connecter)
                 await API.importFromPath({ name, owl_path: this._importFilePath, save_path: path, uri, prefix });
-                UI.success(`Ontology "${name}" imported and connected.`);
+                // Déconnecter après import (import-from-path connecte automatiquement côté backend)
+                await API.disconnectOntology();
+                UI.success(`Ontology "${name}" added to registry.`);
                 this._importFilePath = null;
             } else {
-                // Create from scratch
+                // Create from scratch : enregistrer uniquement
                 await API.registerOntology({ name, path, uri, prefix });
-                await API.connectOntology(name);
-                UI.success(`Ontology "${name}" created and connected.`);
+                UI.success(`Ontology "${name}" added to registry.`);
             }
             await this.refresh();
             this.renderOntologies();
