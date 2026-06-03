@@ -3628,7 +3628,11 @@ const IndividualEditor = {
         const allInds = APP.state.individuals || [];
         if (!rangeClasses || rangeClasses.length === 0)
             return allInds.filter(x => x.id !== excludeId);
+        // Étendre aux descendants des classes du range
+        const { childrenOf } = ClassEditor.buildTree(APP.state.classes || []);
         const accepted = new Set(rangeClasses);
+        const addDesc = (id) => (childrenOf[id]||[]).forEach(c => { if(!accepted.has(c)){ accepted.add(c); addDesc(c); } });
+        rangeClasses.forEach(r => addDesc(r));
         return allInds.filter(x =>
             x.id !== excludeId &&
             (x.types || []).some(t => accepted.has(t))
@@ -3921,12 +3925,20 @@ const IndividualEditor = {
             return lines.join('') || '<div class="cls-list-empty" style="padding:8px">—</div>';
         };
 
-        // Construire l'ensemble des classes à afficher (range + descendants)
-        const clsIds = new Set(effectiveRange);
-        const addDesc = (id) => (childrenOf[id]||[]).forEach(c => { if(!clsIds.has(c)){ clsIds.add(c); addDesc(c); } });
-        effectiveRange.forEach(r => addDesc(r));
-
-        const roots = effectiveRange.length > 0 ? effectiveRange : [];
+        // Construire l'ensemble des classes à afficher
+        // Si range vide → montrer TOUTES les classes (pas de contrainte)
+        const allClasses = APP.state.classes || [];
+        const { roots: allRoots } = ClassEditor.buildTree(allClasses);
+        let clsIds, roots;
+        if (effectiveRange.length > 0) {
+            clsIds = new Set(effectiveRange);
+            const addDesc = (id) => (childrenOf[id]||[]).forEach(c => { if(!clsIds.has(c)){ clsIds.add(c); addDesc(c); } });
+            effectiveRange.forEach(r => addDesc(r));
+            roots = effectiveRange;
+        } else {
+            clsIds = new Set(allClasses.map(c => c.id));
+            roots = allRoots;
+        }
         const clsHtml = renderClsTree(roots, clsIds);
 
         const modal = document.createElement('div');
