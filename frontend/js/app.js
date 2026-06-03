@@ -339,12 +339,12 @@ const APP = {
                         </div>
                         <div class="form-group" style="margin:0;flex:2;min-width:260px">
                             <label>Path * <span style="font-size:10px;color:var(--text-dim)">(directory on your Mac)</span></label>
-                            <label class="btn-secondary btn-sm onto-file-btn" style="width:100%;justify-content:flex-start">
-                                <span id="onto-new-path-display">Choose directory…</span>
-                                <input type="file" id="onto-new-path-picker" webkitdirectory style="display:none"
-                                       onchange="APP._onPathDirChange(event)">
-                            </label>
-                            <input type="hidden" id="onto-new-path" value="">
+                            <input type="text" id="onto-new-path" placeholder="Choose directory…"
+                                   style="width:100%;cursor:pointer"
+                                   onclick="document.getElementById('onto-path-picker').click()"
+                                   readonly>
+                            <input type="file" id="onto-path-picker" webkitdirectory style="display:none"
+                                   onchange="APP._onPathDirChange(event)">
                         </div>
                     </div>
                     <!-- Row 2 : Prefix + URI -->
@@ -449,21 +449,31 @@ const APP = {
                 if (other) other.style.display = 'none';
             }
         });
-        el.style.display = el.style.display === 'none' ? '' : 'none';
+        const wasHidden = el.style.display === 'none';
+        el.style.display = wasHidden ? '' : 'none';
+        // Reset du formulaire New Ontology à chaque ouverture
+        if (wasHidden && id === 'onto-new-panel') {
+            ['onto-new-name','onto-new-path','onto-new-uri'].forEach(fid => {
+                const f = document.getElementById(fid);
+                if (f) f.value = '';
+            });
+            const d = document.getElementById('onto-new-prefix');
+            if (d) d.value = 'onto';
+            const fn = document.getElementById('onto-new-fname');
+            if (fn) fn.textContent = 'Choose file…';
+            this._importFile = null;
+        }
     },
 
     _onPathDirChange(event) {
         const files = event.target.files;
         if (!files || !files.length) return;
-        // webkitRelativePath = "dirname/filename" → on extrait "dirname"
+        // webkitRelativePath = "dirname/subdir/.../filename"
+        // → le 1er segment est le nom du dossier sélectionné
         const relPath = files[0].webkitRelativePath || '';
         const dirName = relPath.split('/')[0] || files[0].name;
-        // Stocker la valeur et mettre à jour l'affichage
-        const hiddenInput = document.getElementById('onto-new-path');
-        const display     = document.getElementById('onto-new-path-display');
-        const path = `/Users/bernard/${dirName}/`;
-        if (hiddenInput) hiddenInput.value = path;
-        if (display)     display.textContent = path;
+        const pathInput = document.getElementById('onto-new-path');
+        if (pathInput) pathInput.value = dirName + '/';
     },
 
     _onImportFileChange(event) {
