@@ -207,19 +207,54 @@ class TripleStore:
 
     # ── Import depuis RDF ────────────────────────────────────
 
+    @staticmethod
+    def _detect_base(g: "Graph", user_uri: str) -> str:
+        """Détecte la base IRI réelle de l'ontologie depuis le graphe RDF.
+        Essaie d'abord le namespace déclaré dans owl:Ontology, puis cherche
+        le préfixe commun aux entités, et retombe sur l'URI fournie par l'utilisateur."""
+        from rdflib import OWL as _OWL, RDF as _RDF, URIRef as _URIRef
+        # 1. Chercher owl:Ontology rdf:about
+        for s in g.subjects(_RDF.type, _OWL.Ontology):
+            if isinstance(s, _URIRef) and str(s).startswith("http"):
+                return str(s).rstrip("#/") + "#"
+        # 2. Chercher le préfixe commun des classes/propriétés
+        iris = [str(s) for s in g.subjects(_RDF.type, _OWL.Class)
+                if isinstance(s, _URIRef)]
+        iris += [str(s) for s in g.subjects(_RDF.type, _OWL.ObjectProperty)
+                 if isinstance(s, _URIRef)]
+        if iris and "#" in iris[0]:
+            return iris[0].rsplit("#", 1)[0] + "#"
+        # 3. Retomber sur l'URI fournie
+        return user_uri.rstrip("#/") + "#"
+
+    @staticmethod
+    def _local_name(uri_str: str, base: str) -> str:
+        """Extrait le nom local en retirant la base ; si échec, utilise le fragment ou le dernier segment."""
+        local = uri_str.replace(base, "")
+        if local and "/" not in local and "#" not in local:
+            return local
+        # Essai fragment (#)
+        if "#" in uri_str:
+            fragment = uri_str.split("#")[-1]
+            if fragment:
+                return fragment
+        # Essai dernier segment (/)
+        segment = uri_str.rstrip("/").split("/")[-1]
+        return segment if segment else ""
+
     def import_from_rdf(self, content: bytes, fmt: str, name: str, host_path: str, uri: str, prefix: str = "onto") -> OWLOntology:
         g = Graph()
         g.parse(data=content, format=fmt)
 
-        base = uri.rstrip("#/") + "#"
-        NS = Namespace(base)
+        base = self._detect_base(g, uri)
+        onto_id = base.rstrip("#/")
 
-        onto = OWLOntology(id=uri, name=name, prefix=prefix)
+        onto = OWLOntology(id=onto_id, name=name, prefix=prefix)
 
         for cls_uri in g.subjects(RDF.type, OWL.Class):
             if isinstance(cls_uri, URIRef):
-                local = str(cls_uri).replace(base, "")
-                if not local or "/" in local:
+                local = self._local_name(str(cls_uri), base)
+                if not local:
                     continue
                 owl_cls = OWLClass(id=local)
                 for label in g.objects(cls_uri, RDFS.label):
@@ -228,34 +263,34 @@ class TripleStore:
                     )
                 for sup in g.objects(cls_uri, RDFS.subClassOf):
                     if isinstance(sup, URIRef):
-                        sup_local = str(sup).replace(base, "")
+                        sup_local = self._local_name(str(sup), base)
                         if sup_local:
                             owl_cls.subClassOf.append(sup_local)
                 onto.classes.append(owl_cls)
 
         for prop_uri in g.subjects(RDF.type, OWL.ObjectProperty):
             if isinstance(prop_uri, URIRef):
-                local = str(prop_uri).replace(base, "")
+                local = self._local_name(str(prop_uri), base)
                 if not local:
                     continue
                 prop = OWLObjectProperty(id=local)
                 for d in g.objects(prop_uri, RDFS.domain):
                     if isinstance(d, URIRef):
-                        prop.domain.append(str(d).replace(base, ""))
+                        prop.domain.append(self._local_name(str(d), base))
                 for r in g.objects(prop_uri, RDFS.range):
                     if isinstance(r, URIRef):
-                        prop.range.append(str(r).replace(base, ""))
+                        prop.range.append(self._local_name(str(r), base))
                 onto.object_properties.append(prop)
 
         for prop_uri in g.subjects(RDF.type, OWL.DatatypeProperty):
             if isinstance(prop_uri, URIRef):
-                local = str(prop_uri).replace(base, "")
+                local = self._local_name(str(prop_uri), base)
                 if not local:
                     continue
                 prop = OWLDatatypeProperty(id=local)
                 for d in g.objects(prop_uri, RDFS.domain):
                     if isinstance(d, URIRef):
-                        prop.domain.append(str(d).replace(base, ""))
+                        prop.domain.append(self._local_name(str(d), base))
                 for r in g.objects(prop_uri, RDFS.range):
                     prop.range.append(str(r).replace(base, "").replace(str(XSD), "xsd:"))
                 onto.datatype_properties.append(prop)
