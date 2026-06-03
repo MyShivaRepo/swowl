@@ -341,10 +341,8 @@ const APP = {
                             <label>Path * <span style="font-size:10px;color:var(--text-dim)">(directory on your Mac)</span></label>
                             <input type="text" id="onto-new-path" placeholder="Choose directory…"
                                    style="width:100%;cursor:pointer"
-                                   onclick="document.getElementById('onto-path-picker').click()"
+                                   onclick="FsBrowser.open('onto-new-path')"
                                    readonly>
-                            <input type="file" id="onto-path-picker" webkitdirectory style="display:none"
-                                   onchange="APP._onPathDirChange(event)">
                         </div>
                     </div>
                     <!-- Row 2 : Prefix + URI -->
@@ -465,16 +463,6 @@ const APP = {
         }
     },
 
-    _onPathDirChange(event) {
-        const files = event.target.files;
-        if (!files || !files.length) return;
-        // webkitRelativePath = "dirname/subdir/.../filename"
-        // → le 1er segment est le nom du dossier sélectionné
-        const relPath = files[0].webkitRelativePath || '';
-        const dirName = relPath.split('/')[0] || files[0].name;
-        const pathInput = document.getElementById('onto-new-path');
-        if (pathInput) pathInput.value = dirName + '/';
-    },
 
     _onImportFileChange(event) {
         const file = event.target.files[0];
