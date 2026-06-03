@@ -655,8 +655,8 @@ const SWRLEditor = {
             case 'naf_block':     return { type: 'naf_block',     atoms: [] };
             case 'conditional':   return {
                 type: 'conditional',
-                condition:  [{ type: 'equality_atom', var: '?x', operator: '=', value: '' }],
-                consequent: [{ type: 'type_atom',     var: '?x', class_id: '' }],
+                condition:  [],
+                consequent: [],
             };
             default: return { type };
         }
