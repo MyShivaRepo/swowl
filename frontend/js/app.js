@@ -737,11 +737,16 @@ const FsBrowser = {
                     <div class="fs-loading">Loading…</div>
                 </div>
                 <div class="fs-browser-footer">
-                    <span style="font-size:10px;color:var(--text-dim);white-space:nowrap">Folder:</span>
-                    <code style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;color:var(--text2)" id="fs-selected-path">${this._currentPath}/</code>
-                    <button class="btn-primary btn-sm" id="fs-select-btn"
-                            data-dir="${this._currentPath}/"
-                            onclick="FsBrowser.confirm(this.dataset.dir)">Select this folder</button>
+                    ${this._targetFieldId === 'onto-new-fname'
+                        ? `<span style="font-size:10px;color:var(--text-dim);white-space:nowrap">File:</span>
+                           <code style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;color:var(--text2)" id="fs-selected-path">— select a file —</code>
+                           <button class="btn-primary btn-sm" id="fs-select-btn" disabled
+                                   onclick="FsBrowser.confirm()">Select this file</button>`
+                        : `<span style="font-size:10px;color:var(--text-dim);white-space:nowrap">Folder:</span>
+                           <code style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;color:var(--text2)" id="fs-selected-path">${this._currentPath}/</code>
+                           <button class="btn-primary btn-sm" id="fs-select-btn"
+                                   data-dir="${this._currentPath}/"
+                                   onclick="FsBrowser.confirm(this.dataset.dir)">Select this folder</button>`}
                     <button class="btn-secondary btn-sm" onclick="FsBrowser.close()">Cancel</button>
                 </div>
             </div>`;
@@ -812,7 +817,13 @@ const FsBrowser = {
         // Highlight
         document.querySelectorAll('.fs-item').forEach(e => e.classList.remove('fs-item-selected'));
         el.classList.add('fs-item-selected');
-        // Le footer garde le dossier courant — le fichier sélectionné est juste mis en évidence
+        // Mode fichier : activer le bouton et afficher le nom du fichier
+        if (this._targetFieldId === 'onto-new-fname') {
+            const selPath = document.getElementById('fs-selected-path');
+            if (selPath) selPath.textContent = name;
+            const btn = document.getElementById('fs-select-btn');
+            if (btn) btn.disabled = false;
+        }
     },
 
     confirm(dirFromBtn) {
