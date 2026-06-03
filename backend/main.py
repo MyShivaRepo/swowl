@@ -728,9 +728,31 @@ def fs_browse(path: str = Query("/Users/bernard")):
         raise HTTPException(404, f"Répertoire introuvable : {path}")
     dirs, files = [], []
     try:
-        entries = sorted(p.iterdir(), key=lambda e: (not e.is_dir(), e.name.lower()))
+        raw_entries = list(p.iterdir())
     except PermissionError:
-        raise HTTPException(403, f"Permission denied: {path}")
+        # macOS sandbox : listing du répertoire racine refusé
+        # → os.listdir peut réussir là où iterdir échoue
+        import os as _os
+        raw_entries = []
+        try:
+            names = _os.listdir(container_path)
+        except PermissionError:
+            names = []
+        for name in names:
+            try:
+                child = p / name
+                child.stat()          # vérifie l'accès
+                raw_entries.append(child)
+            except (PermissionError, OSError):
+                continue
+
+    def _sort_key(e):
+        try:
+            return (not e.is_dir(), e.name.lower())
+        except (PermissionError, OSError):
+            return (True, e.name.lower())
+
+    entries = sorted(raw_entries, key=_sort_key)
     for entry in entries:
         if entry.name.startswith('.'):
             continue
