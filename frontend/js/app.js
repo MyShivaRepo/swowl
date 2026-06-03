@@ -338,11 +338,13 @@ const APP = {
                             <input type="text" id="onto-new-name" placeholder="e.g. MyOntology" style="width:100%">
                         </div>
                         <div class="form-group" style="margin:0;flex:2;min-width:260px">
-                            <label>Path * <span style="font-size:10px;color:var(--text-dim)">(absolute path on your Mac)</span></label>
-                            <div style="display:flex;gap:4px">
-                                <input type="text" id="onto-new-path" placeholder="/Users/bernard/AppData/Ontologies/" style="flex:1;min-width:0">
-                                <button class="btn-sm btn-secondary" onclick="FsBrowser.open('onto-new-path')" title="Browse filesystem">📁</button>
-                            </div>
+                            <label>Path * <span style="font-size:10px;color:var(--text-dim)">(directory on your Mac)</span></label>
+                            <label class="btn-secondary btn-sm onto-file-btn" style="width:100%;justify-content:flex-start">
+                                <span id="onto-new-path-display">Choose directory…</span>
+                                <input type="file" id="onto-new-path-picker" webkitdirectory style="display:none"
+                                       onchange="APP._onPathDirChange(event)">
+                            </label>
+                            <input type="hidden" id="onto-new-path" value="">
                         </div>
                     </div>
                     <!-- Row 2 : Prefix + URI -->
@@ -450,6 +452,20 @@ const APP = {
         el.style.display = el.style.display === 'none' ? '' : 'none';
     },
 
+    _onPathDirChange(event) {
+        const files = event.target.files;
+        if (!files || !files.length) return;
+        // webkitRelativePath = "dirname/filename" → on extrait "dirname"
+        const relPath = files[0].webkitRelativePath || '';
+        const dirName = relPath.split('/')[0] || files[0].name;
+        // Stocker la valeur et mettre à jour l'affichage
+        const hiddenInput = document.getElementById('onto-new-path');
+        const display     = document.getElementById('onto-new-path-display');
+        const path = `/Users/bernard/${dirName}/`;
+        if (hiddenInput) hiddenInput.value = path;
+        if (display)     display.textContent = path;
+    },
+
     _onImportFileChange(event) {
         const file = event.target.files[0];
         if (!file) return;
@@ -461,8 +477,6 @@ const APP = {
         if (nameInput && !nameInput.value) nameInput.value = base;
         const uriInput = document.getElementById('onto-new-uri');
         if (uriInput && !uriInput.value) uriInput.value = `https://example.org/${base}`;
-        const pathInput = document.getElementById('onto-new-path');
-        if (pathInput && !pathInput.value) pathInput.value = `/Users/bernard/Documents/`;
     },
 
     async doCreateOntology() {
