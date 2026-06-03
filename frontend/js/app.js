@@ -306,6 +306,7 @@ const APP = {
                 <td><code>${o.prefix}</code></td>
                 <td><code>${o.uri}</code></td>
                 <td class="actions" style="white-space:nowrap">
+                    <button class="btn-sm" onclick="APP.doEditOntology('${safeName}')" title="Edit attributes">✏️</button>
                     ${connectBtn}
                     ${isConn ? `<button class="btn-sm" onclick="APP.exportOntology('owl')" title="Export OWL">↓ OWL</button>
                     <button class="btn-sm" onclick="APP.exportOntology('ttl')" title="Export Turtle">↓ TTL</button>` : ''}
@@ -373,6 +374,41 @@ const APP = {
                 </div>
             </div>
 
+            <!-- ── Edit Ontology form (hidden by default) ── -->
+            <div id="onto-edit-panel" class="cls-frame onto-collapsible" style="display:none">
+                <div class="cls-frame-bar"><span class="cls-frame-tag">✏️ Edit Ontology</span></div>
+                <div class="cls-frame-body" style="padding:12px;display:flex;flex-direction:column;gap:10px">
+                    <input type="hidden" id="onto-edit-orig-name">
+                    <div style="display:flex;gap:10px;flex-wrap:wrap">
+                        <div class="form-group" style="margin:0;flex:1;min-width:160px">
+                            <label>Name *</label>
+                            <input type="text" id="onto-edit-name" style="width:100%">
+                        </div>
+                        <div class="form-group" style="margin:0;flex:2;min-width:260px">
+                            <label>Path * <span style="font-size:10px;color:var(--text-dim)">(directory)</span></label>
+                            <div style="display:flex;gap:4px">
+                                <input type="text" id="onto-edit-path" style="flex:1;min-width:0">
+                                <button class="btn-sm btn-secondary" onclick="FsBrowser.open('onto-edit-path')" title="Browse">📁</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div style="display:flex;gap:10px;flex-wrap:wrap">
+                        <div class="form-group" style="margin:0;flex:0 0 auto">
+                            <label>Prefix</label>
+                            <input type="text" id="onto-edit-prefix" style="width:90px">
+                        </div>
+                        <div class="form-group" style="margin:0;flex:2;min-width:260px">
+                            <label>URI (base IRI) *</label>
+                            <input type="text" id="onto-edit-uri" style="width:100%">
+                        </div>
+                    </div>
+                    <div style="display:flex;gap:8px">
+                        <button class="btn-primary btn-sm" onclick="APP.doSaveEdit()">💾 Save changes</button>
+                        <button class="btn-secondary btn-sm" onclick="APP.toggleOntoPanel('onto-edit-panel')">Cancel</button>
+                    </div>
+                </div>
+            </div>
+
             <!-- ── Registry table ── -->
             <div class="cls-frame">
                 <div class="cls-frame-bar">
@@ -405,7 +441,7 @@ const APP = {
         const el = document.getElementById(id);
         if (!el) return;
         // Fermer les autres panneaux ouverts
-        ['onto-new-panel'].forEach(pid => {
+        ['onto-new-panel','onto-edit-panel'].forEach(pid => {
             if (pid !== id) {
                 const other = document.getElementById(pid);
                 if (other) other.style.display = 'none';
@@ -451,6 +487,50 @@ const APP = {
                 await API.connectOntology(name);
                 UI.success(`Ontology "${name}" created and connected.`);
             }
+            await this.refresh();
+            this.renderOntologies();
+        } catch (e) { UI.error(e.message); }
+    },
+
+    doEditOntology(name) {
+        // Récupérer l'entrée dans la liste affichée
+        API.listOntologies().then(list => {
+            const o = list.find(e => e.name === name);
+            if (!o) return;
+            document.getElementById('onto-edit-orig-name').value = o.name;
+            document.getElementById('onto-edit-name').value    = o.name;
+            // Afficher le dossier (sans le nom de fichier)
+            const dir = o.path.substring(0, o.path.lastIndexOf('/') + 1);
+            document.getElementById('onto-edit-path').value   = dir;
+            document.getElementById('onto-edit-prefix').value = o.prefix;
+            document.getElementById('onto-edit-uri').value    = o.uri;
+            // Ouvrir le panel (ferme les autres)
+            ['onto-new-panel'].forEach(pid => {
+                const p = document.getElementById(pid);
+                if (p) p.style.display = 'none';
+            });
+            const panel = document.getElementById('onto-edit-panel');
+            if (panel) panel.style.display = '';
+            panel?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }).catch(e => UI.error(e.message));
+    },
+
+    async doSaveEdit() {
+        const origName = document.getElementById('onto-edit-orig-name')?.value.trim();
+        const name     = document.getElementById('onto-edit-name')?.value.trim();
+        const dir      = document.getElementById('onto-edit-path')?.value.trim();
+        const prefix   = document.getElementById('onto-edit-prefix')?.value.trim() || 'onto';
+        const uri      = document.getElementById('onto-edit-uri')?.value.trim();
+        if (!name)  return UI.error('Name is required.');
+        if (!dir)   return UI.error('Path is required.');
+        if (!uri)   return UI.error('URI is required.');
+        // Reconstruire le chemin complet (dir + nom original de fichier si même nom, sinon name.json)
+        const filename = name + '.json';
+        const path = dir.replace(/\/$/, '') + '/' + filename;
+        try {
+            await API.updateOntologyEntry(origName, { name, path, uri, prefix });
+            UI.success(`Ontology "${name}" updated.`);
+            document.getElementById('onto-edit-panel').style.display = 'none';
             await this.refresh();
             this.renderOntologies();
         } catch (e) { UI.error(e.message); }
