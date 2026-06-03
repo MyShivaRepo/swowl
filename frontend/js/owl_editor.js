@@ -3765,7 +3765,7 @@ const IndividualEditor = {
                 <div class="cls-editor-title">INDIVIDUAL EDITOR for&nbsp;
                     <input type="text" id="ind-id" class="cls-id-inp" value="${i.id}"
                            placeholder="newIndividual"
-                           oninput="this.value=this.value.replace(/\s+/g,'_')"
+                           oninput="this.value=this.value.replace(/\\s+/g,'_')"
                            ${isNew
                                ? 'onblur="if(this.value.trim()) IndividualEditor.save(true)"'
                                : ac}
@@ -4396,7 +4396,7 @@ const IndividualEditor = {
     async save(isNew) {
         const originalId = isNew ? null : this._editingId;
         const idRaw = document.getElementById('ind-id')?.value.trim() || '';
-        const id    = idRaw.replace(/\s+/g, '_');   // espace → underscore (URI valide)
+        const id    = idRaw.replace(/\s+/g, '_');   // spaces → underscore
         // Mettre à jour le champ si la valeur a changé
         const idEl = document.getElementById('ind-id');
         if (idEl && id !== idRaw) idEl.value = id;
