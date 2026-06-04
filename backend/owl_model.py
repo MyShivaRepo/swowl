@@ -258,6 +258,7 @@ class OWLOntology(BaseModel):
     datatype_properties: List[OWLDatatypeProperty] = []
     individuals: List[OWLIndividual] = []
     swrl_rules: List[SWRLRule] = []
+    display_rules: dict = Field(default_factory=dict)  # {"single": {classId: propId}, "multi": {classId: [{sep, propId}]}}
 
 
 # ── Résultats d'inférence ─────────────────────────────────────

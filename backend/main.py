@@ -66,6 +66,20 @@ def _collect_class_descendants(onto: OWLOntology, class_id: str) -> set:
     return descendants
 
 
+def _rename_swrl_atom(atom, old_id: str, new_id: str, kind: str) -> None:
+    """Propage un renommage dans un atome SWRL (récursif pour NAFBlock et Conditional)."""
+    if kind == 'class' and getattr(atom, 'class_id', None) == old_id:
+        atom.class_id = new_id
+    if kind == 'property' and getattr(atom, 'property_id', None) == old_id:
+        atom.property_id = new_id
+    for a in getattr(atom, 'atoms', []):
+        _rename_swrl_atom(a, old_id, new_id, kind)
+    for a in getattr(atom, 'condition', []):
+        _rename_swrl_atom(a, old_id, new_id, kind)
+    for a in getattr(atom, 'consequent', []):
+        _rename_swrl_atom(a, old_id, new_id, kind)
+
+
 def _cascade_rename_class(onto: OWLOntology, old_id: str, new_id: str) -> None:
     """Propage le renommage d'une classe à toutes ses références dans l'ontologie."""
 
@@ -98,6 +112,10 @@ def _cascade_rename_class(onto: OWLOntology, old_id: str, new_id: str) -> None:
     for ind in onto.individuals:
         ind.types = [new_id if t == old_id else t for t in ind.types]
 
+    for rule in onto.swrl_rules:
+        for atom in list(rule.body) + list(rule.head):
+            _rename_swrl_atom(atom, old_id, new_id, 'class')
+
 
 def _cascade_rename_property(onto: OWLOntology, old_id: str, new_id: str) -> None:
     """Propage le renommage d'une propriété à toutes ses références."""
@@ -129,6 +147,10 @@ def _cascade_rename_property(onto: OWLOntology, old_id: str, new_id: str) -> Non
         for a in ind.dataAssertions:
             if a.property == old_id:
                 a.property = new_id
+
+    for rule in onto.swrl_rules:
+        for atom in list(rule.body) + list(rule.head):
+            _rename_swrl_atom(atom, old_id, new_id, 'property')
 
 
 def _sync_domain_markers(onto: OWLOntology, prop_id: str,
@@ -247,6 +269,14 @@ def get_current_ontology():
 def update_ontology_meta(onto: OWLOntology):
     store.set(onto)
     return onto
+
+
+@app.put("/api/display-rules", tags=["Ontologie"])
+def update_display_rules(rules: dict):
+    onto = require_onto()
+    onto.display_rules = rules
+    store.save()
+    return rules
 
 
 # ── Import ───────────────────────────────────────────────────
@@ -645,7 +675,21 @@ def update_individual(ind_id: str, ind: OWLIndividual):
     if idx is None:
         raise HTTPException(404, f"Individual '{ind_id}' not found")
     old_assertions = onto.individuals[idx].objectAssertions
-    ind.id = ind_id.strip().replace(' ', '_')   # espace → underscore
+    new_id = ind.id.strip().replace(' ', '_') if ind.id else ind_id
+    if not new_id:
+        raise HTTPException(422, "Individual ID cannot be empty")
+    ind.id = new_id
+    # Si l'ID change, mettre à jour toutes les références dans les autres individus
+    if new_id != ind_id:
+        for other in onto.individuals:
+            if other.id == ind_id:
+                continue
+            other.objectAssertions = [
+                a if a.target != ind_id else a.model_copy(update={"target": new_id})
+                for a in other.objectAssertions
+            ]
+            other.sameAs = [x if x != ind_id else new_id for x in (other.sameAs or [])]
+            other.differentFrom = [x if x != ind_id else new_id for x in (other.differentFrom or [])]
     _sync_inverse_assertions(onto, ind_id, old_assertions, ind.objectAssertions)
     onto.individuals[idx] = ind
     store.save()

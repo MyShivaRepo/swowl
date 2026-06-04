@@ -145,11 +145,15 @@ const InferenceUI = {
             <table class="inf-table">
                 <thead><tr><th>Individu</th><th>Inferred type</th><th>Reason</th></tr></thead>
                 <tbody>
-                ${types.map(t => `<tr>
-                    <td><code>${t.individual_id}</code></td>
+                ${types.map(t => {
+                    const lbl = IndividualEditor._labelForId(t.individual_id);
+                    const tip = lbl !== t.individual_id ? ` title="${t.individual_id}"` : '';
+                    return `<tr>
+                    <td><code${tip}>${lbl}</code></td>
                     <td><code class="tag-class">${t.inferred_type}</code></td>
                     <td><small>${t.reason}</small></td>
-                </tr>`).join('')}
+                </tr>`;
+                }).join('')}
                 </tbody>
             </table>
             </div>
@@ -166,12 +170,18 @@ const InferenceUI = {
             <table class="inf-table">
                 <thead><tr><th>Individu</th><th>Property</th><th>Target</th><th>Reason</th></tr></thead>
                 <tbody>
-                ${assertions.map(a => `<tr>
-                    <td><code>${a.individual}</code></td>
+                ${assertions.map(a => {
+                    const indLbl    = IndividualEditor._labelForId(a.individual);
+                    const indTip    = indLbl !== a.individual ? ` title="${a.individual}"` : '';
+                    const targetLbl = IndividualEditor._labelForId(a.target);
+                    const targetTip = targetLbl !== a.target ? ` title="${a.target}"` : '';
+                    return `<tr>
+                    <td><code${indTip}>${indLbl}</code></td>
                     <td><code class="tag-prop">${a.property}</code></td>
-                    <td><code>${a.target}</code></td>
+                    <td><code${targetTip}>${targetLbl}</code></td>
                     <td><small>${a.reason}</small></td>
-                </tr>`).join('')}
+                </tr>`;
+                }).join('')}
                 </tbody>
             </table>
             </div>

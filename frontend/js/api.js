@@ -28,6 +28,7 @@ const API = {
     disconnectOntology: ()           => API._fetch('POST',   '/ontologies/disconnect'),
     getCurrentOntology: ()           => API._fetch('GET',    '/ontologies/current'),
     updateOntology:     (data)       => API._fetch('PUT',    '/ontologies/current', data),
+    updateDisplayRules: (rules)      => API._fetch('PUT',    '/display-rules', rules),
 
     exportOntology: (fmt) => fetch(`${API.base}/ontologies/export?fmt=${fmt}`)
         .then(r => { if (!r.ok) throw new Error(r.statusText); return r.blob(); }),

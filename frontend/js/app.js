@@ -2,6 +2,118 @@
  * app.js — Application principale : état, navigation, rendu des sections
  */
 
+// ── Paramètres utilisateur (persistés en localStorage) ───────
+
+const Settings = {
+
+    // ── Langues européennes disponibles ──────────────────────────
+    availableLangs: [
+        { code: 'bg', name: 'Български',  nameEn: 'Bulgarian' },
+        { code: 'cs', name: 'Čeština',    nameEn: 'Czech' },
+        { code: 'da', name: 'Dansk',      nameEn: 'Danish' },
+        { code: 'de', name: 'Deutsch',    nameEn: 'German' },
+        { code: 'el', name: 'Ελληνικά',   nameEn: 'Greek' },
+        { code: 'en', name: 'English',    nameEn: 'English' },
+        { code: 'es', name: 'Español',    nameEn: 'Spanish' },
+        { code: 'et', name: 'Eesti',      nameEn: 'Estonian' },
+        { code: 'fi', name: 'Suomi',      nameEn: 'Finnish' },
+        { code: 'fr', name: 'Français',   nameEn: 'French' },
+        { code: 'ga', name: 'Gaeilge',    nameEn: 'Irish' },
+        { code: 'hr', name: 'Hrvatski',   nameEn: 'Croatian' },
+        { code: 'hu', name: 'Magyar',     nameEn: 'Hungarian' },
+        { code: 'it', name: 'Italiano',   nameEn: 'Italian' },
+        { code: 'lt', name: 'Lietuvių',   nameEn: 'Lithuanian' },
+        { code: 'lv', name: 'Latviešu',   nameEn: 'Latvian' },
+        { code: 'mt', name: 'Malti',      nameEn: 'Maltese' },
+        { code: 'nl', name: 'Nederlands', nameEn: 'Dutch' },
+        { code: 'nb', name: 'Norsk',      nameEn: 'Norwegian' },
+        { code: 'pl', name: 'Polski',     nameEn: 'Polish' },
+        { code: 'pt', name: 'Português',  nameEn: 'Portuguese' },
+        { code: 'ro', name: 'Română',     nameEn: 'Romanian' },
+        { code: 'sk', name: 'Slovenčina', nameEn: 'Slovak' },
+        { code: 'sl', name: 'Slovenščina',nameEn: 'Slovenian' },
+        { code: 'sv', name: 'Svenska',    nameEn: 'Swedish' },
+    ],
+
+    activeLangs:   ['fr', 'en'],   // langues actives (sous-ensemble des disponibles)
+    preferredLang: 'fr',           // langue préférée (1 parmi les actives)
+    _key: 'swowl_settings',
+
+    get defaultLang() { return this.preferredLang; },
+
+    load() {
+        try {
+            const s = JSON.parse(localStorage.getItem(this._key) || '{}');
+            this.preferredLang = s.preferredLang || 'fr';
+            this.activeLangs   = s.activeLangs   || ['fr'];
+            if (!this.activeLangs.includes(this.preferredLang))
+                this.activeLangs.unshift(this.preferredLang);
+        } catch (_) {}
+    },
+
+    save() {
+        localStorage.setItem(this._key, JSON.stringify({
+            preferredLang: this.preferredLang,
+            activeLangs:   this.activeLangs,
+        }));
+    },
+
+    setPreferred(lang) {
+        if (!this.activeLangs.includes(lang)) this.activeLangs.push(lang);
+        this.preferredLang = lang;
+        this.save();
+        APP.renderSection('settings');
+    },
+
+    toggleActive(lang) {
+        if (lang === this.preferredLang) return;  // ne peut pas désactiver la préférée
+        if (this.activeLangs.includes(lang))
+            this.activeLangs = this.activeLangs.filter(l => l !== lang);
+        else
+            this.activeLangs.push(lang);
+        this.save();
+        APP.renderSection('settings');
+    },
+
+    /** Ouvre/ferme le dropdown des langues actives sur un champ LANG */
+    showLangDropdown(btn) {
+        document.getElementById('lang-dropdown')?.remove();
+        const inp = btn.previousElementSibling;
+        if (!inp) return;
+        const rect = btn.getBoundingClientRect();
+        const dd = document.createElement('div');
+        dd.id = 'lang-dropdown';
+        dd.style.cssText = `position:fixed;z-index:9999;background:var(--bg2);border:1px solid var(--border);
+            border-radius:4px;box-shadow:0 4px 12px rgba(0,0,0,.3);min-width:120px;
+            top:${rect.bottom+2}px;left:${rect.left}px;overflow:hidden`;
+        Settings.activeLangs.forEach(l => {
+            const item = document.createElement('div');
+            const name = Settings.availableLangs.find(x => x.code === l)?.nameEn || '';
+            item.textContent = `${l}${name ? ' — ' + name : ''}`;
+            item.style.cssText = `padding:5px 12px;cursor:pointer;font-size:12px;font-family:var(--font-mono);
+                ${l === inp.value ? 'background:var(--accent);color:#fff' : ''}`;
+            item.onmouseenter = () => { if (l !== inp.value) item.style.background = 'var(--bg3)'; };
+            item.onmouseleave = () => { if (l !== inp.value) item.style.background = ''; };
+            item.onmousedown = (e) => {
+                e.preventDefault();
+                inp.value = l;
+                inp.dispatchEvent(new Event('change', { bubbles: true }));
+                dd.remove();
+            };
+            dd.appendChild(item);
+        });
+        document.body.appendChild(dd);
+        const close = (e) => {
+            if (!dd.contains(e.target) && e.target !== btn) {
+                dd.remove();
+                document.removeEventListener('click', close, true);
+            }
+        };
+        setTimeout(() => document.addEventListener('click', close, true), 0);
+    },
+};
+Settings.load();
+
 // ── État global ──────────────────────────────────────────────
 
 const APP = {
@@ -221,6 +333,9 @@ const APP = {
         }
 
         switch (section) {
+            case 'settings':
+                main.innerHTML = this.renderSettings();
+                break;
             case 'ontologies':
                 this.renderOntologies();
                 break;
@@ -875,3 +990,131 @@ window.addEventListener('DOMContentLoaded', () => {
     APP.init();
 
 });
+
+// ── Settings UI ───────────────────────────────────────────────
+
+APP._settingsTab = APP._settingsTab || 'languages';
+
+APP.renderSettings = function() {
+    const tab = APP._settingsTab;
+
+    const tabBtn = (id, label) => `
+        <div class="settings-vtab${tab === id ? ' active' : ''}"
+             onclick="APP._settingsTab='${id}';APP.renderSection('settings')"
+             style="padding:10px 16px;cursor:pointer;font-size:13px;font-weight:${tab===id?'600':'400'};
+                    border-left:3px solid ${tab===id?'var(--accent)':'transparent'};
+                    color:${tab===id?'var(--accent)':'var(--text1)'};
+                    background:${tab===id?'var(--bg3)':'transparent'};
+                    white-space:nowrap;user-select:none">
+            ${label}
+        </div>`;
+
+    const sidebar = `
+        <div style="width:150px;flex-shrink:0;border-right:1px solid var(--border);padding:8px 0">
+            ${tabBtn('languages',     '🌐 Languages')}
+            ${tabBtn('naming-rules',  '🏷 Naming Rules')}
+        </div>`;
+
+    const pref    = Settings.preferredLang;
+    const active  = Settings.activeLangs;
+    const avail   = Settings.availableLangs;
+
+    // ── Étage 1 : Langue préférée ────────────────────────────
+    const prefHtml = active.map(code => {
+        const name = avail.find(x => x.code === code)?.name || '';
+        const isPref = code === pref;
+        return `<button class="btn-${isPref ? 'primary' : 'secondary'} btn-sm"
+                        onclick="Settings.setPreferred('${code}')"
+                        style="min-width:60px;gap:4px"
+                        title="${name}">
+                    ${isPref ? '★' : '☆'} ${code}
+                </button>`;
+    }).join('');
+
+    // ── Étage 2 : Langues actives ───────────────────────────
+    const activeHtml = active.map(code => {
+        const name = avail.find(x => x.code === code)?.name || '';
+        const isPref = code === pref;
+        return `<div style="display:inline-flex;align-items:center;gap:2px;
+                    background:var(--bg3);border:1px solid var(--border);border-radius:4px;
+                    padding:3px 8px;font-size:12px;font-family:var(--font-mono)">
+                    <span title="${name}">${code}</span>
+                    ${!isPref ? `<button class="btn-frame-del" style="margin-left:4px;font-size:10px"
+                        onclick="Settings.toggleActive('${code}')" title="Remove">✕</button>` : ''}
+                </div>`;
+    }).join('');
+
+    // ── Étage 3 : Langues disponibles ──────────────────────
+    const availHtml = avail.map(({ code, name }) => {
+        const isActive = active.includes(code);
+        return `<button class="btn-${isActive ? 'primary' : 'secondary'} btn-sm"
+                        onclick="Settings.toggleActive('${code}')"
+                        style="min-width:48px;font-size:11px"
+                        title="${name}${isActive ? ' — active' : ''}">${code}</button>`;
+    }).join('');
+
+    // ── Contenu de l'onglet actif ─────────────────────────────
+    let tabContent = '';
+    if (tab === 'languages') {
+        tabContent = `
+        <div style="display:flex;flex-direction:column;gap:16px;padding:16px;flex:1;overflow-y:auto">
+
+            <!-- Étage 1 : Langue préférée -->
+            <div class="cls-frame" style="padding:0">
+                <div class="cls-frame-bar"><span class="cls-frame-tag">★ Preferred language</span></div>
+                <div class="cls-frame-body" style="padding:10px 14px">
+                    <p style="margin:0 0 8px;font-size:11px;color:var(--text-dim)">
+                        Language applied by default to new <code>rdfs:label</code> and <code>rdfs:comment</code>.
+                        Select one among the active languages.
+                    </p>
+                    <div style="display:flex;flex-wrap:wrap;gap:6px">
+                        ${prefHtml || '<span style="font-size:12px;color:var(--text-dim)">No active languages</span>'}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Étage 2 : Langues actives -->
+            <div class="cls-frame" style="padding:0">
+                <div class="cls-frame-bar"><span class="cls-frame-tag">◆ Active languages</span></div>
+                <div class="cls-frame-body" style="padding:10px 14px">
+                    <p style="margin:0 0 8px;font-size:11px;color:var(--text-dim)">
+                        Languages available in the LANG dropdown. Add from the list below —
+                        the ★ preferred cannot be removed.
+                    </p>
+                    <div style="display:flex;flex-wrap:wrap;gap:6px;min-height:28px">
+                        ${activeHtml || '<span style="font-size:12px;color:var(--text-dim)">—</span>'}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Étage 3 : Langues disponibles -->
+            <div class="cls-frame" style="padding:0">
+                <div class="cls-frame-bar"><span class="cls-frame-tag">◇ Available languages</span></div>
+                <div class="cls-frame-body" style="padding:10px 14px">
+                    <p style="margin:0 0 8px;font-size:11px;color:var(--text-dim)">
+                        All European languages. Click to toggle active / inactive.
+                    </p>
+                    <div style="display:flex;flex-wrap:wrap;gap:5px">${availHtml}</div>
+                </div>
+            </div>
+        </div>`;
+    } else if (tab === 'naming-rules') {
+        tabContent = `
+        <div style="padding:16px;flex:1;display:flex;align-items:center;justify-content:center">
+            <span style="color:var(--text-dim);font-size:13px;font-style:italic">Naming Rules — coming soon</span>
+        </div>`;
+    }
+
+    return `
+    <div style="height:100%;display:flex;flex-direction:column">
+        <div style="padding:16px 20px 0;border-bottom:1px solid var(--border)">
+            <h2 style="margin:0 0 12px;font-size:18px;font-weight:600">🛠️ Settings</h2>
+        </div>
+        <div style="display:flex;flex:1;overflow:hidden">
+            ${sidebar}
+            <div style="flex:1;overflow-y:auto;display:flex;flex-direction:column">
+                ${tabContent}
+            </div>
+        </div>
+    </div>`;
+};

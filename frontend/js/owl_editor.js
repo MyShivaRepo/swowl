@@ -205,9 +205,9 @@ const ClassEditor = {
 
         const hasParent = new Set();
         classes.forEach(c => {
-            const parents = (c.subClassOf || []).filter(s => typeof s === 'string' && allIds.has(s));
+            const parents = [...new Set((c.subClassOf || []).filter(s => typeof s === 'string' && allIds.has(s)))];
             parents.forEach(p => {
-                childrenOf[p].push(c.id);
+                if (!childrenOf[p].includes(c.id)) childrenOf[p].push(c.id);
                 hasParent.add(c.id);
             });
         });
@@ -395,20 +395,56 @@ const ClassEditor = {
                 </select>`;
             return;
         }
-        const icoAdd = `<svg width="9" height="9" viewBox="0 0 9 9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><line x1="4.5" y1="0.5" x2="4.5" y2="8.5"/><line x1="0.5" y1="4.5" x2="8.5" y2="4.5"/></svg>`;
-        const superClasses = (cls.subClassOf || []).filter(s => typeof s === 'string');
-        const superRows = superClasses.map(s => `
-            <div class="cls-list-item" data-id="${s}">
-                <span class="cls-dot"></span>
-                <span class="cls-list-lbl" style="cursor:pointer"
-                      onclick="APP.navigateTo('classes','${s}')">${s}</span>
-                <button class="btn-frame-del" onclick="ClassEditor.removeSuperClass('${s}')">✕</button>
-            </div>`).join('');
+        const superClasses = [...new Set((cls.subClassOf || []).filter(s => typeof s === 'string'))];
+
+        // Build a map id→class for ancestor traversal
+        const classMap = {};
+        (APP.state.classes || []).forEach(c => { classMap[c.id] = c; });
+
+        // For each direct parent, compute the full ancestor chain up to owl:Thing
+        const buildChain = (startId) => {
+            const chain = [];
+            const visited = new Set();
+            let current = startId;
+            while (current && !visited.has(current)) {
+                visited.add(current);
+                chain.push(current);
+                const parentCls = classMap[current];
+                const parents = parentCls ? (parentCls.subClassOf || []).filter(s => typeof s === 'string') : [];
+                current = parents.length > 0 ? parents[0] : null;
+            }
+            chain.push('owl:Thing');
+            return chain;
+        };
+
+        // Render direct parents with their ancestor chains
+        const superRows = superClasses.map(s => {
+            const chain = buildChain(s);
+            const chainHtml = chain.map((id, i) => {
+                const isOwlThing = id === 'owl:Thing';
+                const indent = 6 + i * 14;
+                if (isOwlThing) {
+                    return `<div class="cls-list-item cls-ancestor" style="padding-left:${indent}px;opacity:0.55;font-style:italic;cursor:pointer" onclick="ClassEditor.selectOwlThing()">
+                        <span class="cls-dot tree-cls-dot tree-thing-dot"></span>
+                        <span class="cls-list-lbl">owl:Thing</span>
+                    </div>`;
+                }
+                const isDirect = i === 0;
+                return `<div class="cls-list-item${isDirect ? '' : ' cls-ancestor'}" ${isDirect ? `data-id="${id}"` : `data-ancestor-id="${id}"`} style="padding-left:${indent}px${isDirect ? '' : ';opacity:0.75'}">
+                    <span class="cls-dot tree-cls-dot"></span>
+                    <span class="cls-list-lbl" style="cursor:pointer"
+                          onclick="APP.navigateTo('classes','${id}')">${id}</span>
+                    ${isDirect ? `<button class="btn-frame-del" onclick="ClassEditor.removeSuperClass('${id}')">✕</button>` : ''}
+                </div>`;
+            }).join('');
+            return chainHtml;
+        }).join('');
+
         const availSupers = (APP.state.classes || [])
             .filter(c2 => c2.id !== cls.id && !superClasses.includes(c2.id))
             .map(c2 => `<option value="${c2.id}">${c2.id}</option>`).join('');
         panel.innerHTML = `
-            ${superRows || '<div class="cls-list-empty">owl:Thing</div>'}
+            ${superRows || '<div class="cls-list-item cls-ancestor" style="opacity:0.55;font-style:italic"><span class="cls-dot tree-cls-dot tree-thing-dot"></span><span class="cls-list-lbl">owl:Thing</span></div>'}
             <select id="cls-super-picker" class="cls-picker" style="display:none"
                     onchange="ClassEditor.addSuperClass(this.value)">
                 <option value="">— choose —</option>${availSupers}
@@ -539,6 +575,43 @@ const ClassEditor = {
     async deleteSelected() {
         if (!this._selectedId) return;
         await this.delete(this._selectedId);
+    },
+
+    /** Crée un ObjectProperty avec domain = classe sélectionnée, puis navigue vers l'onglet OP */
+    async createOPForClass() {
+        const classId = this._selectedId;
+        if (!classId) return UI.error('Select a class first');
+        const id = OPEditor._generatePropName();
+        const prop = {
+            id, annotations: { labels: [], comments: [] },
+            domain: [classId], range: [], subPropertyOf: [],
+            inverseOf: null, characteristics: {}, propertyChainAxiom: [],
+        };
+        try {
+            await API.createOP(prop);
+            OPEditor._selectedId = id;
+            OPEditor._editingId  = id;
+            await APP.refresh();
+            APP.renderSection('object-properties');
+        } catch (e) { UI.error(e.message); }
+    },
+
+    /** Crée un DatatypeProperty avec domain = classe sélectionnée, puis navigue vers l'onglet DTP */
+    async createDTPForClass() {
+        const classId = this._selectedId;
+        if (!classId) return UI.error('Select a class first');
+        const id = DPEditor._generatePropName();
+        const prop = {
+            id, annotations: { labels: [], comments: [] },
+            domain: [classId], range: [], subPropertyOf: [], functional: false,
+        };
+        try {
+            await API.createDP(prop);
+            DPEditor._selectedId = id;
+            DPEditor._editingId  = id;
+            await APP.refresh();
+            APP.renderSection('datatype-properties');
+        } catch (e) { UI.error(e.message); }
     },
 
     // ── Menu contextuel ──────────────────────────────────────────
@@ -700,8 +773,8 @@ const ClassEditor = {
 
         // ── Lignes annotations ──
         const annoRows = [
-            ...labels.map(l   => _annoRow('label',   l.value,  l.lang  || 'fr', 'ClassEditor', ac)),
-            ...comments.map(cm => _annoRow('comment', cm.value, cm.lang || 'fr', 'ClassEditor', ac)),
+            ...labels.map(l   => _annoRow('label',   l.value,  l.lang  || Settings.defaultLang, 'ClassEditor', ac)),
+            ...comments.map(cm => _annoRow('comment', cm.value, cm.lang || Settings.defaultLang, 'ClassEditor', ac)),
             ...(c.annotations?.other || []).map(a => _annoRow('other', a.value, '', 'ClassEditor', ac, a.property)),
         ].join('');
 
@@ -1076,9 +1149,17 @@ const RestrictionEditor = {
                 <span class="restr-stoggle" style="transform:rotate(90deg)">▶</span>
                 Asserted Properties
                 <span style="font-weight:400;color:var(--text-dim);margin-left:3px">(${propIds.length})</span>
-                <button class="btn-ftool" style="margin-left:auto;flex-shrink:0"
-                        onclick="event.stopPropagation();RestrictionEditor.showPropPicker()">
-                    ${ico}&thinsp;property</button>
+                <span style="display:flex;gap:2px;margin-left:auto;flex-shrink:0" onclick="event.stopPropagation()">
+                    <button class="btn-ftool" title="Add existing property"
+                            onclick="RestrictionEditor.showPropPicker()">
+                        ${ico}&thinsp;property</button>
+                    <button class="btn-ftool" title="Create new ObjectProperty with domain = ${cls?.id || 'this class'}"
+                            onclick="ClassEditor.createOPForClass()">
+                        <span class="op-prop-dot" style="width:9px;height:9px;display:inline-block;vertical-align:middle;flex-shrink:0"></span>&thinsp;OP</button>
+                    <button class="btn-ftool" title="Create new DatatypeProperty with domain = ${cls?.id || 'this class'}"
+                            onclick="ClassEditor.createDTPForClass()">
+                        <span class="dp-prop-dot" style="width:9px;height:9px;display:inline-block;vertical-align:middle;flex-shrink:0"></span>&thinsp;DT</button>
+                </span>
             </div>
             <div class="restr-section-body">
                 <div id="restr-prop-picker" class="cls-tree-picker" style="display:none;margin:2px 4px 4px">
@@ -1541,7 +1622,12 @@ function _annoRow(type, value, lang, editor, ac, prop = null) {
     } else {
         const propName = type === 'label' ? 'rdfs:label' : 'rdfs:comment';
         propLabel = `<span class="anno-prop-dot"></span> ${propName}`;
-        langCell  = `<input type="text" class="anno-lang-inp" value="${lang||'fr'}" ${ac}>`;
+        langCell  = `<div style="display:flex;align-items:center;gap:1px">
+                        <input type="text" class="anno-lang-inp" value="${lang||Settings.defaultLang}" ${ac}
+                               style="width:36px;min-width:0">
+                        <button class="btn-ftool" style="padding:1px 3px;font-size:9px;flex-shrink:0"
+                                onclick="Settings.showLangDropdown(this)" title="Choose language">▼</button>
+                    </div>`;
         dataProp  = '';
     }
     return `<tr class="anno-row" data-type="${type}"${dataProp}>
@@ -1563,7 +1649,12 @@ function _makeAnnotRow(type, editor, ac, propId = null) {
     } else {
         const propName = type === 'label' ? 'rdfs:label' : 'rdfs:comment';
         propLabel = `<span class="anno-prop-dot"></span> ${propName}`;
-        langHtml  = `<input type="text" class="anno-lang-inp" value="fr" ${ac}>`;
+        langHtml  = `<div style="display:flex;align-items:center;gap:1px">
+                        <input type="text" class="anno-lang-inp" value="${Settings.defaultLang}" ${ac}
+                               style="width:36px;min-width:0">
+                        <button class="btn-ftool" style="padding:1px 3px;font-size:9px;flex-shrink:0"
+                                onclick="Settings.showLangDropdown(this)" title="Choose language">▼</button>
+                    </div>`;
     }
     const tr = document.createElement('tr');
     tr.className = 'anno-row';
@@ -1715,7 +1806,7 @@ function _collectAnnotations(tbodyId) {
     const labels = [], comments = [], other = [];
     document.querySelectorAll(`#${tbodyId} .anno-row`).forEach(row => {
         const value = row.querySelector('.anno-value')?.value.trim() || '';
-        const lang  = row.querySelector('.anno-lang-inp')?.value.trim() || 'fr';
+        const lang  = row.querySelector('.anno-lang-inp')?.value.trim() || Settings.defaultLang;
         if (!value) return;
         if (row.dataset.type === 'label')   labels.push({ value, lang });
         if (row.dataset.type === 'comment') comments.push({ value, lang });
@@ -1836,8 +1927,8 @@ const OPEditor = {
         props.forEach(p => { childrenOf[p.id] = []; });
         const hasParent = new Set();
         props.forEach(p => {
-            (p.subPropertyOf || []).filter(s => typeof s === 'string' && allIds.has(s)).forEach(par => {
-                childrenOf[par].push(p.id);
+            [...new Set((p.subPropertyOf || []).filter(s => typeof s === 'string' && allIds.has(s)))].forEach(par => {
+                if (!childrenOf[par].includes(p.id)) childrenOf[par].push(p.id);
                 hasParent.add(p.id);
             });
         });
@@ -2004,10 +2095,50 @@ const OPEditor = {
                 <div id="op-sub-picker" class="cls-tree-picker" style="display:none"></div>`;
             return;
         }
-        const superPropRows = _listRows(prop.subPropertyOf || [], 'op-sub-list', 'OPEditor.removeSubProp', 'op-prop-dot', '', '', 'object-properties');
+        const superProps = [...new Set((prop.subPropertyOf || []).filter(s => typeof s === 'string'))];
+
+        const propMap = {};
+        (APP.state.object_properties || []).forEach(p => { propMap[p.id] = p; });
+
+        const buildChain = (startId) => {
+            const chain = [];
+            const visited = new Set();
+            let current = startId;
+            while (current && !visited.has(current)) {
+                visited.add(current);
+                chain.push(current);
+                const parentProp = propMap[current];
+                const parents = parentProp ? (parentProp.subPropertyOf || []).filter(s => typeof s === 'string') : [];
+                current = parents.length > 0 ? parents[0] : null;
+            }
+            chain.push('owl:topObjectProperty');
+            return chain;
+        };
+
+        const superPropRows = superProps.map(s => {
+            const chain = buildChain(s);
+            return chain.map((id, i) => {
+                const isRoot = id === 'owl:topObjectProperty';
+                const indent = 6 + i * 14;
+                if (isRoot) {
+                    return `<div class="cls-list-item cls-ancestor" style="padding-left:${indent}px;opacity:0.55;font-style:italic;cursor:pointer" onclick="OPEditor.selectTopProp()">
+                        <span class="op-prop-dot tree-op-dot tree-op-top-dot"></span>
+                        <span class="cls-list-lbl">owl:topObjectProperty</span>
+                    </div>`;
+                }
+                const isDirect = i === 0;
+                return `<div class="cls-list-item${isDirect ? '' : ' cls-ancestor'}" ${isDirect ? `data-id="${id}"` : `data-ancestor-id="${id}"`} style="padding-left:${indent}px${isDirect ? '' : ';opacity:0.75'}">
+                    <span class="op-prop-dot tree-op-dot"></span>
+                    <span class="cls-list-lbl" style="cursor:pointer"
+                          onclick="APP.navigateTo('object-properties','${id}')">${id}</span>
+                    ${isDirect ? `<button class="btn-frame-del" onclick="OPEditor.removeSubProp('${id}')">✕</button>` : ''}
+                </div>`;
+            }).join('');
+        }).join('');
+
         const superPropTree = _opTreePickerItems('OPEditor.addSubProp(this.dataset.id)', [prop.id]);
         panel.innerHTML = `
-            ${superPropRows || '<div class="cls-list-empty">owl:topObjectProperty</div>'}
+            ${superPropRows || '<div class="cls-list-item cls-ancestor" style="opacity:0.55;font-style:italic;cursor:pointer" onclick="OPEditor.selectTopProp()"><span class="op-prop-dot tree-op-dot tree-op-top-dot"></span><span class="cls-list-lbl">owl:topObjectProperty</span></div>'}
             <div id="op-sub-picker" class="cls-tree-picker" style="display:none">
                 ${superPropTree}
             </div>`;
@@ -2250,8 +2381,8 @@ const OPEditor = {
 
         // Annotations
         const annoRows = [
-            ...(p.annotations?.labels   || []).map(l  => _annoRow('label',   l.value,  l.lang  || 'fr', 'OPEditor', ac)),
-            ...(p.annotations?.comments || []).map(cm => _annoRow('comment', cm.value, cm.lang || 'fr', 'OPEditor', ac)),
+            ...(p.annotations?.labels   || []).map(l  => _annoRow('label',   l.value,  l.lang  || Settings.defaultLang, 'OPEditor', ac)),
+            ...(p.annotations?.comments || []).map(cm => _annoRow('comment', cm.value, cm.lang || Settings.defaultLang, 'OPEditor', ac)),
             ...(p.annotations?.other    || []).map(a  => _annoRow('other',   a.value,  '',             'OPEditor', ac, a.property)),
         ].join('');
 
@@ -2346,7 +2477,10 @@ const OPEditor = {
                     ${inverseItem}
                     <input type="hidden" id="op-inverse-value" value="${p.inverseOf || ''}">
                     <div id="op-inverse-picker" class="cls-tree-picker" style="display:none">
-                        ${_opTreePickerItems('OPEditor.setInverse(this.dataset.id)')}
+                        ${_opTreePickerItems('OPEditor.setInverse(this.dataset.id)',
+                            [p.id, ...(APP.state.object_properties || [])
+                                .filter(q => q.inverseOf && q.inverseOf !== p.id)
+                                .map(q => q.id)])}
                     </div>
                     <div id="op-inferred-inverse" style="margin-top:4px;font-size:11px"></div>
                 </div>
@@ -2537,8 +2671,8 @@ const DPEditor = {
         props.forEach(p => { childrenOf[p.id] = []; });
         const hasParent = new Set();
         props.forEach(p => {
-            (p.subPropertyOf || []).filter(s => typeof s === 'string' && allIds.has(s)).forEach(par => {
-                childrenOf[par].push(p.id);
+            [...new Set((p.subPropertyOf || []).filter(s => typeof s === 'string' && allIds.has(s)))].forEach(par => {
+                if (!childrenOf[par].includes(p.id)) childrenOf[par].push(p.id);
                 hasParent.add(p.id);
             });
         });
@@ -2714,12 +2848,52 @@ const DPEditor = {
                 </select>`;
             return;
         }
-        const subRows = _listRows(prop.subPropertyOf || [], 'dp-sub-list', 'DPEditor.removeSubProp', 'dp-prop-dot', '', '', 'datatype-properties');
+        const superProps = [...new Set((prop.subPropertyOf || []).filter(s => typeof s === 'string'))];
+
+        const propMap = {};
+        (APP.state.datatype_properties || []).forEach(p => { propMap[p.id] = p; });
+
+        const buildChain = (startId) => {
+            const chain = [];
+            const visited = new Set();
+            let current = startId;
+            while (current && !visited.has(current)) {
+                visited.add(current);
+                chain.push(current);
+                const parentProp = propMap[current];
+                const parents = parentProp ? (parentProp.subPropertyOf || []).filter(s => typeof s === 'string') : [];
+                current = parents.length > 0 ? parents[0] : null;
+            }
+            chain.push('owl:topDatatypeProperty');
+            return chain;
+        };
+
+        const subRows = superProps.map(s => {
+            const chain = buildChain(s);
+            return chain.map((id, i) => {
+                const isRoot = id === 'owl:topDatatypeProperty';
+                const indent = 6 + i * 14;
+                if (isRoot) {
+                    return `<div class="cls-list-item cls-ancestor" style="padding-left:${indent}px;opacity:0.55;font-style:italic;cursor:pointer" onclick="DPEditor.selectTopProp()">
+                        <span class="dp-prop-dot tree-dp-dot tree-dp-top-dot"></span>
+                        <span class="cls-list-lbl">owl:topDatatypeProperty</span>
+                    </div>`;
+                }
+                const isDirect = i === 0;
+                return `<div class="cls-list-item${isDirect ? '' : ' cls-ancestor'}" ${isDirect ? `data-id="${id}"` : `data-ancestor-id="${id}"`} style="padding-left:${indent}px${isDirect ? '' : ';opacity:0.75'}">
+                    <span class="dp-prop-dot tree-dp-dot"></span>
+                    <span class="cls-list-lbl" style="cursor:pointer"
+                          onclick="APP.navigateTo('datatype-properties','${id}')">${id}</span>
+                    ${isDirect ? `<button class="btn-frame-del" onclick="DPEditor.removeSubProp('${id}')">✕</button>` : ''}
+                </div>`;
+            }).join('');
+        }).join('');
+
         const availSub = (APP.state.datatype_properties || [])
-            .filter(q => q.id !== prop.id && !(prop.subPropertyOf||[]).includes(q.id))
+            .filter(q => q.id !== prop.id && !superProps.includes(q.id))
             .map(q => `<option value="${q.id}">${q.id}</option>`).join('');
         panel.innerHTML = `
-            ${subRows || '<div class="cls-list-empty">owl:topDatatypeProperty</div>'}
+            ${subRows || '<div class="cls-list-item cls-ancestor" style="opacity:0.55;font-style:italic;cursor:pointer" onclick="DPEditor.selectTopProp()"><span class="dp-prop-dot tree-dp-dot tree-dp-top-dot"></span><span class="cls-list-lbl">owl:topDatatypeProperty</span></div>'}
             <select id="dp-sub-picker" class="cls-picker" style="display:none"
                     onchange="DPEditor.addSubProp(this.value)">
                 <option value="">— choose —</option>${availSub}
@@ -2959,8 +3133,8 @@ const DPEditor = {
 
         // Annotations
         const annoRows = [
-            ...(p.annotations?.labels   || []).map(l  => _annoRow('label',   l.value,  l.lang  || 'fr', 'DPEditor', ac)),
-            ...(p.annotations?.comments || []).map(cm => _annoRow('comment', cm.value, cm.lang || 'fr', 'DPEditor', ac)),
+            ...(p.annotations?.labels   || []).map(l  => _annoRow('label',   l.value,  l.lang  || Settings.defaultLang, 'DPEditor', ac)),
+            ...(p.annotations?.comments || []).map(cm => _annoRow('comment', cm.value, cm.lang || Settings.defaultLang, 'DPEditor', ac)),
             ...(p.annotations?.other    || []).map(a  => _annoRow('other',   a.value,  '',             'DPEditor', ac, a.property)),
         ].join('');
 
@@ -3280,27 +3454,7 @@ const IndividualEditor = {
         if (!filtered.length) return '<div class="cls-list-empty" style="padding:12px 8px;font-style:italic">No individuals</div>';
 
         return filtered.map(ind => {
-            // Cherche la règle effective pour cet individu
-            const resolveForClass = (clsId) => {
-                const multi = this._getEffectiveDisplayMulti(clsId);
-                if (multi) return { multi };
-                const single = this._getEffectiveDisplayProp(clsId);
-                if (single) return { single };
-                return null;
-            };
-            let rule = null;
-            if (!this._selectedClassId) {
-                for (const typeId of (ind.types || [])) {
-                    rule = resolveForClass(typeId);
-                    if (rule) break;
-                }
-                if (!rule) rule = resolveForClass(null);
-            } else {
-                rule = resolveForClass(this._selectedClassId);
-            }
-            const dispLabel = rule?.multi
-                ? this._buildMultiLabel(ind, rule.multi)
-                : rule?.single ? this._getDisplayLabel(ind, rule.single) : null;
+            const dispLabel = this._resolveDisplayLabel(ind, this._selectedClassId);
             const mainText  = dispLabel || ind.id;
             const subText   = dispLabel ? ind.id : '';
             return `
@@ -3376,6 +3530,7 @@ const IndividualEditor = {
         this._setDelBtn(this._selectedIndIds.size > 0);
 
         // Col 2 — surlignage multi
+        document.querySelector('#ind-list-scroll .ind-new-placeholder')?.remove();
         document.querySelectorAll('#ind-list-scroll .tree-item').forEach(el => {
             el.classList.toggle('selected', this._selectedIndIds.has(el.dataset.id));
         });
@@ -3404,13 +3559,24 @@ const IndividualEditor = {
         this._anchorIndId    = null;
         this._editingId      = null;
         this._setDelBtn(false);
-        // Col 2 — désélectionner
+        // Col 2 — désélectionner + insérer le placeholder ghost
         document.querySelectorAll('#ind-list-scroll .tree-item').forEach(el => el.classList.remove('selected'));
+        const scroll = document.getElementById('ind-list-scroll');
+        if (scroll) {
+            scroll.querySelector('.ind-new-placeholder')?.remove();
+            const ghost = document.createElement('div');
+            ghost.className = 'tree-item ind-new-placeholder selected';
+            ghost.style.cssText = 'padding:4px 6px 4px 10px;display:flex;align-items:center;gap:4px;opacity:0.6';
+            ghost.innerHTML = `<span class="xsd-dot" style="flex-shrink:0;margin:0"></span>
+                <span style="flex:1;font-style:italic;color:var(--text-dim)">new individual…</span>`;
+            scroll.prepend(ghost);
+        }
         // Col 3 — formulaire vide
         const detail = document.getElementById('ind-detail');
         if (detail) {
             detail.innerHTML = this.renderForm(null, this._selectedClassId);
             _initHResizers('ind-detail');
+            setTimeout(() => document.getElementById('ind-id')?.focus(), 30);
         }
     },
 
@@ -3421,6 +3587,7 @@ const IndividualEditor = {
         this._editingId      = null;
         this._setDelBtn(false);
         document.querySelectorAll('#ind-list-scroll .tree-item').forEach(el => el.classList.remove('selected'));
+        document.querySelector('#ind-list-scroll .ind-new-placeholder')?.remove();
         const detail = document.getElementById('ind-detail');
         if (detail) detail.innerHTML = `<div class="detail-panel-empty">
             <span class="cls-dot" style="width:32px;height:32px"></span>
@@ -3462,7 +3629,22 @@ const IndividualEditor = {
         } catch (e) { UI.error(e.message); }
     },
 
+    /** Persiste les règles d'affichage dans l'ontologie (backend) */
+    _saveDisplayRules() {
+        const rules = { single: this._displayProps, multi: this._displayPropsMulti };
+        API.updateDisplayRules(rules).catch(() => {});
+        if (APP.state.ontology) APP.state.ontology.display_rules = rules;
+    },
+
+    /** Charge les règles d'affichage depuis l'état de l'ontologie */
+    _loadDisplayRules() {
+        const rules = APP.state.ontology?.display_rules || {};
+        this._displayProps      = rules.single || {};
+        this._displayPropsMulti = rules.multi  || {};
+    },
+
     restoreSelection() {
+        this._loadDisplayRules();
         this._initSplitPanes();
         // Col 1 — restaurer surlignage
         const treeId = this._selectedClassId === null ? 'owl:Thing' : this._selectedClassId;
@@ -3671,30 +3853,44 @@ const IndividualEditor = {
         let rows = '';
         if (kind === 'op') {
             const current = (ind?.objectAssertions || []).filter(a => a.property === propId);
-            rows = current.map(a => `
+            const ctxClass = effectiveRange[0] || null;
+            rows = current.map(a => {
+                const lbl = this._labelForId(a.target, ctxClass);
+                const sub = lbl !== a.target ? `<span style="font-size:10px;color:var(--text-faint);display:block">${a.target}</span>` : '';
+                return `
                 <div class="ind-prop-row" style="display:flex;align-items:center;gap:4px;padding:2px 4px">
                     <span class="xsd-dot" style="flex-shrink:0;margin:0"></span>
                     <span class="ind-op-label" style="flex:1;font-size:12px;font-family:var(--font-mono);cursor:pointer"
                           onclick="APP.navigateTo('individuals','${a.target}')"
                           onmouseover="this.style.textDecoration='underline';this.style.color='var(--accent,#5f8dd3)'"
-                          onmouseout="this.style.textDecoration='';this.style.color=''">${a.target}</span>
+                          onmouseout="this.style.textDecoration='';this.style.color=''">${lbl}${sub}</span>
                     <input type="hidden" class="ind-op-target" value="${a.target}">
                     <button class="btn-frame-del" onclick="${delOnclick}">✕</button>
-                </div>`).join('') || '<div class="cls-list-empty">—</div>';
+                </div>`;
+            }).join('') || '<div class="cls-list-empty">—</div>';
         } else {
             const current  = (ind?.dataAssertions || []).filter(a => a.property === propId);
             const dpData2  = (APP.state.datatype_properties || []).find(p => p.id === propId);
             const defDtype = dpData2?.range?.[0] || 'xsd:string';
-            rows = current.map(a => `
+            rows = current.map(a => {
+                const isUrl = /^https?:\/\//i.test(a.value || '');
+                const urlBtn = isUrl
+                    ? `<a href="${(a.value||'').replace(/"/g,'&quot;')}" target="_blank" rel="noopener noreferrer"
+                          style="flex-shrink:0;font-size:14px;line-height:1;opacity:0.65;text-decoration:none;cursor:pointer"
+                          title="Open URL" onclick="event.stopPropagation()">🔗</a>`
+                    : '';
+                return `
                 <div class="ind-prop-row" style="display:flex;align-items:center;gap:4px;padding:2px 4px">
                     <input type="text" class="ind-dp-value"
                         value="${(a.value||'').replace(/"/g,'&quot;')}" placeholder="value" ${ac}
                         style="flex:1;font-size:11px;border:1px solid var(--border);border-radius:3px;
                                padding:2px 4px;background:var(--bg2);color:var(--text1)">
+                    ${urlBtn}
                     <span class="ind-dp-type" data-dtype="${a.datatype || defDtype}"
                           style="font-size:10px;color:var(--text-dim);flex-shrink:0">${a.datatype || defDtype}</span>
                     <button class="btn-frame-del" onclick="${delOnclick}">✕</button>
-                </div>`).join('') || '<div class="cls-list-empty">—</div>';
+                </div>`;
+            }).join('') || '<div class="cls-list-empty">—</div>';
         }
 
         // Masquer le bouton + si single ET déjà une valeur
@@ -3708,7 +3904,11 @@ const IndividualEditor = {
              data-effective-range="${erStr}" data-single="${isSingle}">
             <div class="cls-frame-bar">
                 <span class="${dotCls}"></span>
-                <span class="cls-frame-tag" style="margin-left:4px">${propId}</span>
+                <span class="cls-frame-tag" style="margin-left:4px;cursor:pointer"
+                      onclick="APP.navigateTo('${kind === 'op' ? 'object-properties' : 'datatype-properties'}','${propId}')"
+                      onmouseover="this.style.textDecoration='underline'"
+                      onmouseout="this.style.textDecoration=''"
+                      title="Navigate to ${propId}">${propId}</span>
                 ${rangeChip}
                 <button id="ind-prop-add-${safeId}" class="btn-ftool" style="margin-left:auto${addBtnHidden ? ';display:none' : ''}"
                         onclick="${addOnclick}">${ico}</button>
@@ -3734,8 +3934,8 @@ const IndividualEditor = {
 
         // Annotations
         const annoRows = [
-            ...(i.annotations?.labels   || []).map(l  => _annoRow('label',   l.value, l.lang  || 'fr', 'IndividualEditor', ac)),
-            ...(i.annotations?.comments || []).map(cm => _annoRow('comment', cm.value, cm.lang || 'fr', 'IndividualEditor', ac)),
+            ...(i.annotations?.labels   || []).map(l  => _annoRow('label',   l.value, l.lang  || Settings.defaultLang, 'IndividualEditor', ac)),
+            ...(i.annotations?.comments || []).map(cm => _annoRow('comment', cm.value, cm.lang || Settings.defaultLang, 'IndividualEditor', ac)),
             ...(i.annotations?.other    || []).map(a  => _annoRow('other',   a.value,  '',             'IndividualEditor', ac, a.property)),
         ].join('');
 
@@ -3866,7 +4066,11 @@ const IndividualEditor = {
             const panel         = body.closest('.ind-prop-panel');
             const effectiveRange = (panel?.dataset?.effectiveRange || '').split(',').filter(Boolean);
             const rangeInds     = this._indsOfRange(effectiveRange, this._editingId);
-            const opts = rangeInds.map(x => `<option value="${x.id}">${x.id}</option>`).join('');
+            const ctxClass = effectiveRange[0] || null;
+            const opts = rangeInds.map(x => {
+                const lbl = this._resolveDisplayLabel(x, ctxClass);
+                return `<option value="${x.id}">${lbl ? `${lbl} (${x.id})` : x.id}</option>`;
+            }).join('');
             row.innerHTML = `
                 <span class="xsd-dot" style="flex-shrink:0;margin:0"></span>
                 <select class="ind-op-target" ${ac} style="flex:1;font-size:11px">
@@ -3963,6 +4167,8 @@ const IndividualEditor = {
             <div class="ind-picker-ftr">
                 <button id="ind-picker-ok" class="btn-primary btn-sm" disabled
                         onclick="IndividualEditor.confirmPicker()">OK</button>
+                <button id="ind-picker-new" class="btn-secondary btn-sm" disabled
+                        onclick="IndividualEditor.pickerCreateNew()" title="Create a new individual with the selected class as type">＋ New</button>
                 <button class="btn-secondary btn-sm" onclick="IndividualEditor.closePicker()">Cancel</button>
             </div>
         </div>`;
@@ -3994,22 +4200,28 @@ const IndividualEditor = {
             .filter(x => x.id !== this._editingId && (x.types||[]).some(t => accepted.has(t)));
 
         const listHtml = matching.length
-            ? matching.map(x => `
+            ? matching.map(x => {
+                const lbl = this._resolveDisplayLabel(x, classId);
+                const sub = lbl ? `<span style="font-size:10px;color:var(--text-faint);display:block">${x.id}</span>` : '';
+                return `
                 <div class="tree-item ind-picker-ind" data-id="${x.id}"
                      style="padding:4px 10px;cursor:pointer"
                      onclick="IndividualEditor.pickerSelectInd('${x.id}')"
                      ondblclick="IndividualEditor.pickerSelectInd('${x.id}');IndividualEditor.confirmPicker()">
                     <span class="xsd-dot" style="margin:0 6px 0 0;flex-shrink:0"></span>
-                    <span class="tree-label">${x.id}</span>
-                </div>`).join('')
+                    <span class="tree-label">${lbl || x.id}${sub}</span>
+                </div>`;
+            }).join('')
             : '<div class="cls-list-empty" style="padding:8px;font-style:italic">No individuals</div>';
 
         const listEl = document.getElementById('ind-picker-ind-list');
         if (listEl) listEl.innerHTML = listHtml;
 
-        // Désactiver OK (plus aucun individu sélectionné)
+        // Désactiver OK, activer "New"
         const ok = document.getElementById('ind-picker-ok');
         if (ok) ok.disabled = true;
+        const newBtn = document.getElementById('ind-picker-new');
+        if (newBtn) newBtn.disabled = false;
     },
 
     pickerSelectInd(indId) {
@@ -4038,12 +4250,15 @@ const IndividualEditor = {
             const row = document.createElement('div');
             row.className = 'ind-prop-row';
             row.style.cssText = 'display:flex;align-items:center;gap:4px;padding:2px 4px';
+            const selIndObj = (APP.state.individuals || []).find(x => x.id === selectedInd);
+            const selLbl = selIndObj ? (this._resolveDisplayLabel(selIndObj, this._picker.selectedClass) || selectedInd) : selectedInd;
+            const selSub = selLbl !== selectedInd ? `<span style="font-size:10px;color:var(--text-faint);display:block">${selectedInd}</span>` : '';
             row.innerHTML = `
                 <span class="xsd-dot" style="flex-shrink:0;margin:0"></span>
                 <span class="ind-op-label" style="flex:1;font-size:12px;font-family:var(--font-mono);cursor:pointer"
                       onclick="APP.navigateTo('individuals','${selectedInd}')"
                       onmouseover="this.style.textDecoration='underline';this.style.color='var(--accent,#5f8dd3)'"
-                      onmouseout="this.style.textDecoration='';this.style.color=''">${selectedInd}</span>
+                      onmouseout="this.style.textDecoration='';this.style.color=''">${selLbl}${selSub}</span>
                 <input type="hidden" class="ind-op-target" value="${selectedInd}">
                 <button class="btn-frame-del" onclick="this.closest('.ind-prop-row').remove();IndividualEditor._refreshAddBtn('${safeId}');IndividualEditor.autoSave()">✕</button>`;
             body.appendChild(row);
@@ -4056,6 +4271,58 @@ const IndividualEditor = {
     closePicker() {
         document.getElementById('ind-picker-overlay')?.remove();
         this._picker = { propId: null, effectiveRange: [], selectedClass: null, selectedInd: null };
+    },
+
+    /** Affiche un champ inline dans le picker pour nommer puis créer un individu à la volée */
+    pickerCreateNew() {
+        const listEl = document.getElementById('ind-picker-ind-list');
+        if (!listEl) return;
+        // Ne pas empiler plusieurs champs
+        if (listEl.querySelector('.ind-picker-new-row')) return;
+
+        const classId = this._picker.selectedClass;
+        const row = document.createElement('div');
+        row.className = 'ind-picker-new-row';
+        row.style.cssText = 'display:flex;align-items:center;gap:4px;padding:4px 10px;border-bottom:1px solid var(--border)';
+        row.innerHTML = `
+            <span class="xsd-dot" style="margin:0 6px 0 0;flex-shrink:0"></span>
+            <input type="text" id="ind-picker-new-id" class="cls-id-inp"
+                   placeholder="Individual ID" autocomplete="off"
+                   oninput="this.value=this.value.replace(/\\s+/g,'_')"
+                   style="flex:1;font-size:12px">
+            <button class="btn-primary btn-sm" style="font-size:11px;padding:2px 6px"
+                    onclick="IndividualEditor._pickerConfirmNew()">✓</button>
+            <button class="btn-sm" style="font-size:11px;padding:2px 6px"
+                    onclick="this.closest('.ind-picker-new-row').remove()">✕</button>`;
+        listEl.prepend(row);
+        const inp = document.getElementById('ind-picker-new-id');
+        if (inp) {
+            inp.focus();
+            inp.addEventListener('keydown', e => {
+                if (e.key === 'Enter') IndividualEditor._pickerConfirmNew();
+                if (e.key === 'Escape') row.remove();
+            });
+        }
+    },
+
+    async _pickerConfirmNew() {
+        const inp = document.getElementById('ind-picker-new-id');
+        const name = inp?.value.trim().replace(/\s+/g, '_');
+        if (!name) return;
+        const classId = this._picker.selectedClass;
+        const ind = {
+            id: name,
+            annotations: { labels: [], comments: [], other: [] },
+            types: classId ? [classId] : [],
+            objectAssertions: [], dataAssertions: [], sameAs: [], differentFrom: [],
+        };
+        try {
+            await API.createIndividual(ind);
+            await APP.refresh();
+            document.querySelector('.ind-picker-new-row')?.remove();
+            if (classId) this.pickerSelectClass(classId);
+            this.pickerSelectInd(name);
+        } catch (e) { UI.error(e.message); }
     },
 
     // ── Display Property ─────────────────────────────────────────
@@ -4116,6 +4383,7 @@ const IndividualEditor = {
             document.querySelectorAll('#ind-list-scroll .tree-item').forEach(el =>
                 el.classList.toggle('selected', el.dataset.id === this._selectedIndId));
         }
+        this._saveDisplayRules();
     },
 
     // ── Display Properties (composite) ──────────────────────────
@@ -4143,16 +4411,60 @@ const IndividualEditor = {
         let result = '';
         let hasValue = false;
         for (const { sep, propId } of rows) {
-            const val = this._getDisplayLabel(ind, propId);
-            if (val) { result += (sep || '') + val; hasValue = true; }
+            if (!propId) {
+                if (sep) { result += sep; hasValue = true; }
+            } else {
+                const val = this._getDisplayLabel(ind, propId);
+                if (val) { result += (sep || '') + val; hasValue = true; }
+            }
         }
-        return hasValue ? result.trim() || null : null;
+        return hasValue ? result || null : null;
+    },
+
+    /** Résout le label d'affichage d'un individu selon les règles définies pour sa classe.
+     *  contextClassId : classe de référence pour la recherche (ex: classe sélectionnée, classe du picker) */
+    _resolveDisplayLabel(ind, contextClassId = null) {
+        if (!ind) return null;
+        const resolveForClass = (clsId) => {
+            const multi = this._getEffectiveDisplayMulti(clsId);
+            if (multi) return { multi };
+            const single = this._getEffectiveDisplayProp(clsId);
+            if (single) return { single };
+            return null;
+        };
+        let rule = null;
+        // 1. Contexte explicite (classe sélectionnée dans l'arbre ou le picker)
+        if (contextClassId) rule = resolveForClass(contextClassId);
+        // 2. Types propres de l'individu
+        if (!rule) {
+            for (const typeId of (ind.types || [])) {
+                rule = resolveForClass(typeId);
+                if (rule) break;
+            }
+        }
+        // 3. Règle racine (__root__)
+        if (!rule) rule = resolveForClass(null);
+        if (!rule) return null;
+        return rule.multi
+            ? this._buildMultiLabel(ind, rule.multi)
+            : rule.single ? this._getDisplayLabel(ind, rule.single) : null;
+    },
+
+    /** Retourne le label d'affichage pour un ID d'individu (ou l'ID si aucune règle) */
+    _labelForId(id, contextClassId = null) {
+        // Auto-charger les règles depuis l'état si elles ne sont pas encore en mémoire
+        if (!Object.keys(this._displayProps).length && !Object.keys(this._displayPropsMulti).length) {
+            this._loadDisplayRules();
+        }
+        const ind = (APP.state.individuals || []).find(x => x.id === id);
+        if (!ind) return id;
+        return this._resolveDisplayLabel(ind, contextClassId) || id;
     },
 
     /** Enregistre la règle composite pour la classe courante */
     setDisplayPropsMulti(rows) {
         const key = this._selectedClassId || '__root__';
-        const cleaned = (rows || []).filter(r => r.propId);
+        const cleaned = (rows || []).filter(r => r.propId || r.sep);
         if (cleaned.length) this._displayPropsMulti[key] = cleaned;
         else delete this._displayPropsMulti[key];
         document.getElementById('ind-disp-multi-modal')?.remove();
@@ -4161,6 +4473,7 @@ const IndividualEditor = {
         if (this._selectedIndId)
             document.querySelectorAll('#ind-list-scroll .tree-item').forEach(el =>
                 el.classList.toggle('selected', el.dataset.id === this._selectedIndId));
+        this._saveDisplayRules();
     },
 
     /** Ouvre le modal "Set Display Properties" (composite) */
@@ -4203,7 +4516,7 @@ const IndividualEditor = {
             </div>
             <div style="padding:4px 8px;border-top:1px solid var(--border)">
                 <button class="btn-sm" style="width:100%"
-                        onclick="IndividualEditor._addDisplayMultiRow('${(propOpts[0]?.id || '')}')">➕ Add row</button>
+                        onclick="IndividualEditor._addDisplayMultiRow('')">➕ Add row</button>
             </div>
             <div class="ind-picker-ftr">
                 <button class="btn-primary btn-sm" onclick="IndividualEditor._confirmDisplayMulti()">OK</button>
