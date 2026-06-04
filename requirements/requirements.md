@@ -12,7 +12,7 @@
 
 - Permettre la création, l'édition et la gestion d'ontologies OWL 2 via une interface web intuitive.
 - Offrir un moteur d'inférence embarqué sans raisonneur externe (Pellet, HermiT, etc.).
-- Supporter les règles SWRL (Semantic Web Rule Language) et SWORD (SWRL + Negation As Failure).
+- Supporter les règles SWRL (Semantic Web Rule Language)
 - Permettre l'import/export vers les formats standards RDF (OWL/XML, Turtle, JSON-LD).
 
 ### 1.2 Utilisateurs cibles
