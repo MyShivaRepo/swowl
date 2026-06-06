@@ -50,7 +50,7 @@
 
 | **Si** | l'utilisateur choisit de masquer un onglet optionnel de l'interface, |
 |---|---|
-| **Alors** | l'onglet disparaît immédiatement de la barre de navigation et ce choix est mémorisé ; si l'onglet masqué était celui actif, l'utilisateur est automatiquement redirigé vers l'onglet **Ontologies**. |
+| **Alors** | l'onglet disparaît immédiatement de la barre de navigation et ce choix est mémorisé ; si l'onglet masqué était celui actif, l'utilisateur est automatiquement redirigé vers l'onglet **`Ontologies`**. |
 
 **Code source :** `app.js` → `TabVisibility.hide(tabId)` — Vérifie que `tabId` est présent dans `_optional`, l'ajoute au `Set` interne `_hidden`, sauvegarde l'état dans le `localStorage`, applique la visibilité dans le DOM via `APP._applyTabVisibility()`, puis redirige vers `'ontologies'` si l'onglet actif correspond à celui masqué.
 
