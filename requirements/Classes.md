@@ -20,7 +20,7 @@
 - [REQ-CLS-013 — Adding a restriction on a property](#req-cls-013--adding-a-restriction-on-a-property)
 - [REQ-CLS-014 — Changing the restriction type](#req-cls-014--changing-the-restriction-type)
 - [REQ-CLS-015 — Removing a property from the restrictions panel](#req-cls-015--removing-a-property-from-the-restrictions-panel)
-- [REQ-CLS-016 — Removing a child restriction](#req-cls-016--removing-a-child-restriction)
+- [REQ-CLS-016 — Deleting a child restriction](#req-cls-016--deleting-a-child-restriction)
 - [REQ-CLS-017 — Collecting restrictions for saving](#req-cls-017--collecting-restrictions-for-saving)
 - [REQ-CLS-018 — Quick creation of an ObjectProperty from the Classes tab](#req-cls-018--quick-creation-of-an-objectproperty-from-the-classes-tab)
 - [REQ-CLS-019 — Quick creation of a DatatypeProperty from the Classes tab](#req-cls-019--quick-creation-of-a-datatypeproperty-from-the-classes-tab)
@@ -38,18 +38,23 @@
 - [REQ-CLS-029 — Adding a property in the restrictions panel](#req-cls-029--adding-a-property-in-the-restrictions-panel)
 - [REQ-CLS-030 — Selecting the filler (target class) of a restriction](#req-cls-030--selecting-the-filler-target-class-of-a-restriction)
 - [REQ-CLS-031 — Displaying the full IRI of the class](#req-cls-031--displaying-the-full-iri-of-the-class)
-- [REQ-CLS-032 — Superclasses panel with ancestor hierarchy](#req-cls-032--superclasses-panel-with-ancestor-hierarchy)
+- [REQ-CLS-032 — Superclass panel with ancestor hierarchy](#req-cls-032--superclass-panel-with-ancestor-hierarchy)
 
 ---
 
-## 1. Substance — Business logic and functional rules
+## 1. Substance — Business logic
 
-> Requirements independent of the UI: OWL rules, data constraints, algorithmic behaviours, validations, persistence.
+> Requirements independent of the UI: OWL rules, data constraints, algorithmic behaviors, validations, persistence.
 
 
 ### REQ-CLS-001 — Building the hierarchical class tree
 
-The method iterates over the `APP.state.classes` array, parses textual `subClassOf` relationships to identify parent-child relationships internal to the ontology. It distinguishes local root classes (with no known internal parent), external root classes (whose parent is a URI external to the current namespace), and builds a `childrenOf` dictionary as well as an alphabetically sorted list of `roots` and `externalRoots`.
+**If** the ontology is loaded and contains classes in `APP.state.classes` linked by `subClassOf` relations,
+
+**Then** the system:
+- builds a hierarchical dictionary (`childrenOf`) by analyzing internal parent-child relations,
+- distinguishes local root classes (with no known internal parent) from external root classes (whose parent is a URI outside the current namespace),
+- produces a `roots` list and an `externalRoots` list sorted alphabetically, used to display the class tree.
 
 **Source code:** `owl_editor.js` → `ClassEditor.buildTree()`
 
@@ -57,7 +62,9 @@ The method iterates over the `APP.state.classes` array, parses textual `subClass
 
 ### REQ-CLS-002 — Automatic expansion of a class's ancestors
 
-During programmatic navigation to a class (for example via `APP.navigateTo()`), the method recursively traverses the `subClassOf` chain of the target class and adds each ancestor to `_expanded`, so that the class is visible in the tree without manual expansion.
+**If** a programmatic navigation to a class is triggered (for example via `APP.navigateTo()`),
+
+**Then** the system recursively traverses the `subClassOf` chain of the target class and adds each ancestor to `_expanded`, so that the class is visible in the tree without manual expansion by the user.
 
 **Source code:** `owl_editor.js` → `ClassEditor._expandAncestors()`
 
@@ -65,7 +72,13 @@ During programmatic navigation to a class (for example via `APP.navigateTo()`), 
 
 ### REQ-CLS-003 — Creating a child class (subclass)
 
-On click of the "Child" button or the "＋ Create Class" button, the method determines the current parent (selected class, or `owl:Thing` if nothing is selected), then calls `_createAndSelect()` with the `subClassOf` array initialised to `[parentId]`. If the parent is `owl:Thing` or the custom root, `subClassOf` is left empty.
+**If** the user clicks the "Child" button or the "＋ Create Class" button
+**and** a class is selected in the tree (or no selection is active),
+
+**Then**:
+- if a class is selected, a new subclass is created with `subClassOf` initialized to `[parentId]`,
+- if the selection is `owl:Thing` or the custom root, `subClassOf` is left empty,
+- the new class is immediately selected in the tree.
 
 **Source code:** `owl_editor.js` → `ClassEditor.createChild()`
 
@@ -73,7 +86,10 @@ On click of the "Child" button or the "＋ Create Class" button, the method dete
 
 ### REQ-CLS-004 — Creating a sibling class (same level)
 
-On click of the "Sister" button, the method retrieves the textual parents of the selected class (filters `subClassOf` on strings) and calls `_createAndSelect()` passing that same array of parents, thereby creating a new class at the same hierarchical level.
+**If** the user clicks the "Sister" button
+**and** a class is selected in the tree,
+
+**Then** the system retrieves the textual parents of the selected class (from `subClassOf`) and creates a new class with that same parent array, placing it at the same hierarchical level as the original class.
 
 **Source code:** `owl_editor.js` → `ClassEditor.createSibling()`
 
@@ -81,7 +97,10 @@ On click of the "Sister" button, the method retrieves the textual parents of the
 
 ### REQ-CLS-005 — Deleting the selected class
 
-The "Delete" button triggers deletion of the current class (`_selectedId`). The method calls `API.updateClass()` or `API.createClass()` depending on context, updates `APP.state.classes`, and refreshes the section via `APP.renderSection('classes')`.
+**If** the user clicks the "Delete" button
+**and** a class is selected (`_selectedId`),
+
+**Then** the system deletes the current class, updates `APP.state.classes` in memory, and refreshes the section via `APP.renderSection('classes')`.
 
 **Source code:** `owl_editor.js` → `ClassEditor.deleteSelected()`
 
@@ -89,7 +108,14 @@ The "Delete" button triggers deletion of the current class (`_selectedId`). The 
 
 ### REQ-CLS-006 — Moving a class by drag and drop
 
-Each tree node is draggable. `onDragStart()` stores the identifier of the dragged class in `_dragId`. `onDrop()` retrieves that identifier, removes the old textual parents from `subClassOf` (preserving object restrictions), injects the new parent identifier (or an empty array if dropped onto `owl:Thing`), calls `API.updateClass()`, and refreshes the tree. The new parent is automatically expanded in `_expanded`.
+**If** the user drags a tree node (`onDragStart`) and drops it onto a target node (`onDrop`),
+
+**Then**:
+- the identifier of the dragged class is stored in `_dragId` at the start of the drag,
+- upon drop, the old textual parents from `subClassOf` are removed (object restrictions are preserved),
+- the new parent identifier is injected into `subClassOf` (or an empty array if dropped onto `owl:Thing`),
+- `API.updateClass()` is called and the tree is refreshed,
+- the new parent is automatically expanded in `_expanded`.
 
 **Source code:** `owl_editor.js` → `ClassEditor.onDragStart()` | `ClassEditor.onDrop()`
 
@@ -97,7 +123,10 @@ Each tree node is draggable. `onDragStart()` stores the identifier of the dragge
 
 ### REQ-CLS-007 — Auto-save during editing
 
-When an existing class is being edited (`_editingId !== null`), any change in the form fields (annotations, superclasses, equivalences, disjunctions, restrictions) automatically triggers `autoSave()`, which immediately calls `save(false)` without navigation or reload.
+**If** an existing class is being edited (`_editingId !== null`)
+**and** the user modifies a form field (annotations, superclasses, equivalences, disjunctions, restrictions),
+
+**Then** the system automatically triggers `autoSave()`, which calls `save(false)` immediately, without navigation or view reload.
 
 **Source code:** `owl_editor.js` → `ClassEditor.autoSave()`
 
@@ -105,7 +134,13 @@ When an existing class is being edited (`_editingId !== null`), any change in th
 
 ### REQ-CLS-008 — Saving/creating a class
 
-The method reads the identifier from `#cls-id`, collects the textual superclasses (`.cls-list-item[data-id]` from the left panel), equivalent classes (`#cls-equivalents-list`), disjunctions (`#cls-disjoints-list`), annotations and restrictions via `RestrictionEditor.collect()`. In creation mode (`isNew = true`), it calls `API.createClass()`; in edit mode, it calls `API.updateClass(originalId, cls)` and updates `APP.state.classes` in memory.
+**If** the user submits the form for a class (new or existing),
+
+**Then** the system:
+- reads the identifier from `#cls-id`,
+- collects textual superclasses, equivalent classes, disjunctions, annotations and restrictions via `RestrictionEditor.collect()`,
+- calls `API.createClass()` in creation mode (`isNew = true`) or `API.updateClass(originalId, cls)` in edit mode,
+- updates `APP.state.classes` in memory.
 
 **Source code:** `owl_editor.js` → `ClassEditor.save()`
 
@@ -113,7 +148,15 @@ The method reads the identifier from `#cls-id`, collects the textual superclasse
 
 ### REQ-CLS-009 — Managing superclasses
 
-The `addSuperClass()` method adds a superclass selected via the picker (`cls-super-picker`) to the list of direct superclasses. It injects a DOM element `cls-list-item` with a navigation link to the parent class and a `✕` removal button. On click of the `✕` button of a superclass, the `removeSuperClass()` method removes the corresponding `[data-id]` DOM element from the list. In both cases, if the class is being edited, `autoSave()` is called immediately.
+**If** the user selects a superclass via the `cls-super-picker` picker and clicks "Add",
+
+**Then** the system injects a `cls-list-item` DOM element into the direct superclasses list, with a navigation link to the parent class and a `✕` removal button.
+
+**If** the user clicks the `✕` button of a superclass,
+
+**Then** the system removes the corresponding `[data-id]` DOM element from the list.
+
+In both cases, if the class is being edited, `autoSave()` is called immediately.
 
 **Source code:** `owl_editor.js` → `ClassEditor.addSuperClass()` | `ClassEditor.removeSuperClass()`
 
@@ -121,7 +164,15 @@ The `addSuperClass()` method adds a superclass selected via the picker (`cls-sup
 
 ### REQ-CLS-010 — Managing equivalent classes
 
-The `addEquivalent()` method adds an equivalent class to the `#cls-equivalents-list` list. It creates a DOM element including a clickable navigation link to the equivalent class (via `APP.navigateTo('classes', id)`) and a removal button. On click of `✕`, the `removeEquivalent()` method deletes the DOM node `#cls-equivalents-list .cls-list-item[data-id="${id}"]`. In both cases, `autoSave()` is triggered if the class is being edited.
+**If** the user adds an equivalent class via the dedicated picker,
+
+**Then** the system creates a DOM element in `#cls-equivalents-list` including a clickable navigation link to the equivalent class (via `APP.navigateTo('classes', id)`) and a `✕` removal button.
+
+**If** the user clicks the `✕` button of an equivalent class,
+
+**Then** the system removes the DOM node `#cls-equivalents-list .cls-list-item[data-id="${id}"]`.
+
+In both cases, `autoSave()` is triggered if the class is being edited.
 
 **Source code:** `owl_editor.js` → `ClassEditor.addEquivalent()` | `ClassEditor.removeEquivalent()`
 
@@ -129,7 +180,15 @@ The `addEquivalent()` method adds an equivalent class to the `#cls-equivalents-l
 
 ### REQ-CLS-011 — Managing disjoint classes
 
-The `addDisjoint()` method adds a disjoint class to the `#cls-disjoints-list` list, creating a DOM element with the class label and a removal button. On click of `✕`, the `removeDisjoint()` method removes the corresponding DOM element from `#cls-disjoints-list`. In both cases, `autoSave()` is triggered if the class is being edited.
+**If** the user adds a disjoint class via the dedicated picker,
+
+**Then** the system creates a DOM element in `#cls-disjoints-list` with the class label and a `✕` removal button.
+
+**If** the user clicks the `✕` button of a disjoint class,
+
+**Then** the system removes the corresponding DOM element from `#cls-disjoints-list`.
+
+In both cases, `autoSave()` is triggered if the class is being edited.
 
 **Source code:** `owl_editor.js` → `ClassEditor.addDisjoint()` | `ClassEditor.removeDisjoint()`
 
@@ -137,7 +196,9 @@ The `addDisjoint()` method adds a disjoint class to the `#cls-disjoints-list` li
 
 ### REQ-CLS-012 — Displaying inherited properties (read-only)
 
-`_computeInherited()` recursively traverses the `subClassOf` chain of the current class to collect all restrictions defined on ancestor classes. `_renderGroupReadOnly()` displays these restrictions in read-only mode, with an indication of the source class ("↑ ClassName" tag) and a navigation link to the property.
+**If** the ontology is loaded and the current class has ancestor classes defining restrictions,
+
+**Then** the system recursively traverses the `subClassOf` chain of the current class, collects all restrictions defined on ancestors, and displays them in read-only mode with an indication of the source class (tag "↑ ClassName") and a navigation link to the relevant property.
 
 **Source code:** `owl_editor.js` → `RestrictionEditor._computeInherited()` | `RestrictionEditor._renderGroupReadOnly()`
 
@@ -145,7 +206,12 @@ The `addDisjoint()` method adds a disjoint class to the `#cls-disjoints-list` li
 
 ### REQ-CLS-013 — Adding a restriction on a property
 
-`addRestriction()` adds a restriction of type `someValuesFrom` by default on the selected property. `addRestrictionOfType(type)` (called from the context menu) allows choosing from six types: `someValuesFrom`, `allValuesFrom`, `hasValue`, `exactCardinality`, `minCardinality`, `maxCardinality`. Both methods create a DOM element via `_renderChild()` and append it to the `.restr-children` of the relevant group.
+**If** the user adds a restriction from the restrictions panel (default button or context menu),
+
+**Then**:
+- the default button creates a restriction of type `someValuesFrom`,
+- the context menu allows choosing from six types: `someValuesFrom`, `allValuesFrom`, `hasValue`, `exactCardinality`, `minCardinality`, `maxCardinality`,
+- in both cases, a DOM element is created via `_renderChild()` and added to the `.restr-children` of the relevant property group.
 
 **Source code:** `owl_editor.js` → `RestrictionEditor.addRestriction()` | `RestrictionEditor.addRestrictionOfType()`
 
@@ -153,7 +219,12 @@ The `addDisjoint()` method adds a disjoint class to the `#cls-disjoints-list` li
 
 ### REQ-CLS-014 — Changing the restriction type
 
-When the user changes the restriction type `<select>` (`restr-type-sel`), the method shows or hides the cardinality input field (`restr-card-inp`) and the filler class selector depending on whether the new type contains "Cardinality" or not. It also closes the filler dropdown when switching to a cardinality type.
+**If** the user changes the value of a restriction type `<select>` (`restr-type-sel`),
+
+**Then** the system:
+- displays the cardinality input field (`restr-card-inp`) if the new type contains "Cardinality", and hides it otherwise,
+- shows or hides the filler class selector according to the same criterion,
+- closes the filler dropdown if switching to a cardinality type.
 
 **Source code:** `owl_editor.js` → `RestrictionEditor.onChildType()`
 
@@ -161,15 +232,23 @@ When the user changes the restriction type `<select>` (`restr-type-sel`), the me
 
 ### REQ-CLS-015 — Removing a property from the restrictions panel
 
-On click of `✕` at the property group level, the method removes the `.restr-prop-group` from the DOM, resets `_selectedProp`, puts the property back in the `#restr-prop-picker` in alphabetical order with its icon (OP or DP), and triggers `autoSave()`.
+**If** the user clicks the `✕` button at the level of a property group in the restrictions panel,
+
+**Then** the system:
+- removes the corresponding `.restr-prop-group` from the DOM,
+- resets `_selectedProp`,
+- puts the property back into the `#restr-prop-picker` picker in alphabetical order with its icon (OP or DP),
+- triggers `autoSave()`.
 
 **Source code:** `owl_editor.js` → `RestrictionEditor.deleteProp()`
 
 ---
 
-### REQ-CLS-016 — Removing a child restriction
+### REQ-CLS-016 — Deleting a child restriction
 
-On click of `✕` at a restriction row level (`restr-child-row`), the method removes the DOM element identified by `restr-child-${gid}` and triggers `autoSave()`.
+**If** the user clicks the `✕` button at the level of a restriction row (`restr-child-row`),
+
+**Then** the system removes the DOM element identified by `restr-child-${gid}` and triggers `autoSave()`.
 
 **Source code:** `owl_editor.js` → `RestrictionEditor.deleteChild()`
 
@@ -177,7 +256,12 @@ On click of `✕` at a restriction row level (`restr-child-row`), the method rem
 
 ### REQ-CLS-017 — Collecting restrictions for saving
 
-The method iterates over all `.restr-prop-group` elements in the DOM. For each group with no child row, it generates a marker `{ type: '_marker', property: prop }` (persisted in JSON but ignored in RDF) to preserve the presence of the property. For each row, it reads the type, the filler (or value for `hasValue`) and the cardinality, and returns an array of structured restrictions.
+**If** a class save is triggered and the restrictions panel contains property groups,
+
+**Then** the system:
+- for each group with no child row, generates a marker `{ type: '_marker', property: prop }` (persisted in JSON but ignored in RDF) in order to preserve the property's presence,
+- for each restriction row, reads the type, the filler (or the value for `hasValue`) and the cardinality,
+- returns a structured array of all collected restrictions.
 
 **Source code:** `owl_editor.js` → `RestrictionEditor.collect()`
 
@@ -185,7 +269,10 @@ The method iterates over all `.restr-prop-group` elements in the DOM. For each g
 
 ### REQ-CLS-018 — Quick creation of an ObjectProperty from the Classes tab
 
-From the "OP" button in the restrictions panel, the method retrieves the identifier of the selected class, creates an ObjectProperty object with `domain: [classId]` and empty arrays for `range` and `subPropertyOf`, calls `API.createObjectProperty()`, then automatically navigates to the "object-properties" tab on the new property.
+**If** the user clicks the "OP" button in the restrictions panel
+**and** a class is selected,
+
+**Then** the system creates an ObjectProperty with `domain: [classId]` and empty arrays for `range` and `subPropertyOf` via `API.createObjectProperty()`, then automatically navigates to the "object-properties" tab on the new property.
 
 **Source code:** `owl_editor.js` → `ClassEditor.createOPForClass()`
 
@@ -193,19 +280,24 @@ From the "OP" button in the restrictions panel, the method retrieves the identif
 
 ### REQ-CLS-019 — Quick creation of a DatatypeProperty from the Classes tab
 
-From the "DT" button in the restrictions panel, the method creates a DatatypeProperty with `domain: [classId]`, `functional: false`, and calls `API.createDatatypeProperty()`, then navigates to the "datatype-properties" tab.
+**If** the user clicks the "DT" button in the restrictions panel
+**and** a class is selected,
+
+**Then** the system creates a DatatypeProperty with `domain: [classId]` and `functional: false` via `API.createDatatypeProperty()`, then automatically navigates to the "datatype-properties" tab.
 
 **Source code:** `owl_editor.js` → `ClassEditor.createDTPForClass()`
 
 ---
 
-## 2. Form — Presentation and user interface
+## 2. Form — Presentation and UI
 
-> Requirements relating to display: layout, visual components, interactions, navigation, styles.
+> Requirements related to display: layout, visual components, interactions, navigation, styles.
 
 ### REQ-CLS-020 — Rendering the class tree with the owl:Thing root node
 
-The method generates the HTML of the complete tree. It displays at the top a root node representing `owl:Thing` (or the custom label returned by `APP.getOntologyRootLabels().classRoot`), then recursively calls `_renderNode()` for each root class. If no local class exists, it displays a "No classes" message.
+**If** the ontology is loaded and the Classes tab is displayed,
+
+**Then** the system generates the HTML of the complete tree by displaying at the top a root node representing `owl:Thing` (or the custom label returned by `APP.getOntologyRootLabels().classRoot`), then recursively calls `_renderNode()` for each root class. If no local class exists, a "No classes" message is displayed.
 
 **Source code:** `owl_editor.js` → `ClassEditor.renderTree()`
 
@@ -213,7 +305,15 @@ The method generates the HTML of the complete tree. It displays at the top a roo
 
 ### REQ-CLS-021 — Selecting a class in the tree
 
-On click of a tree node, the method: deselects all existing nodes, visually selects the node whose `.tree-label` matches the requested identifier, loads the class object from `APP.state.classes`, injects the editing form via `renderForm()`, updates the superclasses panel, and enables the action buttons (Child, Sister, Delete).
+**If** the user clicks on a node in the class tree,
+
+**Then** the system:
+- deselects all existing nodes,
+- visually selects the node whose `.tree-label` matches the requested identifier,
+- loads the class object from `APP.state.classes`,
+- injects the editing form via `renderForm()`,
+- updates the superclass panel,
+- enables the action buttons (Child, Sister, Delete).
 
 **Source code:** `owl_editor.js` → `ClassEditor.selectClass()`
 
@@ -221,7 +321,13 @@ On click of a tree node, the method: deselects all existing nodes, visually sele
 
 ### REQ-CLS-022 — Selecting the owl:Thing root node
 
-On click of the `owl:Thing` root node, the method visually selects that node, displays in the detail panel a "Root of all classes" message with a class creation button, clears the superclasses panel, and disables the Sister and Delete buttons (while leaving the Child button active).
+**If** the user clicks on the `owl:Thing` root node in the tree,
+
+**Then** the system:
+- visually selects this node,
+- displays in the detail panel a "Root of all classes" message with a class creation button,
+- clears the superclass panel,
+- disables the Sister and Delete buttons (while leaving the Child button active).
 
 **Source code:** `owl_editor.js` → `ClassEditor.selectOwlThing()`
 
@@ -229,7 +335,9 @@ On click of the `owl:Thing` root node, the method visually selects that node, di
 
 ### REQ-CLS-023 — Expanding/collapsing a tree node
 
-On click of the `▶` arrow of a node, the method toggles the open/closed state of the node in `_expanded` (a `Set`). It then refreshes the tree rendering by calling `buildTree()` on `APP.state.classes`, then redraws the relevant child nodes.
+**If** the user clicks the `▶` arrow of a tree node,
+
+**Then** the system toggles the open/closed state of the node in `_expanded` (a `Set`), refreshes the tree rendering by calling `buildTree()` on `APP.state.classes`, then redraws the relevant child nodes.
 
 **Source code:** `owl_editor.js` → `ClassEditor.toggleNode()`
 
@@ -237,7 +345,16 @@ On click of the `▶` arrow of a node, the method toggles the open/closed state 
 
 ### REQ-CLS-024 — Context menu on a tree node
 
-A right-click on a tree node opens a context menu positioned at the mouse coordinates. This menu offers: "Add child class", "Add sibling class" (only if the target is a class, not `owl:Thing`), and "Delete selected class" (in red). A click outside closes the menu via `_closeContextMenu()`.
+**If** the user right-clicks on a tree node,
+
+**Then** the system opens a context menu positioned at the mouse coordinates, offering:
+- "Add child class",
+- "Add sibling class" (only if the target is a class, not `owl:Thing`),
+- "Delete selected class" (in red).
+
+**If** the user clicks outside the menu,
+
+**Then** the menu is closed via `_closeContextMenu()`.
 
 **Source code:** `owl_editor.js` → `ClassEditor.showContextMenu()`
 
@@ -245,7 +362,15 @@ A right-click on a tree node opens a context menu positioned at the mouse coordi
 
 ### REQ-CLS-025 — Class editing form
 
-The method generates the complete HTML of the class detail panel. It contains: a text field for the identifier (`cls-id`), the mention "(instance of owl:Class)", the full IRI if a base IRI is defined, an annotations table, the restrictions panel (via `RestrictionEditor.renderPanel()`), a "Disjoints" block and an "Equivalent" block. In creation mode (new class), a "✅ Create class" button is displayed.
+**If** a class is selected in the tree or a new class is being created,
+
+**Then** the system generates the complete HTML of the detail panel containing:
+- a text field for the identifier (`cls-id`) with the mention "(instance of owl:Class)",
+- the full IRI if a base IRI is defined,
+- an annotations table,
+- the restrictions panel (via `RestrictionEditor.renderPanel()`),
+- a "Disjoints" block and an "Equivalent" block,
+- in creation mode only, a "✅ Create class" button.
 
 **Source code:** `owl_editor.js` → `ClassEditor.renderForm()`
 
@@ -253,7 +378,9 @@ The method generates the complete HTML of the class detail panel. It contains: a
 
 ### REQ-CLS-026 — Managing rdfs:label and rdfs:comment annotations
 
-On click of the "+label" or "+comment" buttons, the method calls `_makeAnnotRow(type, 'ClassEditor', ac)` to create a table row with a text field for the value, a language field (initialised to `Settings.defaultLang`), and a removal button. The row is inserted into `#cls-anno-table`. If the class is being edited, changes trigger `autoSave()`.
+**If** the user clicks the "+label" or "+comment" button in the class form,
+
+**Then** the system creates a table row via `_makeAnnotRow(type, 'ClassEditor', ac)` containing a text field for the value, a language field (initialized to `Settings.defaultLang`) and a removal button, then inserts this row into `#cls-anno-table`. If the class is being edited, any change in this row triggers `autoSave()`.
 
 **Source code:** `owl_editor.js` → `ClassEditor.addAnnotRow()`
 
@@ -261,7 +388,9 @@ On click of the "+label" or "+comment" buttons, the method calls `_makeAnnotRow(
 
 ### REQ-CLS-027 — Managing custom annotation properties
 
-On click of an annotation property in the `cls-anno-picker` picker, the method calls `_makeAnnotRow('other', 'ClassEditor', ac, prop)` to create an annotation row with the property name, a value field and a language field. It is used for properties such as `rdfs:seeAlso` or any annotation property defined in the ontology.
+**If** the user selects an annotation property in the `cls-anno-picker` picker,
+
+**Then** the system creates an annotation row via `_makeAnnotRow('other', 'ClassEditor', ac, prop)` displaying the property name, a value field and a language field, for properties such as `rdfs:seeAlso` or any annotation property defined in the ontology.
 
 **Source code:** `owl_editor.js` → `ClassEditor.addOtherAnnotRow()`
 
@@ -269,7 +398,12 @@ On click of an annotation property in the `cls-anno-picker` picker, the method c
 
 ### REQ-CLS-028 — Restrictions and asserted properties panel
 
-The method generates the HTML of the "Properties and Restrictions" panel embedded in the class form. It calls `_group()` to group restrictions by property, displays two collapsible sections ("Inherited Properties" and "Asserted Properties") with their respective counters, and exposes buttons to add an existing property, create an ObjectProperty or a DatatypeProperty directly from this panel.
+**If** the form of a class is displayed,
+
+**Then** the system generates the HTML of the "Properties and Restrictions" panel by:
+- calling `_group()` to group restrictions by property,
+- displaying two collapsible sections ("Inherited Properties" and "Asserted Properties") with their respective counters,
+- exposing buttons to add an existing property, create an ObjectProperty or a DatatypeProperty directly from this panel.
 
 **Source code:** `owl_editor.js` → `RestrictionEditor.renderPanel()`
 
@@ -277,7 +411,14 @@ The method generates the HTML of the "Properties and Restrictions" panel embedde
 
 ### REQ-CLS-029 — Adding a property in the restrictions panel
 
-On click of a property in the `#restr-prop-picker` picker, the method checks whether a group for that property already exists (if so, it only selects it), otherwise creates a new empty group via `_renderGroup()`, inserts it into `#restr-tree` in alphabetical order, and immediately selects the property. It removes the property from the picker and triggers `autoSave()`.
+**If** the user clicks on a property in the `#restr-prop-picker` picker,
+
+**Then** the system:
+- checks if a group for this property already exists in `#restr-tree` (if so, only selects it),
+- otherwise, creates a new empty group via `_renderGroup()` and inserts it in alphabetical order,
+- immediately selects the property,
+- removes the property from the picker,
+- triggers `autoSave()`.
 
 **Source code:** `owl_editor.js` → `RestrictionEditor.addProperty()`
 
@@ -285,7 +426,13 @@ On click of a property in the `#restr-prop-picker` picker, the method checks whe
 
 ### REQ-CLS-030 — Selecting the filler (target class) of a restriction
 
-`toggleFillerPicker()` opens/closes a dropdown positioned in `position:fixed` below the filler button, displaying the hierarchical list of classes via `_classHierarchyItems()`. `selectFiller()` updates the value of the hidden field `restr-filler-val`, refreshes the displayed label, replaces the coloured dot, marks the selected item and triggers `autoSave()`.
+**If** the user clicks on the filler button of a restriction,
+
+**Then** the system opens or closes a dropdown positioned at `position:fixed` below the button, displaying the hierarchical list of classes via `_classHierarchyItems()`.
+
+**If** the user selects a class in this dropdown,
+
+**Then** the system updates the value of the hidden field `restr-filler-val`, refreshes the displayed label, replaces the colored dot, marks the selected item and triggers `autoSave()`.
 
 **Source code:** `owl_editor.js` → `RestrictionEditor.toggleFillerPicker()` | `RestrictionEditor.selectFiller()`
 
@@ -293,14 +440,22 @@ On click of a property in the `#restr-prop-picker` picker, the method checks whe
 
 ### REQ-CLS-031 — Displaying the full IRI of the class
 
-If a base IRI is defined in the ontology settings (`baseIri`), the form displays below the title the line `For Class: <baseIri>#<classId>` using a `<code>` tag. This line is only displayed if the class already exists (not in pure creation mode) and `baseIri` is non-empty.
+**If** a base IRI is defined in the ontology settings (`baseIri`)
+**and** the class already exists (not in pure creation mode),
+
+**Then** the form displays below the title the line `For Class: <baseIri>#<classId>` within a `<code>` tag.
 
 **Source code:** `owl_editor.js` → `ClassEditor.renderForm()`
 
 ---
 
-### REQ-CLS-032 — Superclasses panel with ancestor hierarchy
+### REQ-CLS-032 — Superclass panel with ancestor hierarchy
 
-The bottom-left panel displays the list of direct superclasses with a `✕` removal button for each, followed by their indirect ancestors in italics and reduced opacity (0.75), up to `owl:Thing` displayed last. Indirect ancestors are clickable via `APP.navigateTo('classes', id)` but have no removal button.
+**If** a class with superclasses is selected in the tree,
+
+**Then** the left-bottom panel displays:
+- the list of direct superclasses with a `✕` removal button for each,
+- their indirect ancestors in italic and reduced opacity (0.75), up to `owl:Thing` displayed last,
+- indirect ancestors are clickable via `APP.navigateTo('classes', id)` but have no removal button.
 
 **Source code:** `owl_editor.js` → `ClassEditor.renderSplit()` (internal `_renderSupersPanel()` section)
