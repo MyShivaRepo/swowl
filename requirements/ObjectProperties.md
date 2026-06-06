@@ -11,7 +11,7 @@
 - [REQ-OP-004 — Sibling property creation](#req-op-004--sibling-property-creation)
 - [REQ-OP-005 — Automatic unique identifier generation](#req-op-005--automatic-unique-identifier-generation)
 - [REQ-OP-006 — Property creation persistence via API](#req-op-006--property-creation-persistence-via-api)
-- [REQ-OP-007 — Drag-and-drop movement in the tree](#req-op-007--drag-and-drop-movement-in-the-tree)
+- [REQ-OP-007 — Drag-and-drop move in the tree](#req-op-007--drag-and-drop-move-in-the-tree)
 - [REQ-OP-008 — Cycle protection during drag-and-drop](#req-op-008--cycle-protection-during-drag-and-drop)
 - [REQ-OP-009 — Property deletion with confirmation](#req-op-009--property-deletion-with-confirmation)
 - [REQ-OP-010 — Domain class management](#req-op-010--domain-class-management)
@@ -23,7 +23,7 @@
 - [REQ-OP-016 — Super-property management (subPropertyOf)](#req-op-016--super-property-management-subpropertyof)
 - [REQ-OP-017 — OWL property characteristics](#req-op-017--owl-property-characteristics)
 - [REQ-OP-018 — Auto-save in edit mode](#req-op-018--auto-save-in-edit-mode)
-- [REQ-OP-019 — Full save (create or update)](#req-op-019--full-save-create-or-update)
+- [REQ-OP-019 — Full save (creation or update)](#req-op-019--full-save-creation-or-update)
 - [REQ-OP-020 — ObjectProperty creation from the Classes tab](#req-op-020--objectproperty-creation-from-the-classes-tab)
 
 ### Form
@@ -42,268 +42,268 @@
 
 ---
 
-## 1. Substance — Business logic and functional rules
+## 1. Substance — Business logic
 
-> Requirements independent of the UI: OWL rules, data constraints, algorithmic behaviours, validations, persistence.
+> UI-independent requirements: OWL rules, data constraints, algorithmic behaviours, validations, persistence.
 
 
 ### REQ-OP-001 — Tree hierarchy construction
 
-| **If** | the ontology is loaded and contains object properties in `APP.state.object_properties`, |
+| **If** | the ontology contains object properties organised in a hierarchy, |
 |---|---|
-| **Then** | the system computes, for each property, the list of its children (`childrenOf`) and the list of root properties (`roots`) by retaining only `subPropertyOf` references pointing to existing IDs, and sorts all lists alphabetically (case-insensitive via `localeCompare`). |
+| **Then** | the property tree faithfully reflects the specialisation relationships between properties, distinguishing root properties from those that depend on them, and presenting them in alphabetical order. |
 
-**Source code:** `owl_editor.js` → `OPEditor.buildTree()`
+**Source code:** `owl_editor.js` → `OPEditor.buildTree()` — Analyses the `subPropertyOf` relations of each property in `APP.state.object_properties`, builds a `childrenOf` dictionary and a `roots` list by retaining only references pointing to existing IDs, then sorts all lists alphabetically via `localeCompare`.
 
 ---
 
 ### REQ-OP-002 — Automatic ancestor expansion
 
-| **If** | a property is selected or created in the tree, |
+| **If** | the ontologist selects or creates a property in the tree, |
 |---|---|
-| **Then** | the system recursively traverses the `subPropertyOf` chain of the property and adds each ancestor to `OPEditor._expanded`, so that the full path to the property is visible in the tree. |
+| **Then** | the complete path from the root to that property is automatically expanded, without the user having to manually open each intermediate level. |
 
-**Source code:** `owl_editor.js` → `OPEditor._expandAncestors()`
+**Source code:** `owl_editor.js` → `OPEditor._expandAncestors()` — Recursively traverses the `subPropertyOf` chain of the property and adds each ancestor to `OPEditor._expanded`, ensuring the full path is visible in the tree.
 
 ---
 
 ### REQ-OP-003 — Child property creation
 
-| **If** | the user triggers the creation of a child property with a property selected in the tree, |
+| **If** | the ontologist wants to specialise an existing property by creating a subproperty directly positioned beneath it, |
 |---|---|
-| **Then** | the system determines the parent as the selected property (or no parent if the selection is `owl:topObjectProperty`), adds this parent to `_expanded` to open it in the tree, and delegates creation to `_createAndSelect([parent])`. |
+| **Then** | the new property is created as a child of the selected property, and the parent property is automatically expanded in the tree to make the new entry visible. |
 
-**Source code:** `owl_editor.js` → `OPEditor.createChild()`
+**Source code:** `owl_editor.js` → `OPEditor.createChild()` — Determines the parent as the selected property (or no parent if the selection is `owl:topObjectProperty`), adds that parent to `_expanded`, and delegates creation to `_createAndSelect([parent])`.
 
 ---
 
 ### REQ-OP-004 — Sibling property creation
 
-| **If** | the user triggers the creation of a sibling property with a property selected in the tree, |
+| **If** | the ontologist wants to create a new property at the same hierarchical level as an existing property, |
 |---|---|
-| **Then** | the system retrieves the list of direct parents of the selected property (field `subPropertyOf`), adds them all to `_expanded`, and delegates creation to `_createAndSelect(parents)` so that the new property shares the same parents. |
+| **Then** | the new property is positioned under the same parents as the reference property, without requiring any additional configuration of hierarchical relationships. |
 
-**Source code:** `owl_editor.js` → `OPEditor.createSibling()`
+**Source code:** `owl_editor.js` → `OPEditor.createSibling()` — Retrieves the list of direct parents of the selected property (field `subPropertyOf`), adds them to `_expanded`, and delegates creation to `_createAndSelect(parents)`.
 
 ---
 
 ### REQ-OP-005 — Automatic unique identifier generation
 
-| **If** | a new property must be created, |
+| **If** | the ontologist creates a new object property, |
 |---|---|
-| **Then** | the system generates an identifier of the form `NewObjectProperty`, `NewObjectProperty1`, `NewObjectProperty2`, etc. by incrementing the numeric suffix as long as the identifier is already present in `APP.state.object_properties`. |
+| **Then** | a unique identifier is automatically assigned to it, with no risk of collision with existing properties in the ontology. |
 
-**Source code:** `owl_editor.js` → `OPEditor._generatePropName()`
+**Source code:** `owl_editor.js` → `OPEditor._generatePropName()` — Generates an identifier of the form `NewObjectProperty`, `NewObjectProperty1`, `NewObjectProperty2`, etc., incrementing the numeric suffix as long as the identifier is already present in `APP.state.object_properties`.
 
 ---
 
 ### REQ-OP-006 — Property creation persistence via API
 
-| **If** | the creation of a new property is triggered with a list of super-properties (`subPropertyOf`), |
+| **If** | the ontologist confirms the creation of a new object property, |
 |---|---|
-| **Then** | - the system builds a minimal property object (`domain: [], range: [], inverseOf: null, characteristics: {}, propertyChainAxiom: []`) and registers it via `API.createOP(prop)` ;<br>- on success, it sets `_selectedId` and `_editingId`, refreshes the global state via `APP.refresh()`, then re-renders the tab via `APP.renderSection('object-properties')` ;<br>- on error, it displays the message via `UI.error()`. |
+| **Then** | the property is saved in the ontology with its hierarchical relationships, and the tree is updated to immediately reflect this new entry. |
 
-**Source code:** `owl_editor.js` → `OPEditor._createAndSelect()`
+**Source code:** `owl_editor.js` → `OPEditor._createAndSelect()` — Builds a minimal property object (`domain: [], range: [], inverseOf: null, characteristics: {}, propertyChainAxiom: []`) and saves it via `API.createOP(prop)`; on success, sets `_selectedId` and `_editingId`, refreshes global state via `APP.refresh()` and re-renders the tab via `APP.renderSection('object-properties')`; on error, displays the message via `UI.error()`.
 
 ---
 
-### REQ-OP-007 — Drag-and-drop movement in the tree
+### REQ-OP-007 — Drag-and-drop move in the tree
 
-| **If** | the user drops a property onto a target in the tree (including the root), |
+| **If** | the ontologist moves a property in the tree by drag-and-drop to change its hierarchical position, |
 |---|---|
-| **Then** | the system rebuilds the property with `subPropertyOf: [targetId]` (or `[]` if dropped on the root), calls `API.updateOP(draggedId, updated)`, and on success displays `UI.success()`, refreshes the state via `APP.refresh()` and re-renders the tab. |
+| **Then** | the property is attached to its new parent (or placed at the root if dropped onto the root node), and the ontology is updated accordingly. |
 
-**Source code:** `owl_editor.js` → `OPEditor.onDrop()`
+**Source code:** `owl_editor.js` → `OPEditor.onDrop()` — Rebuilds the property with `subPropertyOf: [targetId]` (or `[]` if dropped onto the root), calls `API.updateOP(draggedId, updated)`, and on success displays `UI.success()`, refreshes state via `APP.refresh()` and re-renders the tab.
 
 ---
 
 ### REQ-OP-008 — Cycle protection during drag-and-drop
 
-| **If** | the user attempts to drop a property onto one of its own descendants in the tree, |
+| **If** | the ontologist attempts to move a property onto one of its own descendants in the tree, |
 |---|---|
-| **Then** | the system blocks the drop and displays the message `UI.warn('Cannot drop on a descendant — would create a cycle')` ; the same check is performed in `onDragOver()` to disable the visual drop indicator. |
+| **Then** | the operation is blocked and a warning is displayed, as this would create a circular hierarchy incompatible with OWL. |
 
-**Source code:** `owl_editor.js` → `OPEditor._isDescendant()` and `OPEditor.onDrop()`
+**Source code:** `owl_editor.js` → `OPEditor._isDescendant()` and `OPEditor.onDrop()` — Recursively checks whether the target is a descendant of the dragged property; blocks the drop and displays `UI.warn('Cannot drop on a descendant — would create a cycle')`; the same check is performed in `onDragOver()` to disable the visual drop indicator.
 
 ---
 
 ### REQ-OP-009 — Property deletion with confirmation
 
-| **If** | the user triggers the deletion of a property, |
+| **If** | the ontologist wishes to delete an object property from the ontology, |
 |---|---|
-| **Then** | the system displays a confirmation dialog with the message `Delete ObjectProperty <strong>${id}</strong>?` ; if the user confirms, it calls `API.deleteOP(id)`, resets `_selectedId` and `_editingId` to `null`, then refreshes the tab. |
+| **Then** | explicit confirmation is requested before any permanent deletion, to prevent accidental removals. |
 
-**Source code:** `owl_editor.js` → `OPEditor.delete()`
+**Source code:** `owl_editor.js` → `OPEditor.delete()` — Displays a confirmation dialog with the message `Delete ObjectProperty <strong>${id}</strong>?`; if confirmed, calls `API.deleteOP(id)`, resets `_selectedId` and `_editingId` to `null`, then refreshes the tab.
 
 ---
 
 ### REQ-OP-010 — Domain class management
 
-| **If** | the user adds a class to the domain of a property being edited, |
+| **If** | the ontologist adds a class to the domain of an object property, |
 |---|---|
-| **Then** | the system adds the class ID to the DOM list `#op-domain-list` via `_addListItem()`, closes the picker `op-domain-picker`, and triggers `autoSave()` ; if no domain is defined, the placeholder `owl:Thing` is displayed. |
+| **Then** | the class is associated with the property as a domain constraint, and the property is automatically saved; if no domain is defined, `owl:Thing` is implicitly indicated. |
 
-| **If** | the user removes a class from the domain of a property being edited, |
+| **If** | the ontologist removes a class from the domain of an object property, |
 |---|---|
-| **Then** | the system removes the corresponding item from `#op-domain-list` via `_removeListItem()`, restores the placeholder `owl:Thing` if the list is empty, and triggers `autoSave()`. |
+| **Then** | the domain constraint is deleted, the property is automatically saved, and `owl:Thing` is displayed again if the domain becomes empty. |
 
-**Source code:** `owl_editor.js` → `OPEditor.addDomain()` | `OPEditor.removeDomain()`
+**Source code:** `owl_editor.js` → `OPEditor.addDomain()` — Adds the class ID to the DOM list `#op-domain-list` via `_addListItem()`, closes the `op-domain-picker` picker, and triggers `autoSave()`. `OPEditor.removeDomain()` — Removes the corresponding item from `#op-domain-list` via `_removeListItem()`, restores the `owl:Thing` placeholder if the list is empty, and triggers `autoSave()`.
 
 ---
 
 ### REQ-OP-011 — Range class management
 
-| **If** | the user adds a class to the range of a property being edited, |
+| **If** | the ontologist adds a class to the range of an object property, |
 |---|---|
-| **Then** | the system adds the class ID to `#op-range-list` via `_addListItem()` and triggers `autoSave()` ; if no range is defined, the placeholder `owl:Thing` is displayed. |
+| **Then** | the class is associated with the property as a range constraint, and the property is automatically saved; if no range is defined, `owl:Thing` is implicitly indicated. |
 
-| **If** | the user removes a class from the range of a property being edited, |
+| **If** | the ontologist removes a class from the range of an object property, |
 |---|---|
-| **Then** | the system removes the item from `#op-range-list` via `_removeListItem()`, restores the placeholder `owl:Thing` if the list is empty, and triggers `autoSave()`. |
+| **Then** | the range constraint is deleted, the property is automatically saved, and `owl:Thing` is displayed again if the range becomes empty. |
 
-**Source code:** `owl_editor.js` → `OPEditor.addRange()` | `OPEditor.removeRange()`
+**Source code:** `owl_editor.js` → `OPEditor.addRange()` — Adds the class ID to `#op-range-list` via `_addListItem()` and triggers `autoSave()`. `OPEditor.removeRange()` — Removes the item from `#op-range-list` via `_removeListItem()`, restores the `owl:Thing` placeholder if the list is empty, and triggers `autoSave()`.
 
 ---
 
 ### REQ-OP-012 — Inverse property definition
 
-| **If** | the user selects an inverse property via the picker, |
+| **If** | the ontologist associates an inverse property with the property being edited, |
 |---|---|
-| **Then** | - the system updates the hidden field `#op-inverse-value` with the selected ID ;<br>- replaces in `#op-inverse-body` the placeholder "— none —" with an item containing a delete button ;<br>- hides the `+` button via `display:none` ;<br>- closes the picker `op-inverse-picker` ;<br>- triggers `autoSave()`. |
+| **Then** | the inverse relationship is saved and the property is automatically saved. |
 
-**Source code:** `owl_editor.js` → `OPEditor.setInverse()`
+**Source code:** `owl_editor.js` → `OPEditor.setInverse()` — Updates the hidden field `#op-inverse-value` with the selected ID, replaces the "— none —" placeholder in `#op-inverse-body` with an item containing a delete button, hides the `+` button via `display:none`, closes the `op-inverse-picker` picker, and triggers `autoSave()`.
 
 ---
 
 ### REQ-OP-013 — Inverse property uniqueness
 
-| **If** | the user attempts to open the inverse picker when an inverse property is already defined in `#op-inverse-value`, |
+| **If** | an inverse property is already defined for the property being edited, |
 |---|---|
-| **Then** | the system does not respond and the picker does not open, ensuring that only one inverse property can be defined at a time ; in addition, the picker excludes properties that already have an `inverseOf` defined (except towards the current property). |
+| **Then** | it is not possible to add a second one; furthermore, properties that already have an inverse defined (pointing to another property) are not offered in the selection list. |
 
-**Source code:** `owl_editor.js` → `OPEditor.showPicker()`
+**Source code:** `owl_editor.js` → `OPEditor.showPicker()` — Checks for the presence of a value in `#op-inverse-value` before opening the picker; filters out properties that already have an `inverseOf` defined except towards the current property.
 
 ---
 
 ### REQ-OP-014 — Inverse property removal
 
-| **If** | the user removes the inverse property, |
+| **If** | the ontologist wishes to remove the inverse relationship from a property, |
 |---|---|
-| **Then** | the system clears the value of `#op-inverse-value`, redisplays the placeholder "— none —", and makes the `+` button visible to allow a new selection. |
+| **Then** | the inverse property is dissociated and the ability to define a new one is immediately restored. |
 
-**Source code:** `owl_editor.js` → `OPEditor.removeInverse()`
+**Source code:** `owl_editor.js` → `OPEditor.removeInverse()` — Clears the value of `#op-inverse-value`, re-displays the "— none —" placeholder, and makes the `+` button visible again.
 
 ---
 
 ### REQ-OP-015 — Display of inferred inverse properties
 
-| **If** | a property is selected in the tree **and** the inference engine returns `inferred_inverse_properties` results concerning this property, |
+| **If** | a property is selected and the reasoner detects implicit inverse relationships involving it, |
 |---|---|
-| **Then** | the system injects into `#op-inferred-inverse` a badge `⊢ inverse of <strong>${i.inverse_of}</strong>` for each inference, with the `title` attribute carrying the reason for the inference ; errors are silent. |
+| **Then** | these inferred inversions are displayed distinctly in the form, with the justification for each inference, without any action required from the ontologist. |
 
-**Source code:** `owl_editor.js` → `OPEditor._loadInferredInverse()`
+**Source code:** `owl_editor.js` → `OPEditor._loadInferredInverse()` — Queries the inference engine and injects into `#op-inferred-inverse` a badge `⊢ inverse of <strong>${i.inverse_of}</strong>` for each result in `inferred_inverse_properties`, with the `title` attribute carrying the reason for the inference; errors are silent.
 
 ---
 
 ### REQ-OP-016 — Super-property management (subPropertyOf)
 
-| **If** | the user adds a super-property to the property being edited, |
+| **If** | the ontologist attaches an object property to a super-property, |
 |---|---|
-| **Then** | the system adds the selected property to `#op-sub-list` via `_addListItem()` and triggers `autoSave()`. |
+| **Then** | the hierarchical relationship is saved and the property is automatically saved. |
 
-| **If** | the user removes a super-property from the property being edited, |
+| **If** | the ontologist removes the attachment to a super-property, |
 |---|---|
-| **Then** | the system removes the super-property from `#op-sub-list` via `_removeListItem()` and triggers `autoSave()`. |
+| **Then** | the hierarchical relationship is deleted and the property is automatically saved. |
 
-**Source code:** `owl_editor.js` → `OPEditor.addSubProp()`, `OPEditor.removeSubProp()`
+**Source code:** `owl_editor.js` → `OPEditor.addSubProp()` — Adds the selected property to `#op-sub-list` via `_addListItem()` and triggers `autoSave()`. `OPEditor.removeSubProp()` — Removes the super-property from `#op-sub-list` via `_removeListItem()` and triggers `autoSave()`.
 
 ---
 
 ### REQ-OP-017 — OWL property characteristics
 
-| **If** | the form of a property is displayed, |
+| **If** | the ontologist views the form of an object property, |
 |---|---|
-| **Then** | the system presents a grid of 7 checkboxes (`functional`, `inverseFunctional`, `transitive`, `symmetric`, `asymmetric`, `reflexive`, `irreflexive`) pre-checked according to `prop.characteristics[k]`. |
+| **Then** | the seven OWL characteristics (`functional`, `inverseFunctional`, `transitive`, `symmetric`, `asymmetric`, `reflexive`, `irreflexive`) are presented with their current state, each independently modifiable. |
 
-| **If** | the user saves the property, |
+| **If** | the ontologist saves the property, |
 |---|---|
-| **Then** | the system reads the state of each checkbox via `document.getElementById('op-${k}')?.checked`, builds the `chars` object and includes it in the payload sent to `API.updateOP()` or `API.createOP()`. |
+| **Then** | the state of each characteristic is included in the persisted data of the property. |
 
-**Source code:** `owl_editor.js` → `OPEditor.renderForm()` and `OPEditor.save()`
+**Source code:** `owl_editor.js` → `OPEditor.renderForm()` — Displays a grid of 7 checkboxes pre-checked according to `prop.characteristics[k]`. `OPEditor.save()` — Reads the state of each checkbox via `document.getElementById('op-${k}')?.checked`, builds the `chars` object and includes it in the payload sent to `API.updateOP()` or `API.createOP()`.
 
 ---
 
 ### REQ-OP-018 — Auto-save in edit mode
 
-| **If** | an existing property is being edited (`_editingId !== null`) **and** a form field triggers an `onchange` event, |
+| **If** | the ontologist modifies a field in the form of an already existing property, |
 |---|---|
-| **Then** | the system automatically calls `save(false)` without any further user interaction. |
+| **Then** | the changes are automatically saved, without requiring explicit validation. |
 
-**Source code:** `owl_editor.js` → `OPEditor.autoSave()`
+**Source code:** `owl_editor.js` → `OPEditor.autoSave()` — Checks that `_editingId !== null` and calls `save(false)` on triggering of an `onchange` event in the form.
 
 ---
 
-### REQ-OP-019 — Full save (create or update)
+### REQ-OP-019 — Full save (creation or update)
 
-| **If** | the user saves a property (new or existing), |
+| **If** | the ontologist saves an object property (new or existing), |
 |---|---|
-| **Then** | - the system collects the identifier (`op-id`), annotations, domain, range, super-properties, the inverse property and the 7 characteristics ;<br>- validates the identifier via `_validateId()` ;<br>- if the property is new, calls `API.createOP()` ; otherwise calls `API.updateOP(originalId, prop)` ;<br>- if the identifier has changed, displays a rename message ;<br>- in all cases, refreshes the tab after success. |
+| **Then** | all entered information is persisted in the ontology — identifier, annotations, domain, range, super-properties, inverse property and characteristics — and the tree is updated to reflect the changes, including any renaming. |
 
-**Source code:** `owl_editor.js` → `OPEditor.save()`
+**Source code:** `owl_editor.js` → `OPEditor.save()` — Collects the identifier (`op-id`), annotations, domain, range, super-properties, inverse property and the 7 characteristics; validates the identifier via `_validateId()`; calls `API.createOP()` for a new property or `API.updateOP(originalId, prop)` for an update; displays a rename message if the identifier has changed; refreshes the tab after success.
 
 ---
 
 ### REQ-OP-020 — ObjectProperty creation from the Classes tab
 
-| **If** | the user clicks "Create new ObjectProperty" from the Classes tab with a class selected, |
+| **If** | the ontologist wishes to create an object property directly from a class record, using that class as domain, |
 |---|---|
-| **Then** | the system generates a name via `OPEditor._generatePropName()`, creates a property with `domain: [classId]` and the other fields empty, registers it via `API.createOP()`, sets `OPEditor._selectedId` and `OPEditor._editingId` to the new ID, then navigates to the `object-properties` tab via `APP.navigateTo()`. |
+| **Then** | a new object property is created with the current class as domain, and the application automatically navigates to the object properties tab to allow further editing. |
 
-**Source code:** `owl_editor.js` → anonymous function in `CLSEditor` (line ~613), identified by the comment `Creates an ObjectProperty with domain = selected class`
+**Source code:** `owl_editor.js` → Anonymous function in `CLSEditor` (line ~613, comment `Creates an ObjectProperty with domain = selected class`) — Generates a name via `OPEditor._generatePropName()`, creates a property with `domain: [classId]` and the other fields empty, saves it via `API.createOP()`, sets `OPEditor._selectedId` and `OPEditor._editingId` to the new ID, then navigates to the `object-properties` tab via `APP.navigateTo()`.
 
 ---
 
 ## 2. Form — Presentation and UI
 
-> Requirements relating to display: layout, visual components, interactions, navigation, styles.
+> Display-related requirements: layout, visual components, interactions, navigation, styles.
 
 ### REQ-OP-021 — Object property tree display
 
-| **If** | the object properties tab is rendered, |
+| **If** | the ontologist opens the object properties tab, |
 |---|---|
-| **Then** | - the system places as root a fixed node `owl:topObjectProperty` (clickable via `OPEditor.selectTopProp()`) ;<br>- recursively calls `_renderNode()` for each root property (those without a parent in `subPropertyOf`) ;<br>- if no property exists, displays the text "No ObjectProperty" instead. |
+| **Then** | the tree presents first the root property `owl:topObjectProperty`, followed by all ontology properties organised according to their hierarchical relationships; if the ontology contains no object property, a message explicitly indicates this. |
 
-**Source code:** `owl_editor.js` → `OPEditor.renderTree()`
+**Source code:** `owl_editor.js` → `OPEditor.renderTree()` — Places as root a fixed clickable `owl:topObjectProperty` node via `OPEditor.selectTopProp()`, recursively calls `_renderNode()` for each root property (with no parent in `subPropertyOf`), and displays the text "No ObjectProperty" if no property exists.
 
 ---
 
 ### REQ-OP-022 — Tree node rendering with inverseOf tag
 
-| **If** | a node of the object property tree is rendered, |
+| **If** | a node in the object property tree is displayed, |
 |---|---|
-| **Then** | - the node is `draggable="true"` and carries the handlers `ondragstart`, `ondragover`, `ondragleave`, `ondrop`, `ondragend` ;<br>- if the property has a non-null `inverseOf` field, a badge `↔ <id>` is displayed next to the label ;<br>- indentation is calculated according to depth (`depth * 16 + 6` px) ;<br>- children are rendered in a container `op-tcn-<id>` whose visibility is controlled by `OPEditor._expanded`. |
+| **Then** | if the property has a declared inverse property, it is visually indicated alongside the property name; indentation reflects the hierarchical level; child properties are shown or hidden according to the node's expansion state; the node can be moved by drag-and-drop. |
 
-**Source code:** `owl_editor.js` → `OPEditor._renderNode()`
+**Source code:** `owl_editor.js` → `OPEditor._renderNode()` — Renders the node with `draggable="true"` and the handlers `ondragstart`, `ondragover`, `ondragleave`, `ondrop`, `ondragend`; displays a badge `↔ <id>` if `inverseOf` is non-null; calculates indentation according to `depth * 16 + 6` px; renders children in a container `op-tcn-<id>` whose visibility is controlled by `OPEditor._expanded`.
 
 ---
 
 ### REQ-OP-023 — Selection of owl:topObjectProperty
 
-| **If** | the user clicks on the root node `owl:topObjectProperty`, |
+| **If** | the ontologist clicks on the root node `owl:topObjectProperty`, |
 |---|---|
-| **Then** | - the system sets `_selectedId = null` and `_topPropSelected = true` ;<br>- applies the CSS class `selected` to the root node ;<br>- replaces the content of the detail panel with a welcome message containing a "＋ Create Object Property" button ;<br>- clears the "Super Properties" panel ;<br>- updates the state of the toolbar buttons via `_updateTreeButtons()`. |
+| **Then** | the detail panel offers to create a new object property, no existing property is selected, and the tree actions are updated accordingly. |
 
-**Source code:** `owl_editor.js` → `OPEditor.selectTopProp()`
+**Source code:** `owl_editor.js` → `OPEditor.selectTopProp()` — Sets `_selectedId = null` and `_topPropSelected = true`; applies the CSS class `selected` to the root node; replaces the content of the detail panel with a welcome message containing a "＋ Create Object Property" button; clears the "Super Properties" panel; updates button states via `_updateTreeButtons()`.
 
 ---
 
 ### REQ-OP-024 — Property selection in the tree
 
-| **If** | the user clicks on a node in the object property tree, |
+| **If** | the ontologist selects a property in the tree, |
 |---|---|
-| **Then** | - the system updates `_selectedId` and applies the `selected` class to the correct tree item ;<br>- replaces the detail panel with `renderForm(prop)` ;<br>- initialises the internal vertical resizers via `_initHResizers` ;<br>- refreshes the "Super Properties" panel via `_updateSuperPanel()` ;<br>- updates the buttons via `_updateTreeButtons()` ;<br>- triggers the loading of inverse inferences via `_loadInferredInverse()`. |
+| **Then** | the edit form for that property is displayed in the detail panel, the super-property chain is updated, and inferred inverse properties are loaded. |
 
-**Source code:** `owl_editor.js` → `OPEditor.selectProp()`
+**Source code:** `owl_editor.js` → `OPEditor.selectProp()` — Updates `_selectedId` and applies the `selected` class; replaces the detail panel with `renderForm(prop)`; initialises internal vertical resizers via `_initHResizers`; refreshes the "Super Properties" panel via `_updateSuperPanel()`; updates buttons via `_updateTreeButtons()`; triggers loading of inverse inferences via `_loadInferredInverse()`.
 
 ---
 
@@ -311,104 +311,104 @@
 
 | **If** | `owl:topObjectProperty` is selected, |
 |---|---|
-| **Then** | only the "Child" button (`op-btn-child`) is active ; the "Sister" (`op-btn-sister`) and "Delete" (`op-btn-delete`) buttons are disabled. |
+| **Then** | only the child property creation action is available; the sibling property creation and deletion actions are disabled. |
 
 | **If** | an ordinary property is selected, |
 |---|---|
-| **Then** | all three buttons (`op-btn-child`, `op-btn-sister`, `op-btn-delete`) are active. |
+| **Then** | all three actions (create child property, create sibling property, delete) are available. |
 
-| **If** | no property is selected, |
+| **If** | no property is selected in the tree, |
 |---|---|
-| **Then** | all buttons are disabled. |
+| **Then** | all tree actions are disabled. |
 
-**Source code:** `owl_editor.js` → `OPEditor._updateTreeButtons()`
+**Source code:** `owl_editor.js` → `OPEditor._updateTreeButtons()` — Enables or disables buttons `op-btn-child`, `op-btn-sister` and `op-btn-delete` according to the state of `_selectedId` and `_topPropSelected`.
 
 ---
 
 ### REQ-OP-026 — Tree node expansion/collapse
 
-| **If** | the user clicks on the triangle of a tree node, |
+| **If** | the ontologist clicks on the expansion triangle of a tree node, |
 |---|---|
-| **Then** | the system toggles the visibility of the container `op-tcn-<id>` between `display:none` and `display:block`, updates `OPEditor._expanded` (adding or removing the ID), and rotates the triangle `▶` via the CSS class `open`. |
+| **Then** | the child properties of that node are shown or hidden, and the visual indicator reflects the current state (expanded or collapsed). |
 
-**Source code:** `owl_editor.js` → `OPEditor.toggleNode()`
+**Source code:** `owl_editor.js` → `OPEditor.toggleNode()` — Toggles the visibility of the container `op-tcn-<id>` between `display:none` and `display:block`, updates `OPEditor._expanded` (adding or removing the ID), and rotates the triangle `▶` via the CSS class `open`.
 
 ---
 
 ### REQ-OP-027 — Context menu on right-click in the tree
 
-| **If** | the user right-clicks on a node or on the root of the tree, |
+| **If** | the ontologist right-clicks on a tree node, |
 |---|---|
-| **Then** | - the system creates a DOM element `div#op-ctx-menu` positioned at the mouse coordinates ;<br>- it contains the actions "Add Child Property", "Add Sibling Property" (only if a non-root property is targeted), and "Delete" ;<br>- the menu closes automatically on the next outside click via a `click` listener in capture mode. |
+| **Then** | a context menu is displayed at the cursor coordinates, offering relevant actions according to the targeted node (create child property, create sibling property, delete); the menu closes automatically as soon as a click is made outside it. |
 
-**Source code:** `owl_editor.js` → `OPEditor.showContextMenu()`
+**Source code:** `owl_editor.js` → `OPEditor.showContextMenu()` — Creates a DOM element `div#op-ctx-menu` positioned at the mouse coordinates; includes the actions "Add Child Property", "Add Sibling Property" (only if a non-root property is targeted), and "Delete"; installs a capturing `click` listener for automatic closing.
 
 ---
 
 ### REQ-OP-028 — Object property edit form
 
-| **If** | an object property is selected in the tree, |
+| **If** | the ontologist selects an object property in the tree, |
 |---|---|
-| **Then** | the system generates an HTML form containing: a text field `op-id` (with `_sanitizeId()` on each keystroke), the full IRI computed from `APP.state.ontology.id`, the Annotations block, the Domain and Range blocks side by side, the "Inverse Of" block, the "Characteristics" block, and a "Where Used" frame via `_whereUsedFrame()`. |
+| **Then** | a complete form is displayed with the property identifier, its computed IRI, its annotations, domain and range constraints, the inverse property, OWL characteristics, and the property's usages in the ontology. |
 
-| **If** | the property is new (`isNew = true`), |
+| **If** | the property is new, |
 |---|---|
-| **Then** | saving is triggered on `onblur` ; for an existing property, it is triggered on `onchange`. |
+| **Then** | saving is triggered on blur of the identifier field; for an existing property, it is triggered on each field modification. |
 
-**Source code:** `owl_editor.js` → `OPEditor.renderForm()`
+**Source code:** `owl_editor.js` → `OPEditor.renderForm()` — Generates an HTML form with the `op-id` field (with `_sanitizeId()` on each keystroke), the full IRI computed from `APP.state.ontology.id`, the Annotations block, the Domain and Range blocks side by side, the "Inverse Of" block, the "Characteristics" block, and a "Where Used" frame via `_whereUsedFrame()`; saving is triggered on `onblur` for a new property, on `onchange` for an existing property.
 
 ---
 
 ### REQ-OP-029 — Annotation management (labels, comments, others)
 
-| **If** | the user adds an annotation of type `label` or `comment`, |
+| **If** | the ontologist adds a `label` or `comment` type annotation to the property, |
 |---|---|
-| **Then** | the system adds a row to `#op-annotations-body` via `_makeAnnotRow()`. |
+| **Then** | a new annotation row is added in the Annotations section of the form. |
 
-| **If** | the user adds an annotation of type `other` by selecting an annotation property, |
+| **If** | the ontologist adds an annotation of another type by selecting an annotation property, |
 |---|---|
-| **Then** | the system adds an `other`-type row with the specified property and closes the picker `op-anno-picker`. |
+| **Then** | an annotation row of type `other` is created with the specified property. |
 
-| **If** | the user deletes an annotation row, |
+| **If** | the ontologist deletes an annotation row, |
 |---|---|
-| **Then** | the system removes the parent `<tr>` row of the clicked button and triggers `autoSave()` if the property is in edit mode. |
+| **Then** | the row is removed from the form and the property is automatically saved if it is in edit mode. |
 
-**Source code:** `owl_editor.js` → `OPEditor.addAnnotRow()`, `OPEditor.addOtherAnnotRow()`, `OPEditor.removeAnnotRow()`
+**Source code:** `owl_editor.js` → `OPEditor.addAnnotRow()` — Adds a row to `#op-annotations-body` via `_makeAnnotRow()`. `OPEditor.addOtherAnnotRow()` — Adds a row of type `other` and closes the `op-anno-picker` picker. `OPEditor.removeAnnotRow()` — Removes the parent `<tr>` row of the clicked button and triggers `autoSave()` if in edit mode.
 
 ---
 
 ### REQ-OP-030 — "Super Properties" panel with ancestor chain
 
-| **If** | a property is selected in the tree, |
+| **If** | the ontologist selects a property in the tree, |
 |---|---|
-| **Then** | - the system fills the panel `#op-sub-list` with the direct super-properties of the selected property ;<br>- for each direct super-property, it builds the complete ancestor chain up to `owl:topObjectProperty` and displays each link with increasing indentation ;<br>- direct super-properties have a delete button `✕` ;<br>- transitive ancestors are displayed in italics with reduced opacity (0.75) ;<br>- clicking on any ancestor navigates to that property via `APP.navigateTo()`. |
+| **Then** | the "Super Properties" panel displays the complete hierarchical chain going up to `owl:topObjectProperty`: direct super-properties are editable (deletable), while transitive ancestors are presented visually as such; clicking on any ancestor navigates to its record. |
 
-**Source code:** `owl_editor.js` → `OPEditor._updateSuperPanel()`
+**Source code:** `owl_editor.js` → `OPEditor._updateSuperPanel()` — Fills `#op-sub-list` with direct super-properties; for each one, builds the complete ancestor chain up to `owl:topObjectProperty` with increasing indentation; direct super-properties carry a `✕` delete button; transitive ancestors are displayed in italics with opacity 0.75; each ancestor is clickable via `APP.navigateTo()`.
 
 ---
 
 ### REQ-OP-031 — Two-panel resizable layout
 
-| **If** | the object properties tab is displayed, |
+| **If** | the ontologist consults the object properties tab, |
 |---|---|
-| **Then** | the system generates a two-column layout: a left panel (`op-tree-panel`) containing the tree and the "Super Properties" sub-panel separated by a horizontal resizer `h-resizer`, and a right detail panel (`op-detail`). |
+| **Then** | the interface is divided into a left panel displaying the tree and the super-property chain, and a right panel displaying the edit form; each panel is resizable by dragging a separator handle. |
 
-| **If** | the user drags the vertical resize handle (`op-split-handle`), |
+| **If** | the ontologist drags the vertical separator handle between the two panels, |
 |---|---|
-| **Then** | the system adjusts the width of the left panel between 160 px and 520 px and initialises the internal horizontal resizer via `_initHResizers('op-tree-panel')`. |
+| **Then** | the width of the left panel is adjusted within acceptable limits, and the internal horizontal resizer is recalculated accordingly. |
 
-**Source code:** `owl_editor.js` → `OPEditor.renderSplit()` and `OPEditor._initSplitPane()`
+**Source code:** `owl_editor.js` → `OPEditor.renderSplit()` — Generates the two-column layout with the `op-tree-panel` panel (tree + "Super Properties" sub-panel separated by an `h-resizer`) and the `op-detail` panel. `OPEditor._initSplitPane()` — Handles dragging of the `op-split-handle` handle, constrains the width between 160 px and 520 px, and calls `_initHResizers('op-tree-panel')`.
 
 ---
 
 ### REQ-OP-032 — Selection restoration after re-render
 
-| **If** | the object properties tab is re-rendered after an action, |
+| **If** | the object properties tab is reloaded following an action (creation, modification, deletion), |
 |---|---|
-| **Then** | - the system calls `_initSplitPane()` ;<br>- if `_topPropSelected` is true, calls `selectTopProp()` again ;<br>- if an ID is stored in `_selectedId`, calls `selectProp(_selectedId)` again ;<br>- thereby ensuring that the current selection is maintained after each re-render. |
+| **Then** | the property that was selected before the reload is automatically re-selected, preserving the ontologist's working context. |
 
 ---
 
-*Document generated by static analysis of the source code — claude-sonnet-4-6*
+*Document generated by static source code analysis — claude-sonnet-4-6*
 
-**Source code:** `owl_editor.js` → `OPEditor.restoreSelection()`
+**Source code:** `owl_editor.js` → `OPEditor.restoreSelection()` — Calls `_initSplitPane()`; if `_topPropSelected` is true, calls `selectTopProp()` again; if an ID is stored in `_selectedId`, calls `selectProp(_selectedId)` again.
