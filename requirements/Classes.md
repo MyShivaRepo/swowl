@@ -261,7 +261,7 @@ In both cases, the change is saved automatically if the class is being edited.
 
 ### REQ-CLS-020 — Rendering the class tree with owl:Thing root node
 
-| **If** | the ontologist opens the Classes tab of a loaded ontology, |
+| **If** | the ontologist opens the `Classes` tab of a loaded ontology, |
 |---|---|
 | **Then** | the tree displays the universal root concept (`owl:Thing` or the ontology's custom label) at the top, followed by all classes organised in a hierarchy. If the ontology contains no local classes, an absence message is displayed. |
 
