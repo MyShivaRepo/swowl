@@ -215,7 +215,7 @@
 
 ### REQ-VW-027 — Blocage de l'onglet Views si aucune ontologie n'est connectée
 
-| **Si** | l'ontologiste tente d'accéder à la section Views sans avoir préalablement chargé une ontologie, |
+| **Si** | l'ontologiste tente d'accéder à la section `Views` sans avoir préalablement chargé une ontologie, |
 |---|---|
 | **Alors** | l'application affiche un message informatif invitant l'utilisateur à connecter une ontologie, avec un accès direct à la section de gestion des ontologies, et n'affiche pas les graphes. |
 
@@ -225,7 +225,7 @@
 
 ### REQ-VW-028 — Initialisation différée des graphes après rendu HTML
 
-| **Si** | l'ontologiste navigue vers l'onglet Views et que le HTML vient d'être injecté dans la page, |
+| **Si** | l'ontologiste navigue vers l'onglet `Views` et que le HTML vient d'être injecté dans la page, |
 |---|---|
 | **Alors** | le graphe correspondant au sous-onglet actif est initialisé après un court délai, garantissant que la zone d'affichage est disponible avant le début du rendu graphique. |
 
@@ -243,9 +243,9 @@
 
 ### REQ-VW-001 — Rendu de l'onglet Views avec sous-onglets
 
-| **Si** | l'ontologiste navigue vers l'onglet Views, |
+| **Si** | l'ontologiste navigue vers l'onglet `Views`, |
 |---|---|
-| **Alors** | l'application affiche deux sous-onglets de visualisation — « Ontology » pour explorer la hiérarchie des classes, et « Knowledge Base » pour explorer les individuals et leurs relations — l'onglet actif étant mémorisé entre les navigations. |
+| **Alors** | l'application affiche deux sous-onglets de visualisation — « `Ontology` » pour explorer la hiérarchie des classes, et « Knowledge Base » pour explorer les individuals et leurs relations — l'onglet actif étant mémorisé entre les navigations. |
 
 | **Si** | l'ontologiste sélectionne un sous-onglet, |
 |---|---|
@@ -257,7 +257,7 @@
 
 ### REQ-VW-002 — Sous-onglet « Ontology » : arbre hyperbolique D3
 
-| **Si** | l'ontologiste ouvre le sous-onglet « Ontology », |
+| **Si** | l'ontologiste ouvre le sous-onglet « `Ontology` », |
 |---|---|
 | **Alors** | l'application affiche un graphe hyperbolique interactif de l'arbre des classes, accompagné d'un bouton de réinitialisation de la vue, d'un champ de recherche pour filtrer les classes, d'une aide contextuelle sur les interactions disponibles, d'un compteur de classes et de la zone de visualisation. |
 
