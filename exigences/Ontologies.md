@@ -1,5 +1,3 @@
-Voici le fichier reformulé au format Si/Alors :
-
 # Exigences — Ontologies
 
 > Généré le 2026-06-06 | Dérivé strictement du code source | Aucune hallucination
@@ -45,171 +43,171 @@ Voici le fichier reformulé au format Si/Alors :
 
 ### REQ-ONT-001 — Tri des ontologies dans le registre
 
-| **Si** | le registre des ontologies est affiché, |
+| **Si** | le registre des ontologies est consulté, |
 |---|---|
-| **Alors** | - les ontologies utilisateur apparaissent en premier, triées par ordre alphabétique (`localeCompare`) ;<br>- les ontologies W3C en lecture seule apparaissent en dernier, selon un ordre de dépendance fixe (`owl` → `rdfs` → `rdf`) codé dans la constante `BUILTIN_ORDER`. |
+| **Alors** | les ontologies de l'utilisateur apparaissent en premier, triées alphabétiquement, suivies des ontologies W3C en lecture seule, présentées dans un ordre de dépendance logique (OWL, puis RDFS, puis RDF). |
 
 ---
 
-**Code source :** `app.js` → `_refreshOntoTable()`
+**Code source :** `app.js` → `_refreshOntoTable()` — Trie les ontologies utilisateur par ordre alphabétique (`localeCompare`), puis concatène les ontologies W3C `readonly` dans l'ordre fixe défini par la constante `BUILTIN_ORDER` (`owl` → `rdfs` → `rdf`).
 
 ### REQ-ONT-002 — Auto-sélection de l'ontologie connectée
 
-| **Si** | l'onglet Ontologies est chargé **et** qu'aucune sélection manuelle n'est active (`_selectedOntoName` est nul), |
+| **Si** | l'ontologiste ouvre l'onglet Ontologies sans avoir effectué de sélection manuelle au préalable, |
 |---|---|
-| **Alors** | le système recherche dans la liste l'entrée dont le champ `connected` est vrai et lui affecte automatiquement `_selectedOntoName`, de sorte que l'ontologie connectée soit visuellement mise en évidence. |
+| **Alors** | l'ontologie actuellement connectée est automatiquement mise en évidence dans le registre, sans action supplémentaire de l'utilisateur. |
 
 ---
 
-**Code source :** `app.js` → `renderOntologies()`
+**Code source :** `app.js` → `renderOntologies()` — Si `_selectedOntoName` est nul, parcourt la liste des ontologies pour trouver celle dont `connected` est vrai et lui affecte `_selectedOntoName`, provoquant la mise en surbrillance visuelle de la ligne correspondante.
 
 ### REQ-ONT-003 — Création d'une nouvelle ontologie
 
-| **Si** | l'utilisateur remplit le formulaire wizard (nom, répertoire, préfixe, URI de namespace) et soumet la création, |
+| **Si** | l'ontologiste souhaite créer une nouvelle ontologie et renseigne son nom, son répertoire de stockage, son préfixe et l'URI de son espace de nommage, |
 |---|---|
-| **Alors** | - le système compose le chemin du fichier (`<dir>/<name>.json`) et appelle `API.registerOntology({ name, path, uri, prefix })` pour l'enregistrer ;<br>- si la case « Connect immediately » est cochée, `API.connectOntology(name)` est appelée en complément ;<br>- si l'un des champs obligatoires (`name`, `dir`, `uri`) est absent, un message d'erreur est affiché et le traitement est interrompu. |
+| **Alors** | l'ontologie est enregistrée dans le système ; si l'ontologiste le demande, elle est immédiatement connectée ; si l'un des champs obligatoires est absent, un message d'erreur est affiché et aucun enregistrement n'est effectué. |
 
 ---
 
-**Code source :** `app.js` → `_doNew()`
+**Code source :** `app.js` → `_doNew()` — Compose le chemin `<dir>/<name>.json`, appelle `API.registerOntology({ name, path, uri, prefix })` pour l'enregistrement ; si la case « Connect immediately » est cochée, enchaîne avec `API.connectOntology(name)` ; interrompt le traitement si `name`, `dir` ou `uri` est absent.
 
 ### REQ-ONT-004 — Import d'une ontologie OWL/TTL
 
-| **Si** | l'utilisateur remplit le formulaire d'import (fichier source `.owl`/`.ttl`/`.rdf`, nom, répertoire de destination, préfixe, URI) et lance l'import, |
+| **Si** | l'ontologiste souhaite importer une ontologie existante depuis un fichier source (format OWL, Turtle ou RDF) et renseigne le nom cible, le répertoire de destination, le préfixe et l'URI, |
 |---|---|
-| **Alors** | - le système compose le chemin de sauvegarde (`<dir>/<name>.json`) et appelle `API.importFromPath({ name, owl_path, save_path, uri, prefix })` ;<br>- si la case « Connect immediately » n'est pas cochée, `API.disconnectOntology()` est appelée ensuite ;<br>- si l'un des cinq champs obligatoires est absent, le traitement est interrompu. |
+| **Alors** | le fichier est converti et enregistré dans le système ; si l'ontologiste ne demande pas de connexion immédiate, l'ontologie reste déconnectée ; si l'un des cinq champs obligatoires est absent, l'import est annulé. |
 
 ---
 
-**Code source :** `app.js` → `_doImport()`
+**Code source :** `app.js` → `_doImport()` — Compose le chemin de sauvegarde `<dir>/<name>.json`, appelle `API.importFromPath({ name, owl_path, save_path, uri, prefix })` ; si la case « Connect immediately » n'est pas cochée, appelle `API.disconnectOntology()` en complément ; interrompt si l'un des cinq champs est manquant.
 
 ### REQ-ONT-005 — Lecture automatique du préfixe et de l'URI depuis un fichier source
 
-| **Si** | l'utilisateur clique sur « Lire le préfixe & URI depuis le fichier » avec un fichier source sélectionné, |
+| **Si** | l'ontologiste sélectionne un fichier source lors d'un import et demande la lecture automatique de ses métadonnées, |
 |---|---|
-| **Alors** | le système appelle `API.peekOntology(src)` et injecte les valeurs retournées (`info.name`, `info.prefix`, `info.uri`) dans les champs du formulaire : le champ `name` n'est rempli que s'il est vide, tandis que `prefix` et `uri` sont remplacés inconditionnellement. |
+| **Alors** | le préfixe et l'URI de l'espace de nommage sont extraits du fichier et injectés dans le formulaire ; le nom de l'ontologie est également proposé si le champ est encore vide. |
 
 ---
 
-**Code source :** `app.js` → `_wizardImportPeek()`
+**Code source :** `app.js` → `_wizardImportPeek()` — Appelle `API.peekOntology(src)` et injecte `info.prefix` et `info.uri` inconditionnellement dans les champs du formulaire ; `info.name` n'est injecté dans `wiz-import-name` que si ce champ est actuellement vide.
 
 ### REQ-ONT-006 — Chargement d'une ontologie JSON
 
-| **Si** | l'utilisateur remplit le formulaire de chargement (fichier `.json`, nom, préfixe, URI) et confirme, |
+| **Si** | l'ontologiste souhaite enregistrer dans le système une ontologie déjà sérialisée au format JSON et renseigne le fichier source, le nom, le préfixe et l'URI, |
 |---|---|
-| **Alors** | - le système appelle `API.registerJson(src, name, uri, prefix)` ;<br>- si la case « Connect immediately » est cochée, `API.connectOntology(name)` est appelée ensuite ;<br>- si les champs obligatoires `src` ou `name` sont absents, le traitement est interrompu. |
+| **Alors** | l'ontologie est enregistrée dans le registre ; si l'ontologiste le demande, elle est immédiatement connectée ; si le fichier source ou le nom est absent, le chargement est annulé. |
 
 ---
 
-**Code source :** `app.js` → `_doLoad()`
+**Code source :** `app.js` → `_doLoad()` — Appelle `API.registerJson(src, name, uri, prefix)` ; si la case « Connect immediately » est cochée, enchaîne avec `API.connectOntology(name)` ; interrompt le traitement si `src` ou `name` est absent.
 
 ### REQ-ONT-007 — Lecture automatique des métadonnées depuis un fichier JSON
 
-| **Si** | l'utilisateur clique sur « Lire les informations depuis le fichier » avec un fichier `.json` sélectionné, |
+| **Si** | l'ontologiste sélectionne un fichier JSON lors du chargement et demande la lecture automatique de ses métadonnées, |
 |---|---|
-| **Alors** | le système appelle `API.peekOntology(src)` et injecte les valeurs retournées (`info.name`, `info.prefix`, `info.uri`) dans les champs `wiz-load-name`, `wiz-load-prefix` et `wiz-load-uri`, en remplaçant toute valeur existante. |
+| **Alors** | le nom, le préfixe et l'URI de l'espace de nommage sont extraits du fichier et injectés dans les champs du formulaire, en remplaçant toute valeur précédemment saisie. |
 
 ---
 
-**Code source :** `app.js` → `_wizardLoadPeek()`
+**Code source :** `app.js` → `_wizardLoadPeek()` — Appelle `API.peekOntology(src)` et injecte `info.name`, `info.prefix` et `info.uri` dans les champs `wiz-load-name`, `wiz-load-prefix` et `wiz-load-uri`, en écrasant les valeurs existantes.
 
 ### REQ-ONT-008 — Sauvegarde des modifications d'une ontologie
 
-| **Si** | l'utilisateur modifie les attributs d'une ontologie existante (nom, répertoire, préfixe, URI) et confirme la sauvegarde, |
+| **Si** | l'ontologiste modifie les attributs d'une ontologie déjà enregistrée (nom, répertoire, préfixe ou URI de l'espace de nommage) et confirme les changements, |
 |---|---|
-| **Alors** | le système compose le nouveau chemin (`<dir>/<name>.json`) et appelle `API.updateOntologyEntry(origName, { name, path, uri, prefix })`. Si l'un des champs obligatoires (`name`, `dir`, `uri`) est absent, le traitement est interrompu. |
+| **Alors** | le registre est mis à jour avec les nouvelles valeurs ; si l'un des champs obligatoires est absent, la sauvegarde est annulée. |
 
 ---
 
-**Code source :** `app.js` → `doSaveEdit()`
+**Code source :** `app.js` → `doSaveEdit()` — Compose le nouveau chemin `<dir>/<name>.json` et appelle `API.updateOntologyEntry(origName, { name, path, uri, prefix })` ; interrompt si `name`, `dir` ou `uri` est absent.
 
 ### REQ-ONT-009 — Connexion et déconnexion d'une ontologie
 
-| **Si** | l'utilisateur demande la connexion d'une ontologie, |
+| **Si** | l'ontologiste demande la connexion d'une ontologie, |
 |---|---|
-| **Alors** | - le système appelle `API.connectOntology(name)`, affiche un message de succès, appelle `this.refresh()` puis rafraîchit l'onglet via `renderOntologies()` ;<br>- la ligne de l'ontologie connectée reçoit la classe CSS `onto-current-row` et son indicateur passe au symbole `●` vert. |
+| **Alors** | cette ontologie devient l'ontologie de travail active, clairement identifiée dans le registre, et les onglets d'édition deviennent accessibles. |
 
-| **Si** | l'utilisateur demande la déconnexion de l'ontologie courante, |
+| **Si** | l'ontologiste demande la déconnexion de l'ontologie courante, |
 |---|---|
-| **Alors** | - le système appelle `API.disconnectOntology()`, affiche un message de succès, appelle `this.refresh()` puis réaffiche la section courante via `renderSection(this.currentSection)` ;<br>- les onglets d'édition deviennent inaccessibles (voir REQ-ONT-014). |
+| **Alors** | aucune ontologie n'est plus active et les onglets d'édition deviennent inaccessibles jusqu'à une nouvelle connexion. |
 
 ---
 
-**Code source :** `app.js` → `doConnect()` | `doDisconnect()`
+**Code source :** `app.js` → `doConnect()` — Appelle `API.connectOntology(name)`, affiche un message de succès, appelle `this.refresh()` puis `renderOntologies()` ; la ligne reçoit la classe CSS `onto-current-row` et son indicateur passe au symbole `●` vert. `doDisconnect()` — Appelle `API.disconnectOntology()`, affiche un message de succès, appelle `this.refresh()` puis `renderSection(this.currentSection)`.
 
 ### REQ-ONT-010 — Désenregistrement d'une ontologie
 
-| **Si** | l'utilisateur demande le désenregistrement d'une ontologie et confirme la boîte de dialogue (dont le message précise explicitement que le fichier sur disque ne sera pas supprimé), |
+| **Si** | l'ontologiste souhaite retirer une ontologie du registre et confirme l'opération après avoir été informé que le fichier sur disque ne sera pas supprimé, |
 |---|---|
-| **Alors** | le système appelle `API.unregisterOntology(name)` pour retirer l'entrée du registre, sans toucher au fichier physique. |
+| **Alors** | l'ontologie disparaît du registre sans qu'aucun fichier physique ne soit effacé. |
 
 ---
 
-**Code source :** `app.js` → `doUnregister()`
+**Code source :** `app.js` → `doUnregister()` — Affiche une boîte de dialogue de confirmation précisant explicitement que le fichier sur disque est conservé, puis appelle `API.unregisterOntology(name)` pour retirer l'entrée du registre.
 
 ### REQ-ONT-011 — Téléchargement des ontologies W3C intégrées
 
-| **Si** | l'utilisateur clique sur le bouton « Fetch W3C Ontologies », |
+| **Si** | l'ontologiste souhaite disposer des ontologies de référence W3C (RDF, RDFS, OWL) dans le registre local, |
 |---|---|
-| **Alors** | - le bouton est désactivé pendant l'opération ;<br>- le système appelle `API.fetchBuiltins()` et comptabilise les entrées dont le statut contient la chaîne `'fetched'` pour afficher le nombre d'ontologies effectivement téléchargées et enregistrées (RDF, RDFS, OWL depuis `w3.org`) ;<br>- le bouton est réactivé dans le bloc `finally`. |
+| **Alors** | le système télécharge et enregistre ces ontologies depuis les sources officielles (`w3.org`) et informe l'ontologiste du nombre d'ontologies effectivement récupérées. |
 
 ---
 
-**Code source :** `app.js` → `_fetchBuiltins()`
+**Code source :** `app.js` → `_fetchBuiltins()` — Désactive le bouton pendant l'opération, appelle `API.fetchBuiltins()`, compte les entrées dont le statut contient `'fetched'` pour construire le message de résultat, et réactive le bouton dans le bloc `finally`.
 
 ### REQ-ONT-012 — Export d'une ontologie par nom (OWL/TTL/SWRL/SWORD)
 
-| **Si** | l'utilisateur sélectionne un format d'export et lance l'export d'une ontologie identifiée par son nom, |
+| **Si** | l'ontologiste sélectionne une ontologie du registre et choisit un format d'export parmi les formats sémantiques disponibles, |
 |---|---|
-| **Alors** | le système appelle `API.exportOntologyByName(name, fmt)` et déclenche le téléchargement du blob résultant avec le nom de fichier `<name>.<ext>`, l'extension étant déterminée selon le format : `owl` → `.owl`, `ttl` → `.ttl`, `swrl` → `.json`, `sword` → `.sword`. |
+| **Alors** | le fichier correspondant est généré et proposé au téléchargement avec un nom de fichier reflétant le nom de l'ontologie et le format choisi. |
 
 ---
 
-**Code source :** `app.js` → `exportOntologyByName()`
+**Code source :** `app.js` → `exportOntologyByName()` — Appelle `API.exportOntologyByName(name, fmt)` et déclenche le téléchargement du blob avec le nom `<name>.<ext>` ; l'extension est déterminée par la correspondance : `owl` → `.owl`, `ttl` → `.ttl`, `swrl` → `.json`, `sword` → `.sword`.
 
 ### REQ-ONT-013 — Export de l'ontologie couramment connectée
 
-| **Si** | l'utilisateur lance l'export de l'ontologie couramment connectée en sélectionnant un format, |
+| **Si** | l'ontologiste souhaite exporter l'ontologie sur laquelle il travaille actuellement en choisissant un format, |
 |---|---|
-| **Alors** | le système appelle `API.exportOntology(fmt)` (sans nom explicite) et déclenche le téléchargement avec le nom générique `ontology.<ext>` (`.owl`, `.ttl` ou `.jsonld` selon le format). |
+| **Alors** | le fichier est généré et proposé au téléchargement sous un nom générique associé au format choisi. |
 
 ---
 
-**Code source :** `app.js` → `exportOntology()`
+**Code source :** `app.js` → `exportOntology()` — Appelle `API.exportOntology(fmt)` sans nom explicite et déclenche le téléchargement avec le nom générique `ontology.<ext>` (`.owl`, `.ttl` ou `.jsonld` selon le format).
 
 ### REQ-ONT-014 — Blocage des onglets d'édition en l'absence d'ontologie connectée
 
-| **Si** | l'utilisateur tente de naviguer vers un onglet d'édition **et** qu'aucune ontologie n'est connectée (`this.state.ontology` est nul), |
+| **Si** | l'ontologiste tente d'accéder à un onglet d'édition alors qu'aucune ontologie n'est connectée, |
 |---|---|
-| **Alors** | la navigation est bloquée et un message est affiché dans `#main-content` avec un bouton de renvoi vers l'onglet Ontologies (`APP.navigate('ontologies')`). |
+| **Alors** | l'accès est refusé et un message guide l'ontologiste vers l'onglet Ontologies pour en connecter une. |
 
 ---
 
-**Code source :** `app.js` → `renderSection()`
+**Code source :** `app.js` → `renderSection()` — Vérifie que `this.state.ontology` n'est pas nul ; si c'est le cas, injecte dans `#main-content` un message d'avertissement avec un bouton appelant `APP.navigate('ontologies')`.
 
 ### REQ-ONT-015 — Calcul des racines virtuelles selon le préfixe de l'ontologie
 
-| **Si** | l'ontologie connectée a pour préfixe `'rdf'` ou `'rdfs'`, |
+| **Si** | l'ontologiste travaille sur une ontologie de bas niveau (RDF ou RDFS), |
 |---|---|
-| **Alors** | le système retourne `{ classRoot: 'rdfs:Resource', propRoot: 'rdf:Property' }` comme racines virtuelles. |
+| **Alors** | les arborescences de classes et de propriétés sont ancrées respectivement sur `rdfs:Resource` et `rdf:Property`, conformément à la sémantique de ces vocabulaires. |
 
-| **Si** | l'ontologie connectée a tout autre préfixe (ou qu'aucune ontologie n'est connectée), |
+| **Si** | l'ontologiste travaille sur toute autre ontologie (ou qu'aucune ontologie n'est connectée), |
 |---|---|
-| **Alors** | le système retourne `{ classRoot: 'owl:Thing', propRoot: 'owl:topObjectProperty' }` comme racines virtuelles, utilisées dans les arborescences de l'application. |
+| **Alors** | les arborescences de classes et de propriétés sont ancrées respectivement sur `owl:Thing` et `owl:topObjectProperty`, conformément aux conventions OWL. |
 
 ---
 
-**Code source :** `app.js` → `getOntologyRootLabels()`
+**Code source :** `app.js` → `getOntologyRootLabels()` — Teste le préfixe de l'ontologie connectée : si `'rdf'` ou `'rdfs'`, retourne `{ classRoot: 'rdfs:Resource', propRoot: 'rdf:Property' }` ; sinon retourne `{ classRoot: 'owl:Thing', propRoot: 'owl:topObjectProperty' }`.
 
 ### REQ-ONT-016 — Import implicite de OWL pour les ontologies utilisateur
 
-| **Si** | une ontologie utilisateur (non `readonly`) est affichée dans le tableau **et** qu'elle ne déclare aucun import explicite (tableau `imports` vide), |
+| **Si** | une ontologie de l'utilisateur ne déclare aucun import explicite, |
 |---|---|
-| **Alors** | le système lui substitue automatiquement la liste `['http://www.w3.org/2002/07/owl#']` pour le rendu de l'arbre des imports, reflétant l'import implicite de OWL. |
+| **Alors** | l'arbre des imports lui attribue automatiquement l'ontologie OWL de référence (`http://www.w3.org/2002/07/owl#`), reflétant l'import implicite inhérent à toute ontologie OWL. |
 
 ---
 
-**Code source :** `app.js` → `_refreshOntoTable()`
+**Code source :** `app.js` → `_refreshOntoTable()` — Pour toute ontologie dont `readonly` est faux et dont le tableau `imports` est vide, substitue `['http://www.w3.org/2002/07/owl#']` comme liste d'imports pour le rendu de l'arbre.
 
 ---
 
@@ -219,104 +217,104 @@ Voici le fichier reformulé au format Si/Alors :
 
 ### REQ-ONT-017 — Affichage de l'onglet Ontologies
 
-| **Si** | l'utilisateur navigue vers l'onglet Ontologies, |
+| **Si** | l'ontologiste navigue vers l'onglet Ontologies, |
 |---|---|
-| **Alors** | le système injecte dans `#main-content` la structure HTML complète (en-tête, quatre boutons d'action, panneau wizard masqué par défaut, tableau de registre avec les colonnes Name / Directory / Prefix / Namespace) via `_renderOntologiesShell()`, puis déclenche le chargement asynchrone du registre. |
+| **Alors** | la page affiche un en-tête, les actions disponibles (créer, importer, charger, télécharger les ontologies W3C), un panneau de saisie assistée initialement masqué, et le tableau du registre avec les colonnes Nom, Répertoire, Préfixe et Espace de nommage. |
 
 ---
 
-**Code source :** `app.js` → `renderOntologies()`
+**Code source :** `app.js` → `renderOntologies()` — Injecte dans `#main-content` la structure HTML complète via `_renderOntologiesShell()` (en-tête, quatre boutons d'action, panneau `#onto-wizard` masqué, tableau avec colonnes Name / Directory / Prefix / Namespace), puis déclenche le chargement asynchrone du registre.
 
 ### REQ-ONT-018 — Chargement et affichage du registre
 
 | **Si** | l'onglet Ontologies est affiché, |
 |---|---|
-| **Alors** | le système appelle `API.listOntologies()` pour obtenir la liste des ontologies enregistrées et passe le résultat à `_refreshOntoTable()` qui génère les lignes HTML du tableau. En cas d'erreur API, le corps du tableau affiche le message « Unable to load the registry. ». |
+| **Alors** | la liste de toutes les ontologies enregistrées est chargée et affichée dans le tableau ; si le chargement échoue, un message d'erreur est affiché à la place du tableau. |
 
 ---
 
-**Code source :** `app.js` → `renderOntologies()` et `_refreshOntoTable()`
+**Code source :** `app.js` → `renderOntologies()` et `_refreshOntoTable()` — Appelle `API.listOntologies()` pour obtenir la liste, génère les lignes HTML via `_refreshOntoTable()` ; en cas d'erreur API, affiche « Unable to load the registry. » dans le corps du tableau.
 
 ### REQ-ONT-019 — Sélection d'une ligne du registre
 
-| **Si** | l'utilisateur clique sur une ligne du tableau du registre, |
+| **Si** | l'ontologiste clique sur une ontologie dans le tableau du registre, |
 |---|---|
-| **Alors** | le système mémorise le nom dans `_selectedOntoName` et bascule la classe CSS `onto-selected-row` sur la ligne correspondante, en retirant cette classe de toutes les autres lignes. |
+| **Alors** | la ligne sélectionnée est visuellement mise en évidence et toute sélection précédente est annulée. |
 
 ---
 
-**Code source :** `app.js` → `selectOntoRow()`
+**Code source :** `app.js` → `selectOntoRow()` — Mémorise le nom dans `_selectedOntoName`, retire la classe CSS `onto-selected-row` de toutes les lignes et l'applique à la ligne correspondante au nom sélectionné.
 
 ### REQ-ONT-020 — Affichage du compteur d'ontologies
 
 | **Si** | le registre est chargé, |
 |---|---|
-| **Alors** | l'élément `#onto-registry-count` affiche un texte du type « N ontology » ou « N ontologies » (pluriel conditionnel) reflétant le nombre d'entrées retournées par `API.listOntologies()`. |
+| **Alors** | le nombre total d'ontologies enregistrées est affiché, avec un libellé correctement accordé au singulier ou au pluriel. |
 
 ---
 
-**Code source :** `app.js` → `_refreshOntoTable()`
+**Code source :** `app.js` → `_refreshOntoTable()` — Met à jour le contenu de `#onto-registry-count` avec le texte « N ontology » ou « N ontologies » en fonction du nombre d'entrées retournées par `API.listOntologies()`.
 
 ### REQ-ONT-021 — Édition des attributs d'une ontologie existante
 
-| **Si** | l'utilisateur demande l'édition d'une ontologie existante, |
+| **Si** | l'ontologiste souhaite modifier les attributs d'une ontologie déjà enregistrée, |
 |---|---|
-| **Alors** | le système appelle `API.listOntologies()` pour retrouver l'entrée correspondante, ouvre le panneau wizard en mode « edit » et y injecte un formulaire pré-rempli avec les valeurs actuelles (nom, répertoire, préfixe, URI). Le nom original est conservé dans un champ caché `wiz-edit-orig` et le répertoire est sélectionnable via `FsBrowser`. |
+| **Alors** | un formulaire pré-rempli avec les valeurs actuelles (nom, répertoire, préfixe, URI) s'ouvre pour lui permettre d'effectuer ses modifications, et le répertoire peut être sélectionné via un navigateur de fichiers. |
 
 ---
 
-**Code source :** `app.js` → `doEditOntology()`
+**Code source :** `app.js` → `doEditOntology()` — Appelle `API.listOntologies()` pour retrouver l'entrée, ouvre le panneau wizard en mode `'edit'`, injecte un formulaire pré-rempli avec les valeurs actuelles, conserve le nom original dans le champ caché `wiz-edit-orig` et initialise `FsBrowser` pour la sélection du répertoire.
 
 ### REQ-ONT-022 — Menu déroulant de sélection du format d'export
 
-| **Si** | l'utilisateur clique sur le bouton d'export, |
+| **Si** | l'ontologiste souhaite exporter une ontologie ou un ensemble de règles et clique sur le bouton d'export, |
 |---|---|
-| **Alors** | le système construit et positionne dynamiquement un menu contextuel (`position:fixed`) ancré sous le bouton. Les options proposées dépendent du paramètre `kind` : pour `'onto'` les formats sont OWL (`.owl`) et Turtle (`.ttl`) ; pour `'rules'` les formats sont SWRL (`.json`) et SWORD (`.sword`). Un clic extérieur au menu le ferme automatiquement via un listener `click` sur `document`. |
+| **Alors** | un menu contextuel présente les formats disponibles selon le type de contenu à exporter (formats OWL et Turtle pour une ontologie ; formats SWRL et SWORD pour des règles) ; un clic en dehors du menu le referme. |
 
 ---
 
-**Code source :** `app.js` → `_ontoExportDropdown()`
+**Code source :** `app.js` → `_ontoExportDropdown()` — Construit et positionne dynamiquement un menu contextuel en `position:fixed` ancré sous le bouton ; les options dépendent du paramètre `kind` : `'onto'` → OWL (`.owl`) et Turtle (`.ttl`) ; `'rules'` → SWRL (`.json`) et SWORD (`.sword`) ; un listener `click` sur `document` ferme le menu lors d'un clic extérieur.
 
 ### REQ-ONT-023 — Affichage de l'arbre des imports avec expansion/repli
 
-| **Si** | le registre est affiché et qu'une ontologie possède des imports déclarés (champ `imports`), |
+| **Si** | le registre est affiché et qu'une ontologie déclare des imports, |
 |---|---|
-| **Alors** | - les imports sont rendus en sous-lignes indentées ;<br>- si un import possède lui-même des imports, un bouton `▶`/`▼` permet d'expand/réduire l'arbre, l'état d'expansion étant mémorisé dans le `Set` `_ontoImportExpanded` ;<br>- la détection de cycles est gérée par un paramètre `visited` passé récursivement ;<br>- `toggleImportRow(path)` ajoute ou retire le chemin du `Set` puis rappelle `_refreshOntoTable()`. |
+| **Alors** | les ontologies importées sont affichées en sous-lignes indentées ; si un import possède lui-même des sous-imports, l'ontologiste peut développer ou réduire ce nœud de l'arbre ; les cycles d'import sont détectés et ne provoquent pas de boucle infinie. |
 
 ---
 
-**Code source :** `app.js` → `_refreshOntoTable()` (fonction interne `renderImportRows()`) et `toggleImportRow()`
+**Code source :** `app.js` → `_refreshOntoTable()` (fonction interne `renderImportRows()`) et `toggleImportRow()` — Les imports sont rendus récursivement avec un paramètre `visited` pour la détection de cycles ; l'état d'expansion est mémorisé dans le `Set` `_ontoImportExpanded` ; `toggleImportRow(path)` ajoute ou retire le chemin du `Set` puis rappelle `_refreshOntoTable()`.
 
 ### REQ-ONT-024 — Navigation vers une entrée du registre depuis l'arbre des imports
 
-| **Si** | l'utilisateur clique sur le nom d'un nœud de l'arbre des imports correspondant à une ontologie connue du registre, |
+| **Si** | l'ontologiste clique sur le nom d'une ontologie dans l'arbre des imports, |
 |---|---|
-| **Alors** | le système localise la ligne `tr[data-name]` correspondante, la fait défiler en vue (`scrollIntoView`) et lui applique pendant 1,5 seconde un contour de couleur `var(--accent)` pour attirer l'attention visuelle. |
+| **Alors** | la ligne correspondante dans le tableau du registre est mise en évidence visuellement et défilée en vue, afin que l'ontologiste puisse la retrouver facilement. |
 
 ---
 
-**Code source :** `app.js` → `_scrollToRegistryRow()`
+**Code source :** `app.js` → `_scrollToRegistryRow()` — Localise la ligne `tr[data-name]` correspondante, appelle `scrollIntoView()` et lui applique pendant 1,5 seconde un contour de couleur `var(--accent)`.
 
 ### REQ-ONT-025 — Ouverture du répertoire dans le Finder
 
-| **Si** | l'utilisateur clique sur la cellule « Directory » d'une ligne du registre, |
+| **Si** | l'ontologiste clique sur le répertoire d'une ontologie dans le tableau, |
 |---|---|
-| **Alors** | le système appelle `API.revealInFinder(path)`. En cas d'échec (notamment si `host_agent.py` n'est pas démarré), un message d'avertissement est affiché via `UI.warn()`. |
+| **Alors** | le répertoire de stockage de cette ontologie est ouvert dans le gestionnaire de fichiers du système ; si cette action échoue, un message d'avertissement est affiché. |
 
 ---
 
-**Code source :** `app.js` → `_refreshOntoTable()` (attribut `onclick` de la cellule Directory)
+**Code source :** `app.js` → `_refreshOntoTable()` (attribut `onclick` de la cellule Directory) — Appelle `API.revealInFinder(path)` ; en cas d'échec (notamment si `host_agent.py` n'est pas démarré), affiche un avertissement via `UI.warn()`.
 
 ### REQ-ONT-026 — Panneau wizard commutable (ouverture/fermeture)
 
-| **Si** | l'utilisateur clique sur un bouton d'action du wizard, **et** que le panneau `#onto-wizard` affiche déjà le même type de wizard, |
+| **Si** | l'ontologiste clique sur un bouton d'action et que le panneau de saisie assistée affiche déjà le formulaire correspondant à cette action, |
 |---|---|
-| **Alors** | le panneau est masqué (comportement bascule). |
+| **Alors** | le panneau se referme (comportement bascule). |
 
-| **Si** | l'utilisateur clique sur un bouton d'action du wizard **et** que le panneau affiche un type différent ou est fermé, |
+| **Si** | l'ontologiste clique sur un bouton d'action et que le panneau affiche un formulaire différent ou est fermé, |
 |---|---|
-| **Alors** | le système définit `panel.dataset.type`, rend le panneau visible et injecte le HTML du formulaire correspondant (`_wizardNew()`, `_wizardImport()` ou `_wizardLoad()`). `_closeWizard()` masque le panneau et réinitialise `panel.dataset.type`. |
+| **Alors** | le panneau s'ouvre et affiche le formulaire correspondant à l'action demandée (créer, importer ou charger une ontologie). |
 
 ---
 
-**Code source :** `app.js` → `_openWizard()` et `_closeWizard()`
+**Code source :** `app.js` → `_openWizard()` et `_closeWizard()` — `_openWizard()` compare le type demandé avec `panel.dataset.type` : si identique, appelle `_closeWizard()` ; sinon, définit `panel.dataset.type`, rend le panneau visible et injecte le HTML du formulaire via `_wizardNew()`, `_wizardImport()` ou `_wizardLoad()`. `_closeWizard()` masque le panneau et réinitialise `panel.dataset.type`.
