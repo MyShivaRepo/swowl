@@ -44,11 +44,9 @@
 
 ### REQ-AP-001 — Définition des propriétés d'annotation intégrées (built-ins)
 
-**Si** l'ontologie est chargée et exploite des propriétés d'annotation OWL 2 standard,
-
-**Alors** le système dispose d'une constante `AP_BUILTINS` définissant deux groupes de propriétés en lecture seule :
-- le groupe `rdfs:` contenant `rdfs:label`, `rdfs:comment`, `rdfs:seeAlso`, `rdfs:isDefinedBy`
-- le groupe `owl:` contenant `owl:versionInfo`, `owl:deprecated`, `owl:priorVersion`, `owl:backwardCompatibleWith`, `owl:incompatibleWith`
+| **Si** | l'ontologie est chargée et exploite des propriétés d'annotation OWL 2 standard, |
+|---|---|
+| **Alors** | le système dispose d'une constante `AP_BUILTINS` définissant deux groupes de propriétés en lecture seule :<br>- le groupe `rdfs:` contenant `rdfs:label`, `rdfs:comment`, `rdfs:seeAlso`, `rdfs:isDefinedBy`<br>- le groupe `owl:` contenant `owl:versionInfo`, `owl:deprecated`, `owl:priorVersion`, `owl:backwardCompatibleWith`, `owl:incompatibleWith` |
 
 chaque entrée portant un identifiant et un commentaire descriptif en anglais.
 
@@ -58,9 +56,9 @@ chaque entrée portant un identifiant et un commentaire descriptif en anglais.
 
 ### REQ-AP-002 — Détection des propriétés built-in vs. utilisateur
 
-**Si** le système évalue un identifiant de propriété d'annotation,
-
-**Alors** il détermine si cet identifiant est une propriété built-in en vérifiant sa présence dans les tableaux `AP_BUILTINS['rdfs:']` et `AP_BUILTINS['owl:']`, et retourne `true` si l'identifiant est trouvé dans l'un ou l'autre groupe.
+| **Si** | le système évalue un identifiant de propriété d'annotation, |
+|---|---|
+| **Alors** | il détermine si cet identifiant est une propriété built-in en vérifiant sa présence dans les tableaux `AP_BUILTINS['rdfs:']` et `AP_BUILTINS['owl:']`, et retourne `true` si l'identifiant est trouvé dans l'un ou l'autre groupe. |
 
 ---
 
@@ -68,12 +66,9 @@ chaque entrée portant un identifiant et un commentaire descriptif en anglais.
 
 ### REQ-AP-003 — Construction de l'arbre hiérarchique des propriétés
 
-**Si** l'ontologie est chargée et contient des propriétés d'annotation utilisateur,
-
-**Alors** le système construit les maps de relations parent-enfant et produit :
-- `childrenOf` (map user → [enfants user])
-- `builtinChildrenOf` (map builtin → [enfants user])
-- `roots` (propriétés sans parent, triées alphabétiquement)
+| **Si** | l'ontologie est chargée et contient des propriétés d'annotation utilisateur, |
+|---|---|
+| **Alors** | le système construit les maps de relations parent-enfant et produit :<br>- `childrenOf` (map user → [enfants user])<br>- `builtinChildrenOf` (map builtin → [enfants user])<br>- `roots` (propriétés sans parent, triées alphabétiquement) |
 
 les propriétés dont le parent direct est un identifiant built-in étant placées dans `builtinChildrenOf`.
 
@@ -83,9 +78,9 @@ les propriétés dont le parent direct est un identifiant built-in étant placé
 
 ### REQ-AP-004 — Génération automatique d'un identifiant unique
 
-**Si** l'utilisateur demande la création d'une nouvelle propriété d'annotation,
-
-**Alors** le système génère un identifiant unique en partant de la chaîne `'NewAnnotationProperty'` et en incrémentant un suffixe numérique (`NewAnnotationProperty1`, `NewAnnotationProperty2`, …) jusqu'à trouver un identifiant absent de `APP.state.annotation_properties`.
+| **Si** | l'utilisateur demande la création d'une nouvelle propriété d'annotation, |
+|---|---|
+| **Alors** | le système génère un identifiant unique en partant de la chaîne `'NewAnnotationProperty'` et en incrémentant un suffixe numérique (`NewAnnotationProperty1`, `NewAnnotationProperty2`, …) jusqu'à trouver un identifiant absent de `APP.state.annotation_properties`. |
 
 ---
 
@@ -93,12 +88,9 @@ les propriétés dont le parent direct est un identifiant built-in étant placé
 
 ### REQ-AP-005 — Création d'une propriété enfant (sub-property)
 
-**Si** l'utilisateur clique sur le bouton "Child" avec une propriété sélectionnée dans l'arbre,
-
-**Alors** :
-- si la propriété sélectionnée n'est pas une racine de namespace, elle est placée dans le tableau `subPropertyOf` de la nouvelle propriété
-- le nœud parent est expansé dans `APEditor._expanded`
-- la nouvelle propriété est créée via `API.createAP(prop)` et immédiatement sélectionnée
+| **Si** | l'utilisateur clique sur le bouton "Child" avec une propriété sélectionnée dans l'arbre, |
+|---|---|
+| **Alors** | - si la propriété sélectionnée n'est pas une racine de namespace, elle est placée dans le tableau `subPropertyOf` de la nouvelle propriété<br>- le nœud parent est expansé dans `APEditor._expanded`<br>- la nouvelle propriété est créée via `API.createAP(prop)` et immédiatement sélectionnée |
 
 ---
 
@@ -106,9 +98,9 @@ les propriétés dont le parent direct est un identifiant built-in étant placé
 
 ### REQ-AP-006 — Création d'une propriété sœur (même niveau)
 
-**Si** l'utilisateur clique sur le bouton "Sibling" avec une propriété sélectionnée dans l'arbre,
-
-**Alors** les parents (`subPropertyOf`) de la propriété sélectionnée sont récupérés depuis `APP.state.annotation_properties`, placés comme parents de la nouvelle propriété, ces parents sont expansés dans `APEditor._expanded`, et la création est déléguée à `_createAndSelect()`.
+| **Si** | l'utilisateur clique sur le bouton "Sibling" avec une propriété sélectionnée dans l'arbre, |
+|---|---|
+| **Alors** | les parents (`subPropertyOf`) de la propriété sélectionnée sont récupérés depuis `APP.state.annotation_properties`, placés comme parents de la nouvelle propriété, ces parents sont expansés dans `APEditor._expanded`, et la création est déléguée à `_createAndSelect()`. |
 
 ---
 
@@ -116,12 +108,9 @@ les propriétés dont le parent direct est un identifiant built-in étant placé
 
 ### REQ-AP-007 — Collecte des données du formulaire
 
-**Si** le système collecte les données saisies dans le formulaire d'une propriété d'annotation utilisateur,
-
-**Alors** :
-- l'identifiant est lu depuis le champ `ap-id` avec normalisation des espaces en `_`
-- le `subPropertyOf` existant est conservé depuis `APP.state.annotation_properties` (le formulaire ne l'expose pas directement)
-- les labels, commentaires et autres annotations sont collectés via `_collectAnnotations('ap-annotations-body')`
+| **Si** | le système collecte les données saisies dans le formulaire d'une propriété d'annotation utilisateur, |
+|---|---|
+| **Alors** | - l'identifiant est lu depuis le champ `ap-id` avec normalisation des espaces en `_`<br>- le `subPropertyOf` existant est conservé depuis `APP.state.annotation_properties` (le formulaire ne l'expose pas directement)<br>- les labels, commentaires et autres annotations sont collectés via `_collectAnnotations('ap-annotations-body')` |
 
 ---
 
@@ -129,9 +118,9 @@ les propriétés dont le parent direct est un identifiant built-in étant placé
 
 ### REQ-AP-008 — Sauvegarde automatique à chaque modification
 
-**Si** l'utilisateur modifie un champ du formulaire d'une propriété utilisateur (non racine, non built-in),
-
-**Alors** le système collecte les données via `_collectForm()`, appelle `API.updateAP(id, data)`, détecte un éventuel renommage (si `data.id !== id`), puis rafraîchit l'état et restaure la sélection via `APP.refresh()` et `APEditor.restoreSelection()`.
+| **Si** | l'utilisateur modifie un champ du formulaire d'une propriété utilisateur (non racine, non built-in), |
+|---|---|
+| **Alors** | le système collecte les données via `_collectForm()`, appelle `API.updateAP(id, data)`, détecte un éventuel renommage (si `data.id !== id`), puis rafraîchit l'état et restaure la sélection via `APP.refresh()` et `APEditor.restoreSelection()`. |
 
 ---
 
@@ -139,9 +128,9 @@ les propriétés dont le parent direct est un identifiant built-in étant placé
 
 ### REQ-AP-009 — Sauvegarde manuelle explicite
 
-**Si** l'utilisateur déclenche une sauvegarde manuelle sur une propriété utilisateur,
-
-**Alors** le système collecte les données via `_collectForm()`, valide l'identifiant via `_validateId()`, appelle `API.updateAP()` avec l'identifiant d'édition original (`_editingId`) ou le nouvel identifiant, met à jour `_editingId` et `_selectedId`, expande le nœud sauvegardé, puis rafraîchit l'affichage.
+| **Si** | l'utilisateur déclenche une sauvegarde manuelle sur une propriété utilisateur, |
+|---|---|
+| **Alors** | le système collecte les données via `_collectForm()`, valide l'identifiant via `_validateId()`, appelle `API.updateAP()` avec l'identifiant d'édition original (`_editingId`) ou le nouvel identifiant, met à jour `_editingId` et `_selectedId`, expande le nœud sauvegardé, puis rafraîchit l'affichage. |
 
 ---
 
@@ -149,12 +138,9 @@ les propriétés dont le parent direct est un identifiant built-in étant placé
 
 ### REQ-AP-010 — Glisser-déposer pour réorganiser la hiérarchie
 
-**Si** l'utilisateur glisse une propriété utilisateur et la dépose sur une cible valide dans l'arbre,
-
-**Alors** :
-- si la cible est une racine de namespace, `subPropertyOf` devient `[]`
-- sinon, `subPropertyOf = [targetId]`
-- la mise à jour est persistée via `API.updateAP()`
+| **Si** | l'utilisateur glisse une propriété utilisateur et la dépose sur une cible valide dans l'arbre, |
+|---|---|
+| **Alors** | - si la cible est une racine de namespace, `subPropertyOf` devient `[]`<br>- sinon, `subPropertyOf = [targetId]`<br>- la mise à jour est persistée via `API.updateAP()` |
 
 ---
 
@@ -162,9 +148,9 @@ les propriétés dont le parent direct est un identifiant built-in étant placé
 
 ### REQ-AP-011 — Prévention des cycles lors du glisser-déposer
 
-**Si** l'utilisateur tente de déposer une propriété sur l'un de ses propres descendants dans l'arbre,
-
-**Alors** le dépôt est refusé afin de prévenir la formation d'un cycle hiérarchique, en ne déclenchant pas `event.preventDefault()` dans `onDragOver()`.
+| **Si** | l'utilisateur tente de déposer une propriété sur l'un de ses propres descendants dans l'arbre, |
+|---|---|
+| **Alors** | le dépôt est refusé afin de prévenir la formation d'un cycle hiérarchique, en ne déclenchant pas `event.preventDefault()` dans `onDragOver()`. |
 
 ---
 
@@ -172,15 +158,9 @@ les propriétés dont le parent direct est un identifiant built-in étant placé
 
 ### REQ-AP-012 — Suppression d'une propriété utilisateur avec confirmation
 
-**Si** l'utilisateur clique sur "Delete" avec une propriété utilisateur sélectionnée (non racine, non built-in)
-**et** confirme la suppression dans la boîte de dialogue `UI.confirm()`,
-
-**Alors** :
-- `API.deleteAP(id)` est appelé
-- `_selectedId` est remis à `null`
-- l'état est rafraîchi via `APP.refresh()`
-- le panneau de détail est réinitialisé avec le message d'invite vide
-- l'arbre est redessiné
+| **Si** | l'utilisateur clique sur "Delete" avec une propriété utilisateur sélectionnée (non racine, non built-in) **et** confirme la suppression dans la boîte de dialogue `UI.confirm()`, |
+|---|---|
+| **Alors** | - `API.deleteAP(id)` est appelé<br>- `_selectedId` est remis à `null`<br>- l'état est rafraîchi via `APP.refresh()`<br>- le panneau de détail est réinitialisé avec le message d'invite vide<br>- l'arbre est redessiné |
 
 ---
 
@@ -188,12 +168,9 @@ les propriétés dont le parent direct est un identifiant built-in étant placé
 
 ### REQ-AP-013 — Collecte des annotations (labels, commentaires, autres)
 
-**Si** le système collecte les annotations d'un formulaire identifié par `tbodyId`,
-
-**Alors** il parcourt toutes les lignes CSS `.anno-row` du tableau, et pour chaque ligne non vide :
-- lit la valeur (`.anno-value`) et la langue (`.anno-lang-inp`)
-- classe l'entrée dans `labels`, `comments` ou `other` selon `row.dataset.type`
-- pour les lignes `'other'`, lit la propriété cible dans `row.dataset.prop`
+| **Si** | le système collecte les annotations d'un formulaire identifié par `tbodyId`, |
+|---|---|
+| **Alors** | il parcourt toutes les lignes CSS `.anno-row` du tableau, et pour chaque ligne non vide :<br>- lit la valeur (`.anno-value`) et la langue (`.anno-lang-inp`)<br>- classe l'entrée dans `labels`, `comments` ou `other` selon `row.dataset.type`<br>- pour les lignes `'other'`, lit la propriété cible dans `row.dataset.prop` |
 
 ---
 
@@ -201,9 +178,9 @@ les propriétés dont le parent direct est un identifiant built-in étant placé
 
 ### REQ-AP-014 — Picker de sélection de propriété d'annotation
 
-**Si** un formulaire d'éditeur affiche le sélecteur (picker) de propriétés d'annotation,
-
-**Alors** le système génère un arbre cliquable composé des propriétés built-in (`AP_BUILTINS`) et des propriétés utilisateur issues de `APEditor._buildUserTree()`, un clic sur un élément déclenchant `<editorName>.addOtherAnnotRow(id)`.
+| **Si** | un formulaire d'éditeur affiche le sélecteur (picker) de propriétés d'annotation, |
+|---|---|
+| **Alors** | le système génère un arbre cliquable composé des propriétés built-in (`AP_BUILTINS`) et des propriétés utilisateur issues de `APEditor._buildUserTree()`, un clic sur un élément déclenchant `<editorName>.addOtherAnnotRow(id)`. |
 
 ---
 
@@ -215,9 +192,9 @@ les propriétés dont le parent direct est un identifiant built-in étant placé
 
 ### REQ-AP-015 — Rendu des nœuds built-in dans l'arbre
 
-**Si** l'arbre des propriétés d'annotation doit afficher une propriété built-in,
-
-**Alors** le système génère un nœud affichant l'identifiant de la propriété, un badge textuel `built-in`, un indicateur d'expansion si la propriété a des enfants utilisateur, et rend récursivement les enfants utilisateur via `_renderUserNode()`. Le nœud accepte les événements `ondragover` et `ondrop` mais n'est pas lui-même `draggable`.
+| **Si** | l'arbre des propriétés d'annotation doit afficher une propriété built-in, |
+|---|---|
+| **Alors** | le système génère un nœud affichant l'identifiant de la propriété, un badge textuel `built-in`, un indicateur d'expansion si la propriété a des enfants utilisateur, et rend récursivement les enfants utilisateur via `_renderUserNode()`. Le nœud accepte les événements `ondragover` et `ondrop` mais n'est pas lui-même `draggable`. |
 
 ---
 
@@ -225,9 +202,9 @@ les propriétés dont le parent direct est un identifiant built-in étant placé
 
 ### REQ-AP-016 — Rendu des nœuds utilisateur dans l'arbre
 
-**Si** l'arbre des propriétés d'annotation doit afficher une propriété utilisateur,
-
-**Alors** le système génère un nœud `draggable="true"` avec une indentation calculée selon la profondeur (`depth * 16 + 6` pixels), exposant les gestionnaires `ondragstart`, `ondragover`, `ondragleave`, `ondrop`, `ondragend`, et se rendant récursivement pour tous ses enfants. L'état d'expansion est lu depuis `APEditor._expanded`.
+| **Si** | l'arbre des propriétés d'annotation doit afficher une propriété utilisateur, |
+|---|---|
+| **Alors** | le système génère un nœud `draggable="true"` avec une indentation calculée selon la profondeur (`depth * 16 + 6` pixels), exposant les gestionnaires `ondragstart`, `ondragover`, `ondragleave`, `ondrop`, `ondragend`, et se rendant récursivement pour tous ses enfants. L'état d'expansion est lu depuis `APEditor._expanded`. |
 
 ---
 
@@ -235,9 +212,9 @@ les propriétés dont le parent direct est un identifiant built-in étant placé
 
 ### REQ-AP-017 — Rendu complet de l'arbre avec racines de namespace
 
-**Si** l'onglet des propriétés d'annotation est affiché et que `APP.getOntologyRootLabels().classRoot === 'owl:Thing'`,
-
-**Alors** le système compose l'arbre complet avec deux racines de namespace `rdfs:` et `owl:`, les propriétés utilisateur sans namespace connu ("orphans") rendues à la racine. Chaque racine de namespace est cliquable, expansible, et reçoit les événements de drag-over et drop.
+| **Si** | l'onglet des propriétés d'annotation est affiché et que `APP.getOntologyRootLabels().classRoot === 'owl:Thing'`, |
+|---|---|
+| **Alors** | le système compose l'arbre complet avec deux racines de namespace `rdfs:` et `owl:`, les propriétés utilisateur sans namespace connu ("orphans") rendues à la racine. Chaque racine de namespace est cliquable, expansible, et reçoit les événements de drag-over et drop. |
 
 ---
 
@@ -245,12 +222,9 @@ les propriétés dont le parent direct est un identifiant built-in étant placé
 
 ### REQ-AP-018 — Mise en page en panneau divisé (split pane)
 
-**Si** l'onglet des propriétés d'annotation est rendu,
-
-**Alors** le système génère une mise en page complète composée de :
-- un panneau gauche (`ap-tree-panel`) contenant l'arbre et le panneau des super-propriétés, avec trois boutons d'action "Child", "Sibling" et "Delete" initialement désactivés
-- une poignée de redimensionnement (`ap-split-handle`)
-- un panneau de détail droit (`ap-detail`) affichant un message d'invite et un bouton "＋ Create Annotation Property" lorsqu'aucune propriété n'est sélectionnée
+| **Si** | l'onglet des propriétés d'annotation est rendu, |
+|---|---|
+| **Alors** | le système génère une mise en page complète composée de :<br>- un panneau gauche (`ap-tree-panel`) contenant l'arbre et le panneau des super-propriétés, avec trois boutons d'action "Child", "Sibling" et "Delete" initialement désactivés<br>- une poignée de redimensionnement (`ap-split-handle`)<br>- un panneau de détail droit (`ap-detail`) affichant un message d'invite et un bouton "＋ Create Annotation Property" lorsqu'aucune propriété n'est sélectionnée |
 
 ---
 
@@ -258,9 +232,9 @@ les propriétés dont le parent direct est un identifiant built-in étant placé
 
 ### REQ-AP-019 — Redimensionnement du panneau gauche par glisser-déposer
 
-**Si** l'utilisateur glisse la poignée `ap-split-handle`,
-
-**Alors** la largeur du panneau `ap-tree-panel` est recalculée en pixels avec un minimum de 160 px et un maximum de 520 px, et le redimensionnement horizontal interne est initialisé via `_initHResizers('ap-tree-panel')`.
+| **Si** | l'utilisateur glisse la poignée `ap-split-handle`, |
+|---|---|
+| **Alors** | la largeur du panneau `ap-tree-panel` est recalculée en pixels avec un minimum de 160 px et un maximum de 520 px, et le redimensionnement horizontal interne est initialisé via `_initHResizers('ap-tree-panel')`. |
 
 ---
 
@@ -268,9 +242,9 @@ les propriétés dont le parent direct est un identifiant built-in étant placé
 
 ### REQ-AP-020 — Déplier/replier les nœuds de l'arbre
 
-**Si** l'utilisateur clique sur l'indicateur d'expansion d'un nœud de l'arbre,
-
-**Alors** le système ajoute ou retire l'identifiant du `Set` interne `APEditor._expanded`, puis redéclenche un rendu complet de l'arbre via `_renderTree()` et `_highlightSelected()`. Les nœuds `rdfs:` et `owl:` sont pré-expansés à l'initialisation.
+| **Si** | l'utilisateur clique sur l'indicateur d'expansion d'un nœud de l'arbre, |
+|---|---|
+| **Alors** | le système ajoute ou retire l'identifiant du `Set` interne `APEditor._expanded`, puis redéclenche un rendu complet de l'arbre via `_renderTree()` et `_highlightSelected()`. Les nœuds `rdfs:` et `owl:` sont pré-expansés à l'initialisation. |
 
 ---
 
@@ -278,12 +252,9 @@ les propriétés dont le parent direct est un identifiant built-in étant placé
 
 ### REQ-AP-021 — Sélection d'une propriété dans l'arbre
 
-**Si** l'utilisateur clique sur un nœud de l'arbre des propriétés d'annotation,
-
-**Alors** le système met à jour `APEditor._selectedId`, rafraîchit la mise en évidence visuelle et les boutons, et charge le panneau de détail approprié :
-- `_renderRootDetail()` pour une racine de namespace
-- `_renderBuiltinDetail()` pour une propriété built-in
-- `_renderForm()` pour une propriété utilisateur
+| **Si** | l'utilisateur clique sur un nœud de l'arbre des propriétés d'annotation, |
+|---|---|
+| **Alors** | le système met à jour `APEditor._selectedId`, rafraîchit la mise en évidence visuelle et les boutons, et charge le panneau de détail approprié :<br>- `_renderRootDetail()` pour une racine de namespace<br>- `_renderBuiltinDetail()` pour une propriété built-in<br>- `_renderForm()` pour une propriété utilisateur |
 
 dans tous les cas, `_updateSuperPanel()` est appelé pour mettre à jour le panneau des super-propriétés.
 
@@ -293,12 +264,9 @@ dans tous les cas, `_updateSuperPanel()` est appelé pour mettre à jour le pann
 
 ### REQ-AP-022 — Gestion de l'état des boutons d'action selon la sélection
 
-**Si** la sélection dans l'arbre change,
-
-**Alors** le système active ou masque les boutons "Child", "Sibling" et "Delete" selon le type de l'élément sélectionné :
-- racine de namespace : tous les boutons sont masqués
-- propriété built-in : seul "Child" est visible
-- propriété utilisateur : "Child", "Sibling" et "Delete" sont tous visibles et activés
+| **Si** | la sélection dans l'arbre change, |
+|---|---|
+| **Alors** | le système active ou masque les boutons "Child", "Sibling" et "Delete" selon le type de l'élément sélectionné :<br>- racine de namespace : tous les boutons sont masqués<br>- propriété built-in : seul "Child" est visible<br>- propriété utilisateur : "Child", "Sibling" et "Delete" sont tous visibles et activés |
 
 ---
 
@@ -306,9 +274,9 @@ dans tous les cas, `_updateSuperPanel()` est appelé pour mettre à jour le pann
 
 ### REQ-AP-023 — Affichage du détail d'une racine de namespace
 
-**Si** l'utilisateur sélectionne une racine de namespace (`rdfs:` ou `owl:`) dans l'arbre,
-
-**Alors** le système affiche un panneau de détail en lecture seule listant toutes les propriétés built-in du namespace avec leur identifiant et leur commentaire descriptif, accompagné d'un badge "Namespace root — not an AnnotationProperty".
+| **Si** | l'utilisateur sélectionne une racine de namespace (`rdfs:` ou `owl:`) dans l'arbre, |
+|---|---|
+| **Alors** | le système affiche un panneau de détail en lecture seule listant toutes les propriétés built-in du namespace avec leur identifiant et leur commentaire descriptif, accompagné d'un badge "Namespace root — not an AnnotationProperty". |
 
 ---
 
@@ -316,9 +284,9 @@ dans tous les cas, `_updateSuperPanel()` est appelé pour mettre à jour le pann
 
 ### REQ-AP-024 — Affichage du détail d'une propriété built-in (lecture seule)
 
-**Si** l'utilisateur sélectionne une propriété OWL 2 built-in dans l'arbre,
-
-**Alors** le système affiche un panneau de détail en lecture seule présentant l'identifiant, le commentaire descriptif issu de `AP_BUILTINS`, et la mention "Built-in OWL 2 annotation property — read-only." Aucun formulaire d'édition n'est fourni.
+| **Si** | l'utilisateur sélectionne une propriété OWL 2 built-in dans l'arbre, |
+|---|---|
+| **Alors** | le système affiche un panneau de détail en lecture seule présentant l'identifiant, le commentaire descriptif issu de `AP_BUILTINS`, et la mention "Built-in OWL 2 annotation property — read-only." Aucun formulaire d'édition n'est fourni. |
 
 ---
 
@@ -326,13 +294,9 @@ dans tous les cas, `_updateSuperPanel()` est appelé pour mettre à jour le pann
 
 ### REQ-AP-025 — Formulaire d'édition d'une propriété utilisateur
 
-**Si** l'utilisateur sélectionne une propriété d'annotation utilisateur dans l'arbre,
-
-**Alors** le système affiche un formulaire d'édition contenant :
-- un champ texte `ap-id` pour l'identifiant local (avec `oninput="_sanitizeId(this)"` et `onchange="APEditor._autoSave()"`)
-- l'IRI complète de la propriété construite depuis `APP.state.ontology.id`
-- le libellé `(instance of owl:AnnotationProperty)`
-- les lignes d'annotation existantes (`rdfs:label`, `rdfs:comment`, autres) pré-remplies via `_annoRow()`
+| **Si** | l'utilisateur sélectionne une propriété d'annotation utilisateur dans l'arbre, |
+|---|---|
+| **Alors** | le système affiche un formulaire d'édition contenant :<br>- un champ texte `ap-id` pour l'identifiant local (avec `oninput="_sanitizeId(this)"` et `onchange="APEditor._autoSave()"`)<br>- l'IRI complète de la propriété construite depuis `APP.state.ontology.id`<br>- le libellé `(instance of owl:AnnotationProperty)`<br>- les lignes d'annotation existantes (`rdfs:label`, `rdfs:comment`, autres) pré-remplies via `_annoRow()` |
 
 ---
 
@@ -340,9 +304,9 @@ dans tous les cas, `_updateSuperPanel()` est appelé pour mettre à jour le pann
 
 ### REQ-AP-026 — Ajout d'une ligne d'annotation dans le formulaire
 
-**Si** l'utilisateur demande l'ajout d'une annotation dans le formulaire d'une propriété utilisateur,
-
-**Alors** le système ajoute une nouvelle ligne vide dans le tableau `ap-annotations-body` via `_makeAnnotRow(type, 'APEditor', ac)`, le paramètre `type` pouvant être `'label'`, `'comment'` ou `'other'`, chaque ligne déclenchant `APEditor._autoSave()` à chaque modification.
+| **Si** | l'utilisateur demande l'ajout d'une annotation dans le formulaire d'une propriété utilisateur, |
+|---|---|
+| **Alors** | le système ajoute une nouvelle ligne vide dans le tableau `ap-annotations-body` via `_makeAnnotRow(type, 'APEditor', ac)`, le paramètre `type` pouvant être `'label'`, `'comment'` ou `'other'`, chaque ligne déclenchant `APEditor._autoSave()` à chaque modification. |
 
 ---
 
@@ -350,9 +314,9 @@ dans tous les cas, `_updateSuperPanel()` est appelé pour mettre à jour le pann
 
 ### REQ-AP-027 — Panneau des super-propriétés avec chaîne d'héritage
 
-**Si** une propriété d'annotation est sélectionnée dans l'arbre,
-
-**Alors** le système met à jour le panneau `ap-super-list` en reconstruisant pour chaque parent direct la chaîne complète d'héritage (via `buildChain()`) en remontant récursivement jusqu'à la racine, en ajoutant la racine de namespace (`rdfs:` ou `owl:`) en fin de chaîne. Chaque ancêtre est affiché avec une indentation croissante et un lien de navigation cliquable via `APP.navigateTo()`.
+| **Si** | une propriété d'annotation est sélectionnée dans l'arbre, |
+|---|---|
+| **Alors** | le système met à jour le panneau `ap-super-list` en reconstruisant pour chaque parent direct la chaîne complète d'héritage (via `buildChain()`) en remontant récursivement jusqu'à la racine, en ajoutant la racine de namespace (`rdfs:` ou `owl:`) en fin de chaîne. Chaque ancêtre est affiché avec une indentation croissante et un lien de navigation cliquable via `APP.navigateTo()`. |
 
 ---
 
