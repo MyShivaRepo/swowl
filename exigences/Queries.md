@@ -1,184 +1,250 @@
-# Exigences — Onglet « Queries »
+# Exigences de l'onglet Queries — SWOWL
 
-> Document généré par rétro-engineering du code source SWOWL · version 1.0 · 2026-06-06
-
----
-
-## 1. Navigation et structure de l'onglet
-
-- **REQ-QRY-001** — L'onglet Queries est divisé en deux sous-onglets accessibles via une barre de navigation verticale latérale.
-  - *Si* Si l'utilisateur clique sur un onglet latéral, alors le contenu principal est rechargé avec le sous-onglet sélectionné.
-
-- **REQ-QRY-002** — Le premier sous-onglet s'intitule 'Sparnatural' et affiche le composant visuel Sparnatural.
-
-- **REQ-QRY-003** — Le second sous-onglet s'intitule 'SPARQL VizQ' et affiche l'éditeur visuel de requêtes SPARQL (SparqlEditor).
-
-- **REQ-QRY-004** — L'onglet actif est mis en évidence avec un accent coloré sur la bordure gauche et une police en gras.
-  - *Si* Si un onglet est actif, alors sa bordure gauche affiche la couleur d'accent et son texte est en gras.
-
-- **REQ-QRY-005** — L'état du sous-onglet sélectionné est persisté dans la variable APP._queriesTab entre les rendus.
-  - *Si* Si l'utilisateur change de sous-onglet et revient sur l'onglet Queries, alors le dernier sous-onglet visité est restauré.
+**Date :** 2026-06-06
+**Note :** Exigences dérivées strictement du code source (`sparql_editor.js`)
 
 ---
 
-## 2. Sous-onglet Sparnatural
+## Table des matières
 
-- **REQ-QRY-006** — Le composant Sparnatural est chargé dynamiquement depuis un CDN externe (jsdelivr.net, version 9.1.6).
-  - *Si* Si le custom element 'spar-natural' n'est pas enregistré dans les 5 secondes, alors un message d'erreur avec lien vers le CDN est affiché.
-
-- **REQ-QRY-007** — Sparnatural est configuré via l'endpoint /api/sparnatural-config et exécute les requêtes sur /api/sparql.
-
-- **REQ-QRY-008** — La langue du widget Sparnatural est configurée selon la préférence utilisateur définie dans Settings.preferredLang, avec 'en' comme valeur par défaut.
-
-- **REQ-QRY-009** — Le widget Sparnatural est limité à 1000 résultats par requête.
-
-- **REQ-QRY-010** — Les événements 'queryUpdated' et 'submit' émis par Sparnatural déclenchent automatiquement l'exécution de la requête SPARQL générée.
-  - *Si* Si Sparnatural émet un événement queryUpdated ou submit avec une queryString non vide, alors la requête est envoyée au backend et les résultats sont affichés.
-
-- **REQ-QRY-011** — Les résultats Sparnatural affichent les URIs abrégées (fragment local après # ou /) avec l'URI complète en infobulle.
-
-- **REQ-QRY-012** — En cas d'erreur d'exécution dans Sparnatural, un message d'erreur en rouge est affiché dans la zone de résultats.
-  - *Si* Si la requête Sparnatural retourne une erreur HTTP ou réseau, alors le message d'erreur est affiché en rouge.
-
----
-
-## 3. Gestion des requêtes SPARQL VizQ (CRUD)
-
-- **REQ-QRY-013** — Les requêtes SPARQL VizQ sont persistées dans le localStorage du navigateur, séparément par ontologie.
-  - *Si* Si l'ontologie active change, alors la liste des requêtes affichée correspond au localStorage de cette ontologie.
-
-- **REQ-QRY-014** — L'utilisateur peut créer une nouvelle requête via le bouton ➕ dans l'en-tête du panneau de liste.
-  - *Si* Si l'utilisateur clique sur ➕, alors une nouvelle requête avec un identifiant auto-incrémenté (Query1, Query2…) est créée, sélectionnée et sauvegardée.
-
-- **REQ-QRY-015** — L'identifiant auto-généré d'une nouvelle requête évite les doublons en incrémentant jusqu'à trouver un ID libre.
-
-- **REQ-QRY-016** — L'utilisateur peut sélectionner une requête existante en cliquant sur son entrée dans la liste.
-  - *Si* Si l'utilisateur clique sur une requête dans la liste, alors son formulaire d'édition s'affiche dans le panneau de détail à droite.
-
-- **REQ-QRY-017** — L'utilisateur peut supprimer une requête via le bouton corbeille affiché sur chaque entrée de la liste.
-  - *Si* Si l'utilisateur clique sur le bouton supprimer d'une requête sélectionnée, alors la requête est retirée du localStorage et le panneau de détail affiche l'état vide.
-
-- **REQ-QRY-018** — La suppression d'une requête non sélectionnée ne modifie pas la sélection courante.
-
-- **REQ-QRY-019** — L'utilisateur peut modifier l'identifiant d'une requête via le champ ID dans l'en-tête du formulaire. Les espaces sont automatiquement remplacés par des underscores.
-  - *Si* Si l'utilisateur saisit un espace dans le champ ID, alors il est immédiatement converti en underscore.
-
-- **REQ-QRY-020** — Le changement d'identifiant d'une requête met à jour la clé dans le localStorage et rafraîchit la liste.
-
-- **REQ-QRY-021** — L'utilisateur peut définir un libellé (label) et un commentaire (comment) pour chaque requête.
-  - *Si* Si une requête a un label, alors le label est affiché comme texte principal dans la liste et l'ID apparaît en sous-texte.
+1. [REQ-QRY-001 — Persistance des requêtes par ontologie](#req-qry-001)
+2. [REQ-QRY-002 — Création d'une nouvelle requête](#req-qry-002)
+3. [REQ-QRY-003 — Sélection d'une requête existante](#req-qry-003)
+4. [REQ-QRY-004 — Suppression d'une requête](#req-qry-004)
+5. [REQ-QRY-005 — Recherche/filtrage dans la liste des requêtes](#req-qry-005)
+6. [REQ-QRY-006 — Édition de l'identifiant d'une requête](#req-qry-006)
+7. [REQ-QRY-007 — Édition du libellé et du commentaire d'une requête](#req-qry-007)
+8. [REQ-QRY-008 — Ajout d'un patron triple](#req-qry-008)
+9. [REQ-QRY-009 — Ajout d'un patron FILTER](#req-qry-009)
+10. [REQ-QRY-010 — Ajout d'un bloc OPTIONAL](#req-qry-010)
+11. [REQ-QRY-011 — Ajout de patrons imbriqués dans un bloc OPTIONAL](#req-qry-011)
+12. [REQ-QRY-012 — Suppression d'un patron (racine ou imbriqué)](#req-qry-012)
+13. [REQ-QRY-013 — Sélection du prédicat via menu déroulant hiérarchique](#req-qry-013)
+14. [REQ-QRY-014 — Champ objet adaptatif selon le prédicat](#req-qry-014)
+15. [REQ-QRY-015 — Réinitialisation de l'objet lors du changement de prédicat](#req-qry-015)
+16. [REQ-QRY-016 — Autocomplétion des variables](#req-qry-016)
+17. [REQ-QRY-017 — Options de requête : DISTINCT, ORDER BY, LIMIT](#req-qry-017)
+18. [REQ-QRY-018 — Prévisualisation SPARQL générée](#req-qry-018)
+19. [REQ-QRY-019 — Génération automatique des préfixes SPARQL](#req-qry-019)
+20. [REQ-QRY-020 — Gestion des littéraux non-variables avec FILTER(STR(...))](#req-qry-020)
+21. [REQ-QRY-021 — Exécution de la requête via l'API](#req-qry-021)
+22. [REQ-QRY-022 — Affichage des résultats en tableau](#req-qry-022)
+23. [REQ-QRY-023 — Navigation vers une entité depuis les résultats](#req-qry-023)
+24. [REQ-QRY-024 — Lien externe pour les URIs non reconnues dans les résultats](#req-qry-024)
+25. [REQ-QRY-025 — Redimensionnement du panneau liste](#req-qry-025)
+26. [REQ-QRY-026 — Restauration de la sélection courante](#req-qry-026)
 
 ---
 
-## 4. Editeur de patterns WHERE (triplets, filtres, optionnels)
+### REQ-QRY-001 — Persistance des requêtes par ontologie
 
-- **REQ-QRY-022** — L'utilisateur peut ajouter trois types de patterns dans la clause WHERE : Triple, Filter, Optional.
+**Code source :** `sparql_editor.js` → `_storeKey()`, `_loadAll()`, `_saveAll()`
 
-- **REQ-QRY-023** — Un pattern Triple se compose d'un champ sujet, d'un sélecteur de prédicat et d'un champ objet adaptatif.
-  - *Si* Si aucun triplet n'est défini, alors un message d'invitation est affiché à la place de la liste de patterns.
-
-- **REQ-QRY-024** — Le champ sujet d'un triplet propose l'autocomplétion parmi les variables déjà utilisées dans la requête (datalist).
-
-- **REQ-QRY-025** — Le sélecteur de prédicat est un menu déroulant personnalisé (icon-dropdown) organisé en groupes : Classes (rdf:type), Object Properties, Datatype Properties, Annotation Properties.
-
-- **REQ-QRY-026** — Les propriétés dans le sélecteur de prédicat respectent la hiérarchie subPropertyOf et sont affichées avec indentation.
-
-- **REQ-QRY-027** — Lorsque le prédicat est rdf:type, le champ objet devient un menu déroulant d'arbre de classes (owl:Thing + hiérarchie).
-  - *Si* Si le prédicat change vers rdf:type, alors l'objet est réinitialisé à vide et remplacé par un sélecteur d'arbre de classes.
-
-- **REQ-QRY-028** — Lorsque le prédicat est rdfs:label, rdfs:comment ou une Datatype Property, le champ objet devient un champ texte pleine largeur acceptant une variable ou une valeur littérale.
-
-- **REQ-QRY-029** — Pour les autres prédicats (Object Properties, inconnus), le champ objet est un champ texte court acceptant une variable ou une IRI.
-
-- **REQ-QRY-030** — Lorsque le prédicat change de rdf:type vers un autre type, l'objet est réinitialisé à '?y'.
-
-- **REQ-QRY-031** — Un pattern Filter affiche un champ texte monospace pour saisir une expression FILTER libre.
-
-- **REQ-QRY-032** — Un pattern Optional contient ses propres sous-patterns (Triple et Filter) ajoutables via des boutons internes.
-  - *Si* Si un bloc OPTIONAL est vide, alors un message 'OPTIONAL block vide' est affiché à l'intérieur.
-
-- **REQ-QRY-033** — Chaque pattern (triplet, filtre, optionnel) peut être supprimé individuellement via son bouton corbeille.
-  - *Si* Si l'utilisateur supprime un pattern, alors la requête est immédiatement sauvegardée et le formulaire est rechargé.
-
-- **REQ-QRY-034** — Toute modification d'un champ de pattern (sujet, objet, expression filtre) déclenche une sauvegarde immédiate et rafraîchit l'aperçu SPARQL.
+Les requêtes sont persistées dans le `localStorage` du navigateur. La clé de stockage est construite dynamiquement sous la forme `swowl_sparql_<ontologyId>`, ce qui isole les requêtes de chaque ontologie. `_loadAll()` parse le JSON stocké (retourne `[]` en cas d'erreur), `_saveAll()` sérialise et réécrit le tableau complet.
 
 ---
 
-## 5. Options de requête (DISTINCT, ORDER BY, LIMIT)
+### REQ-QRY-002 — Création d'une nouvelle requête
 
-- **REQ-QRY-035** — L'utilisateur peut activer l'option DISTINCT via une case à cocher.
-  - *Si* Si DISTINCT est coché, alors le mot-clé DISTINCT est inséré dans la clause SELECT générée.
+**Code source :** `sparql_editor.js` → `newQuery()`, `_emptyQuery()`
 
-- **REQ-QRY-036** — L'utilisateur peut définir une variable de tri via le champ ORDER BY, avec autocomplétion parmi les variables de la requête.
-
-- **REQ-QRY-037** — L'utilisateur peut choisir la direction de tri ASC ou DESC via un sélecteur déroulant.
-
-- **REQ-QRY-038** — L'utilisateur peut définir le nombre maximum de résultats via le champ LIMIT (valeur par défaut : 100, min : 1, max : 100000).
-  - *Si* Si la valeur LIMIT est invalide, alors la valeur par défaut 100 est utilisée.
+`newQuery()` génère un identifiant unique de la forme `QueryN` (en incrémentant N jusqu'à ne pas trouver de doublon), crée un objet requête vide via `_emptyQuery()` avec les champs `id`, `label`, `comment`, `distinct: false`, `patterns: []`, `order_by: ''`, `order_dir: 'ASC'`, `limit: 100`, l'ajoute au `localStorage`, puis sélectionne et affiche immédiatement cette nouvelle requête.
 
 ---
 
-## 6. Génération et aperçu SPARQL
+### REQ-QRY-003 — Sélection d'une requête existante
 
-- **REQ-QRY-039** — Un aperçu de la requête SPARQL générée est accessible via un panneau escamotable 'SPARQL' en bas du formulaire.
-  - *Si* Si l'aperçu est masqué et que l'utilisateur clique sur l'en-tête SPARQL, alors le panneau s'affiche et le contenu est rafraîchi.
+**Code source :** `sparql_editor.js` → `selectQuery()`
 
-- **REQ-QRY-040** — La requête SPARQL générée inclut automatiquement les préfixes rdf, rdfs, owl et le préfixe de l'ontologie courante.
-
-- **REQ-QRY-041** — La clause SELECT contient toutes les variables (commençant par ?) trouvées dans les sujets et objets des triplets. Si aucune variable n'est détectée, SELECT * est utilisé.
-
-- **REQ-QRY-042** — Pour un triplet avec prédicat littéral et objet non-variable non-quoté, la génération SPARQL produit une variable intermédiaire et un FILTER(STR(?_lv) = "valeur") pour gérer les langues.
-
-- **REQ-QRY-043** — Les triplets sans prédicat sont ignorés lors de la génération SPARQL.
-
-- **REQ-QRY-044** — L'aperçu SPARQL est automatiquement affiché et rafraîchi lors du lancement d'une requête si l'aperçu était masqué.
-  - *Si* Si l'utilisateur clique sur Run et que l'aperçu SPARQL est fermé, alors il s'ouvre automatiquement.
+`selectQuery(id)` charge la requête correspondante depuis le `localStorage`, en effectue une copie profonde (via `JSON.parse/JSON.stringify`) dans `_editingQuery`, met à jour `_selectedId`, rafraîchit la liste (surlignage) et rend le panneau de détail.
 
 ---
 
-## 7. Exécution des requêtes et affichage des résultats
+### REQ-QRY-004 — Suppression d'une requête
 
-- **REQ-QRY-045** — L'utilisateur peut exécuter la requête en cliquant sur le bouton '▶ Run'.
+**Code source :** `sparql_editor.js` → `deleteQuery()`
 
-- **REQ-QRY-046** — Pendant l'exécution, un indicateur de statut 'Exécution…' est affiché.
-
-- **REQ-QRY-047** — La requête est envoyée en POST sur /api/sparql avec le SPARQL encodé dans le corps (Content-Type: application/x-www-form-urlencoded).
-
-- **REQ-QRY-048** — Après exécution, le nombre de résultats est affiché dans la zone de statut.
-  - *Si* Si la requête retourne N bindings, alors le statut affiche 'N résultat(s)'.
-
-- **REQ-QRY-049** — Les résultats sont affichés dans un tableau HTML avec alternance de couleurs de lignes (zebra striping).
-
-- **REQ-QRY-050** — Les cellules de type URI correspondant à une entité interne (classe, individu, propriété) sont rendues cliquables avec une icône colorée et le nom d'affichage de l'entité.
-  - *Si* Si une URI de résultat correspond à une entité interne connue, alors un lien de navigation est affiché avec l'icône et le label de l'entité.
-
-- **REQ-QRY-051** — Un clic sur une entité interne dans les résultats navigue vers la section correspondante de l'application et sélectionne l'entité.
-  - *Si* Si l'utilisateur clique sur une URI interne dans les résultats, alors APP.navigate est appelé vers la section de l'entité et celle-ci est sélectionnée après 150ms.
-
-- **REQ-QRY-052** — Les URIs externes (non reconnues comme entités internes) sont affichées comme liens hypertextes ouvrant un nouvel onglet.
-
-- **REQ-QRY-053** — Les valeurs littérales avec balise de langue (@fr, @en…) affichent la langue en exposant.
-
-- **REQ-QRY-054** — En cas d'erreur d'exécution, un message d'erreur rouge est affiché dans la zone de résultats du panneau de détail.
-  - *Si* Si la requête retourne une erreur HTTP ou une exception réseau, alors le message d'erreur est affiché en rouge et le statut est vidé.
+`deleteQuery(id)` filtre le tableau de requêtes persistées pour exclure la requête ciblée, sauvegarde le tableau résultant, et, si la requête supprimée était sélectionnée, réinitialise l'état courant (`_selectedId`, `_editingQuery` à `null`) et remplace le panneau de détail par un message vide.
 
 ---
 
-## 8. Recherche, liste et panneau redimensionnable
+### REQ-QRY-005 — Recherche/filtrage dans la liste des requêtes
 
-- **REQ-QRY-055** — Un champ de recherche en bas du panneau liste permet de filtrer les requêtes par ID ou label.
-  - *Si* Si l'utilisateur saisit un texte dans la recherche, alors seules les requêtes dont l'ID ou le label contient ce texte (insensible à la casse) sont affichées.
+**Code source :** `sparql_editor.js` → `_onSearch()`, `renderList()`
 
-- **REQ-QRY-056** — Si aucune requête ne correspond à la recherche, un message 'No matching query' est affiché.
+`_onSearch(val)` mémorise le terme saisi dans `_searchQuery` et reconstruit le contenu HTML de la liste. `renderList()` filtre les requêtes dont la concaténation `id + label` contient le terme (insensible à la casse). Si aucun résultat n'est trouvé, un message `'No matching query'` est affiché.
 
-- **REQ-QRY-057** — Si aucune requête n'est sauvegardée, un message 'No saved query' est affiché dans la liste.
+---
 
-- **REQ-QRY-058** — La largeur du panneau liste est redimensionnable par glisser-déposer via une poignée (split handle) entre le panneau liste et le panneau de détail.
-  - *Si* Si l'utilisateur fait glisser la poignée, alors la largeur du panneau liste est ajustée entre 120px et 400px.
+### REQ-QRY-006 — Édition de l'identifiant d'une requête
 
-- **REQ-QRY-059** — Lors du redimensionnement, la classe CSS 'resizing' est ajoutée au body pour désactiver la sélection de texte.
+**Code source :** `sparql_editor.js` → `_onIdChange()`
 
-- **REQ-QRY-060** — La requête sélectionnée est mise en évidence dans la liste avec la classe CSS 'selected'.
+`_onIdChange(val)` intercepte le changement de l'input `sq-id`. Elle localise l'entrée correspondante dans le `localStorage` par l'ancien identifiant, remplace l'`id` de l'entrée persistée, de `_editingQuery` et de `_selectedId`, sauvegarde, puis rafraîchit la liste. Le champ `oninput` normalise la valeur en remplaçant les espaces par des underscores.
 
-- **REQ-QRY-061** — Lorsque l'onglet SPARQL VizQ est rechargé, la sélection précédente est restaurée (restoreSelection).
-  - *Si* Si _selectedId est défini au rechargement de l'onglet, alors la requête correspondante est re-sélectionnée et son formulaire ré-affiché.
+---
+
+### REQ-QRY-007 — Édition du libellé et du commentaire d'une requête
+
+**Code source :** `sparql_editor.js` → `_syncAndSave()`, `_sync()`
+
+Les champs `sq-label` (input texte) et `sq-comment` (textarea) déclenchent `_syncAndSave()` à leur événement `onchange`. `_sync()` lit les valeurs courantes de tous les champs du formulaire (`sq-id`, `sq-label`, `sq-comment`, `sq-distinct`, `sq-orderby`, `sq-orderdir`, `sq-limit`) et les copie dans `_editingQuery`, puis `_saveEditing()` persiste l'état.
+
+---
+
+### REQ-QRY-008 — Ajout d'un patron triple
+
+**Code source :** `sparql_editor.js` → `addPattern()`, `_newPat()`
+
+`addPattern('triple')` synchronise d'abord le formulaire, puis pousse dans `_editingQuery.patterns` un objet `{ type: 'triple', subject: '?x', predicate: 'rdf:type', object: '' }` créé par `_newPat()`, sauvegarde et re-rend le panneau de détail.
+
+---
+
+### REQ-QRY-009 — Ajout d'un patron FILTER
+
+**Code source :** `sparql_editor.js` → `addPattern()`, `_newPat()`
+
+`addPattern('filter')` ajoute un objet `{ type: 'filter', expr: '' }` à `_editingQuery.patterns`. Le patron est rendu par `_renderPattern()` sous la forme `FILTER ( <expression> )` avec un champ de saisie libre pour l'expression.
+
+---
+
+### REQ-QRY-010 — Ajout d'un bloc OPTIONAL
+
+**Code source :** `sparql_editor.js` → `addPattern()`, `_newPat()`
+
+`addPattern('optional')` ajoute un objet `{ type: 'optional', patterns: [] }` à `_editingQuery.patterns`. `_renderPattern()` affiche ce bloc avec son propre en-tête `OPTIONAL` et des boutons `＋ Triple` / `＋ Filter` pour ajouter des patrons internes.
+
+---
+
+### REQ-QRY-011 — Ajout de patrons imbriqués dans un bloc OPTIONAL
+
+**Code source :** `sparql_editor.js` → `_addInner()`
+
+`_addInner(outerIdx, type)` vérifie que le patron à l'index `outerIdx` est bien de type `optional`, puis lui ajoute un nouveau patron (triple ou filter) via `_newPat()`. L'adressage imbriqué utilise un tableau `[outerIdx, innerIdx]` pour identifier les patrons dans `_getPat()`.
+
+---
+
+### REQ-QRY-012 — Suppression d'un patron (racine ou imbriqué)
+
+**Code source :** `sparql_editor.js` → `deletePattern()`
+
+`deletePattern(idx)` accepte un index simple (entier) pour un patron racine (splice sur `q.patterns`) ou un tableau `[oi, ii]` pour un patron imbriqué dans un OPTIONAL (splice sur `q.patterns[oi].patterns`). La sauvegarde et le re-rendu du panneau sont effectués après chaque suppression.
+
+---
+
+### REQ-QRY-013 — Sélection du prédicat via menu déroulant hiérarchique
+
+**Code source :** `sparql_editor.js` → `_predGroups()`, `_propTreeItems()`, `_ddBuild()`
+
+`_predGroups()` construit quatre groupes de prédicats : `rdf:type` (Classes), Object Properties, Datatype Properties, Annotation Properties (incluant `rdfs:label` et `rdfs:comment`). `_propTreeItems()` ordonne chaque groupe selon la hiérarchie `subPropertyOf` en DFS alphabétique avec gestion de la profondeur. `_ddBuild()` génère le HTML du composant menu déroulant personnalisé avec icônes colorées par type de propriété.
+
+---
+
+### REQ-QRY-014 — Champ objet adaptatif selon le prédicat
+
+**Code source :** `sparql_editor.js` → `_objectField()`
+
+`_objectField(p, idx)` sélectionne le type de champ objet selon la valeur du prédicat :
+- `rdf:type` → menu déroulant d'arborescence de classes (`_buildClsDd()`)
+- `rdfs:label`, `rdfs:comment`, ou une Datatype Property → champ texte pleine largeur avec placeholder `?var ou valeur littérale`
+- Autre (Object Property, annotation, inconnu) → champ texte 95px avec placeholder `?var ou IRI`
+
+---
+
+### REQ-QRY-015 — Réinitialisation de l'objet lors du changement de prédicat
+
+**Code source :** `sparql_editor.js` → `_onPredicateChange()`
+
+`_onPredicateChange(idx, val)` met à jour le prédicat du patron et applique deux règles de réinitialisation : si le nouveau prédicat est `rdf:type` et l'ancien ne l'était pas, `object` est vidé (`''`) ; si l'on quitte `rdf:type`, `object` est réinitialisé à `'?y'`. Le panneau est entièrement re-rendu pour permuter le type de champ objet.
+
+---
+
+### REQ-QRY-016 — Autocomplétion des variables
+
+**Code source :** `sparql_editor.js` → `_collectVars()`, `_renderForm()`
+
+`_collectVars(patterns)` parcourt récursivement tous les patrons (y compris ceux imbriqués dans les OPTIONAL) et collecte dans un `Set` toutes les valeurs de `subject` et `object` commençant par `?`. Ces variables sont exposées via un élément `<datalist id="sq-vars-list">` référencé par les champs `subject`, `object` et `order_by`.
+
+---
+
+### REQ-QRY-017 — Options de requête : DISTINCT, ORDER BY, LIMIT
+
+**Code source :** `sparql_editor.js` → `_sync()`, `_buildSparql()`
+
+Le formulaire expose trois options persistées dans le modèle : une case à cocher `sq-distinct` (booléen), un champ texte `sq-orderby` avec autocomplétion de variables et un sélecteur `sq-orderdir` (`ASC`/`DESC`), un champ numérique `sq-limit` (entier, défaut 100, max 100000). `_buildSparql()` les intègre respectivement en `SELECT DISTINCT`, `ORDER BY DIR(?var)` et `LIMIT N`.
+
+---
+
+### REQ-QRY-018 — Prévisualisation SPARQL générée
+
+**Code source :** `sparql_editor.js` → `_toggleSparql()`, `_refreshSparqlPreview()`
+
+Un panneau `SPARQL` repliable (état stocké dans `_showSparql`) affiche la requête générée dans un élément `<pre>`. `_toggleSparql()` bascule la visibilité et met à jour le libellé `▼ Show` / `▲ Hide`. `_refreshSparqlPreview()` appelle `_sync()` puis `_buildSparql()` et injecte le texte dans `sq-sparql-preview` sans re-rendre l'intégralité du formulaire.
+
+---
+
+### REQ-QRY-019 — Génération automatique des préfixes SPARQL
+
+**Code source :** `sparql_editor.js` → `_buildSparql()`
+
+`_buildSparql()` injecte systématiquement les préfixes `rdf:`, `rdfs:` et `owl:`. Si l'ontologie courante (`APP.state.ontology`) possède un `prefix` et un `id` (IRI de base), un quatrième préfixe `PREFIX <prefix>: <IRI#>` est ajouté (le séparateur `#` est omis si l'IRI se termine déjà par `#` ou `/`).
+
+---
+
+### REQ-QRY-020 — Gestion des littéraux non-variables avec FILTER(STR(...))
+
+**Code source :** `sparql_editor.js` → `_buildSparql()` (fonction interne `patToLines`)
+
+Lorsqu'un patron triple porte un prédicat de type littéral (`rdfs:label`, `rdfs:comment`, ou une Datatype Property) et que la valeur de l'objet n'est pas une variable (`?`), ni déjà entre guillemets, `_buildSparql()` génère une variable intermédiaire `?_lvN` et ajoute automatiquement une clause `FILTER ( STR(?_lvN) = "valeur" )` pour comparer indépendamment du tag de langue RDF.
+
+---
+
+### REQ-QRY-021 — Exécution de la requête via l'API
+
+**Code source :** `sparql_editor.js` → `runQuery()`
+
+`runQuery()` synchronise le formulaire, génère la requête SPARQL, affiche un statut `Exécution…`, expose automatiquement la prévisualisation SPARQL, puis envoie la requête en POST sur `/api/sparql` avec le content-type `application/x-www-form-urlencoded` (paramètre `query`). En cas de réponse non-OK, le texte d'erreur du serveur est propagé. Le nombre de résultats (`bindings.length`) est affiché dans `sq-status` après succès.
+
+---
+
+### REQ-QRY-022 — Affichage des résultats en tableau
+
+**Code source :** `sparql_editor.js` → `_renderResults()`
+
+`_renderResults(vars, bindings)` génère un tableau HTML avec : les noms de variables en en-têtes de colonnes, une ligne par binding avec mise en évidence au survol et alternance de fond sur les lignes paires/impaires. Les cellules sans valeur affichent un tiret (`—`). Les valeurs littérales avec tag de langue (`xml:lang`) affichent le tag en exposant (ex. `@fr`).
+
+---
+
+### REQ-QRY-023 — Navigation vers une entité depuis les résultats
+
+**Code source :** `sparql_editor.js` → `_resolveEntity()`, `navigateToEntity()`, `_renderResults()`
+
+`_resolveEntity(uri)` extrait la partie locale de l'URI (après `#` ou `/`) et cherche une correspondance dans `APP.state` parmi les classes, individus, object properties, datatype properties et annotation properties. Si une correspondance est trouvée, `_renderResults()` rend la cellule comme un lien cliquable avec l'icône colorée de l'entité et son nom d'affichage. `navigateToEntity(uri)` appelle `APP.navigate(section)` puis, après 150 ms, la fonction de sélection spécifique à l'éditeur concerné (`ClassEditor.selectClass`, `IndividualEditor.selectIndividual`, `OPEditor.selectProp`, `DPEditor.selectProp`, `APEditor.selectProp`).
+
+---
+
+### REQ-QRY-024 — Lien externe pour les URIs non reconnues dans les résultats
+
+**Code source :** `sparql_editor.js` → `_renderResults()`
+
+Pour les cellules de type `uri` dont `_resolveEntity()` ne retourne aucune correspondance dans l'application, `_renderResults()` génère une balise `<a href="..." target="_blank">` affichant la partie locale de l'URI, permettant d'ouvrir la ressource externe dans un nouvel onglet.
+
+---
+
+### REQ-QRY-025 — Redimensionnement du panneau liste
+
+**Code source :** `sparql_editor.js` → `_initSplitHandle()`
+
+`_initSplitHandle()` attache une fois (flag `_bound`) des écouteurs `mousedown`/`mousemove`/`mouseup` sur la poignée `sparql-split-h`. Lors du glissement, la largeur du panneau `sparql-list-panel` est contrainte entre 120 px et 400 px. La classe CSS `resizing` est ajoutée au `body` pendant le glissement.
+
+---
+
+### REQ-QRY-026 — Restauration de la sélection courante
+
+**Code source :** `sparql_editor.js` → `restoreSelection()`
+
+`restoreSelection()` est appelée lors du retour sur l'onglet. Elle réinitialise la poignée de redimensionnement via `_initSplitHandle()` et, si `_selectedId` est défini, rappelle `selectQuery(_selectedId)` pour réafficher le panneau de détail de la dernière requête sélectionnée.
+
+---
+
+*— Document généré par claude-sonnet-4-6*
