@@ -386,7 +386,7 @@
 
 | **Si** | l'ontologiste ouvre le sélecteur de `propriété` d'un atome, |
 |---|---|
-| **Alors** | un menu déroulant présente les `propriétés` objet et les `propriétés de données` de l'`ontologie`, visuellement distinguées, triées alphabétiquement au sein de chaque groupe. |
+| **Alors** | un menu déroulant présente les `propriétés` objet et les `DatatypeProperty` de l'`ontologie`, visuellement distinguées, triées alphabétiquement au sein de chaque groupe. |
 
 ---
 
