@@ -52,7 +52,9 @@
 
 ### REQ-DP-001 — Initialisation de la liste des types XSD disponibles
 
-Le code définit un tableau constant `XSD_TYPES` contenant exactement 12 types XSD utilisables comme range : `xsd:string`, `xsd:integer`, `xsd:decimal`, `xsd:float`, `xsd:double`, `xsd:boolean`, `xsd:date`, `xsd:dateTime`, `xsd:duration`, `xsd:anyURI`, `xsd:nonNegativeInteger`, `xsd:positiveInteger`. Cette liste est la seule référence pour les types de données autorisés dans l'application.
+**Si** l'application est chargée et que des DatatypeProperties peuvent être définies,
+
+**Alors** le système dispose d'une liste constante de 12 types XSD autorisés comme range : `xsd:string`, `xsd:integer`, `xsd:decimal`, `xsd:float`, `xsd:double`, `xsd:boolean`, `xsd:date`, `xsd:dateTime`, `xsd:duration`, `xsd:anyURI`, `xsd:nonNegativeInteger`, `xsd:positiveInteger` — cette liste constitue la seule référence pour les types de données autorisés dans l'application.
 
 ---
 
@@ -60,7 +62,9 @@ Le code définit un tableau constant `XSD_TYPES` contenant exactement 12 types X
 
 ### REQ-DP-002 — Construction de l'arbre hiérarchique des propriétés
 
-La méthode `buildTree(props)` calcule la structure parent/enfant à partir du champ `subPropertyOf` de chaque propriété. Elle retourne un objet `{ roots, childrenOf }` où `roots` est la liste triée alphabétiquement des propriétés sans parent, et `childrenOf` est une map de chaque propriété vers ses enfants triés alphabétiquement. Les cycles sont évités : seules les références vers des IDs existants sont prises en compte.
+**Si** l'ontologie est chargée et contient des DatatypeProperties reliées par des relations `subPropertyOf`,
+
+**Alors** le système construit un objet `{ roots, childrenOf }` où `roots` est la liste triée alphabétiquement des propriétés sans parent, et `childrenOf` est une map de chaque propriété vers ses enfants triés alphabétiquement — les cycles sont évités en ne prenant en compte que les références vers des IDs existants.
 
 ---
 
@@ -68,7 +72,10 @@ La méthode `buildTree(props)` calcule la structure parent/enfant à partir du c
 
 ### REQ-DP-003 — Expansion automatique des ancêtres d'une propriété sélectionnée
 
-La méthode `_expandAncestors(propId)` parcourt récursivement les parents d'une propriété (via `subPropertyOf`) et ajoute chacun d'eux dans `this._expanded` (Set), de sorte que le chemin depuis la racine jusqu'à la propriété soit entièrement déplié à l'affichage.
+**Si** une propriété est sélectionnée dans l'arbre
+**et** qu'elle possède un ou plusieurs ancêtres via `subPropertyOf`,
+
+**Alors** le système parcourt récursivement tous ses ancêtres et les ajoute dans l'ensemble `_expanded`, de sorte que le chemin depuis la racine jusqu'à la propriété sélectionnée soit entièrement déplié à l'affichage.
 
 ---
 
@@ -76,7 +83,12 @@ La méthode `_expandAncestors(propId)` parcourt récursivement les parents d'une
 
 ### REQ-DP-004 — Création d'une propriété enfant (child)
 
-La méthode `createChild()` lit `_selectedId` pour déterminer le parent éventuel : si une propriété est sélectionnée, elle devient le parent unique ; sinon la nouvelle propriété est créée à la racine. Elle ajoute le parent au Set `_expanded` pour garantir sa visibilité, puis délègue à `_createAndSelect([parent])`.
+**Si** l'utilisateur déclenche la création d'une propriété enfant,
+
+**Alors** :
+- si une propriété est sélectionnée, elle devient le parent unique de la nouvelle propriété et est ajoutée à `_expanded` pour garantir sa visibilité ;
+- si aucune propriété n'est sélectionnée, la nouvelle propriété est créée à la racine sans parent ;
+- dans les deux cas, la création est déléguée à `_createAndSelect([parent])`.
 
 ---
 
@@ -84,7 +96,10 @@ La méthode `createChild()` lit `_selectedId` pour déterminer le parent éventu
 
 ### REQ-DP-005 — Création d'une propriété sœur (sibling)
 
-La méthode `createSibling()` ne s'exécute que si `_selectedId` est défini. Elle récupère les parents (`subPropertyOf`) de la propriété sélectionnée et les passe à `_createAndSelect()`, produisant une nouvelle propriété au même niveau hiérarchique. Chaque parent est ajouté à `_expanded`.
+**Si** l'utilisateur déclenche la création d'une propriété sœur
+**et** qu'une propriété est actuellement sélectionnée (`_selectedId` défini),
+
+**Alors** le système récupère les parents (`subPropertyOf`) de la propriété sélectionnée, les passe à `_createAndSelect()` et ajoute chacun d'eux à `_expanded`, produisant ainsi une nouvelle propriété au même niveau hiérarchique.
 
 ---
 
@@ -92,7 +107,9 @@ La méthode `createSibling()` ne s'exécute que si `_selectedId` est défini. El
 
 ### REQ-DP-006 — Génération d'un nom unique pour une nouvelle propriété
 
-La méthode `_generatePropName()` construit un nom en partant de `'NewDatatypeProperty'` et en incrémentant un compteur (`NewDatatypeProperty1`, `NewDatatypeProperty2`, …) jusqu'à trouver un nom absent de la liste des IDs existants dans `APP.state.datatype_properties`.
+**Si** une nouvelle DatatypeProperty doit être créée,
+
+**Alors** le système génère un nom en partant de `'NewDatatypeProperty'` et en incrémentant un compteur (`NewDatatypeProperty1`, `NewDatatypeProperty2`, …) jusqu'à trouver un nom absent de la liste des IDs existants dans `APP.state.datatype_properties`.
 
 ---
 
@@ -100,7 +117,13 @@ La méthode `_generatePropName()` construit un nom en partant de `'NewDatatypePr
 
 ### REQ-DP-007 — Création effective et navigation vers la nouvelle propriété
 
-La méthode `_createAndSelect(subPropertyOf)` construit un objet propriété avec les valeurs par défaut (`annotations` vides, `domain` vide, `range` vide, `functional: false`) et l'IRI généré par `_generatePropName()`. Elle appelle `API.createDP(prop)`, mémorise l'ID dans `_selectedId` et `_editingId`, puis rafraîchit l'état applicatif via `APP.refresh()` et `APP.renderSection('datatype-properties')`. Les erreurs sont affichées via `UI.error()`.
+**Si** la création d'une DatatypeProperty est confirmée avec les parents ciblés,
+
+**Alors** :
+- le système construit un objet propriété avec les valeurs par défaut (`annotations` vides, `domain` vide, `range` vide, `functional: false`) et l'IRI généré par `_generatePropName()` ;
+- il appelle `API.createDP(prop)`, mémorise l'ID dans `_selectedId` et `_editingId` ;
+- il rafraîchit l'état applicatif via `APP.refresh()` et `APP.renderSection('datatype-properties')` ;
+- en cas d'erreur, celle-ci est affichée via `UI.error()`.
 
 ---
 
@@ -108,7 +131,17 @@ La méthode `_createAndSelect(subPropertyOf)` construit un objet propriété ave
 
 ### REQ-DP-008 — Dépôt (drop) d'une propriété sur une nouvelle cible
 
-La méthode `onDrop(event, targetId)` déplace une propriété dans la hiérarchie en modifiant son champ `subPropertyOf` : si `targetId` est défini, la nouvelle liste de parents vaut `[targetId]` ; sinon elle est vide (propriété racine). Elle appelle `API.updateDP()` pour persister le changement, affiche un message de succès via `UI.success()`, puis rafraîchit l'affichage. Si la cible est un descendant de la source, l'opération est annulée avec un avertissement `UI.warn('Cannot drop on a descendant — would create a cycle')`.
+**Si** l'utilisateur dépose une propriété sur une cible valide lors d'un drag & drop
+**et** que la cible n'est pas un descendant de la source,
+
+**Alors** :
+- si `targetId` est défini, `subPropertyOf` de la propriété déplacée est mis à jour à `[targetId]` ;
+- si `targetId` est indéfini, la propriété devient racine (`subPropertyOf` vide) ;
+- `API.updateDP()` est appelé pour persister le changement, un message de succès est affiché via `UI.success()`, et l'affichage est rafraîchi.
+
+**Si** la cible est un descendant de la source,
+
+**Alors** l'opération est annulée et un avertissement `UI.warn('Cannot drop on a descendant — would create a cycle')` est affiché.
 
 ---
 
@@ -116,7 +149,9 @@ La méthode `onDrop(event, targetId)` déplace une propriété dans la hiérarch
 
 ### REQ-DP-009 — Vérification d'un lien ancêtre/descendant pour le drag & drop
 
-La méthode `_isDescendant(potentialDesc, ancestorId)` effectue une traversée récursive en profondeur de l'arbre (via `buildTree()`) depuis `ancestorId` pour déterminer si `potentialDesc` est l'un de ses descendants. Retourne `false` si l'un des deux paramètres est null/undefined.
+**Si** le système doit déterminer si une propriété cible est un descendant d'une propriété source lors d'un drag & drop,
+
+**Alors** il effectue une traversée récursive en profondeur de l'arbre (via `buildTree()`) depuis la propriété source pour vérifier si la cible en est un descendant — retourne `false` si l'un des deux paramètres est null ou undefined.
 
 ---
 
@@ -124,7 +159,14 @@ La méthode `_isDescendant(potentialDesc, ancestorId)` effectue une traversée r
 
 ### REQ-DP-010 — Contrôle de l'unicité du range avant ouverture du sélecteur
 
-La méthode `showPicker(id)` interdit l'ouverture du sélecteur de range (`dp-range-picker`) si la liste `dp-range-list` contient déjà un élément `.cls-list-item[data-id]`, garantissant ainsi qu'une seule valeur XSD peut être définie comme range. Pour les autres sélecteurs, elle délègue à `_togglePicker(id)`.
+**Si** l'utilisateur tente d'ouvrir le sélecteur de range (`dp-range-picker`)
+**et** que la liste `dp-range-list` contient déjà un élément `.cls-list-item[data-id]`,
+
+**Alors** le système interdit l'ouverture du sélecteur, garantissant qu'une seule valeur XSD peut être définie comme range.
+
+**Si** l'utilisateur ouvre tout autre sélecteur,
+
+**Alors** le système délègue l'ouverture à `_togglePicker(id)`.
 
 ---
 
@@ -132,8 +174,13 @@ La méthode `showPicker(id)` interdit l'ouverture du sélecteur de range (`dp-ra
 
 ### REQ-DP-011 — Gestion du domaine
 
-`addDomain(id)` appelle `_addListItem()` pour insérer la classe dans `dp-domain-list`, en utilisant le style `cls-dot`, puis déclenche `autoSave()`.
-`removeDomain(id)` appelle `_removeListItem()` qui retire l'entrée de `dp-domain-list` et affiche `owl:Thing` comme valeur par défaut si la liste devient vide, puis déclenche `autoSave()`.
+**Si** l'utilisateur ajoute une classe comme domaine d'une DatatypeProperty,
+
+**Alors** le système insère la classe dans `dp-domain-list` via `_addListItem()` avec le style `cls-dot`, puis déclenche `autoSave()`.
+
+**Si** l'utilisateur supprime une classe du domaine,
+
+**Alors** le système retire l'entrée de `dp-domain-list` via `_removeListItem()`, affiche `owl:Thing` comme valeur par défaut si la liste devient vide, puis déclenche `autoSave()`.
 
 ---
 
@@ -141,8 +188,13 @@ La méthode `showPicker(id)` interdit l'ouverture du sélecteur de range (`dp-ra
 
 ### REQ-DP-012 — Gestion du range (type XSD)
 
-`addRange(id)` appelle `_addListItem()` pour insérer le type XSD dans `dp-range-list` avec le style `xsd-dot`, puis masque le bouton `dp-range-btn` pour empêcher l'ajout d'un second type. Elle déclenche ensuite `autoSave()` si une propriété est en cours d'édition.
-`removeRange(id)` appelle `_removeListItem()` pour supprimer le type de `dp-range-list` (la valeur par défaut affichée redevient `rdfs:Literal`), puis réaffiche le bouton `dp-range-btn` pour permettre la sélection d'un nouveau type. Elle déclenche ensuite `autoSave()`.
+**Si** l'utilisateur ajoute un type XSD comme range d'une DatatypeProperty,
+
+**Alors** le système insère le type dans `dp-range-list` via `_addListItem()` avec le style `xsd-dot`, masque le bouton `dp-range-btn` pour empêcher l'ajout d'un second type, puis déclenche `autoSave()` si une propriété est en cours d'édition.
+
+**Si** l'utilisateur supprime le type XSD du range,
+
+**Alors** le système retire le type de `dp-range-list` via `_removeListItem()` (la valeur par défaut affichée redevient `rdfs:Literal`), réaffiche le bouton `dp-range-btn` pour permettre la sélection d'un nouveau type, puis déclenche `autoSave()`.
 
 ---
 
@@ -150,8 +202,13 @@ La méthode `showPicker(id)` interdit l'ouverture du sélecteur de range (`dp-ra
 
 ### REQ-DP-013 — Gestion d'une super-propriété
 
-`addSubProp(id)` insère la propriété choisie dans `dp-sub-list` via `_addListItem()`, avec navigation vers la section `'datatype-properties'` et style `dp-prop-dot`, puis déclenche `autoSave()`.
-`removeSubProp(id)` retire l'entrée de `dp-sub-list` via `_removeListItem()`, puis déclenche `autoSave()`.
+**Si** l'utilisateur ajoute une super-propriété à une DatatypeProperty,
+
+**Alors** le système insère la propriété choisie dans `dp-sub-list` via `_addListItem()` avec navigation vers la section `'datatype-properties'` et style `dp-prop-dot`, puis déclenche `autoSave()`.
+
+**Si** l'utilisateur supprime une super-propriété,
+
+**Alors** le système retire l'entrée de `dp-sub-list` via `_removeListItem()`, puis déclenche `autoSave()`.
 
 ---
 
@@ -159,7 +216,10 @@ La méthode `showPicker(id)` interdit l'ouverture du sélecteur de range (`dp-ra
 
 ### REQ-DP-014 — Sauvegarde automatique lors d'un changement de champ
 
-La méthode `autoSave()` appelle `save(false)` uniquement si `_editingId !== null`, c'est-à-dire si une propriété existante est en cours d'édition. Elle est branchée sur l'événement `onchange` de tous les champs du formulaire lorsqu'une propriété existante est sélectionnée.
+**Si** l'utilisateur modifie un champ du formulaire d'édition
+**et** qu'une propriété existante est en cours d'édition (`_editingId !== null`),
+
+**Alors** le système déclenche automatiquement `save(false)` pour persister les modifications sans action explicite de l'utilisateur.
 
 ---
 
@@ -167,15 +227,25 @@ La méthode `autoSave()` appelle `save(false)` uniquement si `_editingId !== nul
 
 ### REQ-DP-015 — Sauvegarde (création ou mise à jour) d'une DatatypeProperty
 
-La méthode `save(isNew)` collecte toutes les valeurs du formulaire :
-- ID via `document.getElementById('dp-id').value`, validé par `_validateId()`.
-- Annotations (labels, comments, other) via `_collectAnnotations('dp-annotations-body')`.
-- Domain via `_collectList('dp-domain-list')`.
-- Range via `_collectList('dp-range-list')`.
-- SubPropertyOf via `_collectList('dp-sub-list')`.
+**Si** l'utilisateur sauvegarde une DatatypeProperty (nouvelle ou existante),
+
+**Alors** le système collecte toutes les valeurs du formulaire :
+- ID via `document.getElementById('dp-id').value`, validé par `_validateId()` ;
+- Annotations (labels, comments, other) via `_collectAnnotations('dp-annotations-body')` ;
+- Domain via `_collectList('dp-domain-list')` ;
+- Range via `_collectList('dp-range-list')` ;
+- SubPropertyOf via `_collectList('dp-sub-list')` ;
 - Functional via l'état de la case à cocher `dp-functional`.
 
-En mode création (`isNew === true`), elle appelle `API.createDP(prop)` et affiche un message de succès. En mode mise à jour, elle appelle `API.updateDP(originalId, prop)` et signale un renommage si l'ID a changé. Dans les deux cas, `APP.refresh()` puis `APP.renderSection('datatype-properties')` sont appelés.
+**Si** le mode est création (`isNew === true`),
+
+**Alors** le système appelle `API.createDP(prop)` et affiche un message de succès.
+
+**Si** le mode est mise à jour,
+
+**Alors** le système appelle `API.updateDP(originalId, prop)` et signale un renommage si l'ID a changé.
+
+Dans les deux cas, `APP.refresh()` puis `APP.renderSection('datatype-properties')` sont appelés.
 
 ---
 
@@ -183,7 +253,17 @@ En mode création (`isNew === true`), elle appelle `API.createDP(prop)` et affic
 
 ### REQ-DP-016 — Suppression d'une DatatypeProperty avec confirmation
 
-La méthode `delete(id)` affiche une boîte de dialogue de confirmation via `UI.confirm()`. Si l'utilisateur confirme, elle appelle `API.deleteDP(id)`, affiche un message de succès via `UI.success()`, réinitialise `_selectedId` et `_editingId` à `null`, puis rafraîchit l'affichage via `APP.refresh()` et `APP.renderSection('datatype-properties')`. La méthode publique `deleteSelected()` délègue à `delete(this._selectedId)` si une propriété est sélectionnée.
+**Si** l'utilisateur déclenche la suppression d'une DatatypeProperty,
+
+**Alors** le système affiche une boîte de dialogue de confirmation via `UI.confirm()`.
+
+**Si** l'utilisateur confirme la suppression,
+
+**Alors** :
+- `API.deleteDP(id)` est appelé ;
+- un message de succès est affiché via `UI.success()` ;
+- `_selectedId` et `_editingId` sont réinitialisés à `null` ;
+- l'affichage est rafraîchi via `APP.refresh()` et `APP.renderSection('datatype-properties')`.
 
 ---
 
@@ -197,7 +277,9 @@ La méthode `delete(id)` affiche une boîte de dialogue de confirmation via `UI.
 
 ### REQ-DP-017 — Génération d'options HTML pour les DatatypeProperties
 
-La fonction `dpOptions(selectedId)` parcourt `APP.state.datatype_properties` et produit une chaîne d'éléments `<option>` pour chaque propriété, avec sélection de la valeur correspondant à `selectedId`. Ce résultat est utilisé dans les listes déroulantes d'autres onglets qui référencent une DatatypeProperty.
+**Si** un composant d'un autre onglet nécessite une liste déroulante référençant des DatatypeProperties,
+
+**Alors** le système parcourt `APP.state.datatype_properties` et produit une chaîne d'éléments `<option>` pour chaque propriété, avec sélection de la valeur correspondant à `selectedId`.
 
 ---
 
@@ -205,7 +287,9 @@ La fonction `dpOptions(selectedId)` parcourt `APP.state.datatype_properties` et 
 
 ### REQ-DP-018 — Génération d'options HTML pour les types XSD
 
-La fonction `xsdOptions(selected)` itère sur `XSD_TYPES` et produit des éléments `<option>` HTML. La valeur par défaut du paramètre `selected` est `'xsd:string'`. Cette fonction alimente les sélecteurs XSD dans l'onglet Individuals.
+**Si** un sélecteur XSD doit être affiché (notamment dans l'onglet Individuals),
+
+**Alors** le système itère sur `XSD_TYPES` et produit des éléments `<option>` HTML, avec `xsd:string` comme valeur sélectionnée par défaut si aucune valeur n'est précisée.
 
 ---
 
@@ -213,7 +297,12 @@ La fonction `xsdOptions(selected)` itère sur `XSD_TYPES` et produit des éléme
 
 ### REQ-DP-019 — Rendu d'un nœud de l'arbre avec gestion drag & drop
 
-La méthode `_renderNode(id, childrenOf, depth)` génère le HTML d'un nœud de l'arbre. Elle applique un indentation proportionnelle à la profondeur (`depth * 16 + 6` px), affiche un triangle de déplacement si le nœud a des enfants, et branche les handlers `onclick`, `oncontextmenu`, `ondragstart`, `ondragover`, `ondragleave`, `ondrop`, `ondragend` vers les méthodes correspondantes de `DPEditor`.
+**Si** un nœud de l'arbre des DatatypeProperties doit être affiché,
+
+**Alors** le système génère le HTML du nœud avec :
+- une indentation proportionnelle à la profondeur (`depth * 16 + 6` px) ;
+- un triangle de déplacement si le nœud a des enfants ;
+- les handlers `onclick`, `oncontextmenu`, `ondragstart`, `ondragover`, `ondragleave`, `ondrop`, `ondragend` branchés vers les méthodes correspondantes de `DPEditor`.
 
 ---
 
@@ -221,7 +310,12 @@ La méthode `_renderNode(id, childrenOf, depth)` génère le HTML d'un nœud de 
 
 ### REQ-DP-020 — Rendu de l'arbre complet avec racine owl:topDataProperty
 
-La méthode `renderTree(props)` appelle `buildTree()` puis `_renderNode()` pour chaque racine. Elle affiche en tête un élément représentant la racine (`owl:topDataProperty` ou `rdf:Property` selon `APP.getOntologyRootLabels()`). Si la liste de propriétés est vide, elle affiche le message `"No DatatypeProperty"`.
+**Si** l'onglet DatatypeProperties est affiché,
+
+**Alors** :
+- le système appelle `buildTree()` puis `_renderNode()` pour chaque racine ;
+- il affiche en tête un élément représentant la racine (`owl:topDataProperty` ou `rdf:Property` selon `APP.getOntologyRootLabels()`) ;
+- si la liste de propriétés est vide, il affiche le message `"No DatatypeProperty"`.
 
 ---
 
@@ -229,7 +323,13 @@ La méthode `renderTree(props)` appelle `buildTree()` puis `_renderNode()` pour 
 
 ### REQ-DP-021 — Rendu de la mise en page en deux panneaux (split)
 
-La méthode `renderSplit(props)` génère la structure HTML complète de l'onglet : panneau gauche contenant l'arbre et le sous-panneau "Super Properties", séparateur redimensionnable horizontal (`split-handle`), et panneau droit (`detail-panel`) vide avec un bouton de création. Les boutons "Child", "Sibling" et "Delete" sont rendus désactivés par défaut.
+**Si** l'onglet DatatypeProperties est initialisé,
+
+**Alors** le système génère la structure HTML complète avec :
+- un panneau gauche contenant l'arbre et le sous-panneau "Super Properties" ;
+- un séparateur redimensionnable horizontal (`split-handle`) ;
+- un panneau droit (`detail-panel`) vide avec un bouton de création ;
+- les boutons "Child", "Sibling" et "Delete" rendus désactivés par défaut.
 
 ---
 
@@ -237,7 +337,11 @@ La méthode `renderSplit(props)` génère la structure HTML complète de l'ongle
 
 ### REQ-DP-022 — Restauration de la sélection après re-rendu
 
-La méthode `restoreSelection()` appelle d'abord `_initSplitPane()` pour ré-attacher les listeners de redimensionnement, puis re-sélectionne soit la racine (`selectTopProp()`), soit la propriété mémorisée dans `_selectedId` (`selectProp()`), préservant ainsi l'état de l'interface après un re-rendu complet de la section.
+**Si** la section DatatypeProperties est re-rendue,
+
+**Alors** le système :
+- appelle `_initSplitPane()` pour ré-attacher les listeners de redimensionnement ;
+- re-sélectionne soit la racine (`selectTopProp()`), soit la propriété mémorisée dans `_selectedId` (`selectProp()`), préservant ainsi l'état de l'interface.
 
 ---
 
@@ -245,7 +349,9 @@ La méthode `restoreSelection()` appelle d'abord `_initSplitPane()` pour ré-att
 
 ### REQ-DP-023 — Redimensionnement horizontal du panneau gauche
 
-La méthode `_initSplitPane()` attache un listener `mousedown` sur l'élément `dp-split-handle` pour permettre à l'utilisateur de redimensionner le panneau gauche par glisser-déposer. La largeur est contrainte entre 160 et 520 px. Elle appelle également `_initHResizers('dp-tree-panel')` pour le redimensionnement vertical entre l'arbre et le sous-panneau "Super Properties".
+**Si** l'utilisateur effectue un glisser-déposer sur l'élément `dp-split-handle`,
+
+**Alors** le système redimensionne le panneau gauche en contraignant sa largeur entre 160 et 520 px, et appelle `_initHResizers('dp-tree-panel')` pour gérer le redimensionnement vertical entre l'arbre et le sous-panneau "Super Properties".
 
 ---
 
@@ -253,7 +359,16 @@ La méthode `_initSplitPane()` attache un listener `mousedown` sur l'élément `
 
 ### REQ-DP-024 — Mise à jour du panneau "Super Properties"
 
-La méthode `_updateSuperPanel(prop)` met à jour le contenu du panneau gauche inférieur (`dp-sub-list`). Si aucune propriété n'est passée, elle affiche un message "— select a property —". Si une propriété est passée, elle calcule la chaîne complète d'ancêtres via la fonction interne `buildChain()`, affiche chaque ancêtre avec indentation croissante, et termine la chaîne par `owl:topDatatypeProperty`. Les ancêtres directs comportent un bouton de suppression (✕). Un sélecteur HTML propose les propriétés non encore utilisées comme super-propriétés.
+**Si** aucune propriété n'est sélectionnée,
+
+**Alors** le panneau gauche inférieur (`dp-sub-list`) affiche le message "— select a property —".
+
+**Si** une propriété est sélectionnée,
+
+**Alors** :
+- le système calcule la chaîne complète d'ancêtres via `buildChain()` et affiche chaque ancêtre avec indentation croissante, terminant par `owl:topDatatypeProperty` ;
+- les ancêtres directs comportent un bouton de suppression (✕) ;
+- un sélecteur HTML propose les propriétés non encore utilisées comme super-propriétés.
 
 ---
 
@@ -261,7 +376,13 @@ La méthode `_updateSuperPanel(prop)` met à jour le contenu du panneau gauche i
 
 ### REQ-DP-025 — Sélection de la racine owl:topDataProperty
 
-La méthode `selectTopProp()` positionne `_selectedId` à `null` et `_topPropSelected` à `true`. Elle met à jour la surlignage dans l'arbre, remplace le contenu du panneau de détail par un écran d'accueil affichant la racine et un bouton de création, puis appelle `_updateSuperPanel(null)` et `_updateTreeButtons()`.
+**Si** l'utilisateur sélectionne la racine `owl:topDataProperty`,
+
+**Alors** :
+- `_selectedId` est positionné à `null` et `_topPropSelected` à `true` ;
+- le surlignage dans l'arbre est mis à jour ;
+- le panneau de détail affiche un écran d'accueil avec la racine et un bouton de création ;
+- `_updateSuperPanel(null)` et `_updateTreeButtons()` sont appelés.
 
 ---
 
@@ -269,7 +390,15 @@ La méthode `selectTopProp()` positionne `_selectedId` à `null` et `_topPropSel
 
 ### REQ-DP-026 — Sélection d'une DatatypeProperty dans l'arbre
 
-La méthode `selectProp(id)` mémorise `id` dans `_selectedId`, met à jour le surlignage visuel dans l'arbre, retrouve l'objet propriété dans `APP.state.datatype_properties`, injecte le formulaire de détail via `renderForm()`, initialise les redimensionneurs verticaux du panneau droit, met à jour le panneau "Super Properties" et les boutons de la barre d'outils.
+**Si** l'utilisateur sélectionne une DatatypeProperty dans l'arbre,
+
+**Alors** :
+- `id` est mémorisé dans `_selectedId` ;
+- le surlignage visuel dans l'arbre est mis à jour ;
+- l'objet propriété est retrouvé dans `APP.state.datatype_properties` ;
+- le formulaire de détail est injecté via `renderForm()` ;
+- les redimensionneurs verticaux du panneau droit sont initialisés ;
+- le panneau "Super Properties" et les boutons de la barre d'outils sont mis à jour.
 
 ---
 
@@ -277,7 +406,17 @@ La méthode `selectProp(id)` mémorise `id` dans `_selectedId`, met à jour le s
 
 ### REQ-DP-027 — Gestion de l'état des boutons de la barre d'outils
 
-La méthode `_updateTreeButtons()` active ou désactive les boutons `dp-btn-child`, `dp-btn-sister` et `dp-btn-delete` selon l'état courant : si la racine est sélectionnée, seul "Child" est activé et "Sibling" / "Delete" sont masqués ; si une propriété est sélectionnée, les trois boutons sont actifs ; sinon, tous sont désactivés.
+**Si** la racine est sélectionnée,
+
+**Alors** seul le bouton "Child" est activé ; "Sibling" et "Delete" sont masqués.
+
+**Si** une propriété est sélectionnée,
+
+**Alors** les trois boutons "Child", "Sibling" et "Delete" sont actifs.
+
+**Si** aucune sélection n'est active,
+
+**Alors** tous les boutons sont désactivés.
 
 ---
 
@@ -285,7 +424,9 @@ La méthode `_updateTreeButtons()` active ou désactive les boutons `dp-btn-chil
 
 ### REQ-DP-028 — Expansion / réduction d'un nœud de l'arbre
 
-La méthode `toggleNode(id)` bascule la visibilité du conteneur enfant `dp-tcn-${id}`. Elle met à jour le Set `_expanded` (ajout ou suppression de `id`) et fait pivoter la flèche de déplié/replié de l'élément `.tree-toggle`.
+**Si** l'utilisateur clique sur le triangle d'un nœud de l'arbre,
+
+**Alors** le système bascule la visibilité du conteneur enfant `dp-tcn-${id}`, met à jour le Set `_expanded` (ajout ou suppression de `id`), et fait pivoter la flèche de déplié/replié de l'élément `.tree-toggle`.
 
 ---
 
@@ -293,7 +434,14 @@ La méthode `toggleNode(id)` bascule la visibilité du conteneur enfant `dp-tcn-
 
 ### REQ-DP-029 — Affichage du menu contextuel (clic droit)
 
-La méthode `showContextMenu(event, id)` supprime tout menu existant, sélectionne la propriété ou la racine selon la valeur de `id`, crée un élément `div.ctx-menu` et l'insère dans le `body` à la position du curseur. Le menu contient toujours l'item "Add Child Property" ; si `id` est défini (propriété réelle), il ajoute également "Add Sibling Property" et "Delete". Le menu se ferme automatiquement au clic en dehors via un listener `click` sur `document`.
+**Si** l'utilisateur effectue un clic droit sur un nœud de l'arbre,
+
+**Alors** :
+- tout menu contextuel existant est supprimé ;
+- la propriété ou la racine est sélectionnée selon la valeur de `id` ;
+- un élément `div.ctx-menu` est créé et inséré dans le `body` à la position du curseur ;
+- le menu contient toujours l'item "Add Child Property" ; si `id` est défini (propriété réelle), "Add Sibling Property" et "Delete" sont également ajoutés ;
+- le menu se ferme automatiquement au clic en dehors via un listener `click` sur `document`.
 
 ---
 
@@ -301,7 +449,9 @@ La méthode `showContextMenu(event, id)` supprime tout menu existant, sélection
 
 ### REQ-DP-030 — Fermeture du menu contextuel
 
-La méthode `_closeContextMenu()` supprime du DOM l'élément portant l'ID `dp-ctx-menu`, s'il existe.
+**Si** le menu contextuel est ouvert et qu'une action de fermeture est déclenchée,
+
+**Alors** le système supprime du DOM l'élément portant l'ID `dp-ctx-menu`, s'il existe.
 
 ---
 
@@ -309,7 +459,12 @@ La méthode `_closeContextMenu()` supprime du DOM l'élément portant l'ID `dp-c
 
 ### REQ-DP-031 — Démarrage du drag d'une propriété
 
-La méthode `onDragStart(event, id)` mémorise l'ID de la propriété glissée dans `_dragId`, positionne `effectAllowed` à `'move'`, stocke l'ID dans `dataTransfer`, et ajoute la classe CSS `'dragging'` à l'élément source après un délai de 0 ms (via `setTimeout`).
+**Si** l'utilisateur commence à glisser une propriété dans l'arbre,
+
+**Alors** :
+- l'ID de la propriété glissée est mémorisé dans `_dragId` ;
+- `effectAllowed` est positionné à `'move'` et l'ID est stocké dans `dataTransfer` ;
+- la classe CSS `'dragging'` est ajoutée à l'élément source après un délai de 0 ms (via `setTimeout`).
 
 ---
 
@@ -317,7 +472,12 @@ La méthode `onDragStart(event, id)` mémorise l'ID de la propriété glissée d
 
 ### REQ-DP-032 — Survol d'une cible lors du drag
 
-La méthode `onDragOver(event, targetId)` autorise le dépôt (`event.preventDefault()`) uniquement si : un drag est en cours (`_dragId` défini), la cible est différente de la source, et la cible n'est pas un descendant de la source (vérifié via `_isDescendant()`). Elle applique la classe `'drag-over'` à l'élément survolé.
+**Si** l'utilisateur survole une cible pendant un drag
+**et** qu'un drag est en cours (`_dragId` défini),
+**et** que la cible est différente de la source,
+**et** que la cible n'est pas un descendant de la source (vérifié via `_isDescendant()`),
+
+**Alors** le système autorise le dépôt (`event.preventDefault()`) et applique la classe `'drag-over'` à l'élément survolé.
 
 ---
 
@@ -325,13 +485,23 @@ La méthode `onDragOver(event, targetId)` autorise le dépôt (`event.preventDef
 
 ### REQ-DP-033 — Rendu du formulaire d'édition d'une DatatypeProperty
 
-La méthode `renderForm(prop)` génère le HTML complet du panneau droit. En mode création (`prop === null`), un bouton "✅ Create" est affiché. En mode édition, toutes les modifications de champ déclenchent `autoSave()` via `onchange`. Le formulaire comporte les sections suivantes, toutes générées par cette méthode :
-- **En-tête** : champ de saisie de l'ID (avec `_sanitizeId()`), mention `(instance of owl:DatatypeProperty)`, IRI complète calculée à partir de `APP.state.ontology.id`.
-- **Annotations** : table avec colonnes Property / Value / Lang, peuplée via `_annoRow()` pour `labels`, `comments` et `other`.
-- **Domain(s)** : liste des classes domaine via `_listRows()`, sélecteur parmi les classes disponibles (`APP.state.classes`), valeur par défaut affichée `owl:Thing`.
-- **Range** : liste des types XSD via `_listRows()`, sélecteur parmi les types non encore utilisés tirés de `XSD_TYPES`, valeur par défaut affichée `rdfs:Literal`.
-- **Characteristics** : case à cocher unique "Functional" liée à `p.functional`.
+**Si** l'utilisateur sélectionne une DatatypeProperty ou crée une nouvelle propriété,
+
+**Alors** le système génère le HTML complet du panneau droit avec les sections suivantes :
+- **En-tête** : champ de saisie de l'ID (avec `_sanitizeId()`), mention `(instance of owl:DatatypeProperty)`, IRI complète calculée à partir de `APP.state.ontology.id` ;
+- **Annotations** : table avec colonnes Property / Value / Lang, peuplée via `_annoRow()` pour `labels`, `comments` et `other` ;
+- **Domain(s)** : liste des classes domaine via `_listRows()`, sélecteur parmi les classes disponibles (`APP.state.classes`), valeur par défaut affichée `owl:Thing` ;
+- **Range** : liste des types XSD via `_listRows()`, sélecteur parmi les types non encore utilisés tirés de `XSD_TYPES`, valeur par défaut affichée `rdfs:Literal` ;
+- **Characteristics** : case à cocher unique "Functional" liée à `p.functional` ;
 - **Where Used** : section générée par `_whereUsedFrame()` listant les règles qui utilisent cette propriété.
+
+**Si** le mode est création (`prop === null`),
+
+**Alors** un bouton "✅ Create" est affiché à la place de la sauvegarde automatique.
+
+**Si** le mode est édition,
+
+**Alors** toutes les modifications de champ déclenchent `autoSave()` via `onchange`.
 
 ---
 
@@ -339,8 +509,13 @@ La méthode `renderForm(prop)` génère le HTML complet du panneau droit. En mod
 
 ### REQ-DP-034 — Ajout / suppression d'une ligne d'annotation (label / comment)
 
-`addAnnotRow(type)` appelle `_makeAnnotRow(type, 'DPEditor', ac)` et insère la ligne retournée dans le `tbody` identifié `dp-annotations-body`. L'attribut `ac` active `autoSave()` si une propriété est en cours d'édition (`_editingId !== null`).
-`removeAnnotRow(btn)` supprime du DOM la ligne `<tr>` parente du bouton passé en paramètre (`btn.closest('tr')?.remove()`), puis déclenche `autoSave()` si une propriété est en cours d'édition.
+**Si** l'utilisateur ajoute une ligne d'annotation de type label ou comment,
+
+**Alors** le système appelle `_makeAnnotRow(type, 'DPEditor', ac)` et insère la ligne retournée dans le `tbody` identifié `dp-annotations-body` — `autoSave()` est activé si une propriété est en cours d'édition (`_editingId !== null`).
+
+**Si** l'utilisateur supprime une ligne d'annotation,
+
+**Alors** le système supprime du DOM la ligne `<tr>` parente du bouton cliqué (`btn.closest('tr')?.remove()`), puis déclenche `autoSave()` si une propriété est en cours d'édition.
 
 ---
 
@@ -348,7 +523,9 @@ La méthode `renderForm(prop)` génère le HTML complet du panneau droit. En mod
 
 ### REQ-DP-035 — Ajout d'une annotation "autre propriété"
 
-La méthode `addOtherAnnotRow(prop)` appelle `_makeAnnotRow('other', 'DPEditor', ac, prop)`, insère la ligne dans `dp-annotations-body`, puis masque le sélecteur d'annotation `dp-anno-picker` en forçant son `style.display` à `'none'`.
+**Si** l'utilisateur sélectionne une annotation de type "autre propriété" via le sélecteur dédié,
+
+**Alors** le système appelle `_makeAnnotRow('other', 'DPEditor', ac, prop)`, insère la ligne dans `dp-annotations-body`, puis masque le sélecteur d'annotation `dp-anno-picker` en forçant son `style.display` à `'none'`.
 
 ---
 
