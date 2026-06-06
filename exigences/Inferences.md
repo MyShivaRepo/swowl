@@ -33,7 +33,7 @@
 
 ### REQ-INF-001 — Récupération des inférences via l'API
 
-| **Si** | l'`ontologiste` consulte le panneau des `inférences`, |
+| **Si** | l'ontologiste consulte le panneau des `inférences`, |
 |---|---|
 | **Alors** | l'application récupère auprès du raisonneur l'ensemble des résultats calculés : violations de cohérence, fermeture de la hiérarchie, `restrictions` héritées, `restrictions` inverses, types inférés, assertions symétriques, transitives, par chaînes de `propriétés` et `propriétés` inverses. |
 
@@ -43,7 +43,7 @@
 
 ### REQ-INF-002 — Rafraîchissement automatique du panneau
 
-| **Si** | l'`ontologiste` navigue vers l'onglet des `inférences`, |
+| **Si** | l'ontologiste navigue vers l'onglet des `inférences`, |
 |---|---|
 | **Alors** | le panneau se met à jour régulièrement de façon automatique, sans que l'utilisateur ait besoin d'intervenir, afin de refléter en permanence l'état courant du raisonnement sur l'`ontologie`. |
 
@@ -53,7 +53,7 @@
 
 ### REQ-INF-003 — Arrêt du rafraîchissement automatique
 
-| **Si** | l'`ontologiste` quitte l'onglet des `inférences` ou qu'un nouveau cycle de rafraîchissement doit démarrer, |
+| **Si** | l'ontologiste quitte l'onglet des `inférences` ou qu'un nouveau cycle de rafraîchissement doit démarrer, |
 |---|---|
 | **Alors** | toute mise à jour automatique en cours est immédiatement interrompue, sans laisser de cycle résiduel actif en arrière-plan. |
 
@@ -65,7 +65,7 @@
 
 | **Si** | la récupération des `inférences` auprès du raisonneur échoue, |
 |---|---|
-| **Alors** | l'`ontologiste` est informé de l'échec par un message d'erreur explicite affiché dans le panneau, et aucune donnée partielle ou obsolète n'est conservée à l'écran. |
+| **Alors** | l'ontologiste est informé de l'échec par un message d'erreur explicite affiché dans le panneau, et aucune donnée partielle ou obsolète n'est conservée à l'écran. |
 
 ---
 
@@ -81,7 +81,7 @@
 
 ### REQ-INF-004 — Affichage de l'état de cohérence de l'ontologie
 
-| **Si** | l'`ontologiste` consulte le panneau des `inférences`, |
+| **Si** | l'ontologiste consulte le panneau des `inférences`, |
 |---|---|
 | **Alors** | l'en-tête du panneau indique clairement si l'`ontologie` est cohérente, en erreur ou porteuse d'avertissements, avec un indicateur visuel distinct pour chaque niveau de sévérité. |
 
@@ -103,7 +103,7 @@
 
 | **Si** | l'`ontologie` contient des `classes` organisées en hiérarchie, |
 |---|---|
-| **Alors** | la section "Resolved hierarchy" présente pour chaque `classe` l'ensemble de ses ancêtres à tous les niveaux, permettant à l'`ontologiste` de visualiser d'un coup d'œil l'intégralité de la chaîne de spécialisation, sans avoir à remonter manuellement les relations une à une. |
+| **Alors** | la section "Resolved hierarchy" présente pour chaque `classe` l'ensemble de ses ancêtres à tous les niveaux, permettant à l'ontologiste de visualiser d'un coup d'œil l'intégralité de la chaîne de spécialisation, sans avoir à remonter manuellement les relations une à une. |
 
 ---
 
@@ -113,7 +113,7 @@
 
 | **Si** | des `restrictions` OWL ont été définies sur des `classes` parentes et propagées à leurs sous-`classes` par la hiérarchie, |
 |---|---|
-| **Alors** | la section "Inherited `restrictions`" indique pour chaque sous-`classe` quelles `restrictions` elle hérite, de quelle `classe` parente elles proviennent, et en quoi elles consistent, afin que l'`ontologiste` comprenne l'impact transitif de la hiérarchie sur les contraintes des `individus`. |
+| **Alors** | la section "Inherited `restrictions`" indique pour chaque sous-`classe` quelles `restrictions` elle hérite, de quelle `classe` parente elles proviennent, et en quoi elles consistent, afin que l'ontologiste comprenne l'impact transitif de la hiérarchie sur les contraintes des `individus`. |
 
 ---
 
@@ -181,7 +181,7 @@
 
 ### REQ-INF-014 — Bouton de recalcul manuel des inférences
 
-| **Si** | l'`ontologiste` souhaite forcer une mise à jour immédiate des résultats d'`inférence` sans attendre le prochain cycle automatique, |
+| **Si** | l'ontologiste souhaite forcer une mise à jour immédiate des résultats d'`inférence` sans attendre le prochain cycle automatique, |
 |---|---|
 | **Alors** | il peut déclencher un recalcul complet à la demande, et le panneau se met à jour instantanément avec les derniers résultats du raisonneur. |
 
@@ -191,7 +191,7 @@
 
 ### REQ-INF-015 — Sections rétractables (collapsible) pour les résultats d'inférence
 
-| **Si** | l'`ontologiste` veut se concentrer sur une catégorie d'`inférences` particulière, |
+| **Si** | l'ontologiste veut se concentrer sur une catégorie d'`inférences` particulière, |
 |---|---|
 | **Alors** | il peut replier ou déplier chaque section de résultats individuellement en cliquant sur son titre, et un indicateur visuel signale l'état courant (replié ou déplié) de chaque section. |
 
