@@ -55,7 +55,7 @@
 
 ### REQ-VW-004 — Resolving the best class label
 
-| **If** | the `ontologist` browses the class tree and a class has multiple label annotations in different languages, |
+| **If** | the ontologist browses the class tree and a class has multiple label annotations in different languages, |
 |---|---|
 | **Then** | the application displays the label in the user's preferred language; failing that, the first available label; failing that, the technical identifier of the class. |
 
@@ -65,7 +65,7 @@
 
 ### REQ-VW-005 — Hyperbolic layout algorithm (Poincaré disk)
 
-| **If** | the `ontologist` visualizes the class tree in the hyperbolic graph, |
+| **If** | the ontologist visualizes the class tree in the hyperbolic graph, |
 |---|---|
 | **Then** | `classes` are arranged in a hyperbolic space of the Poincaré disk type: each hierarchy level is evenly spaced, the children of a node are distributed in equal angular sectors around their parent, and translations between levels respect hyperbolic geometry. |
 
@@ -75,7 +75,7 @@
 
 ### REQ-VW-007 — Click on a node: centering via Möbius transformation
 
-| **If** | the `ontologist` clicks on a class in the hyperbolic graph to explore it, |
+| **If** | the ontologist clicks on a class in the hyperbolic graph to explore it, |
 |---|---|
 | **Then** | the selected class moves to the center of the disk, allowing it to be brought into focus and its nearby neighbors to be visualized with more detail. |
 
@@ -85,7 +85,7 @@
 
 ### REQ-VW-008 — Double-click (second click at center): navigation to the class editor
 
-| **If** | the `ontologist` double-clicks on a class at the center of the hyperbolic graph to edit it, |
+| **If** | the ontologist double-clicks on a class at the center of the hyperbolic graph to edit it, |
 |---|---|
 | **Then** | the application automatically navigates to the editing form of that class, without any additional interaction. |
 
@@ -95,7 +95,7 @@
 
 ### REQ-VW-009 — Resetting focus to the root
 
-| **If** | the `ontologist` wishes to return to the overview of the `ontology` after navigating in the hyperbolic graph, |
+| **If** | the ontologist wishes to return to the overview of the `ontology` after navigating in the hyperbolic graph, |
 |---|---|
 | **Then** | the graph returns to its initial layout, with all `classes` repositioned to their starting location, accompanied by a return animation. |
 
@@ -105,11 +105,11 @@
 
 ### REQ-VW-010 — Filtering classes by text in the hyperbolic graph
 
-| **If** | the `ontologist` types a term to search for a class in the hyperbolic graph, |
+| **If** | the ontologist types a term to search for a class in the hyperbolic graph, |
 |---|---|
 | **Then** | `classes` whose name or identifier matches the entered term are visually highlighted, while other `classes` remain visible but without highlighting. |
 
-| **If** | the `ontologist` clears the search term, |
+| **If** | the ontologist clears the search term, |
 |---|---|
 | **Then** | all `classes` return to their normal appearance and the graph is redrawn without highlighting. |
 
@@ -129,7 +129,7 @@
 
 ### REQ-VW-014 — Color palette by class
 
-| **If** | the `ontologist` visualizes the Knowledge Base graph containing `individuals` belonging to different `classes`, |
+| **If** | the ontologist visualizes the Knowledge Base graph containing `individuals` belonging to different `classes`, |
 |---|---|
 | **Then** | each class is identified by a distinct and consistent color throughout the session, making it possible to visually distinguish `individuals` by their type. |
 
@@ -143,7 +143,7 @@
 
 ### REQ-VW-015 — Resolving the best individual label
 
-| **If** | the `ontologist` browses the Knowledge Base graph and an `individual` has multiple labels in different languages, |
+| **If** | the ontologist browses the Knowledge Base graph and an `individual` has multiple labels in different languages, |
 |---|---|
 | **Then** | the application displays the label in the user's preferred language; failing that, the first available label; failing that, the technical identifier of the `individual`. |
 
@@ -153,7 +153,7 @@
 
 ### REQ-VW-020 — Click on an individual node: navigation to the individual editor
 
-| **If** | the `ontologist` clicks on an `individual` in the Knowledge Base graph to `view` or modify its `properties`, |
+| **If** | the ontologist clicks on an `individual` in the Knowledge Base graph to `view` or modify its `properties`, |
 |---|---|
 | **Then** | the application automatically navigates to the editing form of that `individual`, without any additional interaction. |
 
@@ -163,15 +163,15 @@
 
 ### REQ-VW-022 — Drag and drop of nodes in the Knowledge Base graph
 
-| **If** | the `ontologist` starts dragging an `individual` in the Knowledge Base graph, |
+| **If** | the ontologist starts dragging an `individual` in the Knowledge Base graph, |
 |---|---|
 | **Then** | the simulation activates and the node follows the cursor movement. |
 
-| **If** | the `ontologist` moves the cursor, |
+| **If** | the ontologist moves the cursor, |
 |---|---|
 | **Then** | the node follows the cursor position in real time. |
 
-| **If** | the `ontologist` releases the node, |
+| **If** | the ontologist releases the node, |
 |---|---|
 | **Then** | the simulation resumes its natural behavior and the node is freed to reposition itself. |
 
@@ -181,7 +181,7 @@
 
 ### REQ-VW-023 — D3 force simulation with configured parameters
 
-| **If** | the `ontologist` opens the Knowledge Base graph containing `individuals` and assertions, |
+| **If** | the ontologist opens the Knowledge Base graph containing `individuals` and assertions, |
 |---|---|
 | **Then** | nodes automatically position themselves in the space by applying attraction forces between linked `individuals`, repulsion forces between all nodes, attraction toward the center, and collision avoidance, in order to produce a readable and balanced layout. |
 
@@ -191,7 +191,7 @@
 
 ### REQ-VW-024 — Restarting the force simulation
 
-| **If** | the `ontologist` wishes to reorganize the Knowledge Base graph after moving nodes or modifying data, |
+| **If** | the ontologist wishes to reorganize the Knowledge Base graph after moving nodes or modifying data, |
 |---|---|
 | **Then** | the simulation resumes from its current state with a high initial energy, allowing nodes to find a new balanced layout. |
 
@@ -201,11 +201,11 @@
 
 ### REQ-VW-025 — Filtering individuals by text in the Knowledge Base graph
 
-| **If** | the `ontologist` types a term to search for an `individual` or a class type in the Knowledge Base graph, |
+| **If** | the ontologist types a term to search for an `individual` or a class type in the Knowledge Base graph, |
 |---|---|
 | **Then** | nodes matching the term remain fully visible, while the others are strongly faded to highlight the relevant results. |
 
-| **If** | the `ontologist` clears the search term, |
+| **If** | the ontologist clears the search term, |
 |---|---|
 | **Then** | all nodes and their labels return to full visibility. |
 
@@ -215,7 +215,7 @@
 
 ### REQ-VW-027 — Blocking the Views tab when no ontology is connected
 
-| **If** | the `ontologist` attempts to access the `Views` section without having previously loaded an `ontology`, |
+| **If** | the ontologist attempts to access the `Views` section without having previously loaded an `ontology`, |
 |---|---|
 | **Then** | the application displays an informational message inviting the user to connect an `ontology`, with a direct link to the `ontology` management section, and does not display the graphs. |
 
@@ -225,7 +225,7 @@
 
 ### REQ-VW-028 — Deferred graph initialization after HTML rendering
 
-| **If** | the `ontologist` navigates to the `Views` tab and the HTML has just been injected into the page, |
+| **If** | the ontologist navigates to the `Views` tab and the HTML has just been injected into the page, |
 |---|---|
 | **Then** | the graph corresponding to the active sub-tab is initialized after a short delay, ensuring that the display area is available before graphical rendering begins. |
 
@@ -243,11 +243,11 @@
 
 ### REQ-VW-001 — Rendering the Views tab with sub-tabs
 
-| **If** | the `ontologist` navigates to the `Views` tab, |
+| **If** | the ontologist navigates to the `Views` tab, |
 |---|---|
 | **Then** | the application displays two visualization sub-tabs — "`Ontology`" for exploring the class hierarchy, and "Knowledge Base" for exploring `individuals` and their relationships — the active tab being remembered between navigations. |
 
-| **If** | the `ontologist` selects a sub-tab, |
+| **If** | the ontologist selects a sub-tab, |
 |---|---|
 | **Then** | the `view` refreshes to display the corresponding graph. |
 
@@ -257,7 +257,7 @@
 
 ### REQ-VW-002 — "Ontology" sub-tab: D3 hyperbolic tree
 
-| **If** | the `ontologist` opens the "`Ontology`" sub-tab, |
+| **If** | the ontologist opens the "`Ontology`" sub-tab, |
 |---|---|
 | **Then** | the application displays an interactive hyperbolic graph of the class tree, along with a `view` reset button, a search field for filtering `classes`, contextual help on available interactions, a class counter, and the visualization area. |
 
@@ -281,7 +281,7 @@
 
 ### REQ-VW-011 — Class counter displayed in the toolbar
 
-| **If** | the `ontologist` browses the hyperbolic graph, |
+| **If** | the ontologist browses the hyperbolic graph, |
 |---|---|
 | **Then** | the total number of `classes` present in the `ontology` is displayed in the graph toolbar. |
 
@@ -291,7 +291,7 @@
 
 ### REQ-VW-012 — "Knowledge Base" sub-tab: D3 force graph
 
-| **If** | the `ontologist` opens the "Knowledge Base" sub-tab, |
+| **If** | the ontologist opens the "Knowledge Base" sub-tab, |
 |---|---|
 | **Then** | the application displays an interactive force graph of `individuals` and their relationships, along with a simulation restart button, a search field for filtering `individuals`, a class type legend, a counter, and the visualization area. |
 
@@ -301,7 +301,7 @@
 
 ### REQ-VW-016 — Class legend in the Knowledge Base graph
 
-| **If** | the `ontologist` visualizes the Knowledge Base graph containing `individuals` of several types, |
+| **If** | the ontologist visualizes the Knowledge Base graph containing `individuals` of several types, |
 |---|---|
 | **Then** | a legend displays the correspondence between each class type and its color in the graph, making it possible to visually identify `individuals` according to their membership. |
 
@@ -321,7 +321,7 @@
 
 ### REQ-VW-018 — Zoom and pan on the Knowledge Base graph
 
-| **If** | the `ontologist` wishes to navigate in the Knowledge Base graph to explore dense areas or zoom out for an overview, |
+| **If** | the ontologist wishes to navigate in the Knowledge Base graph to explore dense areas or zoom out for an overview, |
 |---|---|
 | **Then** | the application allows zooming and panning freely, with a zoom factor between 0.1× and 4×. |
 
@@ -333,7 +333,7 @@
 
 | **If** | the Knowledge Base graph displays assertions between `individuals`, |
 |---|---|
-| **Then** | the name of the `object property` is displayed at the midpoint of each link, allowing the `ontologist` to identify the nature of the relationship without clicking on the edge. |
+| **Then** | the name of the `object property` is displayed at the midpoint of each link, allowing the ontologist to identify the nature of the relationship without clicking on the edge. |
 
 ---
 
@@ -341,11 +341,11 @@
 
 ### REQ-VW-021 — Node hover: connection highlighting
 
-| **If** | the `ontologist` hovers over an `individual` in the Knowledge Base graph, |
+| **If** | the ontologist hovers over an `individual` in the Knowledge Base graph, |
 |---|---|
 | **Then** | only that node and its directly connected neighbors remain fully visible; all other nodes, edges, and labels are strongly faded, allowing focus on the immediate relationships of the `individual`. |
 
-| **If** | the `ontologist` leaves the node, |
+| **If** | the ontologist leaves the node, |
 |---|---|
 | **Then** | all graph elements return to their normal visibility. |
 
@@ -355,7 +355,7 @@
 
 ### REQ-VW-026 — Individual and connection counter
 
-| **If** | the `ontologist` browses the Knowledge Base graph, |
+| **If** | the ontologist browses the Knowledge Base graph, |
 |---|---|
 | **Then** | the total number of `individuals` and the total number of connections between them are displayed in the graph toolbar. |
 
