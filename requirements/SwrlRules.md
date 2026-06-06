@@ -5,307 +5,478 @@
 ## Table of contents
 
 ### Substance
-- [REQ-SWR-001 — Search/filtering of rules](#req-swr-001--searchfiltering-of-rules)
-- [REQ-SWR-002 — Selecting an existing rule](#req-swr-002--selecting-an-existing-rule)
-- [REQ-SWR-003 — Creating a new rule](#req-swr-003--creating-a-new-rule)
-- [REQ-SWR-004 — Automatic generation of a unique identifier](#req-swr-004--automatic-generation-of-a-unique-identifier)
-- [REQ-SWR-005 — Synchronising metadata from the DOM](#req-swr-005--synchronising-metadata-from-the-dom)
-- [REQ-SWR-006 — Auto-save on metadata change](#req-swr-006--auto-save-on-metadata-change)
-- [REQ-SWR-007 — Saving a rule (create or update)](#req-swr-007--saving-a-rule-create-or-update)
-- [REQ-SWR-008 — Renaming an existing rule](#req-swr-008--renaming-an-existing-rule)
-- [REQ-SWR-009 — Deleting a rule](#req-swr-009--deleting-a-rule)
-- [REQ-SWR-010 — Adding and removing an atom in a section](#req-swr-010--adding-and-removing-an-atom-in-a-section)
-- [REQ-SWR-011 — Editing an atom field](#req-swr-011--editing-an-atom-field)
-- [REQ-SWR-012 — Selecting a class in the picker](#req-swr-012--selecting-a-class-in-the-picker)
-- [REQ-SWR-013 — Selecting a property in the picker](#req-swr-013--selecting-a-property-in-the-picker)
-- [REQ-SWR-014 — Filtering individuals by class in the picker](#req-swr-014--filtering-individuals-by-class-in-the-picker)
-- [REQ-SWR-015 — Selecting an individual in the picker](#req-swr-015--selecting-an-individual-in-the-picker)
-- [REQ-SWR-016 — Confirming the selection of an individual](#req-swr-016--confirming-the-selection-of-an-individual)
-- [REQ-SWR-017 — Closing the individual picker](#req-swr-017--closing-the-individual-picker)
-- [REQ-SWR-018 — Drag-and-drop to reorder atoms](#req-swr-018--drag-and-drop-to-reorder-atoms)
+- [REQ-SWR-005 — Search/filtering of rules](#req-swr-005--searchfiltering-of-rules)
+- [REQ-SWR-007 — Selecting an existing rule](#req-swr-007--selecting-an-existing-rule)
+- [REQ-SWR-008 — Creating a new rule](#req-swr-008--creating-a-new-rule)
+- [REQ-SWR-009 — Automatic generation of a unique identifier](#req-swr-009--automatic-generation-of-a-unique-identifier)
+- [REQ-SWR-011 — Synchronisation of metadata from the DOM](#req-swr-011--synchronisation-of-metadata-from-the-dom)
+- [REQ-SWR-012 — Automatic save on metadata modification](#req-swr-012--automatic-save-on-metadata-modification)
+- [REQ-SWR-013 — Saving a rule (creation or update)](#req-swr-013--saving-a-rule-creation-or-update)
+- [REQ-SWR-014 — Renaming an existing rule](#req-swr-014--renaming-an-existing-rule)
+- [REQ-SWR-015 — Deleting a rule](#req-swr-015--deleting-a-rule)
+- [REQ-SWR-016 — Adding an atom to a section](#req-swr-016--adding-an-atom-to-a-section)
+- [REQ-SWR-017 — Deleting an atom](#req-swr-017--deleting-an-atom)
+- [REQ-SWR-018 — Modifying an atom field](#req-swr-018--modifying-an-atom-field)
+- [REQ-SWR-025 — Selecting a class in the picker](#req-swr-025--selecting-a-class-in-the-picker)
+- [REQ-SWR-027 — Selecting a property in the picker](#req-swr-027--selecting-a-property-in-the-picker)
+- [REQ-SWR-029 — Filtering individuals by class in the picker](#req-swr-029--filtering-individuals-by-class-in-the-picker)
+- [REQ-SWR-030 — Selecting an individual in the picker](#req-swr-030--selecting-an-individual-in-the-picker)
+- [REQ-SWR-031 — Confirming the selection of an individual](#req-swr-031--confirming-the-selection-of-an-individual)
+- [REQ-SWR-032 — Closing the individual picker](#req-swr-032--closing-the-individual-picker)
+- [REQ-SWR-034 — Drag-and-drop to reorder atoms](#req-swr-034--drag-and-drop-to-reorder-atoms)
 
 ### Form
-- [REQ-SWR-019 — Two-panel interface layout](#req-swr-019--two-panel-interface-layout)
-- [REQ-SWR-020 — Resizing the list panel](#req-swr-020--resizing-the-list-panel)
-- [REQ-SWR-021 — Displaying the SWRL rule list](#req-swr-021--displaying-the-swrl-rule-list)
-- [REQ-SWR-022 — Visual indicator for broken references](#req-swr-022--visual-indicator-for-broken-references)
-- [REQ-SWR-023 — Dynamic filtering update](#req-swr-023--dynamic-filtering-update)
-- [REQ-SWR-024 — Rule editing form](#req-swr-024--rule-editing-form)
-- [REQ-SWR-025 — Rendering an atom of type `type_atom`](#req-swr-025--rendering-an-atom-of-type-type_atom)
-- [REQ-SWR-026 — Rendering an atom of type `property_atom`](#req-swr-026--rendering-an-atom-of-type-property_atom)
-- [REQ-SWR-027 — Rendering an atom of type `equality_atom`](#req-swr-027--rendering-an-atom-of-type-equality_atom)
-- [REQ-SWR-028 — Rendering a NAF block](#req-swr-028--rendering-a-naf-block)
-- [REQ-SWR-029 — Rendering a nested conditional atom](#req-swr-029--rendering-a-nested-conditional-atom)
-- [REQ-SWR-030 — Class picker for `type_atom` atoms](#req-swr-030--class-picker-for-type_atom-atoms)
-- [REQ-SWR-031 — Property picker for `property_atom` atoms](#req-swr-031--property-picker-for-property_atom-atoms)
-- [REQ-SWR-032 — Two-panel individual picker (modal)](#req-swr-032--two-panel-individual-picker-modal)
+- [REQ-SWR-001 — Two-panel interface display](#req-swr-001--two-panel-interface-display)
+- [REQ-SWR-002 — Resizing the list panel](#req-swr-002--resizing-the-list-panel)
+- [REQ-SWR-003 — Displaying the SWRL rule list](#req-swr-003--displaying-the-swrl-rule-list)
+- [REQ-SWR-004 — Visual indicator for broken references](#req-swr-004--visual-indicator-for-broken-references)
+- [REQ-SWR-006 — Dynamic update of filtering](#req-swr-006--dynamic-update-of-filtering)
+- [REQ-SWR-010 — Rule editing form](#req-swr-010--rule-editing-form)
+- [REQ-SWR-019 — Rendering an atom of type `type_atom`](#req-swr-019--rendering-an-atom-of-type-type_atom)
+- [REQ-SWR-020 — Rendering an atom of type `property_atom`](#req-swr-020--rendering-an-atom-of-type-property_atom)
+- [REQ-SWR-021 — Rendering an atom of type `equality_atom`](#req-swr-021--rendering-an-atom-of-type-equality_atom)
+- [REQ-SWR-022 — Rendering a NAF block](#req-swr-022--rendering-a-naf-block)
+- [REQ-SWR-023 — Rendering a nested conditional atom](#req-swr-023--rendering-a-nested-conditional-atom)
+- [REQ-SWR-024 — Class picker for `type_atom` atoms](#req-swr-024--class-picker-for-type_atom-atoms)
+- [REQ-SWR-026 — Property picker for `property_atom` atoms](#req-swr-026--property-picker-for-property_atom-atoms)
+- [REQ-SWR-028 — Two-panel individual picker (modal)](#req-swr-028--two-panel-individual-picker-modal)
 - [REQ-SWR-033 — Dynamic positioning of dropdowns](#req-swr-033--dynamic-positioning-of-dropdowns)
-- [REQ-SWR-034 — Navigation to a referenced entity from an atom](#req-swr-034--navigation-to-a-referenced-entity-from-an-atom)
+- [REQ-SWR-035 — Navigation to a referenced entity from an atom](#req-swr-035--navigation-to-a-referenced-entity-from-an-atom)
 
 ---
 
-## 1. Substance — Business logic and functional rules
+## 1. Substance — Business logic
 
 > Requirements independent of the UI: OWL rules, data constraints, algorithmic behaviours, validations, persistence.
 
 
-### REQ-SWR-001 — Search/filtering of rules
+### REQ-SWR-005 — Search/filtering of rules
 
-The system filters the rule list according to a text query entered in the search field (`#swrl-search`). Matching is case-insensitive and covers the `id`, `label`, and `comment` fields of the rule, as well as the `class_id`, `property_id`, `var`, `subject`, `object`, and `value` fields of each atom in the body (`body`) and the head (`head`).
+**If** the user types a text query in the search field (`#swrl-search`),
+
+**Then** the system filters the rule list by performing a case-insensitive match on the `id`, `label` and `comment` fields of each rule, as well as on the `class_id`, `property_id`, `var`, `subject`, `object` and `value` fields of each atom in the body (`body`) and head (`head`).
 
 ---
 
 **Source code:** `swrl_editor.js` → `_filterRules()`
 
-### REQ-SWR-002 — Selecting an existing rule
+### REQ-SWR-007 — Selecting an existing rule
 
-When the user clicks on a rule in the list, the system retrieves the corresponding rule from `APP.state.swrl_rules`, performs a deep copy (`JSON.parse(JSON.stringify(rule))`), assigns it to `_editingRule`, and triggers rendering of the editing form in the right panel. The `selected` class is applied to the corresponding list element.
+**If** the user clicks on a rule in the list,
+
+**Then**:
+- the system retrieves the corresponding rule from `APP.state.swrl_rules` and performs a deep copy (`JSON.parse(JSON.stringify(rule))`)
+- the copy is assigned to `_editingRule`
+- the editing form is rendered in the right panel
+- the CSS class `selected` is applied to the corresponding list element
 
 ---
 
 **Source code:** `swrl_editor.js` → `selectRule()`
 
-### REQ-SWR-003 — Creating a new rule
+### REQ-SWR-008 — Creating a new rule
 
-When the user clicks the ➕ button, the system generates a unique identifier, creates an empty rule (`body: [], head: [], enabled: true`), sends it via `API.createSWRLRule()`, refreshes the application state, updates the list, and displays the editing form for the newly selected rule.
+**If** the user clicks the ➕ button,
+
+**Then**:
+- the system generates a unique identifier
+- an empty rule is created (`body: [], head: [], enabled: true`)
+- the rule is sent via `API.createSWRLRule()`
+- the application state is refreshed and the list is updated
+- the editing form for the new rule is displayed and the rule is selected
 
 ---
 
 **Source code:** `swrl_editor.js` → `newRule()`
 
-### REQ-SWR-004 — Automatic generation of a unique identifier
+### REQ-SWR-009 — Automatic generation of a unique identifier
 
-The system automatically generates an identifier for a new rule starting from `NewRule`, then trying `NewRule1`, `NewRule2`, and so on, until it finds an identifier not already present in the existing list (`APP.state.swrl_rules`).
+**If** the system needs to generate an identifier for a new rule,
+
+**Then** it starts from the value `NewRule`, then tries successively `NewRule1`, `NewRule2`, etc., until it finds an identifier absent from `APP.state.swrl_rules`.
 
 ---
 
 **Source code:** `swrl_editor.js` → `_generateRuleName()`
 
-### REQ-SWR-005 — Synchronising metadata from the DOM
+### REQ-SWR-011 — Synchronisation of metadata from the DOM
 
-The system reads the values of the `#swrl-id`, `#swrl-label`, and `#swrl-comment` fields from the DOM and writes them into `_editingRule`. Spaces in the identifier are replaced by `_`.
+**If** the system triggers a metadata synchronisation,
+
+**Then** it reads the values of the `#swrl-id`, `#swrl-label` and `#swrl-comment` fields from the DOM, writes them into `_editingRule`, and replaces spaces in the identifier with `_`.
 
 ---
 
 **Source code:** `swrl_editor.js` → `_syncFromDom()`
 
-### REQ-SWR-006 — Auto-save on metadata change
+### REQ-SWR-012 — Automatic save on metadata modification
 
-On each `onchange` event on the `ID`, `Label`, or `Comment` fields, the system synchronises metadata from the DOM via `_syncFromDom()` and then automatically triggers a save via `save(false)` if the rule is not new.
+**If** the user triggers an `onchange` event on the `ID`, `Label` or `Comment` fields
+**and** the rule currently being edited is not new,
+
+**Then** the system synchronises the metadata from the DOM via `_syncFromDom()` and then automatically triggers a save via `save(false)`.
 
 ---
 
 **Source code:** `swrl_editor.js` → `_syncAndSave()`
 
-### REQ-SWR-007 — Saving a rule (create or update)
+### REQ-SWR-013 — Saving a rule (creation or update)
 
-The system saves the rule currently being edited. If the rule is new, it calls `API.createSWRLRule()`; otherwise it calls `API.updateSWRLRule(originalId, rule)`. After saving, the application state is refreshed and the list is updated. In case of error, a message is displayed via `UI.error()`.
+**If** the system needs to save the rule currently being edited,
 
----
-
-**Source code:** `swrl_editor.js` → `save()`
-
-### REQ-SWR-008 — Renaming an existing rule
-
-During an update, if the current identifier of the rule (`rule.id`) differs from the original identifier (`_editingId`), the system calls `API.updateSWRLRule(originalId, rule)` with the old identifier and displays a success message indicating the new name.
+**Then**:
+- if the rule is new, it calls `API.createSWRLRule()`
+- otherwise, it calls `API.updateSWRLRule(originalId, rule)`
+- after saving, the application state is refreshed and the list is updated
+- in case of error, a message is displayed via `UI.error()`
 
 ---
 
 **Source code:** `swrl_editor.js` → `save()`
 
-### REQ-SWR-009 — Deleting a rule
+### REQ-SWR-014 — Renaming an existing rule
 
-The system displays a confirmation prompt before deleting a rule. Upon confirmation, it calls `API.deleteSWRLRule(id)`. If the returned error is a 404, it is ignored. After deletion, the selection and the rule being edited are reset, the application state is refreshed, the list is updated, and the detail panel is cleared.
+**If** the system saves an update
+**and** the current identifier of the rule (`rule.id`) differs from the original identifier (`_editingId`),
+
+**Then** the system calls `API.updateSWRLRule(originalId, rule)` with the old identifier and displays a success message indicating the new name.
+
+---
+
+**Source code:** `swrl_editor.js` → `save()`
+
+### REQ-SWR-015 — Deleting a rule
+
+**If** the user requests the deletion of a rule
+**and** confirms the request,
+
+**Then**:
+- the system calls `API.deleteSWRLRule(id)` (a 404 error is ignored)
+- the selection and the rule currently being edited are reset
+- the application state is refreshed and the list is updated
+- the detail panel is cleared
 
 ---
 
 **Source code:** `swrl_editor.js` → `delete()`
 
-### REQ-SWR-010 — Adding and removing an atom in a section
+### REQ-SWR-016 — Adding an atom to a section
 
-The system allows adding a new atom of the specified type (created by `_makeAtom()`) to the list designated by a path (`body`, `head`, or a nested atom sub-path), as well as removing an existing atom designated by its path. In both cases, the form is re-rendered after the operation and the rule is automatically saved if it is not new.
+**If** the user adds an atom of a given type to a section (`body`, `head`, or a nested atom sub-path),
+
+**Then**:
+- the system creates a new atom via `_makeAtom()` and appends it to the list designated by the path
+- the form is re-rendered
+- if the rule is not new, an automatic save is triggered
 
 ---
 
-**Source code:** `swrl_editor.js` → `addAtom()` | `removeAtom()`
+**Source code:** `swrl_editor.js` → `addAtom()`
 
-### REQ-SWR-011 — Editing an atom field
+### REQ-SWR-017 — Deleting an atom
 
-The system updates the value of a field (`var`, `subject`, `object`, `value`, `operator`, etc.) of an atom designated by its path, then triggers an automatic save if the rule is not new.
+**If** the user deletes an atom designated by its path,
+
+**Then**:
+- the system resolves the path in `_editingRule` and removes the atom
+- the form is re-rendered
+- if the rule is not new, an automatic save is triggered
+
+---
+
+**Source code:** `swrl_editor.js` → `removeAtom()`
+
+### REQ-SWR-018 — Modifying an atom field
+
+**If** the user modifies the value of a field (`var`, `subject`, `object`, `value`, `operator`, etc.) of an atom designated by its path,
+
+**Then** the system updates the corresponding value in `_editingRule` and triggers an automatic save if the rule is not new.
 
 ---
 
 **Source code:** `swrl_editor.js` → `updateField()`
 
-### REQ-SWR-012 — Selecting a class in the picker
+### REQ-SWR-025 — Selecting a class in the picker
 
-When the user selects a class in the picker, the system updates the `class_id` field of the atom designated by `_currentPickerPath`, closes all class pickers, re-renders the form, and triggers an automatic save.
+**If** the user selects a class in the class picker,
+
+**Then**:
+- the system updates the `class_id` field of the atom designated by `_currentPickerPath`
+- all open class pickers are closed
+- the form is re-rendered
+- an automatic save is triggered
 
 ---
 
 **Source code:** `swrl_editor.js` → `onClassPickerSelect()`
 
-### REQ-SWR-013 — Selecting a property in the picker
+### REQ-SWR-027 — Selecting a property in the picker
 
-When the user selects a property, the system updates the `property_id` field of the atom designated by `_currentPropPickerPath`, closes all property pickers, re-renders the form, and triggers an automatic save.
+**If** the user selects a property in the property picker,
+
+**Then**:
+- the system updates the `property_id` field of the atom designated by `_currentPropPickerPath`
+- all open property pickers are closed
+- the form is re-rendered
+- an automatic save is triggered
 
 ---
 
 **Source code:** `swrl_editor.js` → `onPropPickerSelect()`
 
-### REQ-SWR-014 — Filtering individuals by class in the picker
+### REQ-SWR-029 — Filtering individuals by class in the picker
 
-When a class is selected in the left panel of the picker, the system filters the individuals displayed in the right panel. If `owl:Thing` is selected, all individuals are displayed. Otherwise, only individuals whose `types` field includes the selected class or one of its subclasses are displayed. The label of each individual is resolved via `IndividualEditor._labelForId()`.
+**If** the user selects a class in the left panel of the individual picker,
+
+**Then**:
+- if `owl:Thing` is selected, all individuals are displayed
+- otherwise, only individuals whose `types` field includes the selected class or one of its subclasses are displayed
+- the label of each individual is resolved via `IndividualEditor._labelForId()`
 
 ---
 
 **Source code:** `swrl_editor.js` → `swrlIndPickerSelectClass()`
 
-### REQ-SWR-015 — Selecting an individual in the picker
+### REQ-SWR-030 — Selecting an individual in the picker
 
-When the user clicks on an individual in the picker list, the system marks it as selected in `_swrlIndPicker.selectedInd` and enables the `OK` button. A double-click on an individual selects it and immediately confirms the selection.
+**If** the user clicks on an individual in the picker list,
+
+**Then** the individual is marked as selected in `_swrlIndPicker.selectedInd` and the `OK` button is enabled.
+
+**If** the user double-clicks on an individual,
+
+**Then** the individual is selected and confirmation is triggered immediately.
 
 ---
 
 **Source code:** `swrl_editor.js` → `swrlIndPickerSelectInd()`
 
-### REQ-SWR-016 — Confirming the selection of an individual
+### REQ-SWR-031 — Confirming the selection of an individual
 
-Upon confirmation (via the `OK` button or a double-click), the system calls `onIndPickerSelect()` with the identifier of the selected individual, which updates the `value` field of the relevant `equality_atom`, re-renders the form, triggers an automatic save, and then closes the modal.
+**If** the user clicks the `OK` button or double-clicks on an individual in the picker,
+
+**Then**:
+- the system calls `onIndPickerSelect()` with the identifier of the selected individual
+- the `value` field of the concerned `equality_atom` atom is updated
+- the form is re-rendered and an automatic save is triggered
+- the modal is closed
 
 ---
 
 **Source code:** `swrl_editor.js` → `confirmIndPicker()`
 
-### REQ-SWR-017 — Closing the individual picker
+### REQ-SWR-032 — Closing the individual picker
 
-The system removes the `#swrl-ind-picker-modal` element from the DOM and resets the internal state `_swrlIndPicker` (atom path, selected class, selected individual).
+**If** the system closes the individual picker,
+
+**Then**:
+- the `#swrl-ind-picker-modal` element is removed from the DOM
+- the internal state `_swrlIndPicker` is reset (atom path, selected class, selected individual)
 
 ---
 
 **Source code:** `swrl_editor.js` → `closeIndPicker()`
 
-### REQ-SWR-018 — Drag-and-drop to reorder atoms
+### REQ-SWR-034 — Drag-and-drop to reorder atoms
 
-The system allows reordering atoms by drag-and-drop within the same list (same `listPath`). Only the `⠿` element (handle) is `draggable="true"` to avoid nesting conflicts. A drop is accepted only if the source and target lists are identical. After dropping, atoms are reordered in `_editingRule` via `splice()`, the form is re-rendered, and an automatic save is triggered.
+**If** the user drags an atom via the `⠿` handle and drops it onto another atom in the same list (`listPath`),
+
+**Then**:
+- the atoms are reordered in `_editingRule` via `splice()`
+- the form is re-rendered
+- an automatic save is triggered
+
+**If** the source list and the target list are different,
+
+**Then** the drop is rejected.
 
 ---
 
-**Source code:** `swrl_editor.js` → `onDragStart()`, `onDragOver()`, `onDragLeave()`, `onDrop()`, `onDragEnd()`
-
----
-
-## 2. Form — Presentation and user interface
+## 2. Form — Presentation and UI
 
 > Requirements relating to display: layout, visual components, interactions, navigation, styles.
 
-### REQ-SWR-019 — Two-panel interface layout
+**Source code:** `swrl_editor.js` → `onDragStart()`, `onDragOver()`, `onDragLeave()`, `onDrop()`, `onDragEnd()`
 
-The system displays the SwrlRules tab as an interface divided into two panels: a left panel (`#swrl-list-panel`) containing the rule list and a search field, and a right panel (`#swrl-detail`) intended for displaying the editing form. The detail panel displays a prompt message when no rule is selected.
+### REQ-SWR-001 — Two-panel interface display
+
+**If** the SwrlRules tab is displayed,
+
+**Then**:
+- the system presents an interface divided into two panels: a left panel (`#swrl-list-panel`) containing the rule list and a search field, and a right panel (`#swrl-detail`) intended for the editing form
+- if no rule is selected, the right panel displays a prompt message
 
 ---
 
 **Source code:** `swrl_editor.js` → `renderSplit()`
 
-### REQ-SWR-020 — Resizing the list panel
+### REQ-SWR-002 — Resizing the list panel
 
-The system allows the user to horizontally resize the list panel by dragging the handle (`#swrl-split-h`). The minimum width is 120 px and the maximum width is 400 px.
+**If** the user drags the `#swrl-split-h` handle,
+
+**Then** the system resizes the list panel horizontally with a minimum width of 120 px and a maximum width of 400 px.
 
 ---
 
 **Source code:** `swrl_editor.js` → `_initSplitHandle()`
 
-### REQ-SWR-021 — Displaying the SWRL rule list
+### REQ-SWR-003 — Displaying the SWRL rule list
 
-The system displays the filtered list of SWRL rules. Each entry shows the label (`label`) or identifier (`id`) of the rule, the identifier as sub-text when a label exists, a ⚙️ icon, and a delete button. The selected rule is highlighted via the CSS class `selected`. If no rule is present or matches the filter, an empty message is displayed.
+**If** the SWRL rule list is displayed (filtered or complete),
+
+**Then**:
+- each entry presents the label (`label`) or identifier (`id`) of the rule, the identifier as subtext when a label exists, a ⚙️ icon and a delete button
+- the selected rule is highlighted via the CSS class `selected`
+- if no rule is present or matches the filter, an empty message is displayed
 
 ---
 
 **Source code:** `swrl_editor.js` → `renderList()`
 
-### REQ-SWR-022 — Visual indicator for broken references
+### REQ-SWR-004 — Visual indicator for broken references
 
-The system detects whether a rule references a class or property that no longer exists in the application state (`APP.state`). If so, the rule entry in the list is coloured red (`var(--red,#ef4444)`), and the affected atoms display a `⚠ deleted` badge in the editing form. Detection covers `type_atom` atoms (field `class_id`), `property_atom` atoms (field `property_id`), as well as atoms nested inside `naf_block` and `conditional` blocks.
+**If** a rule references a class or property that no longer exists in `APP.state`,
+
+**Then**:
+- the rule entry in the list is coloured red (`var(--red,#ef4444)`)
+- the affected atoms display a `⚠ deleted` badge in the editing form
+- detection covers `type_atom` atoms (field `class_id`), `property_atom` atoms (field `property_id`), as well as atoms nested inside `naf_block` and `conditional` blocks
 
 ---
 
 **Source code:** `swrl_editor.js` → `_ruleHasBrokenRefs()` and `renderList()`
 
-### REQ-SWR-023 — Dynamic filtering update
+### REQ-SWR-006 — Dynamic update of filtering
 
-The system instantly updates the list displayed in `#swrl-list` on each keystroke in the search field. A ✕ button is dynamically added to the search field when the query is non-empty, and removed when it is cleared. Clicking this button resets the query and re-triggers filtering.
+**If** the user types or modifies the query in the search field,
+
+**Then**:
+- the list displayed in `#swrl-list` is updated instantly
+- a ✕ button is added dynamically to the field when the query is non-empty, and removed when it is cleared
+
+**If** the user clicks the ✕ button,
+
+**Then** the query is reset and filtering is re-triggered.
 
 ---
 
 **Source code:** `swrl_editor.js` → `_applySearch()`
 
-### REQ-SWR-024 — Rule editing form
+### REQ-SWR-010 — Rule editing form
 
-The system displays a form comprising: an `ID` field (required, with automatic replacement of spaces by `_`), a `Label` field, a `Comment` text area, an `if` section (rule body) and a `then` section (rule head). Each section has buttons to add atoms of type `type_atom`, `property_atom`, `equality_atom`. The `body` section additionally offers the `naf_block` type; the `head` section offers the `conditional` type in place of `naf_block`.
+**If** a rule is selected and the editing form is displayed,
+
+**Then** the system presents:
+- a mandatory `ID` field with automatic replacement of spaces by `_`
+- a `Label` field
+- a `Comment` text area
+- an `if` section (body) and a `then` section (head), each with buttons to add atoms of type `type_atom`, `property_atom`, `equality_atom`
+- the `body` section additionally offers the `naf_block` type; the `head` section offers the `conditional` type in place of `naf_block`
 
 ---
 
 **Source code:** `swrl_editor.js` → `_renderForm()`
 
-### REQ-SWR-025 — Rendering an atom of type `type_atom`
+### REQ-SWR-019 — Rendering an atom of type `type_atom`
 
-The system displays a `type_atom` atom as a variable field (`?var`) followed by the keyword `is a` and a class selector. If the referenced class no longer exists in `APP.state.classes`, the selector displays `⚠ deleted` in red. If the class exists, it is clickable and navigates to the `classes` view via `APP.navigateTo()`.
+**If** an atom of type `type_atom` is rendered in the form,
+
+**Then**:
+- the system displays a variable field (`?var`) followed by the keyword `is a` and a class selector
+- if the referenced class no longer exists in `APP.state.classes`, the selector displays `⚠ deleted` in red
+- if the class exists, it is clickable and navigates to the `classes` view via `APP.navigateTo()`
 
 ---
 
 **Source code:** `swrl_editor.js` → `_renderAtom()` (branch `case 'type_atom'`)
 
-### REQ-SWR-026 — Rendering an atom of type `property_atom`
+### REQ-SWR-020 — Rendering an atom of type `property_atom`
 
-The system displays a `property_atom` atom as a subject field (`?subj`), a property selector (object property or datatype property, distinguished by their coloured dot) and an object field (`?obj / ?_`). If the property no longer exists, the selector displays `⚠ deleted`. If it exists, it is clickable and navigates to `object-properties` or `datatype-properties` depending on its type.
+**If** an atom of type `property_atom` is rendered in the form,
+
+**Then**:
+- the system displays a subject field (`?subj`), a property selector (object property or datatype property, distinguished by their coloured dot) and an object field (`?obj / ?_`)
+- if the property no longer exists, the selector displays `⚠ deleted`
+- if it exists, it is clickable and navigates to `object-properties` or `datatype-properties` depending on its type
 
 ---
 
 **Source code:** `swrl_editor.js` → `_renderAtom()` (branch `case 'property_atom'`)
 
-### REQ-SWR-027 — Rendering an atom of type `equality_atom`
+### REQ-SWR-021 — Rendering an atom of type `equality_atom`
 
-The system displays an `equality_atom` atom with a variable field (`?var`), an operator selector among `=`, `!=`, `>`, `>=`, `<`, `<=`, and a value field. If the value matches a known individual in `APP.state.individuals`, it is displayed as a navigable pill (click → `APP.navigateTo('individuals', ...)`). Otherwise, a free text field is displayed. A separate button allows opening the individual picker.
+**If** an atom of type `equality_atom` is rendered in the form,
+
+**Then**:
+- the system displays a variable field (`?var`), an operator selector among `=`, `!=`, `>`, `>=`, `<`, `<=`, and a value field
+- if the value corresponds to a known individual in `APP.state.individuals`, it is displayed as a navigable badge (click → `APP.navigateTo('individuals', ...)`)
+- otherwise, a free text field is displayed
+- a separate button allows opening the individual picker
 
 ---
 
 **Source code:** `swrl_editor.js` → `_renderAtom()` (branch `case 'equality_atom'`)
 
-### REQ-SWR-028 — Rendering a NAF block
+### REQ-SWR-022 — Rendering a NAF block
 
-The system displays a NAF (Negation As Failure) block with a header labelled `NAF`, buttons to add atoms of type `type_atom`, `property_atom`, or `equality_atom` inside the block, and recursive rendering of nested atoms via `_renderAtomList()`.
+**If** a NAF block is rendered in the form,
+
+**Then** the system displays:
+- a header labelled `NAF`
+- buttons to add atoms of type `type_atom`, `property_atom` or `equality_atom` inside the block
+- the recursive rendering of nested atoms via `_renderAtomList()`
 
 ---
 
 **Source code:** `swrl_editor.js` → `_renderAtom()` (branch `case 'naf_block'`)
 
-### REQ-SWR-029 — Rendering a nested conditional atom
+### REQ-SWR-023 — Rendering a nested conditional atom
 
-The system displays a `conditional` atom as two nested `if` and `then` sub-sections, each with buttons to add atoms (`type_atom`, `property_atom`, `equality_atom`, `naf_block` in the condition; an additional `conditional` in the consequent). The code normalises legacy formats at render time (single object → list) for the `condition` and `consequent` fields.
+**If** an atom of type `conditional` is rendered in the form,
+
+**Then**:
+- the system displays two nested `if` and `then` sub-sections, each with buttons to add atoms (`type_atom`, `property_atom`, `equality_atom`, `naf_block` in the condition; additionally `conditional` in the consequent)
+- legacy formats (single object → list) are normalised at render time for the `condition` and `consequent` fields
 
 ---
 
 **Source code:** `swrl_editor.js` → `_renderAtom()` (branch `case 'conditional'`)
 
-### REQ-SWR-030 — Class picker for `type_atom` atoms
+### REQ-SWR-024 — Class picker for `type_atom` atoms
 
-The system opens or closes a class selection dropdown positioned with `position:fixed` below (or above) the trigger button. All other open class pickers are closed upon opening. The dropdown closes automatically when clicking outside.
+**If** the user opens the class picker,
+
+**Then**:
+- all other open class pickers are closed
+- a dropdown is displayed at `position:fixed` below (or above if space is insufficient) the trigger button
+
+**If** the user clicks outside the dropdown,
+
+**Then** the dropdown closes automatically.
 
 ---
 
 **Source code:** `swrl_editor.js` → `toggleClassPicker()`
 
-### REQ-SWR-031 — Property picker for `property_atom` atoms
+### REQ-SWR-026 — Property picker for `property_atom` atoms
 
-The system opens or closes a property selection dropdown positioned with `position:fixed`. The dropdown content is built dynamically from `APP.state.object_properties` and `APP.state.datatype_properties`, sorted alphabetically, with a visual separator between the two groups. Object properties are distinguished by an `op-prop-dot` coloured dot and datatype properties by a `dp-prop-dot` coloured dot.
+**If** the user opens the property picker,
+
+**Then**:
+- the system displays a dropdown at `position:fixed` whose content is built dynamically from `APP.state.object_properties` and `APP.state.datatype_properties`, sorted alphabetically, with a visual separator between the two groups
+- object properties are distinguished by a coloured dot `op-prop-dot` and datatype properties by `dp-prop-dot`
 
 ---
 
 **Source code:** `swrl_editor.js` → `togglePropPicker()`
 
-### REQ-SWR-032 — Two-panel individual picker (modal)
+### REQ-SWR-028 — Two-panel individual picker (modal)
 
-The system opens a modal window (`#swrl-ind-picker-modal`) comprising two panels: a class tree on the left (including `owl:Thing` as the first entry with the total number of individuals) and an individual list on the right. The class tree is built via `ClassEditor.buildTree()` and the individual count for each class takes the hierarchy into account (descendant classes included).
+**If** the user opens the individual picker,
+
+**Then** the system displays a modal window (`#swrl-ind-picker-modal`) composed of:
+- a left panel with a class tree (built via `ClassEditor.buildTree()`) including `owl:Thing` as the first entry with the total number of individuals; the number of individuals for each class takes the hierarchy into account (descendant classes included)
+- a right panel with the list of individuals
 
 ---
 
@@ -313,14 +484,27 @@ The system opens a modal window (`#swrl-ind-picker-modal`) comprising two panels
 
 ### REQ-SWR-033 — Dynamic positioning of dropdowns
 
-The system computes the optimal position of a `position:fixed` dropdown by taking into account the available space below and above the trigger button. If the space below the button is insufficient, the dropdown opens upwards. The minimum width is that of the trigger button or the `width` value passed as a parameter (default 200 px); the maximum height is bounded to 260 px or the available space.
+**If** the system needs to position a dropdown at `position:fixed`,
+
+**Then**:
+- it calculates the available space below and above the trigger button
+- if the space below the button is insufficient, the dropdown opens upwards
+- the minimum width is that of the trigger button or the `width` value passed as a parameter (default 200 px)
+- the maximum height is bounded to 260 px or the available space
 
 ---
 
 **Source code:** `swrl_editor.js` → `_positionDropdown()`
 
-### REQ-SWR-034 — Navigation to a referenced entity from an atom
+### REQ-SWR-035 — Navigation to a referenced entity from an atom
 
-The system makes the class, property, and individual identifiers displayed in atoms clickable when the referenced entity exists. A click calls `APP.navigateTo()` with the target tab (`classes`, `object-properties`, `datatype-properties`, `individuals`) and the entity identifier. On hover, an underline and an accent colour are applied.
+**If** an entity referenced in an atom (class, property or individual) exists in the application state
+**and** the user clicks on its displayed identifier,
+
+**Then** the system calls `APP.navigateTo()` with the target tab (`classes`, `object-properties`, `datatype-properties`, `individuals`) and the entity identifier.
+
+**If** the user hovers over the identifier,
+
+**Then** an underline and an accent colour are applied.
 
 **Source code:** `swrl_editor.js` → `_renderAtom()` (branches `type_atom`, `property_atom`, `equality_atom`)
