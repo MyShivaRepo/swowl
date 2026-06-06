@@ -5,7 +5,7 @@
 ## Table des matières
 
 ### Fond
-- [REQ-AP-001 — Définition des propriétés d'annotation intégrées (built-ins)](#req-ap-001--définition-des-propriétés-dannotation-intégrées-built-ins)
+- [REQ-AP-001 — Définition des `AnnotationProperty` intégrées (built-ins)](#req-ap-001--définition-des-propriétés-dannotation-intégrées-built-ins)
 - [REQ-AP-002 — Détection des propriétés built-in vs. utilisateur](#req-ap-002--détection-des-propriétés-built-in-vs-utilisateur)
 - [REQ-AP-003 — Construction de l'arbre hiérarchique des propriétés](#req-ap-003--construction-de-larbre-hiérarchique-des-propriétés)
 - [REQ-AP-004 — Génération automatique d'un identifiant unique](#req-ap-004--génération-automatique-dun-identifiant-unique)
@@ -18,7 +18,7 @@
 - [REQ-AP-011 — Prévention des cycles lors du glisser-déposer](#req-ap-011--prévention-des-cycles-lors-du-glisser-déposer)
 - [REQ-AP-012 — Suppression d'une propriété utilisateur avec confirmation](#req-ap-012--suppression-dune-propriété-utilisateur-avec-confirmation)
 - [REQ-AP-013 — Collecte des annotations (labels, commentaires, autres)](#req-ap-013--collecte-des-annotations-labels-commentaires-autres)
-- [REQ-AP-014 — Picker de sélection de propriété d'annotation](#req-ap-014--picker-de-sélection-de-propriété-dannotation)
+- [REQ-AP-014 — Picker de sélection de `AnnotationProperty`](#req-ap-014--picker-de-sélection-de-propriété-dannotation)
 
 ### Forme
 - [REQ-AP-015 — Rendu des nœuds built-in dans l'arbre](#req-ap-015--rendu-des-nœuds-built-in-dans-larbre)
@@ -42,11 +42,11 @@
 > Exigences indépendantes de l'IHM : règles OWL, contraintes de données, comportements algorithmiques, validations, persistance.
 
 
-### REQ-AP-001 — Définition des propriétés d'annotation intégrées (built-ins)
+### REQ-AP-001 — Définition des `AnnotationProperty` intégrées (built-ins)
 
-| **Si** | l'ontologiste exploite des `propriétés d'annotation` OWL 2 standard dans son `ontologie`, |
+| **Si** | l'ontologiste exploite des `AnnotationProperty` OWL 2 standard dans son `ontologie`, |
 |---|---|
-| **Alors** | l'application reconnaît nativement deux groupes de `propriétés d'annotation` prédéfinies en lecture seule :<br>- le groupe `rdfs:` : `rdfs:label`, `rdfs:comment`, `rdfs:seeAlso`, `rdfs:isDefinedBy`<br>- le groupe `owl:` : `owl:versionInfo`, `owl:deprecated`, `owl:priorVersion`, `owl:backwardCompatibleWith`, `owl:incompatibleWith`<br>chacune accompagnée d'une description en anglais accessible à l'utilisateur. |
+| **Alors** | l'application reconnaît nativement deux groupes de `AnnotationProperty` prédéfinies en lecture seule :<br>- le groupe `rdfs:` : `rdfs:label`, `rdfs:comment`, `rdfs:seeAlso`, `rdfs:isDefinedBy`<br>- le groupe `owl:` : `owl:versionInfo`, `owl:deprecated`, `owl:priorVersion`, `owl:backwardCompatibleWith`, `owl:incompatibleWith`<br>chacune accompagnée d'une description en anglais accessible à l'utilisateur. |
 
 ---
 
@@ -54,7 +54,7 @@
 
 ### REQ-AP-002 — Détection des propriétés built-in vs. utilisateur
 
-| **Si** | l'application doit distinguer une `propriété d'annotation` standard OWL 2 d'une `propriété` définie par l'ontologiste, |
+| **Si** | l'application doit distinguer une `AnnotationProperty` standard OWL 2 d'une `propriété` définie par l'ontologiste, |
 |---|---|
 | **Alors** | elle identifie correctement toute `propriété` appartenant aux groupes `rdfs:` ou `owl:` comme étant une `propriété` intégrée, et traite les autres comme des `propriétés` utilisateur éditables. |
 
@@ -64,9 +64,9 @@
 
 ### REQ-AP-003 — Construction de l'arbre hiérarchique des propriétés
 
-| **Si** | l'`ontologie` contient des `propriétés d'annotation` organisées en hiérarchie de sous-`propriétés`, |
+| **Si** | l'`ontologie` contient des `AnnotationProperty` organisées en hiérarchie de sous-`propriétés`, |
 |---|---|
-| **Alors** | l'arbre des `propriétés d'annotation` reflète fidèlement les relations de spécialisation entre `propriétés`, en distinguant les `propriétés` racines, les `propriétés` attachées à un parent intégré et celles attachées à un parent utilisateur. |
+| **Alors** | l'arbre des `AnnotationProperty` reflète fidèlement les relations de spécialisation entre `propriétés`, en distinguant les `propriétés` racines, les `propriétés` attachées à un parent intégré et celles attachées à un parent utilisateur. |
 
 ---
 
@@ -74,7 +74,7 @@
 
 ### REQ-AP-004 — Génération automatique d'un identifiant unique
 
-| **Si** | l'ontologiste crée une nouvelle `propriété d'annotation` sans en préciser l'identifiant, |
+| **Si** | l'ontologiste crée une nouvelle `AnnotationProperty` sans en préciser l'identifiant, |
 |---|---|
 | **Alors** | l'application lui propose automatiquement un identifiant unique, sans conflit avec les `propriétés` déjà présentes dans l'`ontologie`. |
 
@@ -84,7 +84,7 @@
 
 ### REQ-AP-005 — Création d'une propriété enfant (sub-property)
 
-| **Si** | l'ontologiste souhaite spécialiser une `propriété d'annotation` existante en créant une sous-`propriété` directement positionnée sous celle-ci, |
+| **Si** | l'ontologiste souhaite spécialiser une `AnnotationProperty` existante en créant une sous-`propriété` directement positionnée sous celle-ci, |
 |---|---|
 | **Alors** | la nouvelle `propriété` est automatiquement rattachée au parent sélectionné, le parent est déplié dans l'arbre, et la nouvelle `propriété` est immédiatement sélectionnée pour édition. |
 
@@ -94,7 +94,7 @@
 
 ### REQ-AP-006 — Création d'une propriété sœur (même niveau)
 
-| **Si** | l'ontologiste souhaite créer une nouvelle `propriété d'annotation` au même niveau hiérarchique qu'une `propriété` existante, |
+| **Si** | l'ontologiste souhaite créer une nouvelle `AnnotationProperty` au même niveau hiérarchique qu'une `propriété` existante, |
 |---|---|
 | **Alors** | la nouvelle `propriété` hérite des mêmes parents que la `propriété` de référence, et ses parents sont dépliés dans l'arbre pour rendre la nouvelle `propriété` immédiatement visible. |
 
@@ -104,7 +104,7 @@
 
 ### REQ-AP-007 — Collecte des données du formulaire
 
-| **Si** | l'ontologiste a renseigné les champs d'une `propriété d'annotation` utilisateur et que l'application doit persister ces informations, |
+| **Si** | l'ontologiste a renseigné les champs d'une `AnnotationProperty` utilisateur et que l'application doit persister ces informations, |
 |---|---|
 | **Alors** | l'application consolide l'identifiant saisi, les relations de sous-`propriété` existantes et l'ensemble des annotations (labels, commentaires, autres) en une représentation cohérente prête à être sauvegardée. |
 
@@ -114,7 +114,7 @@
 
 ### REQ-AP-008 — Sauvegarde automatique à chaque modification
 
-| **Si** | l'ontologiste modifie un champ du formulaire d'une `propriété d'annotation` utilisateur, |
+| **Si** | l'ontologiste modifie un champ du formulaire d'une `AnnotationProperty` utilisateur, |
 |---|---|
 | **Alors** | les modifications sont persistées immédiatement et automatiquement, sans action supplémentaire de l'utilisateur, et l'affichage reste synchronisé avec l'état sauvegardé. |
 
@@ -124,7 +124,7 @@
 
 ### REQ-AP-009 — Sauvegarde manuelle explicite
 
-| **Si** | l'ontologiste déclenche explicitement la sauvegarde d'une `propriété d'annotation` utilisateur, |
+| **Si** | l'ontologiste déclenche explicitement la sauvegarde d'une `AnnotationProperty` utilisateur, |
 |---|---|
 | **Alors** | l'application valide l'identifiant, persiste les modifications, met à jour la sélection courante pour refléter un éventuel renommage, et rafraîchit l'affichage de l'arbre. |
 
@@ -134,7 +134,7 @@
 
 ### REQ-AP-010 — Glisser-déposer pour réorganiser la hiérarchie
 
-| **Si** | l'ontologiste souhaite déplacer une `propriété d'annotation` utilisateur dans la hiérarchie en la faisant glisser vers un autre emplacement de l'arbre, |
+| **Si** | l'ontologiste souhaite déplacer une `AnnotationProperty` utilisateur dans la hiérarchie en la faisant glisser vers un autre emplacement de l'arbre, |
 |---|---|
 | **Alors** | la `propriété` déplacée est rattachée au nouveau parent cible, ou promue au rang de `propriété` racine si elle est déposée sur une racine de `namespace`, et ce changement est immédiatement persisté. |
 
@@ -144,7 +144,7 @@
 
 ### REQ-AP-011 — Prévention des cycles lors du glisser-déposer
 
-| **Si** | l'ontologiste tente de déplacer une `propriété d'annotation` vers l'un de ses propres descendants dans la hiérarchie, |
+| **Si** | l'ontologiste tente de déplacer une `AnnotationProperty` vers l'un de ses propres descendants dans la hiérarchie, |
 |---|---|
 | **Alors** | l'application refuse ce déplacement afin de préserver la cohérence acyclique de la hiérarchie des sous-`propriétés`. |
 
@@ -154,7 +154,7 @@
 
 ### REQ-AP-012 — Suppression d'une propriété utilisateur avec confirmation
 
-| **Si** | l'ontologiste souhaite supprimer définitivement une `propriété d'annotation` utilisateur, |
+| **Si** | l'ontologiste souhaite supprimer définitivement une `AnnotationProperty` utilisateur, |
 |---|---|
 | **Alors** | l'application demande une confirmation explicite avant toute suppression, puis retire la `propriété` de l'`ontologie`, réinitialise la sélection et rafraîchit l'arbre. |
 
@@ -164,19 +164,19 @@
 
 ### REQ-AP-013 — Collecte des annotations (labels, commentaires, autres)
 
-| **Si** | l'ontologiste a renseigné des annotations textuelles (labels, commentaires, ou annotations personnalisées) sur une `propriété d'annotation`, |
+| **Si** | l'ontologiste a renseigné des annotations textuelles (labels, commentaires, ou annotations personnalisées) sur une `AnnotationProperty`, |
 |---|---|
-| **Alors** | l'application regroupe ces annotations par catégorie (labels, commentaires, autres `propriétés d'annotation`), en conservant pour chacune la valeur, la langue et, pour les annotations personnalisées, la `propriété d'annotation` utilisée. |
+| **Alors** | l'application regroupe ces annotations par catégorie (labels, commentaires, autres `AnnotationProperty`), en conservant pour chacune la valeur, la langue et, pour les annotations personnalisées, la `AnnotationProperty` utilisée. |
 
 ---
 
 **Code source :** `owl_editor.js` → `_collectAnnotations(tbodyId)` — Parcourt les lignes CSS `.anno-row` du tableau identifié par `tbodyId`, lit `.anno-value` et `.anno-lang-inp` pour chaque ligne non vide, classe dans `labels`, `comments` ou `other` selon `row.dataset.type`, et pour `'other'` lit la propriété cible dans `row.dataset.prop`.
 
-### REQ-AP-014 — Picker de sélection de propriété d'annotation
+### REQ-AP-014 — Picker de sélection de `AnnotationProperty`
 
-| **Si** | l'ontologiste souhaite ajouter une annotation à l'aide d'une `propriété d'annotation` spécifique, |
+| **Si** | l'ontologiste souhaite ajouter une annotation à l'aide d'une `AnnotationProperty` spécifique, |
 |---|---|
-| **Alors** | l'application lui propose un sélecteur visuel listant toutes les `propriétés d'annotation` disponibles — intégrées et définies par l'utilisateur — organisées de manière hiérarchique et navigables par un simple clic. |
+| **Alors** | l'application lui propose un sélecteur visuel listant toutes les `AnnotationProperty` disponibles — intégrées et définies par l'utilisateur — organisées de manière hiérarchique et navigables par un simple clic. |
 
 ---
 
@@ -188,7 +188,7 @@
 
 ### REQ-AP-015 — Rendu des nœuds built-in dans l'arbre
 
-| **Si** | l'arbre des `propriétés d'annotation` affiche une `propriété` intégrée OWL 2, |
+| **Si** | l'arbre des `AnnotationProperty` affiche une `propriété` intégrée OWL 2, |
 |---|---|
 | **Alors** | cette `propriété` est présentée avec une indication visuelle de son statut non éditable, un contrôle d'expansion si elle possède des sous-`propriétés` utilisateur, et ses sous-`propriétés` éventuelles sont affichées en dessous. Elle peut recevoir des `propriétés` glissées mais ne peut pas elle-même être déplacée. |
 
@@ -198,7 +198,7 @@
 
 ### REQ-AP-016 — Rendu des nœuds utilisateur dans l'arbre
 
-| **Si** | l'arbre des `propriétés d'annotation` affiche une `propriété` définie par l'ontologiste, |
+| **Si** | l'arbre des `AnnotationProperty` affiche une `propriété` définie par l'ontologiste, |
 |---|---|
 | **Alors** | cette `propriété` est visuellement indentée selon sa profondeur dans la hiérarchie, peut être glissée vers un autre emplacement, et ses sous-`propriétés` sont affichées en dessous lorsqu'elle est dépliée. |
 
@@ -208,7 +208,7 @@
 
 ### REQ-AP-017 — Rendu complet de l'arbre avec racines de namespace
 
-| **Si** | l'onglet des `propriétés d'annotation` est affiché pour une `ontologie` OWL standard, |
+| **Si** | l'onglet des `AnnotationProperty` est affiché pour une `ontologie` OWL standard, |
 |---|---|
 | **Alors** | l'arbre présente deux racines de `namespace` (`rdfs:` et `owl:`) regroupant les `propriétés` intégrées correspondantes, suivies des `propriétés` utilisateur organisées en sous-arbre. Les `propriétés` utilisateur sans rattachement connu à un `namespace` sont affichées à la racine de l'arbre. |
 
@@ -218,7 +218,7 @@
 
 ### REQ-AP-018 — Mise en page en panneau divisé (split pane)
 
-| **Si** | l'ontologiste ouvre l'onglet des `propriétés d'annotation`, |
+| **Si** | l'ontologiste ouvre l'onglet des `AnnotationProperty`, |
 |---|---|
 | **Alors** | l'interface présente un panneau gauche contenant l'arbre des `propriétés` et les actions disponibles, et un panneau droit affichant le détail de la `propriété` sélectionnée ou une invitation à en créer une nouvelle. Les actions de création sont désactivées tant qu'aucune `propriété` n'est sélectionnée. |
 
@@ -248,7 +248,7 @@
 
 ### REQ-AP-021 — Sélection d'une propriété dans l'arbre
 
-| **Si** | l'ontologiste clique sur une `propriété` dans l'arbre des `propriétés d'annotation`, |
+| **Si** | l'ontologiste clique sur une `propriété` dans l'arbre des `AnnotationProperty`, |
 |---|---|
 | **Alors** | la `propriété` est mise en évidence visuellement, les actions disponibles sont mises à jour selon son type, et le panneau de détail affiche les informations correspondantes : description pour une racine de `namespace`, `vue` en lecture seule pour une `propriété` intégrée, formulaire d'édition pour une `propriété` utilisateur. |
 
@@ -258,7 +258,7 @@
 
 ### REQ-AP-022 — Gestion de l'état des boutons d'action selon la sélection
 
-| **Si** | la sélection dans l'arbre des `propriétés d'annotation` change, |
+| **Si** | la sélection dans l'arbre des `AnnotationProperty` change, |
 |---|---|
 | **Alors** | les actions proposées s'adaptent au type de l'élément sélectionné : une racine de `namespace` ne propose aucune action, une `propriété` intégrée permet uniquement de créer une sous-`propriété`, et une `propriété` utilisateur autorise la création de sous-`propriété`, la création de `propriété` sœur et la suppression. |
 
@@ -270,7 +270,7 @@
 
 | **Si** | l'ontologiste sélectionne une racine de `namespace` dans l'arbre, |
 |---|---|
-| **Alors** | le panneau de détail présente en lecture seule l'ensemble des `propriétés d'annotation` intégrées appartenant à ce `namespace`, avec leur identifiant et leur description, et indique clairement que la racine de `namespace` n'est pas elle-même une `propriété d'annotation`. |
+| **Alors** | le panneau de détail présente en lecture seule l'ensemble des `AnnotationProperty` intégrées appartenant à ce `namespace`, avec leur identifiant et leur description, et indique clairement que la racine de `namespace` n'est pas elle-même une `AnnotationProperty`. |
 
 ---
 
@@ -278,7 +278,7 @@
 
 ### REQ-AP-024 — Affichage du détail d'une propriété built-in (lecture seule)
 
-| **Si** | l'ontologiste sélectionne une `propriété d'annotation` intégrée OWL 2 dans l'arbre, |
+| **Si** | l'ontologiste sélectionne une `AnnotationProperty` intégrée OWL 2 dans l'arbre, |
 |---|---|
 | **Alors** | le panneau de détail présente son identifiant et sa description normative en lecture seule, en indiquant explicitement qu'elle ne peut pas être modifiée. |
 
@@ -288,7 +288,7 @@
 
 ### REQ-AP-025 — Formulaire d'édition d'une propriété utilisateur
 
-| **Si** | l'ontologiste sélectionne une `propriété d'annotation` qu'il a définie, |
+| **Si** | l'ontologiste sélectionne une `AnnotationProperty` qu'il a définie, |
 |---|---|
 | **Alors** | le panneau de détail affiche un formulaire permettant de modifier l'identifiant local de la `propriété`, de consulter son IRI complète dans l'`ontologie`, et de gérer ses annotations (labels, commentaires, annotations personnalisées). |
 
@@ -298,9 +298,9 @@
 
 ### REQ-AP-026 — Ajout d'une ligne d'annotation dans le formulaire
 
-| **Si** | l'ontologiste souhaite ajouter une annotation (label, commentaire, ou annotation personnalisée) à une `propriété d'annotation` utilisateur, |
+| **Si** | l'ontologiste souhaite ajouter une annotation (label, commentaire, ou annotation personnalisée) à une `AnnotationProperty` utilisateur, |
 |---|---|
-| **Alors** | une nouvelle ligne vide est insérée dans le formulaire pour saisir la valeur, la langue et, pour les annotations personnalisées, la `propriété d'annotation` à utiliser. |
+| **Alors** | une nouvelle ligne vide est insérée dans le formulaire pour saisir la valeur, la langue et, pour les annotations personnalisées, la `AnnotationProperty` à utiliser. |
 
 ---
 
@@ -308,7 +308,7 @@
 
 ### REQ-AP-027 — Panneau des super-propriétés avec chaîne d'héritage
 
-| **Si** | l'ontologiste sélectionne une `propriété d'annotation` dans l'arbre, |
+| **Si** | l'ontologiste sélectionne une `AnnotationProperty` dans l'arbre, |
 |---|---|
 | **Alors** | le panneau des super-`propriétés` affiche, pour chaque parent direct, la chaîne complète d'héritage jusqu'à la racine de `namespace`, chaque ancêtre étant présenté avec une indentation croissante et constituant un lien de navigation vers cet ancêtre. |
 
