@@ -43,9 +43,9 @@
 
 ### REQ-QRY-001 — Persistance des requêtes par ontologie
 
-| **Si** | l'utilisateur travaille sur plusieurs ontologies distinctes, |
+| **Si** | l'utilisateur travaille sur plusieurs `ontologies` distinctes, |
 |---|---|
-| **Alors** | les requêtes de chaque ontologie sont isolées les unes des autres et persistent entre les sessions, sans risque de mélange ni de perte lors d'un rechargement de l'application. |
+| **Alors** | les `requêtes` de chaque `ontologie` sont isolées les unes des autres et persistent entre les sessions, sans risque de mélange ni de perte lors d'un rechargement de l'application. |
 
 ---
 
@@ -53,9 +53,9 @@
 
 ### REQ-QRY-002 — Création d'une nouvelle requête
 
-| **Si** | l'utilisateur souhaite formuler une nouvelle requête sur l'ontologie courante, |
+| **Si** | l'utilisateur souhaite formuler une nouvelle `requête` sur l'`ontologie` courante, |
 |---|---|
-| **Alors** | il peut créer une requête vierge avec un identifiant unique, prête à être configurée et exécutée, sans avoir à saisir manuellement un identifiant ni à remplir les champs optionnels. |
+| **Alors** | il peut créer une `requête` vierge avec un identifiant unique, prête à être configurée et exécutée, sans avoir à saisir manuellement un identifiant ni à remplir les champs optionnels. |
 
 ---
 
@@ -63,9 +63,9 @@
 
 ### REQ-QRY-003 — Sélection d'une requête existante
 
-| **Si** | l'utilisateur choisit une requête dans la liste des requêtes sauvegardées, |
+| **Si** | l'utilisateur choisit une `requête` dans la liste des `requêtes` sauvegardées, |
 |---|---|
-| **Alors** | le détail complet de cette requête s'affiche dans le panneau d'édition, reflétant exactement l'état persisté, sans altérer les autres requêtes. |
+| **Alors** | le détail complet de cette `requête` s'affiche dans le panneau d'édition, reflétant exactement l'état persisté, sans altérer les autres `requêtes`. |
 
 ---
 
@@ -73,9 +73,9 @@
 
 ### REQ-QRY-004 — Suppression d'une requête
 
-| **Si** | l'utilisateur supprime une requête de la liste, |
+| **Si** | l'utilisateur supprime une `requête` de la liste, |
 |---|---|
-| **Alors** | la requête est définitivement retirée de la liste persistée, et si c'était la requête en cours d'édition, le panneau de détail est vidé. |
+| **Alors** | la `requête` est définitivement retirée de la liste persistée, et si c'était la `requête` en cours d'édition, le panneau de détail est vidé. |
 
 ---
 
@@ -83,9 +83,9 @@
 
 ### REQ-QRY-005 — Recherche/filtrage dans la liste des requêtes
 
-| **Si** | l'utilisateur saisit un terme dans le champ de recherche de la liste des requêtes, |
+| **Si** | l'utilisateur saisit un terme dans le champ de recherche de la liste des `requêtes`, |
 |---|---|
-| **Alors** | seules les requêtes dont l'identifiant ou le libellé contient ce terme sont affichées ; si aucune requête ne correspond, un message explicite l'indique. |
+| **Alors** | seules les `requêtes` dont l'identifiant ou le libellé contient ce terme sont affichées ; si aucune `requête` ne correspond, un message explicite l'indique. |
 
 ---
 
@@ -93,7 +93,7 @@
 
 ### REQ-QRY-006 — Édition de l'identifiant d'une requête
 
-| **Si** | l'utilisateur modifie l'identifiant d'une requête et que la saisie contient des espaces, |
+| **Si** | l'utilisateur modifie l'identifiant d'une `requête` et que la saisie contient des espaces, |
 |---|---|
 | **Alors** | les espaces sont automatiquement remplacés par des underscores afin de garantir la validité de l'identifiant, et la liste est mise à jour en conséquence. |
 
@@ -103,7 +103,7 @@
 
 ### REQ-QRY-007 — Édition du libellé et du commentaire d'une requête
 
-| **Si** | l'utilisateur modifie le libellé ou le commentaire d'une requête et quitte le champ, |
+| **Si** | l'utilisateur modifie le libellé ou le commentaire d'une `requête` et quitte le champ, |
 |---|---|
 | **Alors** | les modifications sont automatiquement sauvegardées sans action supplémentaire de l'utilisateur. |
 
@@ -113,9 +113,9 @@
 
 ### REQ-QRY-008 — Ajout d'un patron triple
 
-| **Si** | l'utilisateur souhaite ajouter une condition de type sujet-prédicat-objet à la requête courante, |
+| **Si** | l'utilisateur souhaite ajouter une condition de type sujet-prédicat-objet à la `requête` courante, |
 |---|---|
-| **Alors** | un nouveau patron triple est ajouté à la requête avec des valeurs par défaut permettant de commencer la saisie immédiatement. |
+| **Alors** | un nouveau patron triple est ajouté à la `requête` avec des valeurs par défaut permettant de commencer la saisie immédiatement. |
 
 ---
 
@@ -123,9 +123,9 @@
 
 ### REQ-QRY-009 — Ajout d'un patron FILTER
 
-| **Si** | l'utilisateur souhaite ajouter une condition de filtrage à la requête courante, |
+| **Si** | l'utilisateur souhaite ajouter une condition de filtrage à la `requête` courante, |
 |---|---|
-| **Alors** | un nouveau patron FILTER est ajouté à la requête avec un champ de saisie libre pour exprimer la condition. |
+| **Alors** | un nouveau patron FILTER est ajouté à la `requête` avec un champ de saisie libre pour exprimer la condition. |
 
 ---
 
@@ -133,9 +133,9 @@
 
 ### REQ-QRY-010 — Ajout d'un bloc OPTIONAL
 
-| **Si** | l'utilisateur souhaite exprimer des conditions facultatives dans la requête courante, |
+| **Si** | l'utilisateur souhaite exprimer des conditions facultatives dans la `requête` courante, |
 |---|---|
-| **Alors** | un bloc OPTIONAL vide est ajouté à la requête, dans lequel il peut ensuite ajouter des patrons triple ou FILTER de manière autonome. |
+| **Alors** | un bloc OPTIONAL vide est ajouté à la `requête`, dans lequel il peut ensuite ajouter des patrons triple ou FILTER de manière autonome. |
 
 ---
 
@@ -145,7 +145,7 @@
 
 | **Si** | l'utilisateur ajoute un patron triple ou FILTER à l'intérieur d'un bloc OPTIONAL existant, |
 |---|---|
-| **Alors** | le nouveau patron est bien rattaché au bloc OPTIONAL concerné et non à la racine de la requête. |
+| **Alors** | le nouveau patron est bien rattaché au bloc OPTIONAL concerné et non à la racine de la `requête`. |
 
 ---
 
@@ -153,9 +153,9 @@
 
 ### REQ-QRY-012 — Suppression d'un patron (racine ou imbriqué)
 
-| **Si** | l'utilisateur supprime un patron situé directement dans la requête (niveau racine), |
+| **Si** | l'utilisateur supprime un patron situé directement dans la `requête` (niveau racine), |
 |---|---|
-| **Alors** | ce patron est retiré de la requête et le panneau est mis à jour. |
+| **Alors** | ce patron est retiré de la `requête` et le panneau est mis à jour. |
 
 | **Si** | l'utilisateur supprime un patron situé à l'intérieur d'un bloc OPTIONAL, |
 |---|---|
@@ -169,7 +169,7 @@
 
 | **Si** | l'utilisateur change le prédicat d'un patron triple pour le définir à `rdf:type`, |
 |---|---|
-| **Alors** | le champ objet est vidé afin d'inviter l'utilisateur à sélectionner une classe plutôt qu'une variable. |
+| **Alors** | le champ objet est vidé afin d'inviter l'utilisateur à sélectionner une `classe` plutôt qu'une variable. |
 
 | **Si** | l'utilisateur change le prédicat d'un patron triple depuis `rdf:type` vers un autre prédicat, |
 |---|---|
@@ -181,9 +181,9 @@
 
 ### REQ-QRY-016 — Autocomplétion des variables
 
-| **Si** | l'ontologie est chargée et que la requête courante contient des variables définies dans des patrons (y compris imbriqués dans des blocs OPTIONAL), |
+| **Si** | l'`ontologie` est chargée et que la `requête` courante contient des variables définies dans des patrons (y compris imbriqués dans des blocs OPTIONAL), |
 |---|---|
-| **Alors** | ces variables sont proposées en autocomplétion dans les champs sujet, objet et tri, facilitant la cohérence de la requête. |
+| **Alors** | ces variables sont proposées en autocomplétion dans les champs sujet, objet et tri, facilitant la cohérence de la `requête`. |
 
 ---
 
@@ -193,7 +193,7 @@
 
 | **Si** | l'utilisateur configure des options de mise en forme des résultats (élimination des doublons, tri, limitation du nombre de résultats), |
 |---|---|
-| **Alors** | ces options sont intégrées dans la requête SPARQL générée et persistent avec la requête. |
+| **Alors** | ces options sont intégrées dans la `requête` SPARQL générée et persistent avec la `requête`. |
 
 ---
 
@@ -201,9 +201,9 @@
 
 ### REQ-QRY-019 — Génération automatique des préfixes SPARQL
 
-| **Si** | une requête SPARQL est générée pour une ontologie disposant d'un préfixe déclaré, |
+| **Si** | une `requête` SPARQL est générée pour une `ontologie` disposant d'un préfixe déclaré, |
 |---|---|
-| **Alors** | les préfixes standards (`rdf:`, `rdfs:`, `owl:`) ainsi que le préfixe propre à l'ontologie sont automatiquement inclus dans la requête, sans que l'utilisateur ait à les saisir manuellement. |
+| **Alors** | les préfixes standards (`rdf:`, `rdfs:`, `owl:`) ainsi que le préfixe propre à l'`ontologie` sont automatiquement inclus dans la `requête`, sans que l'utilisateur ait à les saisir manuellement. |
 
 ---
 
@@ -211,7 +211,7 @@
 
 ### REQ-QRY-020 — Gestion des littéraux non-variables avec FILTER(STR(...))
 
-| **Si** | l'utilisateur saisit une valeur littérale (non-variable) dans le champ objet d'un patron portant un prédicat de type annotation ou propriété de données, |
+| **Si** | l'utilisateur saisit une valeur littérale (non-variable) dans le champ objet d'un patron portant un prédicat de type annotation ou `propriété de données`, |
 |---|---|
 | **Alors** | la comparaison s'effectue indépendamment du tag de langue RDF, évitant les faux négatifs liés aux littéraux étiquetés. |
 
@@ -221,9 +221,9 @@
 
 ### REQ-QRY-021 — Exécution de la requête via l'API
 
-| **Si** | l'utilisateur lance l'exécution de la requête courante, |
+| **Si** | l'utilisateur lance l'exécution de la `requête` courante, |
 |---|---|
-| **Alors** | la requête est envoyée au point d'accès SPARQL, un indicateur de progression est affiché pendant l'exécution, puis le nombre de résultats obtenus est indiqué en cas de succès, ou le message d'erreur du serveur est affiché en cas d'échec. |
+| **Alors** | la `requête` est envoyée au point d'accès SPARQL, un indicateur de progression est affiché pendant l'exécution, puis le nombre de résultats obtenus est indiqué en cas de succès, ou le message d'erreur du serveur est affiché en cas d'échec. |
 
 ---
 
@@ -231,9 +231,9 @@
 
 ### REQ-QRY-026 — Restauration de la sélection courante
 
-| **Si** | l'utilisateur revient sur l'onglet des requêtes après avoir navigué ailleurs dans l'application, |
+| **Si** | l'utilisateur revient sur l'onglet des `requêtes` après avoir navigué ailleurs dans l'application, |
 |---|---|
-| **Alors** | la dernière requête qu'il consultait est automatiquement réaffichée dans le panneau de détail, sans qu'il ait à la rechercher et la sélectionner à nouveau. |
+| **Alors** | la dernière `requête` qu'il consultait est automatiquement réaffichée dans le panneau de détail, sans qu'il ait à la rechercher et la sélectionner à nouveau. |
 
 ---
 
@@ -249,7 +249,7 @@
 
 | **Si** | l'utilisateur ouvre le sélecteur de prédicat d'un patron triple, |
 |---|---|
-| **Alors** | les prédicats disponibles sont présentés organisés par catégorie (type de classe, propriétés d'objet, propriétés de données, propriétés d'annotation), en respectant la hiérarchie de l'ontologie, avec une icône distinctive par type de propriété. |
+| **Alors** | les prédicats disponibles sont présentés organisés par catégorie (type de `classe`, `propriétés d'objet`, `propriétés de données`, `propriétés d'annotation`), en respectant la hiérarchie de l'`ontologie`, avec une icône distinctive par type de `propriété`. |
 
 ---
 
@@ -259,13 +259,13 @@
 
 | **Si** | le prédicat d'un patron triple est `rdf:type`, |
 |---|---|
-| **Alors** | le champ objet présente un sélecteur d'arborescence de classes de l'ontologie. |
+| **Alors** | le champ objet présente un sélecteur d'arborescence de `classes` de l'`ontologie`. |
 
-| **Si** | le prédicat est une propriété d'annotation ou une propriété de données, |
+| **Si** | le prédicat est une `propriété d'annotation` ou une `propriété de données`, |
 |---|---|
 | **Alors** | le champ objet présente un champ texte large permettant de saisir une variable ou une valeur littérale. |
 
-| **Si** | le prédicat est une propriété d'objet ou une valeur non reconnue, |
+| **Si** | le prédicat est une `propriété d'objet` ou une valeur non reconnue, |
 |---|---|
 | **Alors** | le champ objet présente un champ texte court permettant de saisir une variable ou un IRI. |
 
@@ -275,9 +275,9 @@
 
 ### REQ-QRY-018 — Prévisualisation SPARQL générée
 
-| **Si** | l'utilisateur souhaite visualiser la requête SPARQL correspondant aux patrons qu'il a définis, |
+| **Si** | l'utilisateur souhaite visualiser la `requête` SPARQL correspondant aux patrons qu'il a définis, |
 |---|---|
-| **Alors** | il peut afficher ou masquer un panneau de prévisualisation affichant la requête SPARQL générée en temps réel, sans quitter le formulaire d'édition. |
+| **Alors** | il peut afficher ou masquer un panneau de prévisualisation affichant la `requête` SPARQL générée en temps réel, sans quitter le formulaire d'édition. |
 
 ---
 
@@ -285,7 +285,7 @@
 
 ### REQ-QRY-022 — Affichage des résultats en tableau
 
-| **Si** | une requête SPARQL retourne des résultats, |
+| **Si** | une `requête` SPARQL retourne des résultats, |
 |---|---|
 | **Alors** | les résultats sont affichés dans un tableau lisible avec les variables en en-têtes de colonnes, une ligne par résultat, et une indication claire pour les cellules sans valeur ; les tags de langue des littéraux sont visibles en exposant. |
 
@@ -295,7 +295,7 @@
 
 ### REQ-QRY-023 — Navigation vers une entité depuis les résultats
 
-| **Si** | un résultat de requête correspond à une entité connue de l'ontologie (classe, individu, propriété), |
+| **Si** | un résultat de `requête` correspond à une entité connue de l'`ontologie` (`classe`, `individu`, `propriété`), |
 |---|---|
 | **Alors** | l'utilisateur peut cliquer sur ce résultat pour naviguer directement vers la fiche de l'entité dans l'onglet correspondant de l'application. |
 
@@ -305,7 +305,7 @@
 
 ### REQ-QRY-024 — Lien externe pour les URIs non reconnues dans les résultats
 
-| **Si** | un résultat de requête est une URI ne correspondant à aucune entité de l'ontologie courante, |
+| **Si** | un résultat de `requête` est une URI ne correspondant à aucune entité de l'`ontologie` courante, |
 |---|---|
 | **Alors** | l'utilisateur peut ouvrir cette ressource externe dans un nouvel onglet en cliquant dessus. |
 
@@ -315,7 +315,7 @@
 
 ### REQ-QRY-025 — Redimensionnement du panneau liste
 
-| **Si** | l'utilisateur souhaite ajuster la largeur du panneau listant les requêtes, |
+| **Si** | l'utilisateur souhaite ajuster la largeur du panneau listant les `requêtes`, |
 |---|---|
 | **Alors** | il peut le redimensionner librement par glisser-déposer, dans des limites raisonnables assurant l'utilisabilité de l'interface. |
 
