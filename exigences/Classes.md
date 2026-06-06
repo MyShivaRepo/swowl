@@ -33,7 +33,7 @@
 - [REQ-CLS-024 — Menu contextuel sur un nœud de l'arbre](#req-cls-024--menu-contextuel-sur-un-nœud-de-larbre)
 - [REQ-CLS-025 — Formulaire d'édition d'une classe](#req-cls-025--formulaire-dédition-dune-classe)
 - [REQ-CLS-026 — Gestion des annotations rdfs:label et rdfs:comment](#req-cls-026--gestion-des-annotations-rdfslabel-et-rdfscomment)
-- [REQ-CLS-027 — Gestion des propriétés d'annotation personnalisées](#req-cls-027--gestion-des-propriétés-dannotation-personnalisées)
+- [REQ-CLS-027 — Gestion des `AnnotationProperty` personnalisées](#req-cls-027--gestion-des-propriétés-dannotation-personnalisées)
 - [REQ-CLS-028 — Panneau de restrictions et propriétés assertées](#req-cls-028--panneau-de-restrictions-et-propriétés-assertées)
 - [REQ-CLS-029 — Ajout d'une propriété dans le panneau de restrictions](#req-cls-029--ajout-dune-propriété-dans-le-panneau-de-restrictions)
 - [REQ-CLS-030 — Sélection du filler (classe cible) d'une restriction](#req-cls-030--sélection-du-filler-classe-cible-dune-restriction)
@@ -247,9 +247,9 @@ Dans les deux cas, la modification est sauvegardée automatiquement si la classe
 
 ### REQ-CLS-019 — Création rapide d'une DatatypeProperty depuis l'onglet Classes
 
-| **Si** | l'ontologiste souhaite créer une `propriété de données` directement associée à la `classe` qu'il est en train d'éditer, |
+| **Si** | l'ontologiste souhaite créer une `DatatypeProperty` directement associée à la `classe` qu'il est en train d'éditer, |
 |---|---|
-| **Alors** | une nouvelle `propriété de données` est créée avec la `classe` courante déclarée comme domaine, et l'application navigue automatiquement vers l'onglet des `propriétés de données` pour permettre à l'ontologiste de la compléter. |
+| **Alors** | une nouvelle `DatatypeProperty` est créée avec la `classe` courante déclarée comme domaine, et l'application navigue automatiquement vers l'onglet des `DatatypeProperty` pour permettre à l'ontologiste de la compléter. |
 
 **Code source :** `owl_editor.js` → `ClassEditor.createDTPForClass()` — Crée une DatatypeProperty avec `domain: [classId]` et `functional: false` via `API.createDatatypeProperty()`, puis navigue vers l'onglet "datatype-properties".
 
@@ -333,13 +333,13 @@ Dans les deux cas, la modification est sauvegardée automatiquement si la classe
 
 ---
 
-### REQ-CLS-027 — Gestion des propriétés d'annotation personnalisées
+### REQ-CLS-027 — Gestion des `AnnotationProperty` personnalisées
 
-| **Si** | l'ontologiste souhaite ajouter une annotation via une `propriété d'annotation` personnalisée (telle que `rdfs:seeAlso` ou toute `propriété d'annotation` définie dans l'`ontologie`), |
+| **Si** | l'ontologiste souhaite ajouter une annotation via une `AnnotationProperty` personnalisée (telle que `rdfs:seeAlso` ou toute `AnnotationProperty` définie dans l'`ontologie`), |
 |---|---|
 | **Alors** | une ligne d'annotation est ajoutée au tableau, affichant le nom de la `propriété` sélectionnée, un champ de valeur et un champ de langue. |
 
-**Code source :** `owl_editor.js` → `ClassEditor.addOtherAnnotRow()` — Crée une ligne via `_makeAnnotRow('other', 'ClassEditor', ac, prop)` affichant le nom de la propriété d'annotation, un champ valeur et un champ langue, pour `rdfs:seeAlso` ou toute propriété d'annotation de l'ontologie sélectionnée dans `cls-anno-picker`.
+**Code source :** `owl_editor.js` → `ClassEditor.addOtherAnnotRow()` — Crée une ligne via `_makeAnnotRow('other', 'ClassEditor', ac, prop)` affichant le nom de la `AnnotationProperty`, un champ valeur et un champ langue, pour `rdfs:seeAlso` ou toute `AnnotationProperty` de l'ontologie sélectionnée dans `cls-anno-picker`.
 
 ---
 
