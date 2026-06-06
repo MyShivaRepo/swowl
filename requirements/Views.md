@@ -5,22 +5,22 @@
 ## Table of contents
 
 ### Substance
-- [REQ-VW-003 — Building the hierarchical class tree](#req-vw-003--building-the-hierarchical-class-tree)
+- [REQ-VW-003 — Building the class hierarchy tree](#req-vw-003--building-the-class-hierarchy-tree)
 - [REQ-VW-004 — Resolving the best class label](#req-vw-004--resolving-the-best-class-label)
-- [REQ-VW-005 — Hyperbolic placement algorithm (Poincaré disk)](#req-vw-005--hyperbolic-placement-algorithm-poincaré-disk)
-- [REQ-VW-007 — Node click: centering via Möbius transformation](#req-vw-007--node-click-centering-via-möbius-transformation)
+- [REQ-VW-005 — Hyperbolic layout algorithm (Poincaré disk)](#req-vw-005--hyperbolic-layout-algorithm-poincaré-disk)
+- [REQ-VW-007 — Click on a node: centering via Möbius transformation](#req-vw-007--click-on-a-node-centering-via-möbius-transformation)
 - [REQ-VW-008 — Double-click (second click at center): navigation to the class editor](#req-vw-008--double-click-second-click-at-center-navigation-to-the-class-editor)
 - [REQ-VW-009 — Resetting focus to the root](#req-vw-009--resetting-focus-to-the-root)
 - [REQ-VW-010 — Filtering classes by text in the hyperbolic graph](#req-vw-010--filtering-classes-by-text-in-the-hyperbolic-graph)
 - [REQ-VW-013 — Building nodes (individuals) and links (assertions)](#req-vw-013--building-nodes-individuals-and-links-assertions)
 - [REQ-VW-014 — Color palette by class](#req-vw-014--color-palette-by-class)
 - [REQ-VW-015 — Resolving the best individual label](#req-vw-015--resolving-the-best-individual-label)
-- [REQ-VW-020 — Individual node click: navigation to the individual editor](#req-vw-020--individual-node-click-navigation-to-the-individual-editor)
+- [REQ-VW-020 — Click on an individual node: navigation to the individual editor](#req-vw-020--click-on-an-individual-node-navigation-to-the-individual-editor)
 - [REQ-VW-022 — Drag and drop of nodes in the Knowledge Base graph](#req-vw-022--drag-and-drop-of-nodes-in-the-knowledge-base-graph)
 - [REQ-VW-023 — D3 force simulation with configured parameters](#req-vw-023--d3-force-simulation-with-configured-parameters)
 - [REQ-VW-024 — Restarting the force simulation](#req-vw-024--restarting-the-force-simulation)
 - [REQ-VW-025 — Filtering individuals by text in the Knowledge Base graph](#req-vw-025--filtering-individuals-by-text-in-the-knowledge-base-graph)
-- [REQ-VW-027 — Blocking the Views tab if no ontology is connected](#req-vw-027--blocking-the-views-tab-if-no-ontology-is-connected)
+- [REQ-VW-027 — Blocking the Views tab when no ontology is connected](#req-vw-027--blocking-the-views-tab-when-no-ontology-is-connected)
 - [REQ-VW-028 — Deferred graph initialization after HTML rendering](#req-vw-028--deferred-graph-initialization-after-html-rendering)
 
 ### Form
@@ -43,330 +43,324 @@
 > Requirements independent of the UI: OWL rules, data constraints, algorithmic behaviors, validations, persistence.
 
 
-### REQ-VW-003 — Building the hierarchical class tree
+### REQ-VW-003 — Building the class hierarchy tree
 
-| **If** | the ontology is loaded and contains classes in `APP.state.classes`, |
+| **If** | the ontology is loaded and contains classes organized in a hierarchy, |
 |---|---|
-| **Then** | the system:<br>- builds a `classMap` indexed by `id` for each class<br>- computes for each class its parents via `subClassOf`<br>- promotes classes with no internal parent to root rank under a virtual node `owl:Thing`<br>- recursively builds the hierarchy via `buildNode(id, depth)`, each node exposing the properties `{ id, depth, label, hpos, basePos, children }` |
+| **Then** | the class tree faithfully reflects the specialization relationships: each class is positioned under its parent concept, classes with no parent are attached to the universal root `owl:Thing`, and the hierarchy is built recursively by exposing for each node its depth level, its label, and its children. |
 
 ---
 
-**Source code:** `app.js` → `APP._initHyperbolicGraph()`
+**Source code:** `app.js` → `APP._initHyperbolicGraph()` — Builds a `classMap` indexed by `id`, computes parents via `subClassOf`, elevates classes with no internal parent under a virtual `owl:Thing` node, and recursively builds the hierarchy via `buildNode(id, depth)`, each node exposing `{ id, depth, label, hpos, basePos, children }`.
 
 ### REQ-VW-004 — Resolving the best class label
 
-| **If** | the system must display the label of a class, |
+| **If** | the ontologist browses the class tree and a class has multiple label annotations in different languages, |
 |---|---|
-| **Then** | - it searches in `cls.annotations` for an annotation `rdfs:label` or `label` matching `Settings.preferredLang`<br>- if no match is found, it takes the first available `rdfs:label` annotation<br>- if no annotation exists, it returns `cls.id` |
+| **Then** | the application displays the label in the user's preferred language; failing that, the first available label; failing that, the technical identifier of the class. |
 
 ---
 
-**Source code:** `app.js` → `APP._hypBestLabel(cls)`
+**Source code:** `app.js` → `APP._hypBestLabel(cls)` — Searches in `cls.annotations` for an `rdfs:label` or `label` annotation matching `Settings.preferredLang`, takes the first available annotation if no match is found, and returns `cls.id` if no annotation exists.
 
-### REQ-VW-005 — Hyperbolic placement algorithm (Poincaré disk)
+### REQ-VW-005 — Hyperbolic layout algorithm (Poincaré disk)
 
-| **If** | the hierarchical class tree is built and must be rendered in the Poincaré disk, |
+| **If** | the ontologist visualizes the class tree in the hyperbolic graph, |
 |---|---|
-| **Then** | the system:<br>- uses the constant `STEP_R = Math.tanh(0.4)` to define the spacing between levels<br>- distributes the children of each node into equal angular sectors via `layoutNode(node, pos, angle, wedge)`<br>- performs hyperbolic translations via `mobiusTranslate(z, a)` (Möbius transformation)<br>- exposes the complex helpers (`cadd`, `csub`, `cmul`, `cconj`, `cdiv`, `polar`) in `APP._hypMath` |
+| **Then** | classes are arranged in a hyperbolic space of the Poincaré disk type: each hierarchy level is evenly spaced, the children of a node are distributed in equal angular sectors around their parent, and translations between levels respect hyperbolic geometry. |
 
 ---
 
-**Source code:** `app.js` → `APP._initHyperbolicGraph()` (internal functions `layoutNode`, `cadd`, `csub`, `cmul`, `cconj`, `cabs`, `cdiv`, `polar`, `mobiusFocus`, `mobiusTranslate`)
+**Source code:** `app.js` → `APP._initHyperbolicGraph()` (internal functions `layoutNode`, `cadd`, `csub`, `cmul`, `cconj`, `cabs`, `cdiv`, `polar`, `mobiusFocus`, `mobiusTranslate`) — Uses `STEP_R = Math.tanh(0.4)` for inter-level spacing, distributes children via `layoutNode(node, pos, angle, wedge)`, and performs hyperbolic translations via `mobiusTranslate(z, a)`.
 
-### REQ-VW-007 — Node click: centering via Möbius transformation
+### REQ-VW-007 — Click on a node: centering via Möbius transformation
 
-| **If** | the user clicks on a node in the hyperbolic graph **and** the distance of that node from the center is greater than 0.02, |
+| **If** | the ontologist clicks on a class in the hyperbolic graph to explore it, |
 |---|---|
-| **Then** | the system:<br>- computes `mobiusFocus(n.hpos, a)` for each node in the tree in order to bring the clicked node toward the center of the disk<br>- calls `APP._hypDraw(true)` to animate the transition |
+| **Then** | the selected class moves to the center of the disk, allowing it to be brought into focus and its nearby neighbors to be visualized with more detail. |
 
 ---
 
-**Source code:** `app.js` → `APP._hypClick(node)`
+**Source code:** `app.js` → `APP._hypClick(node)` — If the distance from the node to the center is greater than 0.02, computes `mobiusFocus(n.hpos, a)` for each node to recenter the clicked node, then calls `APP._hypDraw(true)` to animate the transition.
 
 ### REQ-VW-008 — Double-click (second click at center): navigation to the class editor
 
-| **If** | the user clicks on a node whose distance from the center is less than 0.10 **and** the `id` of that node is not `'owl:Thing'`, |
+| **If** | the ontologist double-clicks on a class at the center of the hyperbolic graph to edit it, |
 |---|---|
-| **Then** | the system:<br>- calls `APP.navigate('classes')`<br>- after 80 ms, sets `ClassEditor._selectedId = node.id` and calls `ClassEditor.restoreSelection()` to directly open the edit form for the corresponding class |
+| **Then** | the application automatically navigates to the editing form of that class, without any additional interaction. |
 
 ---
 
-**Source code:** `app.js` → `APP._hypClick(node)`
+**Source code:** `app.js` → `APP._hypClick(node)` — If the distance from the node to the center is less than 0.10 and the `id` is not `'owl:Thing'`, calls `APP.navigate('classes')`, then after 80 ms sets `ClassEditor._selectedId = node.id` and calls `ClassEditor.restoreSelection()`.
 
 ### REQ-VW-009 — Resetting focus to the root
 
-| **If** | the user triggers a reset of the hyperbolic graph, |
+| **If** | the ontologist wishes to return to the overview of the ontology after navigating in the hyperbolic graph, |
 |---|---|
-| **Then** | the system copies `basePos` into `hpos` for all nodes in `APP._hypNodes`, restoring the initial layout positions, then calls `APP._hypDraw(true)` to animate the return. |
+| **Then** | the graph returns to its initial layout, with all classes repositioned to their starting location, accompanied by a return animation. |
 
 ---
 
-**Source code:** `app.js` → `APP._hypReset()`
+**Source code:** `app.js` → `APP._hypReset()` — Copies `basePos` into `hpos` for all nodes in `APP._hypNodes`, then calls `APP._hypDraw(true)` to animate the return.
 
 ### REQ-VW-010 — Filtering classes by text in the hyperbolic graph
 
-| **If** | the user types a filter query in the dedicated field of the hyperbolic graph, |
+| **If** | the ontologist types a term to search for a class in the hyperbolic graph, |
 |---|---|
-| **Then** | - each node whose `label` or `id` contains the query (case-insensitive) receives a green stroke (`#10b981`) and a label colored `#6ee7b7`<br>- non-matching nodes have their highlight attributes removed |
+| **Then** | classes whose name or identifier matches the entered term are visually highlighted, while other classes remain visible but without highlighting. |
 
-| **If** | the query is empty, |
+| **If** | the ontologist clears the search term, |
 |---|---|
-| **Then** | all highlight attributes are removed and `APP._hypDraw(false)` is called. |
+| **Then** | all classes return to their normal appearance and the graph is redrawn without highlighting. |
 
 ---
 
-**Source code:** `app.js` → `APP._hypFilter(q)`
+**Source code:** `app.js` → `APP._hypFilter(q)` — Matching nodes (label or id, case-insensitive) receive a green stroke `#10b981` and a label colored in `#6ee7b7`; non-matching nodes have their highlighting attributes removed. If the query is empty, all attributes are removed and `APP._hypDraw(false)` is called.
 
 ### REQ-VW-013 — Building nodes (individuals) and links (assertions)
 
-| **If** | the ontology is loaded and contains individuals in `APP.state.individuals`, |
+| **If** | the ontology is loaded and contains individuals linked by object properties, |
 |---|---|
-| **Then** | the system:<br>- creates one D3 node `{ id, label, classId, ind, x, y }` per individual, positioned randomly around the center<br>- iterates over `ind.objectAssertions` for each individual and creates a link `{ source, target, property, id }` for each assertion whose `target` is an existing individual<br>- stores all nodes and links in `APP._kbData` |
+| **Then** | each individual is represented as a graph node, and each assertion between two existing individuals is represented as a directed link between the corresponding nodes. |
 
 ---
 
-**Source code:** `app.js` → `APP._initKnowledgeBase()`
+**Source code:** `app.js` → `APP._initKnowledgeBase()` — Creates one D3 node `{ id, label, classId, ind, x, y }` per individual randomly positioned around the center, iterates over `ind.objectAssertions` to create links `{ source, target, property, id }` for each assertion whose target is an existing individual, and stores everything in `APP._kbData`.
 
 ### REQ-VW-014 — Color palette by class
 
-| **If** | a `classId` is encountered for the first time during the construction of the Knowledge Base graph, |
+| **If** | the ontologist visualizes the Knowledge Base graph containing individuals belonging to different classes, |
 |---|---|
-| **Then** | the system assigns it the next color from a predefined palette of 15 hexadecimal colors, stored in `APP._kbColorMap`. |
+| **Then** | each class is identified by a distinct and consistent color throughout the session, making it possible to visually distinguish individuals by their type. |
 
-| **If** | the `classId` has already been encountered, |
+| **If** | the same class is encountered again, |
 |---|---|
-| **Then** | the system returns the previously assigned color without modifying the palette. |
+| **Then** | the same color is applied to it without modification. |
 
 ---
 
-**Source code:** `app.js` → `APP._kbClassColor(classId)`
+**Source code:** `app.js` → `APP._kbClassColor(classId)` — Assigns to each `classId` encountered for the first time the next color from a palette of 15 predefined hexadecimal colors, stored in `APP._kbColorMap`; returns the previously assigned color if the `classId` is already known.
 
 ### REQ-VW-015 — Resolving the best individual label
 
-| **If** | the system must display the label of an individual, |
+| **If** | the ontologist browses the Knowledge Base graph and an individual has multiple labels in different languages, |
 |---|---|
-| **Then** | - it searches in `ind.annotations.labels` for a label matching `Settings.preferredLang`<br>- if no match is found, it takes the first available label<br>- if no label exists, it returns `ind.id` |
+| **Then** | the application displays the label in the user's preferred language; failing that, the first available label; failing that, the technical identifier of the individual. |
 
 ---
 
-**Source code:** `app.js` → `APP._kbBestLabel(ind)`
+**Source code:** `app.js` → `APP._kbBestLabel(ind)` — Searches in `ind.annotations.labels` for a label matching `Settings.preferredLang`, takes the first available label if no match is found, and returns `ind.id` if no label exists.
 
-### REQ-VW-020 — Individual node click: navigation to the individual editor
+### REQ-VW-020 — Click on an individual node: navigation to the individual editor
 
-| **If** | the user clicks on an individual node in the Knowledge Base graph, |
+| **If** | the ontologist clicks on an individual in the Knowledge Base graph to view or modify its properties, |
 |---|---|
-| **Then** | the system:<br>- calls `APP.navigate('individuals')`<br>- after 120 ms, sets `IndividualEditor._selectedId = d.id` and calls `IndividualEditor.restoreSelection()` to display the form for the clicked individual |
+| **Then** | the application automatically navigates to the editing form of that individual, without any additional interaction. |
 
 ---
 
-**Source code:** `app.js` → `APP._initKnowledgeBase()`
+**Source code:** `app.js` → `APP._initKnowledgeBase()` — Calls `APP.navigate('individuals')`, then after 120 ms sets `IndividualEditor._selectedId = d.id` and calls `IndividualEditor.restoreSelection()`.
 
 ### REQ-VW-022 — Drag and drop of nodes in the Knowledge Base graph
 
-| **If** | the user starts dragging a node (`dragstart`), |
+| **If** | the ontologist starts dragging an individual in the Knowledge Base graph, |
 |---|---|
-| **Then** | the simulation is restarted with `alphaTarget(0.3)` and the node's `fx`/`fy` coordinates are fixed to the current position. |
+| **Then** | the simulation activates and the node follows the cursor movement. |
 
-| **If** | the user moves the node (`drag`), |
+| **If** | the ontologist moves the cursor, |
 |---|---|
-| **Then** | the `fx`/`fy` coordinates follow the cursor. |
+| **Then** | the node follows the cursor position in real time. |
 
-| **If** | the user releases the node (`dragend`), |
+| **If** | the ontologist releases the node, |
 |---|---|
-| **Then** | `alphaTarget(0)` cools the simulation and `fx`/`fy` are set to `null` to release the node. |
+| **Then** | the simulation resumes its natural behavior and the node is freed to reposition itself. |
 
 ---
 
-**Source code:** `app.js` → `APP._initKnowledgeBase()`
+**Source code:** `app.js` → `APP._initKnowledgeBase()` — On `dragstart`: `alphaTarget(0.3)` and pinning `fx`/`fy` to the current position. On `drag`: updating `fx`/`fy` according to the cursor position. On `dragend`: `alphaTarget(0)` and setting `fx`/`fy` back to `null`.
 
 ### REQ-VW-023 — D3 force simulation with configured parameters
 
-| **If** | the Knowledge Base graph is initialized with nodes and links, |
+| **If** | the ontologist opens the Knowledge Base graph containing individuals and assertions, |
 |---|---|
-| **Then** | the system creates a `d3.forceSimulation(nodes)` simulation with the following forces:<br>- `forceLink`: target distance 120, strength 0.6<br>- `forceManyBody`: intensity -350 (repulsion)<br>- `forceCenter`: centered on `(W/2, H/2)`, strength 0.05<br>- `forceCollide`: radius 28 |
-
-**and** updates at each tick the positions of edges, edge labels and nodes.
+| **Then** | nodes automatically position themselves in the space by applying attraction forces between linked individuals, repulsion forces between all nodes, attraction toward the center, and collision avoidance, in order to produce a readable and balanced layout. |
 
 ---
 
-**Source code:** `app.js` → `APP._initKnowledgeBase()`
+**Source code:** `app.js` → `APP._initKnowledgeBase()` — Creates a `d3.forceSimulation(nodes)` simulation with: `forceLink` (distance 120, strength 0.6), `forceManyBody` (strength -350), `forceCenter` centered on `(W/2, H/2)` (strength 0.05), and `forceCollide` (radius 28). Updates edge, edge label, and node positions at each tick.
 
 ### REQ-VW-024 — Restarting the force simulation
 
-| **If** | the user triggers a restart of the simulation **and** `APP._kbSim` is defined, |
+| **If** | the ontologist wishes to reorganize the Knowledge Base graph after moving nodes or modifying data, |
 |---|---|
-| **Then** | the system calls `APP._kbSim.alpha(0.8).restart()`, warming up the simulation and restarting it from its current state. |
+| **Then** | the simulation resumes from its current state with a high initial energy, allowing nodes to find a new balanced layout. |
 
 ---
 
-**Source code:** `app.js` → `APP._kbRestart()`
+**Source code:** `app.js` → `APP._kbRestart()` — If `APP._kbSim` is defined, calls `APP._kbSim.alpha(0.8).restart()`.
 
 ### REQ-VW-025 — Filtering individuals by text in the Knowledge Base graph
 
-| **If** | the user types a filter query in the dedicated field of the Knowledge Base graph, |
+| **If** | the ontologist types a term to search for an individual or a class type in the Knowledge Base graph, |
 |---|---|
-| **Then** | - nodes whose `label` or `classId` contains the query (case-insensitive) retain an opacity of 1<br>- other nodes are set to an opacity of 0.1 |
+| **Then** | nodes matching the term remain fully visible, while the others are strongly faded to highlight the relevant results. |
 
-| **If** | the query is empty, |
+| **If** | the ontologist clears the search term, |
 |---|---|
-| **Then** | all nodes and labels return to an opacity of 1. |
+| **Then** | all nodes and their labels return to full visibility. |
 
 ---
 
-**Source code:** `app.js` → `APP._kbFilter(q)`
+**Source code:** `app.js` → `APP._kbFilter(q)` — Nodes whose `label` or `classId` contains the query (case-insensitive) keep an opacity of 1; others drop to 0.1. If the query is empty, all nodes and labels return to an opacity of 1.
 
-### REQ-VW-027 — Blocking the Views tab if no ontology is connected
+### REQ-VW-027 — Blocking the Views tab when no ontology is connected
 
-| **If** | the user attempts to access the `'views'` section **and** `APP.state.ontology` is null, |
+| **If** | the ontologist attempts to access the Views section without having previously loaded an ontology, |
 |---|---|
-| **Then** | the system injects into `#main-content` the message returned by `APP._noOntoMsg()` (containing a "Go to Ontologies" button) and interrupts the normal rendering of the view. |
+| **Then** | the application displays an informational message inviting the user to connect an ontology, with a direct link to the ontology management section, and does not display the graphs. |
 
 ---
 
-**Source code:** `app.js` → `APP.renderSection(section)`
+**Source code:** `app.js` → `APP.renderSection(section)` — If `APP.state.ontology` is null, injects into `#main-content` the message returned by `APP._noOntoMsg()` (containing a "Go to Ontologies" button) and interrupts the normal rendering of the view.
 
 ### REQ-VW-028 — Deferred graph initialization after HTML rendering
 
-| **If** | the HTML from `APP.renderViews()` has just been injected into the DOM, |
+| **If** | the ontologist navigates to the Views tab and the HTML has just been injected into the page, |
 |---|---|
-| **Then** | the system waits 80 ms via `setTimeout` before initializing the graph corresponding to `APP._viewsTab`:<br>- `APP._initHyperbolicGraph()` if the active tab is `'ontology'`<br>- `APP._initKnowledgeBase()` if the active tab is `'knowledge-base'` |
+| **Then** | the graph corresponding to the active sub-tab is initialized after a short delay, ensuring that the display area is available before graphical rendering begins. |
 
-This delay ensures that the SVG container is present in the DOM before D3 initialization.
+---
+
+**Source code:** `app.js` → `APP.renderSection(section)` — Waits 80 ms via `setTimeout` before calling `APP._initHyperbolicGraph()` if the active tab is `'ontology'`, or `APP._initKnowledgeBase()` if the active tab is `'knowledge-base'`. This delay ensures that the SVG container is present in the DOM before D3 initialization.
 
 ---
 
 ## 2. Form — Presentation and UI
 
-> Requirements relating to display: layout, visual components, interactions, navigation, styles.
+> Requirements related to display: layout, visual components, interactions, navigation, styles.
 
 **Source code:** `app.js` → `APP.renderSection(section)`
 
 ### REQ-VW-001 — Rendering the Views tab with sub-tabs
 
-| **If** | the user navigates to the Views tab, |
+| **If** | the ontologist navigates to the Views tab, |
 |---|---|
-| **Then** | the system generates a sidebar with two clickable sub-tabs: `'ontology'` (label "🗂 Ontology") and `'knowledge-base'` (label "🧩 Knowledge Base"), the active tab being stored in `APP._viewsTab` (initialized to `'ontology'`). |
+| **Then** | the application displays two visualization sub-tabs — "Ontology" for exploring the class hierarchy, and "Knowledge Base" for exploring individuals and their relationships — the active tab being remembered between navigations. |
 
-| **If** | the user clicks on a sub-tab, |
+| **If** | the ontologist selects a sub-tab, |
 |---|---|
-| **Then** | `APP._viewsTab` is updated and `APP.renderSection('views')` is called again to refresh the view. |
+| **Then** | the view refreshes to display the corresponding graph. |
 
 ---
 
-**Source code:** `app.js` → `APP.renderViews()`
+**Source code:** `app.js` → `APP.renderViews()` — Generates a sidebar with two clickable sub-tabs: `'ontology'` (label "🗂 Ontology") and `'knowledge-base'` (label "🧩 Knowledge Base"), the active tab being stored in `APP._viewsTab` (initialized to `'ontology'`). A click updates `APP._viewsTab` and calls `APP.renderSection('views')` again.
 
 ### REQ-VW-002 — "Ontology" sub-tab: D3 hyperbolic tree
 
-| **If** | `APP._viewsTab === 'ontology'`, |
+| **If** | the ontologist opens the "Ontology" sub-tab, |
 |---|---|
-| **Then** | the system generates a panel containing:<br>- a "⟳ Reset" button (calls `APP._hypReset()`)<br>- a filter input field bound to `APP._hypFilter(this.value)`<br>- a text hint "Click → focus · Double-click → edit"<br>- a counter (`#cy-node-count`)<br>- an SVG container `#cy-ontology` |
+| **Then** | the application displays an interactive hyperbolic graph of the class tree, along with a view reset button, a search field for filtering classes, contextual help on available interactions, a class counter, and the visualization area. |
 
 ---
 
-**Source code:** `app.js` → `APP.renderViews()`
+**Source code:** `app.js` → `APP.renderViews()` — Generates a panel containing: a "⟳ Reset" button (calling `APP._hypReset()`), an input field bound to `APP._hypFilter(this.value)`, textual help "Clic → focus · Double-clic → éditer", a `#cy-node-count` counter, and an SVG container `#cy-ontology`.
 
 ### REQ-VW-006 — SVG drawing of nodes and edges with proportional opacity and size
 
-| **If** | the hyperbolic graph must be drawn, |
+| **If** | the hyperbolic graph is displayed, |
 |---|---|
-| **Then** | for each node, the system computes its distance from the center (`cabs(node.hpos)`) and derives:<br>- the circle radius: `Math.max(3.5, 10 * (1 - dist*0.65))`<br>- the opacity: `Math.max(0.12, 1 - dist*0.55)`<br>- the font size: `Math.max(8, 13 * (1 - dist*0.82))`<br>- the fill color and text color<br>- hiding the label if `dist >= 0.78` |
+| **Then** | classes close to the center are represented by larger, more opaque nodes with more readable labels, while classes far from the center appear smaller and more transparent, their labels being hidden beyond a certain distance threshold. |
 
-| **If** | `animated === true`, |
+| **If** | an animation is triggered on a focus change, |
 |---|---|
-| **Then** | a CSS transition `transform 0.42s cubic-bezier(0.33,1,0.68,1)` is applied to each node. |
-
-Each edge is rendered as a `<line>` element connecting the node to its parent.
+| **Then** | nodes move with a smooth transition. |
 
 ---
 
-**Source code:** `app.js` → `APP._hypDraw(animated)`
+**Source code:** `app.js` → `APP._hypDraw(animated)` — For each node, computes `dist = cabs(node.hpos)` and derives: radius `Math.max(3.5, 10 * (1 - dist*0.65))`, opacity `Math.max(0.12, 1 - dist*0.55)`, font size `Math.max(8, 13 * (1 - dist*0.82))`, label hidden if `dist >= 0.78`. If `animated === true`, applies a CSS transition `transform 0.42s cubic-bezier(0.33,1,0.68,1)`. Edges are rendered as `<line>` elements.
 
 ### REQ-VW-011 — Class counter displayed in the toolbar
 
-| **If** | the hyperbolic graph is initialized, |
+| **If** | the ontologist browses the hyperbolic graph, |
 |---|---|
-| **Then** | the system updates the element `#cy-node-count` with the text `"N class(es)"` (plural if N > 1). |
+| **Then** | the total number of classes present in the ontology is displayed in the graph toolbar. |
 
 ---
 
-**Source code:** `app.js` → `APP._initHyperbolicGraph()`
+**Source code:** `app.js` → `APP._initHyperbolicGraph()` — Updates the `#cy-node-count` element with the text `"N class(es)"` (plural if N > 1).
 
 ### REQ-VW-012 — "Knowledge Base" sub-tab: D3 force graph
 
-| **If** | `APP._viewsTab === 'knowledge-base'`, |
+| **If** | the ontologist opens the "Knowledge Base" sub-tab, |
 |---|---|
-| **Then** | the system generates a panel containing:<br>- a "⟳ Restart" button (calls `APP._kbRestart()`)<br>- a filter field bound to `APP._kbFilter(this.value)`<br>- a legend container `#kb-legend`<br>- a counter `#kb-count`<br>- an SVG container `#kb-graph` |
-
-**and** calls `APP._initKnowledgeBase()` after a delay of 80 ms.
+| **Then** | the application displays an interactive force graph of individuals and their relationships, along with a simulation restart button, a search field for filtering individuals, a class type legend, a counter, and the visualization area. |
 
 ---
 
-**Source code:** `app.js` → `APP.renderViews()` and `APP._initKnowledgeBase()`
+**Source code:** `app.js` → `APP.renderViews()` and `APP._initKnowledgeBase()` — Generates a panel with: a "⟳ Restart" button (calling `APP._kbRestart()`), a filter field bound to `APP._kbFilter(this.value)`, a `#kb-legend` legend container, a `#kb-count` counter, and an SVG container `#kb-graph`. Calls `APP._initKnowledgeBase()` after 80 ms.
 
 ### REQ-VW-016 — Class legend in the Knowledge Base graph
 
-| **If** | the Knowledge Base graph is initialized and contains nodes, |
+| **If** | the ontologist visualizes the Knowledge Base graph containing individuals of several types, |
 |---|---|
-| **Then** | the system collects unique `classId` values, sorts them, pre-assigns their colors via `APP._kbClassColor()`, then injects into `#kb-legend` a colored badge (8 px square) followed by the class name for each entry. |
+| **Then** | a legend displays the correspondence between each class type and its color in the graph, making it possible to visually identify individuals according to their membership. |
 
 ---
 
-**Source code:** `app.js` → `APP._initKnowledgeBase()`
+**Source code:** `app.js` → `APP._initKnowledgeBase()` — Collects unique `classId` values, sorts them, pre-assigns their colors via `APP._kbClassColor()`, and injects into `#kb-legend` a colored badge (8 px square) followed by the class name for each entry.
 
 ### REQ-VW-017 — SVG arrowheads on directional edges
 
-| **If** | the Knowledge Base graph is initialized, |
+| **If** | the Knowledge Base graph displays assertions between individuals, |
 |---|---|
-| **Then** | the system adds into the `<defs>` section of the SVG two markers via `mkArrow(id, color)`:<br>- `kb-arrow` (color `#3a4a62`, normal arrow)<br>- `kb-arrow-hi` (color `#3b82f6`, highlighted arrow) |
-
-Edges use `marker-end='url(#kb-arrow)'`.
+| **Then** | each link is directed and carries an arrowhead at its end, indicating the direction of the relationship; links highlighted on hover use a distinct-colored arrowhead. |
 
 ---
 
-**Source code:** `app.js` → `APP._initKnowledgeBase()`
+**Source code:** `app.js` → `APP._initKnowledgeBase()` — Adds two markers to the `<defs>` section of the SVG via `mkArrow(id, color)`: `kb-arrow` (color `#3a4a62`) and `kb-arrow-hi` (color `#3b82f6`). Edges use `marker-end='url(#kb-arrow)'`.
 
 ### REQ-VW-018 — Zoom and pan on the Knowledge Base graph
 
-| **If** | the Knowledge Base graph is displayed, |
+| **If** | the ontologist wishes to navigate in the Knowledge Base graph to explore dense areas or zoom out for an overview, |
 |---|---|
-| **Then** | the system applies `d3.zoom().scaleExtent([0.1, 4])` to the SVG and, on each `zoom` event, applies the transformation to the `zoomG` group containing all graphical elements, enabling a zoom factor from 0.1× to 4×. |
+| **Then** | the application allows zooming and panning freely, with a zoom factor between 0.1× and 4×. |
 
 ---
 
-**Source code:** `app.js` → `APP._initKnowledgeBase()`
+**Source code:** `app.js` → `APP._initKnowledgeBase()` — Applies `d3.zoom().scaleExtent([0.1, 4])` to the SVG; on each `zoom` event, applies the transformation to the `zoomG` group containing all graphical elements.
 
 ### REQ-VW-019 — Property labels on edges
 
-| **If** | the Knowledge Base graph is initialized with links, |
+| **If** | the Knowledge Base graph displays assertions between individuals, |
 |---|---|
-| **Then** | for each link, a `<text>` element containing the value `d.property` is created in the `labelG` group and positioned at the midpoint of the edge (`(source.x + target.x)/2, (source.y + target.y)/2 - 4`), updated at each simulation tick. |
+| **Then** | the name of the object property is displayed at the midpoint of each link, allowing the ontologist to identify the nature of the relationship without clicking on the edge. |
 
 ---
 
-**Source code:** `app.js` → `APP._initKnowledgeBase()`
+**Source code:** `app.js` → `APP._initKnowledgeBase()` — For each link, creates a `<text>` element containing `d.property` in the `labelG` group, positioned at `((source.x + target.x)/2, (source.y + target.y)/2 - 4)` and updated at each simulation tick.
 
 ### REQ-VW-021 — Node hover: connection highlighting
 
-| **If** | the user hovers over a node (`mouseover`), |
+| **If** | the ontologist hovers over an individual in the Knowledge Base graph, |
 |---|---|
-| **Then** | the system:<br>- reduces the opacity of non-connected nodes to 0.2<br>- reduces the opacity of uninvolved edges and labels to 0.05 |
+| **Then** | only that node and its directly connected neighbors remain fully visible; all other nodes, edges, and labels are strongly faded, allowing focus on the immediate relationships of the individual. |
 
-| **If** | the user leaves the node (`mouseout`), |
+| **If** | the ontologist leaves the node, |
 |---|---|
-| **Then** | all opacities are restored to 1. |
+| **Then** | all graph elements return to their normal visibility. |
 
 ---
 
-**Source code:** `app.js` → `APP._initKnowledgeBase()` (handlers `mouseover` / `mouseout`)
+**Source code:** `app.js` → `APP._initKnowledgeBase()` (`mouseover` / `mouseout` handlers) — On `mouseover`: opacity of nodes not connected to 0.2, opacity of uninvolved edges and labels to 0.05. On `mouseout`: all opacities restored to 1.
 
 ### REQ-VW-026 — Individual and connection counter
 
-| **If** | the Knowledge Base graph is initialized, |
+| **If** | the ontologist browses the Knowledge Base graph, |
 |---|---|
-| **Then** | the system updates the element `#kb-count` with the text `"N individual(s) · M connection(s)"` (conditional plural for each value). |
+| **Then** | the total number of individuals and the total number of connections between them are displayed in the graph toolbar. |
 
 ---
 
 *Document generated on 2026-06-06 — claude-sonnet-4-6*
 
-**Source code:** `app.js` → `APP._initKnowledgeBase()`
+**Source code:** `app.js` → `APP._initKnowledgeBase()` — Updates the `#kb-count` element with the text `"N individual(s) · M connection(s)"` (conditional plural for each value).
