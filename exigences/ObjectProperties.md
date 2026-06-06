@@ -59,7 +59,7 @@
 
 ### REQ-OP-002 — Expansion automatique des ancêtres
 
-| **Si** | l'`ontologiste` sélectionne ou crée une `propriété` dans l'arbre, |
+| **Si** | l'ontologiste sélectionne ou crée une `propriété` dans l'arbre, |
 |---|---|
 | **Alors** | le chemin complet depuis la racine jusqu'à cette `propriété` est automatiquement déplié, sans que l'utilisateur ait à ouvrir manuellement chaque niveau intermédiaire. |
 
@@ -69,7 +69,7 @@
 
 ### REQ-OP-003 — Création d'une propriété enfant
 
-| **Si** | l'`ontologiste` veut spécialiser une `propriété` existante en créant une sous-`propriété` directement positionnée sous elle, |
+| **Si** | l'ontologiste veut spécialiser une `propriété` existante en créant une sous-`propriété` directement positionnée sous elle, |
 |---|---|
 | **Alors** | la nouvelle `propriété` est créée comme enfant de la `propriété` sélectionnée, et la `propriété` parente est automatiquement dépliée dans l'arbre pour rendre la nouvelle entrée visible. |
 
@@ -79,7 +79,7 @@
 
 ### REQ-OP-004 — Création d'une propriété sœur
 
-| **Si** | l'`ontologiste` veut créer une nouvelle `propriété` au même niveau hiérarchique qu'une `propriété` existante, |
+| **Si** | l'ontologiste veut créer une nouvelle `propriété` au même niveau hiérarchique qu'une `propriété` existante, |
 |---|---|
 | **Alors** | la nouvelle `propriété` est positionnée sous les mêmes parents que la `propriété` de référence, sans nécessiter de configuration supplémentaire des relations hiérarchiques. |
 
@@ -89,7 +89,7 @@
 
 ### REQ-OP-005 — Génération automatique d'un identifiant unique
 
-| **Si** | l'`ontologiste` crée une nouvelle `propriété d'objet`, |
+| **Si** | l'ontologiste crée une nouvelle `propriété d'objet`, |
 |---|---|
 | **Alors** | un identifiant unique lui est attribué automatiquement, sans risque de collision avec les `propriétés` existantes de l'`ontologie`. |
 
@@ -99,7 +99,7 @@
 
 ### REQ-OP-006 — Persistance de la création d'une propriété via l'API
 
-| **Si** | l'`ontologiste` confirme la création d'une nouvelle `propriété d'objet`, |
+| **Si** | l'ontologiste confirme la création d'une nouvelle `propriété d'objet`, |
 |---|---|
 | **Alors** | la `propriété` est enregistrée dans l'`ontologie` avec ses relations hiérarchiques, et l'arbre est mis à jour pour refléter immédiatement cette nouvelle entrée. |
 
@@ -109,7 +109,7 @@
 
 ### REQ-OP-007 — Déplacement par glisser-déposer dans l'arbre
 
-| **Si** | l'`ontologiste` déplace une `propriété` dans l'arbre par glisser-déposer pour modifier sa position hiérarchique, |
+| **Si** | l'ontologiste déplace une `propriété` dans l'arbre par glisser-déposer pour modifier sa position hiérarchique, |
 |---|---|
 | **Alors** | la `propriété` est rattachée à son nouveau parent (ou placée à la racine si déposée sur le nœud racine), et l'`ontologie` est mise à jour en conséquence. |
 
@@ -119,7 +119,7 @@
 
 ### REQ-OP-008 — Protection contre les cycles lors du glisser-déposer
 
-| **Si** | l'`ontologiste` tente de déplacer une `propriété` sur l'un de ses propres descendants dans l'arbre, |
+| **Si** | l'ontologiste tente de déplacer une `propriété` sur l'un de ses propres descendants dans l'arbre, |
 |---|---|
 | **Alors** | l'opération est bloquée et un avertissement est affiché, car cela créerait une hiérarchie circulaire incompatible avec OWL. |
 
@@ -129,7 +129,7 @@
 
 ### REQ-OP-009 — Suppression d'une propriété avec confirmation
 
-| **Si** | l'`ontologiste` souhaite supprimer une `propriété d'objet` de l'`ontologie`, |
+| **Si** | l'ontologiste souhaite supprimer une `propriété d'objet` de l'`ontologie`, |
 |---|---|
 | **Alors** | une confirmation explicite lui est demandée avant toute suppression définitive, pour éviter les suppressions accidentelles. |
 
@@ -139,11 +139,11 @@
 
 ### REQ-OP-010 — Gestion des classes du domaine
 
-| **Si** | l'`ontologiste` ajoute une `classe` au domaine d'une `propriété d'objet`, |
+| **Si** | l'ontologiste ajoute une `classe` au domaine d'une `propriété d'objet`, |
 |---|---|
 | **Alors** | la `classe` est associée à la `propriété` comme contrainte de domaine, et la `propriété` est sauvegardée automatiquement ; si aucun domaine n'est défini, `owl:Thing` est implicitement indiqué. |
 
-| **Si** | l'`ontologiste` retire une `classe` du domaine d'une `propriété d'objet`, |
+| **Si** | l'ontologiste retire une `classe` du domaine d'une `propriété d'objet`, |
 |---|---|
 | **Alors** | la contrainte de domaine est supprimée, la `propriété` est sauvegardée automatiquement, et `owl:Thing` est à nouveau affiché si le domaine devient vide. |
 
@@ -153,11 +153,11 @@
 
 ### REQ-OP-011 — Gestion des classes du range
 
-| **Si** | l'`ontologiste` ajoute une `classe` au range d'une `propriété d'objet`, |
+| **Si** | l'ontologiste ajoute une `classe` au range d'une `propriété d'objet`, |
 |---|---|
 | **Alors** | la `classe` est associée à la `propriété` comme contrainte de range, et la `propriété` est sauvegardée automatiquement ; si aucun range n'est défini, `owl:Thing` est implicitement indiqué. |
 
-| **Si** | l'`ontologiste` retire une `classe` du range d'une `propriété d'objet`, |
+| **Si** | l'ontologiste retire une `classe` du range d'une `propriété d'objet`, |
 |---|---|
 | **Alors** | la contrainte de range est supprimée, la `propriété` est sauvegardée automatiquement, et `owl:Thing` est à nouveau affiché si le range devient vide. |
 
@@ -167,7 +167,7 @@
 
 ### REQ-OP-012 — Définition de la propriété inverse
 
-| **Si** | l'`ontologiste` associe une `propriété` inverse à la `propriété` en cours d'édition, |
+| **Si** | l'ontologiste associe une `propriété` inverse à la `propriété` en cours d'édition, |
 |---|---|
 | **Alors** | la relation d'inversion est enregistrée et la `propriété` est sauvegardée automatiquement. |
 
@@ -187,7 +187,7 @@
 
 ### REQ-OP-014 — Suppression de la propriété inverse
 
-| **Si** | l'`ontologiste` souhaite retirer la relation d'inversion d'une `propriété`, |
+| **Si** | l'ontologiste souhaite retirer la relation d'inversion d'une `propriété`, |
 |---|---|
 | **Alors** | la `propriété` inverse est dissociée et la possibilité d'en définir une nouvelle est immédiatement rétablie. |
 
@@ -199,7 +199,7 @@
 
 | **Si** | une `propriété` est sélectionnée et que le moteur de raisonnement détecte des relations d'inversion implicites la concernant, |
 |---|---|
-| **Alors** | ces inversions inférées sont affichées distinctement dans le formulaire, avec la justification de chaque `inférence`, sans intervention de l'`ontologiste`. |
+| **Alors** | ces inversions inférées sont affichées distinctement dans le formulaire, avec la justification de chaque `inférence`, sans intervention de l'ontologiste. |
 
 **Code source :** `owl_editor.js` → `OPEditor._loadInferredInverse()` — Interroge le moteur d'inférence et injecte dans `#op-inferred-inverse` un badge `⊢ inverse of <strong>${i.inverse_of}</strong>` pour chaque résultat `inferred_inverse_properties`, avec l'attribut `title` portant la raison de l'inférence ; les erreurs sont silencieuses.
 
@@ -207,11 +207,11 @@
 
 ### REQ-OP-016 — Gestion des super-propriétés (subPropertyOf)
 
-| **Si** | l'`ontologiste` rattache une `propriété d'objet` à une super-`propriété`, |
+| **Si** | l'ontologiste rattache une `propriété d'objet` à une super-`propriété`, |
 |---|---|
 | **Alors** | la relation de hiérarchie est enregistrée et la `propriété` est sauvegardée automatiquement. |
 
-| **Si** | l'`ontologiste` retire le rattachement à une super-`propriété`, |
+| **Si** | l'ontologiste retire le rattachement à une super-`propriété`, |
 |---|---|
 | **Alors** | la relation hiérarchique est supprimée et la `propriété` est sauvegardée automatiquement. |
 
@@ -221,11 +221,11 @@
 
 ### REQ-OP-017 — Caractéristiques OWL de la propriété
 
-| **Si** | l'`ontologiste` consulte le formulaire d'une `propriété d'objet`, |
+| **Si** | l'ontologiste consulte le formulaire d'une `propriété d'objet`, |
 |---|---|
 | **Alors** | les sept caractéristiques OWL (`functional`, `inverseFunctional`, `transitive`, `symmetric`, `asymmetric`, `reflexive`, `irreflexive`) sont présentées avec leur état courant, modifiables indépendamment les unes des autres. |
 
-| **Si** | l'`ontologiste` sauvegarde la `propriété`, |
+| **Si** | l'ontologiste sauvegarde la `propriété`, |
 |---|---|
 | **Alors** | l'état de chaque caractéristique est inclus dans les données persistées de la `propriété`. |
 
@@ -235,7 +235,7 @@
 
 ### REQ-OP-018 — Sauvegarde automatique en mode édition
 
-| **Si** | l'`ontologiste` modifie un champ du formulaire d'une `propriété` déjà existante, |
+| **Si** | l'ontologiste modifie un champ du formulaire d'une `propriété` déjà existante, |
 |---|---|
 | **Alors** | les modifications sont sauvegardées automatiquement, sans qu'il soit nécessaire de valider explicitement. |
 
@@ -245,7 +245,7 @@
 
 ### REQ-OP-019 — Sauvegarde complète (création ou mise à jour)
 
-| **Si** | l'`ontologiste` sauvegarde une `propriété d'objet` (nouvelle ou existante), |
+| **Si** | l'ontologiste sauvegarde une `propriété d'objet` (nouvelle ou existante), |
 |---|---|
 | **Alors** | toutes les informations saisies sont persistées dans l'`ontologie` — identifiant, annotations, domaine, range, super-`propriétés`, `propriété` inverse et caractéristiques — et l'arbre est mis à jour pour refléter les changements, y compris un éventuel renommage. |
 
@@ -255,7 +255,7 @@
 
 ### REQ-OP-020 — Création d'une ObjectProperty depuis l'onglet Classes
 
-| **Si** | l'`ontologiste` souhaite créer une `propriété d'objet` directement depuis la fiche d'une `classe`, en utilisant cette `classe` comme domaine, |
+| **Si** | l'ontologiste souhaite créer une `propriété d'objet` directement depuis la fiche d'une `classe`, en utilisant cette `classe` comme domaine, |
 |---|---|
 | **Alors** | une nouvelle `propriété d'objet` est créée avec la `classe` courante comme domaine, et l'application navigue automatiquement vers l'onglet des `propriétés d'objet` pour permettre la suite de l'édition. |
 
@@ -269,7 +269,7 @@
 
 ### REQ-OP-021 — Affichage de l'arbre des propriétés d'objet
 
-| **Si** | l'`ontologiste` ouvre l'onglet des `propriétés d'objet`, |
+| **Si** | l'ontologiste ouvre l'onglet des `propriétés d'objet`, |
 |---|---|
 | **Alors** | l'arbre présente en premier lieu la `propriété` racine `owl:topObjectProperty`, suivie de toutes les `propriétés` de l'`ontologie` organisées selon leurs relations hiérarchiques ; si l'`ontologie` ne contient aucune `propriété d'objet`, un message l'indique explicitement. |
 
@@ -289,7 +289,7 @@
 
 ### REQ-OP-023 — Sélection de owl:topObjectProperty
 
-| **Si** | l'`ontologiste` clique sur le nœud racine `owl:topObjectProperty`, |
+| **Si** | l'ontologiste clique sur le nœud racine `owl:topObjectProperty`, |
 |---|---|
 | **Alors** | le panneau de détail propose de créer une nouvelle `propriété d'objet`, aucune `propriété` existante n'est sélectionnée, et les actions de l'arbre sont mises à jour en conséquence. |
 
@@ -299,7 +299,7 @@
 
 ### REQ-OP-024 — Sélection d'une propriété dans l'arbre
 
-| **Si** | l'`ontologiste` sélectionne une `propriété` dans l'arbre, |
+| **Si** | l'ontologiste sélectionne une `propriété` dans l'arbre, |
 |---|---|
 | **Alors** | le formulaire d'édition de cette `propriété` s'affiche dans le panneau de détail, la chaîne de super-`propriétés` est mise à jour, et les `propriétés` inverses inférées sont chargées. |
 
@@ -327,7 +327,7 @@
 
 ### REQ-OP-026 — Expansion/réduction d'un nœud de l'arbre
 
-| **Si** | l'`ontologiste` clique sur le triangle d'expansion d'un nœud de l'arbre, |
+| **Si** | l'ontologiste clique sur le triangle d'expansion d'un nœud de l'arbre, |
 |---|---|
 | **Alors** | les `propriétés` enfants de ce nœud sont affichées ou masquées, et l'indicateur visuel reflète l'état courant (déplié ou replié). |
 
@@ -337,7 +337,7 @@
 
 ### REQ-OP-027 — Menu contextuel au clic droit sur l'arbre
 
-| **Si** | l'`ontologiste` effectue un clic droit sur un nœud de l'arbre, |
+| **Si** | l'ontologiste effectue un clic droit sur un nœud de l'arbre, |
 |---|---|
 | **Alors** | un menu contextuel s'affiche aux coordonnées du curseur, proposant les actions pertinentes selon le nœud ciblé (création d'une `propriété` enfant, d'une `propriété` sœur, suppression) ; le menu se ferme automatiquement dès qu'un clic est effectué en dehors de lui. |
 
@@ -347,7 +347,7 @@
 
 ### REQ-OP-028 — Formulaire d'édition d'une propriété d'objet
 
-| **Si** | l'`ontologiste` sélectionne une `propriété d'objet` dans l'arbre, |
+| **Si** | l'ontologiste sélectionne une `propriété d'objet` dans l'arbre, |
 |---|---|
 | **Alors** | un formulaire complet s'affiche avec l'identifiant de la `propriété`, son IRI calculé, ses annotations, les contraintes de domaine et de range, la `propriété` inverse, les caractéristiques OWL, et les usages de la `propriété` dans l'`ontologie`. |
 
@@ -361,15 +361,15 @@
 
 ### REQ-OP-029 — Gestion des annotations (labels, comments, autres)
 
-| **Si** | l'`ontologiste` ajoute une annotation de type `label` ou `comment` à la `propriété`, |
+| **Si** | l'ontologiste ajoute une annotation de type `label` ou `comment` à la `propriété`, |
 |---|---|
 | **Alors** | une nouvelle ligne d'annotation est ajoutée dans la section Annotations du formulaire. |
 
-| **Si** | l'`ontologiste` ajoute une annotation d'un autre type en sélectionnant une `propriété d'annotation`, |
+| **Si** | l'ontologiste ajoute une annotation d'un autre type en sélectionnant une `propriété d'annotation`, |
 |---|---|
 | **Alors** | une ligne d'annotation de type `other` est créée avec la `propriété` spécifiée. |
 
-| **Si** | l'`ontologiste` supprime une ligne d'annotation, |
+| **Si** | l'ontologiste supprime une ligne d'annotation, |
 |---|---|
 | **Alors** | la ligne est retirée du formulaire et la `propriété` est sauvegardée automatiquement si elle est en mode édition. |
 
@@ -379,7 +379,7 @@
 
 ### REQ-OP-030 — Panneau "Super Properties" avec chaîne d'ancêtres
 
-| **Si** | l'`ontologiste` sélectionne une `propriété` dans l'arbre, |
+| **Si** | l'ontologiste sélectionne une `propriété` dans l'arbre, |
 |---|---|
 | **Alors** | le panneau "Super `Properties`" affiche la chaîne hiérarchique complète remontant jusqu'à `owl:topObjectProperty` : les super-`propriétés` directes sont modifiables (supprimables), tandis que les ancêtres transitifs sont présentés visuellement comme tels ; un clic sur n'importe quel ancêtre navigue vers sa fiche. |
 
@@ -389,11 +389,11 @@
 
 ### REQ-OP-031 — Mise en page en deux panneaux redimensionnables
 
-| **Si** | l'`ontologiste` consulte l'onglet des `propriétés d'objet`, |
+| **Si** | l'ontologiste consulte l'onglet des `propriétés d'objet`, |
 |---|---|
 | **Alors** | l'interface est divisée en un panneau gauche affichant l'arbre et la chaîne de super-`propriétés`, et un panneau droit affichant le formulaire d'édition ; chaque panneau est redimensionnable par glisser-déposer d'une poignée de séparation. |
 
-| **Si** | l'`ontologiste` fait glisser la poignée de séparation verticale entre les deux panneaux, |
+| **Si** | l'ontologiste fait glisser la poignée de séparation verticale entre les deux panneaux, |
 |---|---|
 | **Alors** | la largeur du panneau gauche est ajustée dans les limites acceptables, et le redimensionneur horizontal interne est recalculé en conséquence. |
 
@@ -405,7 +405,7 @@
 
 | **Si** | l'onglet des `propriétés d'objet` est rechargé suite à une action (création, modification, suppression), |
 |---|---|
-| **Alors** | la `propriété` qui était sélectionnée avant le rechargement est automatiquement sélectionnée à nouveau, préservant le contexte de travail de l'`ontologiste`. |
+| **Alors** | la `propriété` qui était sélectionnée avant le rechargement est automatiquement sélectionnée à nouveau, préservant le contexte de travail de l'ontologiste. |
 
 ---
 
