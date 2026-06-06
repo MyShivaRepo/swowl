@@ -52,9 +52,9 @@
 
 ### REQ-DP-001 — Initialization of the available XSD type list
 
-**If** the application is loaded and DatatypeProperties can be defined,
-
-**Then** the system holds a constant list of 12 allowed XSD types as range: `xsd:string`, `xsd:integer`, `xsd:decimal`, `xsd:float`, `xsd:double`, `xsd:boolean`, `xsd:date`, `xsd:dateTime`, `xsd:duration`, `xsd:anyURI`, `xsd:nonNegativeInteger`, `xsd:positiveInteger` — this list is the sole reference for allowed data types in the application.
+| **If** | the application is loaded and DatatypeProperties can be defined, |
+|---|---|
+| **Then** | the system holds a constant list of 12 allowed XSD types as range: `xsd:string`, `xsd:integer`, `xsd:decimal`, `xsd:float`, `xsd:double`, `xsd:boolean`, `xsd:date`, `xsd:dateTime`, `xsd:duration`, `xsd:anyURI`, `xsd:nonNegativeInteger`, `xsd:positiveInteger` — this list is the sole reference for allowed data types in the application. |
 
 ---
 
@@ -62,9 +62,9 @@
 
 ### REQ-DP-002 — Building the hierarchical property tree
 
-**If** the ontology is loaded and contains DatatypeProperties linked by `subPropertyOf` relations,
-
-**Then** the system builds an object `{ roots, childrenOf }` where `roots` is the alphabetically sorted list of properties with no parent, and `childrenOf` is a map of each property to its alphabetically sorted children — cycles are avoided by only taking into account references to existing IDs.
+| **If** | the ontology is loaded and contains DatatypeProperties linked by `subPropertyOf` relations, |
+|---|---|
+| **Then** | the system builds an object `{ roots, childrenOf }` where `roots` is the alphabetically sorted list of properties with no parent, and `childrenOf` is a map of each property to its alphabetically sorted children — cycles are avoided by only taking into account references to existing IDs. |
 
 ---
 
@@ -72,10 +72,9 @@
 
 ### REQ-DP-003 — Automatic expansion of ancestors of a selected property
 
-**If** a property is selected in the tree
-**and** it has one or more ancestors via `subPropertyOf`,
-
-**Then** the system recursively traverses all its ancestors and adds them to the `_expanded` set, so that the path from the root to the selected property is fully expanded in the display.
+| **If** | a property is selected in the tree **and** it has one or more ancestors via `subPropertyOf`, |
+|---|---|
+| **Then** | the system recursively traverses all its ancestors and adds them to the `_expanded` set, so that the path from the root to the selected property is fully expanded in the display. |
 
 ---
 
@@ -83,12 +82,9 @@
 
 ### REQ-DP-004 — Creating a child property
 
-**If** the user triggers the creation of a child property,
-
-**Then** :
-- if a property is selected, it becomes the sole parent of the new property and is added to `_expanded` to guarantee its visibility;
-- if no property is selected, the new property is created at the root with no parent;
-- in both cases, creation is delegated to `_createAndSelect([parent])`.
+| **If** | the user triggers the creation of a child property, |
+|---|---|
+| **Then** | - if a property is selected, it becomes the sole parent of the new property and is added to `_expanded` to guarantee its visibility;<br>- if no property is selected, the new property is created at the root with no parent;<br>- in both cases, creation is delegated to `_createAndSelect([parent])`. |
 
 ---
 
@@ -96,10 +92,9 @@
 
 ### REQ-DP-005 — Creating a sibling property
 
-**If** the user triggers the creation of a sibling property
-**and** a property is currently selected (`_selectedId` defined),
-
-**Then** the system retrieves the parents (`subPropertyOf`) of the selected property, passes them to `_createAndSelect()` and adds each of them to `_expanded`, thereby producing a new property at the same hierarchical level.
+| **If** | the user triggers the creation of a sibling property **and** a property is currently selected (`_selectedId` defined), |
+|---|---|
+| **Then** | the system retrieves the parents (`subPropertyOf`) of the selected property, passes them to `_createAndSelect()` and adds each of them to `_expanded`, thereby producing a new property at the same hierarchical level. |
 
 ---
 
@@ -107,9 +102,9 @@
 
 ### REQ-DP-006 — Generating a unique name for a new property
 
-**If** a new DatatypeProperty must be created,
-
-**Then** the system generates a name starting from `'NewDatatypeProperty'` and incrementing a counter (`NewDatatypeProperty1`, `NewDatatypeProperty2`, …) until a name is found that is absent from the list of existing IDs in `APP.state.datatype_properties`.
+| **If** | a new DatatypeProperty must be created, |
+|---|---|
+| **Then** | the system generates a name starting from `'NewDatatypeProperty'` and incrementing a counter (`NewDatatypeProperty1`, `NewDatatypeProperty2`, …) until a name is found that is absent from the list of existing IDs in `APP.state.datatype_properties`. |
 
 ---
 
@@ -117,13 +112,9 @@
 
 ### REQ-DP-007 — Effective creation and navigation to the new property
 
-**If** the creation of a DatatypeProperty is confirmed with the targeted parents,
-
-**Then** :
-- the system builds a property object with default values (empty `annotations`, empty `domain`, empty `range`, `functional: false`) and the IRI generated by `_generatePropName()`;
-- it calls `API.createDP(prop)`, stores the ID in `_selectedId` and `_editingId`;
-- it refreshes the application state via `APP.refresh()` and `APP.renderSection('datatype-properties')`;
-- in case of error, it is displayed via `UI.error()`.
+| **If** | the creation of a DatatypeProperty is confirmed with the targeted parents, |
+|---|---|
+| **Then** | - the system builds a property object with default values (empty `annotations`, empty `domain`, empty `range`, `functional: false`) and the IRI generated by `_generatePropName()`;<br>- it calls `API.createDP(prop)`, stores the ID in `_selectedId` and `_editingId`;<br>- it refreshes the application state via `APP.refresh()` and `APP.renderSection('datatype-properties')`;<br>- in case of error, it is displayed via `UI.error()`. |
 
 ---
 
@@ -131,17 +122,13 @@
 
 ### REQ-DP-008 — Dropping a property onto a new target
 
-**If** the user drops a property onto a valid target during drag & drop
-**and** the target is not a descendant of the source,
+| **If** | the user drops a property onto a valid target during drag & drop **and** the target is not a descendant of the source, |
+|---|---|
+| **Then** | - if `targetId` is defined, the `subPropertyOf` of the moved property is updated to `[targetId]`;<br>- if `targetId` is undefined, the property becomes a root (`subPropertyOf` empty);<br>- `API.updateDP()` is called to persist the change, a success message is displayed via `UI.success()`, and the display is refreshed. |
 
-**Then** :
-- if `targetId` is defined, the `subPropertyOf` of the moved property is updated to `[targetId]`;
-- if `targetId` is undefined, the property becomes a root (`subPropertyOf` empty);
-- `API.updateDP()` is called to persist the change, a success message is displayed via `UI.success()`, and the display is refreshed.
-
-**If** the target is a descendant of the source,
-
-**Then** the operation is cancelled and a warning `UI.warn('Cannot drop on a descendant — would create a cycle')` is displayed.
+| **If** | the target is a descendant of the source, |
+|---|---|
+| **Then** | the operation is cancelled and a warning `UI.warn('Cannot drop on a descendant — would create a cycle')` is displayed. |
 
 ---
 
@@ -149,9 +136,9 @@
 
 ### REQ-DP-009 — Checking an ancestor/descendant relationship for drag & drop
 
-**If** the system must determine whether a target property is a descendant of a source property during drag & drop,
-
-**Then** it performs a recursive depth-first traversal of the tree (via `buildTree()`) from the source property to check whether the target is a descendant of it — returns `false` if either parameter is null or undefined.
+| **If** | the system must determine whether a target property is a descendant of a source property during drag & drop, |
+|---|---|
+| **Then** | it performs a recursive depth-first traversal of the tree (via `buildTree()`) from the source property to check whether the target is a descendant of it — returns `false` if either parameter is null or undefined. |
 
 ---
 
@@ -159,14 +146,13 @@
 
 ### REQ-DP-010 — Checking range uniqueness before opening the picker
 
-**If** the user attempts to open the range picker (`dp-range-picker`)
-**and** the `dp-range-list` already contains a `.cls-list-item[data-id]` element,
+| **If** | the user attempts to open the range picker (`dp-range-picker`) **and** the `dp-range-list` already contains a `.cls-list-item[data-id]` element, |
+|---|---|
+| **Then** | the system prevents the picker from opening, ensuring that only one XSD value can be defined as range. |
 
-**Then** the system prevents the picker from opening, ensuring that only one XSD value can be defined as range.
-
-**If** the user opens any other picker,
-
-**Then** the system delegates opening to `_togglePicker(id)`.
+| **If** | the user opens any other picker, |
+|---|---|
+| **Then** | the system delegates opening to `_togglePicker(id)`. |
 
 ---
 
@@ -174,13 +160,13 @@
 
 ### REQ-DP-011 — Domain management
 
-**If** the user adds a class as the domain of a DatatypeProperty,
+| **If** | the user adds a class as the domain of a DatatypeProperty, |
+|---|---|
+| **Then** | the system inserts the class into `dp-domain-list` via `_addListItem()` with the `cls-dot` style, then triggers `autoSave()`. |
 
-**Then** the system inserts the class into `dp-domain-list` via `_addListItem()` with the `cls-dot` style, then triggers `autoSave()`.
-
-**If** the user removes a class from the domain,
-
-**Then** the system removes the entry from `dp-domain-list` via `_removeListItem()`, displays `owl:Thing` as the default value if the list becomes empty, then triggers `autoSave()`.
+| **If** | the user removes a class from the domain, |
+|---|---|
+| **Then** | the system removes the entry from `dp-domain-list` via `_removeListItem()`, displays `owl:Thing` as the default value if the list becomes empty, then triggers `autoSave()`. |
 
 ---
 
@@ -188,13 +174,13 @@
 
 ### REQ-DP-012 — Range management (XSD type)
 
-**If** the user adds an XSD type as the range of a DatatypeProperty,
+| **If** | the user adds an XSD type as the range of a DatatypeProperty, |
+|---|---|
+| **Then** | the system inserts the type into `dp-range-list` via `_addListItem()` with the `xsd-dot` style, hides the `dp-range-btn` button to prevent adding a second type, then triggers `autoSave()` if a property is being edited. |
 
-**Then** the system inserts the type into `dp-range-list` via `_addListItem()` with the `xsd-dot` style, hides the `dp-range-btn` button to prevent adding a second type, then triggers `autoSave()` if a property is being edited.
-
-**If** the user removes the XSD type from the range,
-
-**Then** the system removes the type from `dp-range-list` via `_removeListItem()` (the displayed default value reverts to `rdfs:Literal`), shows the `dp-range-btn` button again to allow selecting a new type, then triggers `autoSave()`.
+| **If** | the user removes the XSD type from the range, |
+|---|---|
+| **Then** | the system removes the type from `dp-range-list` via `_removeListItem()` (the displayed default value reverts to `rdfs:Literal`), shows the `dp-range-btn` button again to allow selecting a new type, then triggers `autoSave()`. |
 
 ---
 
@@ -202,13 +188,13 @@
 
 ### REQ-DP-013 — Super-property management
 
-**If** the user adds a super-property to a DatatypeProperty,
+| **If** | the user adds a super-property to a DatatypeProperty, |
+|---|---|
+| **Then** | the system inserts the chosen property into `dp-sub-list` via `_addListItem()` with navigation to the `'datatype-properties'` section and the `dp-prop-dot` style, then triggers `autoSave()`. |
 
-**Then** the system inserts the chosen property into `dp-sub-list` via `_addListItem()` with navigation to the `'datatype-properties'` section and the `dp-prop-dot` style, then triggers `autoSave()`.
-
-**If** the user removes a super-property,
-
-**Then** the system removes the entry from `dp-sub-list` via `_removeListItem()`, then triggers `autoSave()`.
+| **If** | the user removes a super-property, |
+|---|---|
+| **Then** | the system removes the entry from `dp-sub-list` via `_removeListItem()`, then triggers `autoSave()`. |
 
 ---
 
@@ -216,10 +202,9 @@
 
 ### REQ-DP-014 — Auto-save on field change
 
-**If** the user modifies a field in the edit form
-**and** an existing property is being edited (`_editingId !== null`),
-
-**Then** the system automatically triggers `save(false)` to persist the changes without any explicit action from the user.
+| **If** | the user modifies a field in the edit form **and** an existing property is being edited (`_editingId !== null`), |
+|---|---|
+| **Then** | the system automatically triggers `save(false)` to persist the changes without any explicit action from the user. |
 
 ---
 
@@ -227,23 +212,17 @@
 
 ### REQ-DP-015 — Saving (creating or updating) a DatatypeProperty
 
-**If** the user saves a DatatypeProperty (new or existing),
+| **If** | the user saves a DatatypeProperty (new or existing), |
+|---|---|
+| **Then** | the system collects all form values:<br>- ID via `document.getElementById('dp-id').value`, validated by `_validateId()`;<br>- Annotations (labels, comments, other) via `_collectAnnotations('dp-annotations-body')`;<br>- Domain via `_collectList('dp-domain-list')`;<br>- Range via `_collectList('dp-range-list')`;<br>- SubPropertyOf via `_collectList('dp-sub-list')`;<br>- Functional via the state of the `dp-functional` checkbox. |
 
-**Then** the system collects all form values:
-- ID via `document.getElementById('dp-id').value`, validated by `_validateId()`;
-- Annotations (labels, comments, other) via `_collectAnnotations('dp-annotations-body')`;
-- Domain via `_collectList('dp-domain-list')`;
-- Range via `_collectList('dp-range-list')`;
-- SubPropertyOf via `_collectList('dp-sub-list')`;
-- Functional via the state of the `dp-functional` checkbox.
+| **If** | the mode is creation (`isNew === true`), |
+|---|---|
+| **Then** | the system calls `API.createDP(prop)` and displays a success message. |
 
-**If** the mode is creation (`isNew === true`),
-
-**Then** the system calls `API.createDP(prop)` and displays a success message.
-
-**If** the mode is update,
-
-**Then** the system calls `API.updateDP(originalId, prop)` and signals a rename if the ID has changed.
+| **If** | the mode is update, |
+|---|---|
+| **Then** | the system calls `API.updateDP(originalId, prop)` and signals a rename if the ID has changed. |
 
 In both cases, `APP.refresh()` then `APP.renderSection('datatype-properties')` are called.
 
@@ -253,17 +232,13 @@ In both cases, `APP.refresh()` then `APP.renderSection('datatype-properties')` a
 
 ### REQ-DP-016 — Deleting a DatatypeProperty with confirmation
 
-**If** the user triggers the deletion of a DatatypeProperty,
+| **If** | the user triggers the deletion of a DatatypeProperty, |
+|---|---|
+| **Then** | the system displays a confirmation dialog via `UI.confirm()`. |
 
-**Then** the system displays a confirmation dialog via `UI.confirm()`.
-
-**If** the user confirms the deletion,
-
-**Then** :
-- `API.deleteDP(id)` is called;
-- a success message is displayed via `UI.success()`;
-- `_selectedId` and `_editingId` are reset to `null`;
-- the display is refreshed via `APP.refresh()` and `APP.renderSection('datatype-properties')`.
+| **If** | the user confirms the deletion, |
+|---|---|
+| **Then** | - `API.deleteDP(id)` is called;<br>- a success message is displayed via `UI.success()`;<br>- `_selectedId` and `_editingId` are reset to `null`;<br>- the display is refreshed via `APP.refresh()` and `APP.renderSection('datatype-properties')`. |
 
 ---
 
@@ -277,9 +252,9 @@ In both cases, `APP.refresh()` then `APP.renderSection('datatype-properties')` a
 
 ### REQ-DP-017 — Generating HTML options for DatatypeProperties
 
-**If** a component from another tab requires a dropdown list referencing DatatypeProperties,
-
-**Then** the system iterates over `APP.state.datatype_properties` and produces a string of `<option>` elements for each property, with selection of the value corresponding to `selectedId`.
+| **If** | a component from another tab requires a dropdown list referencing DatatypeProperties, |
+|---|---|
+| **Then** | the system iterates over `APP.state.datatype_properties` and produces a string of `<option>` elements for each property, with selection of the value corresponding to `selectedId`. |
 
 ---
 
@@ -287,9 +262,9 @@ In both cases, `APP.refresh()` then `APP.renderSection('datatype-properties')` a
 
 ### REQ-DP-018 — Generating HTML options for XSD types
 
-**If** an XSD selector must be displayed (notably in the Individuals tab),
-
-**Then** the system iterates over `XSD_TYPES` and produces HTML `<option>` elements, with `xsd:string` as the default selected value if no value is specified.
+| **If** | an XSD selector must be displayed (notably in the Individuals tab), |
+|---|---|
+| **Then** | the system iterates over `XSD_TYPES` and produces HTML `<option>` elements, with `xsd:string` as the default selected value if no value is specified. |
 
 ---
 
@@ -297,12 +272,9 @@ In both cases, `APP.refresh()` then `APP.renderSection('datatype-properties')` a
 
 ### REQ-DP-019 — Rendering a tree node with drag & drop handling
 
-**If** a node of the DatatypeProperties tree must be displayed,
-
-**Then** the system generates the node's HTML with:
-- indentation proportional to depth (`depth * 16 + 6` px);
-- a toggle triangle if the node has children;
-- the `onclick`, `oncontextmenu`, `ondragstart`, `ondragover`, `ondragleave`, `ondrop`, `ondragend` handlers wired to the corresponding methods of `DPEditor`.
+| **If** | a node of the DatatypeProperties tree must be displayed, |
+|---|---|
+| **Then** | the system generates the node's HTML with:<br>- indentation proportional to depth (`depth * 16 + 6` px);<br>- a toggle triangle if the node has children;<br>- the `onclick`, `oncontextmenu`, `ondragstart`, `ondragover`, `ondragleave`, `ondrop`, `ondragend` handlers wired to the corresponding methods of `DPEditor`. |
 
 ---
 
@@ -310,12 +282,9 @@ In both cases, `APP.refresh()` then `APP.renderSection('datatype-properties')` a
 
 ### REQ-DP-020 — Rendering the full tree with owl:topDataProperty root
 
-**If** the DatatypeProperties tab is displayed,
-
-**Then** :
-- the system calls `buildTree()` then `_renderNode()` for each root;
-- it displays at the top an element representing the root (`owl:topDataProperty` or `rdf:Property` depending on `APP.getOntologyRootLabels()`);
-- if the property list is empty, it displays the message `"No DatatypeProperty"`.
+| **If** | the DatatypeProperties tab is displayed, |
+|---|---|
+| **Then** | - the system calls `buildTree()` then `_renderNode()` for each root;<br>- it displays at the top an element representing the root (`owl:topDataProperty` or `rdf:Property` depending on `APP.getOntologyRootLabels()`);<br>- if the property list is empty, it displays the message `"No DatatypeProperty"`. |
 
 ---
 
@@ -323,13 +292,9 @@ In both cases, `APP.refresh()` then `APP.renderSection('datatype-properties')` a
 
 ### REQ-DP-021 — Rendering the two-panel (split) layout
 
-**If** the DatatypeProperties tab is initialized,
-
-**Then** the system generates the complete HTML structure with:
-- a left panel containing the tree and the "Super Properties" sub-panel;
-- a horizontal resizable separator (`split-handle`);
-- an empty right panel (`detail-panel`) with a create button;
-- the "Child", "Sibling" and "Delete" buttons rendered as disabled by default.
+| **If** | the DatatypeProperties tab is initialized, |
+|---|---|
+| **Then** | the system generates the complete HTML structure with:<br>- a left panel containing the tree and the "Super Properties" sub-panel;<br>- a horizontal resizable separator (`split-handle`);<br>- an empty right panel (`detail-panel`) with a create button;<br>- the "Child", "Sibling" and "Delete" buttons rendered as disabled by default. |
 
 ---
 
@@ -337,11 +302,9 @@ In both cases, `APP.refresh()` then `APP.renderSection('datatype-properties')` a
 
 ### REQ-DP-022 — Restoring selection after re-render
 
-**If** the DatatypeProperties section is re-rendered,
-
-**Then** the system:
-- calls `_initSplitPane()` to re-attach resize listeners;
-- re-selects either the root (`selectTopProp()`), or the property stored in `_selectedId` (`selectProp()`), thereby preserving the interface state.
+| **If** | the DatatypeProperties section is re-rendered, |
+|---|---|
+| **Then** | the system:<br>- calls `_initSplitPane()` to re-attach resize listeners;<br>- re-selects either the root (`selectTopProp()`), or the property stored in `_selectedId` (`selectProp()`), thereby preserving the interface state. |
 
 ---
 
@@ -349,9 +312,9 @@ In both cases, `APP.refresh()` then `APP.renderSection('datatype-properties')` a
 
 ### REQ-DP-023 — Horizontal resizing of the left panel
 
-**If** the user drags the `dp-split-handle` element,
-
-**Then** the system resizes the left panel by constraining its width between 160 and 520 px, and calls `_initHResizers('dp-tree-panel')` to manage the vertical resizing between the tree and the "Super Properties" sub-panel.
+| **If** | the user drags the `dp-split-handle` element, |
+|---|---|
+| **Then** | the system resizes the left panel by constraining its width between 160 and 520 px, and calls `_initHResizers('dp-tree-panel')` to manage the vertical resizing between the tree and the "Super Properties" sub-panel. |
 
 ---
 
@@ -359,16 +322,13 @@ In both cases, `APP.refresh()` then `APP.renderSection('datatype-properties')` a
 
 ### REQ-DP-024 — Updating the "Super Properties" panel
 
-**If** no property is selected,
+| **If** | no property is selected, |
+|---|---|
+| **Then** | the lower left panel (`dp-sub-list`) displays the message "— select a property —". |
 
-**Then** the lower left panel (`dp-sub-list`) displays the message "— select a property —".
-
-**If** a property is selected,
-
-**Then** :
-- the system computes the full ancestor chain via `buildChain()` and displays each ancestor with increasing indentation, ending with `owl:topDatatypeProperty`;
-- direct ancestors have a delete button (✕);
-- an HTML selector offers properties not yet used as super-properties.
+| **If** | a property is selected, |
+|---|---|
+| **Then** | - the system computes the full ancestor chain via `buildChain()` and displays each ancestor with increasing indentation, ending with `owl:topDatatypeProperty`;<br>- direct ancestors have a delete button (✕);<br>- an HTML selector offers properties not yet used as super-properties. |
 
 ---
 
@@ -376,13 +336,9 @@ In both cases, `APP.refresh()` then `APP.renderSection('datatype-properties')` a
 
 ### REQ-DP-025 — Selecting the owl:topDataProperty root
 
-**If** the user selects the `owl:topDataProperty` root,
-
-**Then** :
-- `_selectedId` is set to `null` and `_topPropSelected` to `true`;
-- the highlighting in the tree is updated;
-- the detail panel displays a welcome screen with the root and a create button;
-- `_updateSuperPanel(null)` and `_updateTreeButtons()` are called.
+| **If** | the user selects the `owl:topDataProperty` root, |
+|---|---|
+| **Then** | - `_selectedId` is set to `null` and `_topPropSelected` to `true`;<br>- the highlighting in the tree is updated;<br>- the detail panel displays a welcome screen with the root and a create button;<br>- `_updateSuperPanel(null)` and `_updateTreeButtons()` are called. |
 
 ---
 
@@ -390,15 +346,9 @@ In both cases, `APP.refresh()` then `APP.renderSection('datatype-properties')` a
 
 ### REQ-DP-026 — Selecting a DatatypeProperty in the tree
 
-**If** the user selects a DatatypeProperty in the tree,
-
-**Then** :
-- `id` is stored in `_selectedId`;
-- the visual highlighting in the tree is updated;
-- the property object is retrieved from `APP.state.datatype_properties`;
-- the detail form is injected via `renderForm()`;
-- the vertical resizers of the right panel are initialized;
-- the "Super Properties" panel and toolbar buttons are updated.
+| **If** | the user selects a DatatypeProperty in the tree, |
+|---|---|
+| **Then** | - `id` is stored in `_selectedId`;<br>- the visual highlighting in the tree is updated;<br>- the property object is retrieved from `APP.state.datatype_properties`;<br>- the detail form is injected via `renderForm()`;<br>- the vertical resizers of the right panel are initialized;<br>- the "Super Properties" panel and toolbar buttons are updated. |
 
 ---
 
@@ -406,17 +356,17 @@ In both cases, `APP.refresh()` then `APP.renderSection('datatype-properties')` a
 
 ### REQ-DP-027 — Managing toolbar button states
 
-**If** the root is selected,
+| **If** | the root is selected, |
+|---|---|
+| **Then** | only the "Child" button is enabled; "Sibling" and "Delete" are hidden. |
 
-**Then** only the "Child" button is enabled; "Sibling" and "Delete" are hidden.
+| **If** | a property is selected, |
+|---|---|
+| **Then** | all three buttons "Child", "Sibling" and "Delete" are active. |
 
-**If** a property is selected,
-
-**Then** all three buttons "Child", "Sibling" and "Delete" are active.
-
-**If** no selection is active,
-
-**Then** all buttons are disabled.
+| **If** | no selection is active, |
+|---|---|
+| **Then** | all buttons are disabled. |
 
 ---
 
@@ -424,9 +374,9 @@ In both cases, `APP.refresh()` then `APP.renderSection('datatype-properties')` a
 
 ### REQ-DP-028 — Expanding / collapsing a tree node
 
-**If** the user clicks on the toggle triangle of a tree node,
-
-**Then** the system toggles the visibility of the child container `dp-tcn-${id}`, updates the `_expanded` Set (adding or removing `id`), and rotates the arrow of the `.tree-toggle` element to reflect the expanded/collapsed state.
+| **If** | the user clicks on the toggle triangle of a tree node, |
+|---|---|
+| **Then** | the system toggles the visibility of the child container `dp-tcn-${id}`, updates the `_expanded` Set (adding or removing `id`), and rotates the arrow of the `.tree-toggle` element to reflect the expanded/collapsed state. |
 
 ---
 
@@ -434,14 +384,9 @@ In both cases, `APP.refresh()` then `APP.renderSection('datatype-properties')` a
 
 ### REQ-DP-029 — Displaying the context menu (right-click)
 
-**If** the user right-clicks on a tree node,
-
-**Then** :
-- any existing context menu is removed;
-- the property or root is selected according to the value of `id`;
-- a `div.ctx-menu` element is created and inserted into the `body` at the cursor position;
-- the menu always contains the item "Add Child Property"; if `id` is defined (real property), "Add Sibling Property" and "Delete" are also added;
-- the menu closes automatically on an outside click via a `click` listener on `document`.
+| **If** | the user right-clicks on a tree node, |
+|---|---|
+| **Then** | - any existing context menu is removed;<br>- the property or root is selected according to the value of `id`;<br>- a `div.ctx-menu` element is created and inserted into the `body` at the cursor position;<br>- the menu always contains the item "Add Child Property"; if `id` is defined (real property), "Add Sibling Property" and "Delete" are also added;<br>- the menu closes automatically on an outside click via a `click` listener on `document`. |
 
 ---
 
@@ -449,9 +394,9 @@ In both cases, `APP.refresh()` then `APP.renderSection('datatype-properties')` a
 
 ### REQ-DP-030 — Closing the context menu
 
-**If** the context menu is open and a close action is triggered,
-
-**Then** the system removes from the DOM the element bearing the ID `dp-ctx-menu`, if it exists.
+| **If** | the context menu is open and a close action is triggered, |
+|---|---|
+| **Then** | the system removes from the DOM the element bearing the ID `dp-ctx-menu`, if it exists. |
 
 ---
 
@@ -459,12 +404,9 @@ In both cases, `APP.refresh()` then `APP.renderSection('datatype-properties')` a
 
 ### REQ-DP-031 — Starting the drag of a property
 
-**If** the user begins dragging a property in the tree,
-
-**Then** :
-- the ID of the dragged property is stored in `_dragId`;
-- `effectAllowed` is set to `'move'` and the ID is stored in `dataTransfer`;
-- the CSS class `'dragging'` is added to the source element after a 0 ms delay (via `setTimeout`).
+| **If** | the user begins dragging a property in the tree, |
+|---|---|
+| **Then** | - the ID of the dragged property is stored in `_dragId`;<br>- `effectAllowed` is set to `'move'` and the ID is stored in `dataTransfer`;<br>- the CSS class `'dragging'` is added to the source element after a 0 ms delay (via `setTimeout`). |
 
 ---
 
@@ -472,12 +414,9 @@ In both cases, `APP.refresh()` then `APP.renderSection('datatype-properties')` a
 
 ### REQ-DP-032 — Hovering over a target during drag
 
-**If** the user hovers over a target during a drag
-**and** a drag is in progress (`_dragId` defined),
-**and** the target is different from the source,
-**and** the target is not a descendant of the source (checked via `_isDescendant()`),
-
-**Then** the system allows the drop (`event.preventDefault()`) and applies the `'drag-over'` class to the hovered element.
+| **If** | the user hovers over a target during a drag **and** a drag is in progress (`_dragId` defined), **and** the target is different from the source, **and** the target is not a descendant of the source (checked via `_isDescendant()`), |
+|---|---|
+| **Then** | the system allows the drop (`event.preventDefault()`) and applies the `'drag-over'` class to the hovered element. |
 
 ---
 
@@ -485,23 +424,17 @@ In both cases, `APP.refresh()` then `APP.renderSection('datatype-properties')` a
 
 ### REQ-DP-033 — Rendering the DatatypeProperty edit form
 
-**If** the user selects a DatatypeProperty or creates a new property,
+| **If** | the user selects a DatatypeProperty or creates a new property, |
+|---|---|
+| **Then** | the system generates the complete HTML of the right panel with the following sections:<br>- **Header**: ID input field (with `_sanitizeId()`), mention `(instance of owl:DatatypeProperty)`, full IRI computed from `APP.state.ontology.id`;<br>- **Annotations**: table with Property / Value / Lang columns, populated via `_annoRow()` for `labels`, `comments` and `other`;<br>- **Domain(s)**: list of domain classes via `_listRows()`, selector among available classes (`APP.state.classes`), default displayed value `owl:Thing`;<br>- **Range**: list of XSD types via `_listRows()`, selector among unused types drawn from `XSD_TYPES`, default displayed value `rdfs:Literal`;<br>- **Characteristics**: single checkbox "Functional" bound to `p.functional`;<br>- **Where Used**: section generated by `_whereUsedFrame()` listing the rules that use this property. |
 
-**Then** the system generates the complete HTML of the right panel with the following sections:
-- **Header**: ID input field (with `_sanitizeId()`), mention `(instance of owl:DatatypeProperty)`, full IRI computed from `APP.state.ontology.id`;
-- **Annotations**: table with Property / Value / Lang columns, populated via `_annoRow()` for `labels`, `comments` and `other`;
-- **Domain(s)**: list of domain classes via `_listRows()`, selector among available classes (`APP.state.classes`), default displayed value `owl:Thing`;
-- **Range**: list of XSD types via `_listRows()`, selector among unused types drawn from `XSD_TYPES`, default displayed value `rdfs:Literal`;
-- **Characteristics**: single checkbox "Functional" bound to `p.functional`;
-- **Where Used**: section generated by `_whereUsedFrame()` listing the rules that use this property.
+| **If** | the mode is creation (`prop === null`), |
+|---|---|
+| **Then** | a "✅ Create" button is displayed instead of auto-save. |
 
-**If** the mode is creation (`prop === null`),
-
-**Then** a "✅ Create" button is displayed instead of auto-save.
-
-**If** the mode is editing,
-
-**Then** all field modifications trigger `autoSave()` via `onchange`.
+| **If** | the mode is editing, |
+|---|---|
+| **Then** | all field modifications trigger `autoSave()` via `onchange`. |
 
 ---
 
@@ -509,13 +442,13 @@ In both cases, `APP.refresh()` then `APP.renderSection('datatype-properties')` a
 
 ### REQ-DP-034 — Adding / removing an annotation row (label / comment)
 
-**If** the user adds an annotation row of type label or comment,
+| **If** | the user adds an annotation row of type label or comment, |
+|---|---|
+| **Then** | the system calls `_makeAnnotRow(type, 'DPEditor', ac)` and inserts the returned row into the `tbody` identified as `dp-annotations-body` — `autoSave()` is triggered if a property is being edited (`_editingId !== null`). |
 
-**Then** the system calls `_makeAnnotRow(type, 'DPEditor', ac)` and inserts the returned row into the `tbody` identified as `dp-annotations-body` — `autoSave()` is triggered if a property is being edited (`_editingId !== null`).
-
-**If** the user removes an annotation row,
-
-**Then** the system removes from the DOM the parent `<tr>` row of the clicked button (`btn.closest('tr')?.remove()`), then triggers `autoSave()` if a property is being edited.
+| **If** | the user removes an annotation row, |
+|---|---|
+| **Then** | the system removes from the DOM the parent `<tr>` row of the clicked button (`btn.closest('tr')?.remove()`), then triggers `autoSave()` if a property is being edited. |
 
 ---
 
@@ -523,9 +456,9 @@ In both cases, `APP.refresh()` then `APP.renderSection('datatype-properties')` a
 
 ### REQ-DP-035 — Adding an "other property" annotation
 
-**If** the user selects an "other property" annotation via the dedicated selector,
-
-**Then** the system calls `_makeAnnotRow('other', 'DPEditor', ac, prop)`, inserts the row into `dp-annotations-body`, then hides the annotation picker `dp-anno-picker` by forcing its `style.display` to `'none'`.
+| **If** | the user selects an "other property" annotation via the dedicated selector, |
+|---|---|
+| **Then** | the system calls `_makeAnnotRow('other', 'DPEditor', ac, prop)`, inserts the row into `dp-annotations-body`, then hides the annotation picker `dp-anno-picker` by forcing its `style.display` to `'none'`. |
 
 ---
 
