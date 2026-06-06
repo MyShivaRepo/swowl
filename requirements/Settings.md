@@ -50,7 +50,7 @@
 
 | **If** | the user chooses to hide an optional tab from the interface, |
 |---|---|
-| **Then** | the tab immediately disappears from the navigation bar and this choice is saved; if the hidden tab was the active one, the user is automatically redirected to the **Ontologies** tab. |
+| **Then** | the tab immediately disappears from the navigation bar and this choice is saved; if the hidden tab was the active one, the user is automatically redirected to the **`Ontologies`** tab. |
 
 **Source code:** `app.js` → `TabVisibility.hide(tabId)` — Verifies that `tabId` is present in `_optional`, adds it to the internal `Set` `_hidden`, saves the state to `localStorage`, applies the visibility in the DOM via `APP._applyTabVisibility()`, then redirects to `'ontologies'` if the active tab matches the one being hidden.
 
