@@ -119,7 +119,7 @@
 
 ### REQ-VW-013 — Construction des nœuds (individuals) et liens (assertions)
 
-| **Si** | l'`ontologie` est chargée et contient des `individuals` reliés par des `propriétés d'objet`, |
+| **Si** | l'`ontologie` est chargée et contient des `individuals` reliés par des `ObjectProperty`, |
 |---|---|
 | **Alors** | chaque `individual` est représenté comme un nœud du graphe, et chaque assertion entre deux `individuals` existants est représentée comme un lien orienté entre les nœuds correspondants. |
 
@@ -333,7 +333,7 @@
 
 | **Si** | le graphe Knowledge Base affiche des assertions entre `individuals`, |
 |---|---|
-| **Alors** | le nom de la `propriété d'objet` est affiché au milieu de chaque lien, permettant à l'ontologiste d'identifier la nature de la relation sans avoir à cliquer sur l'arête. |
+| **Alors** | le nom de la `ObjectProperty` est affiché au milieu de chaque lien, permettant à l'ontologiste d'identifier la nature de la relation sans avoir à cliquer sur l'arête. |
 
 ---
 
