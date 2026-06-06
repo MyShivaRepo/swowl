@@ -215,7 +215,7 @@
 
 ### REQ-VW-027 — Blocking the Views tab when no ontology is connected
 
-| **If** | the ontologist attempts to access the Views section without having previously loaded an ontology, |
+| **If** | the ontologist attempts to access the `Views` section without having previously loaded an ontology, |
 |---|---|
 | **Then** | the application displays an informational message inviting the user to connect an ontology, with a direct link to the ontology management section, and does not display the graphs. |
 
@@ -225,7 +225,7 @@
 
 ### REQ-VW-028 — Deferred graph initialization after HTML rendering
 
-| **If** | the ontologist navigates to the Views tab and the HTML has just been injected into the page, |
+| **If** | the ontologist navigates to the `Views` tab and the HTML has just been injected into the page, |
 |---|---|
 | **Then** | the graph corresponding to the active sub-tab is initialized after a short delay, ensuring that the display area is available before graphical rendering begins. |
 
@@ -243,9 +243,9 @@
 
 ### REQ-VW-001 — Rendering the Views tab with sub-tabs
 
-| **If** | the ontologist navigates to the Views tab, |
+| **If** | the ontologist navigates to the `Views` tab, |
 |---|---|
-| **Then** | the application displays two visualization sub-tabs — "Ontology" for exploring the class hierarchy, and "Knowledge Base" for exploring individuals and their relationships — the active tab being remembered between navigations. |
+| **Then** | the application displays two visualization sub-tabs — "`Ontology`" for exploring the class hierarchy, and "Knowledge Base" for exploring individuals and their relationships — the active tab being remembered between navigations. |
 
 | **If** | the ontologist selects a sub-tab, |
 |---|---|
@@ -257,7 +257,7 @@
 
 ### REQ-VW-002 — "Ontology" sub-tab: D3 hyperbolic tree
 
-| **If** | the ontologist opens the "Ontology" sub-tab, |
+| **If** | the ontologist opens the "`Ontology`" sub-tab, |
 |---|---|
 | **Then** | the application displays an interactive hyperbolic graph of the class tree, along with a view reset button, a search field for filtering classes, contextual help on available interactions, a class counter, and the visualization area. |
 
