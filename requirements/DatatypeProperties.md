@@ -52,9 +52,9 @@
 
 ### REQ-DP-001 — Initialization of the available XSD types list
 
-| **If** | the ontologist needs to type a DatatypeProperty with a literal data type, |
+| **If** | the ontologist needs to type a `DatatypeProperty` with a literal data type, |
 |---|---|
-| **Then** | the application offers exactly 12 recognized XSD types: `xsd:string`, `xsd:integer`, `xsd:decimal`, `xsd:float`, `xsd:double`, `xsd:boolean`, `xsd:date`, `xsd:dateTime`, `xsd:duration`, `xsd:anyURI`, `xsd:nonNegativeInteger`, `xsd:positiveInteger` — no other data type is allowed as the range of a DatatypeProperty. |
+| **Then** | the application offers exactly 12 recognized XSD types: `xsd:string`, `xsd:integer`, `xsd:decimal`, `xsd:float`, `xsd:double`, `xsd:boolean`, `xsd:date`, `xsd:dateTime`, `xsd:duration`, `xsd:anyURI`, `xsd:nonNegativeInteger`, `xsd:positiveInteger` — no other data type is allowed as the range of a `DatatypeProperty`. |
 
 ---
 
@@ -62,7 +62,7 @@
 
 ### REQ-DP-002 — Construction of the property hierarchical tree
 
-| **If** | the ontology contains DatatypeProperties organized in a specialization hierarchy, |
+| **If** | the ontology contains `DatatypeProperties` organized in a specialization hierarchy, |
 |---|---|
 | **Then** | the property tree faithfully reflects these specialization relationships, with the most general properties at the root and the most specific ones as leaves, each level sorted alphabetically. |
 
@@ -72,7 +72,7 @@
 
 ### REQ-DP-003 — Automatic expansion of a selected property's ancestors
 
-| **If** | the ontologist selects a DatatypeProperty buried in the hierarchy, |
+| **If** | the ontologist selects a `DatatypeProperty` buried in the hierarchy, |
 |---|---|
 | **Then** | the tree automatically unfolds to reveal the selected property, without the user having to manually expand each intermediate level. |
 
@@ -82,7 +82,7 @@
 
 ### REQ-DP-004 — Creation of a child property
 
-| **If** | the ontologist wishes to specialize an existing DatatypeProperty by creating a subproperty, |
+| **If** | the ontologist wishes to specialize an existing `DatatypeProperty` by creating a subproperty, |
 |---|---|
 | **Then** | the new property is automatically positioned under the currently selected property in the hierarchy, and the parent property is expanded to make it visible. |
 
@@ -96,7 +96,7 @@
 
 ### REQ-DP-005 — Creation of a sibling property
 
-| **If** | the ontologist wishes to create a DatatypeProperty at the same specialization level as an existing property, |
+| **If** | the ontologist wishes to create a `DatatypeProperty` at the same specialization level as an existing property, |
 |---|---|
 | **Then** | the new property inherits the same super-properties as the reference property, thus automatically positioning itself at the same rank in the hierarchy. |
 
@@ -106,7 +106,7 @@
 
 ### REQ-DP-006 — Unique name generation for a new property
 
-| **If** | the ontologist creates a new DatatypeProperty, |
+| **If** | the ontologist creates a new `DatatypeProperty`, |
 |---|---|
 | **Then** | a provisional name is automatically assigned to it, guaranteeing the absence of identifier conflict with the properties already present in the ontology. |
 
@@ -116,7 +116,7 @@
 
 ### REQ-DP-007 — Effective creation and navigation to the new property
 
-| **If** | the ontologist confirms the creation of a DatatypeProperty, |
+| **If** | the ontologist confirms the creation of a `DatatypeProperty`, |
 |---|---|
 | **Then** | the new property is immediately accessible in the tree and its edit form opens automatically, ready to be filled in. |
 
@@ -126,15 +126,15 @@
 
 ### REQ-DP-008 — Drop of a property onto a new target
 
-| **If** | the ontologist moves a DatatypeProperty by drag & drop to another parent property, |
+| **If** | the ontologist moves a `DatatypeProperty` by drag & drop to another parent property, |
 |---|---|
 | **Then** | the specialization relationship is updated to reflect the new position in the hierarchy, and the change is immediately persisted. |
 
-| **If** | the ontologist attempts to move a DatatypeProperty onto one of its own descendants, |
+| **If** | the ontologist attempts to move a `DatatypeProperty` onto one of its own descendants, |
 |---|---|
 | **Then** | the operation is rejected in order to prevent the creation of a cycle in the hierarchy, and a warning is displayed. |
 
-| **If** | the ontologist drops a DatatypeProperty onto the root or outside any node, |
+| **If** | the ontologist drops a `DatatypeProperty` onto the root or outside any node, |
 |---|---|
 | **Then** | the property becomes a root property, with no specialization relationship. |
 
@@ -144,7 +144,7 @@
 
 ### REQ-DP-009 — Ancestor/descendant link check for drag & drop
 
-| **If** | the ontologist moves a DatatypeProperty by drag & drop, |
+| **If** | the ontologist moves a `DatatypeProperty` by drag & drop, |
 |---|---|
 | **Then** | the application checks in real time that the potential target is not a descendant of the property being moved, in order to prevent any cycle creation in the hierarchy. |
 
@@ -156,7 +156,7 @@
 
 | **If** | the ontologist attempts to add a data type as range when a type is already defined, |
 |---|---|
-| **Then** | the range picker does not open, ensuring that a DatatypeProperty can have only one data type as its range. |
+| **Then** | the range picker does not open, ensuring that a `DatatypeProperty` can have only one data type as its range. |
 
 | **If** | the ontologist opens any other value picker, |
 |---|---|
@@ -168,7 +168,7 @@
 
 ### REQ-DP-011 — Domain management
 
-| **If** | the ontologist associates a class as the domain of a DatatypeProperty, |
+| **If** | the ontologist associates a class as the domain of a `DatatypeProperty`, |
 |---|---|
 | **Then** | the class appears in the property's domain list and the change is automatically saved. |
 
@@ -182,7 +182,7 @@
 
 ### REQ-DP-012 — Range management (XSD type)
 
-| **If** | the ontologist associates an XSD data type as the range of a DatatypeProperty, |
+| **If** | the ontologist associates an XSD data type as the range of a `DatatypeProperty`, |
 |---|---|
 | **Then** | the type appears in the range list and the ability to add a second one is disabled in order to maintain range uniqueness; the change is automatically saved. |
 
@@ -196,7 +196,7 @@
 
 ### REQ-DP-013 — Super-property management
 
-| **If** | the ontologist declares a super-property for a DatatypeProperty, |
+| **If** | the ontologist declares a super-property for a `DatatypeProperty`, |
 |---|---|
 | **Then** | the specialization relationship is recorded and visible in the super-properties list, and the change is automatically saved. |
 
@@ -210,7 +210,7 @@
 
 ### REQ-DP-014 — Automatic save on field change
 
-| **If** | the ontologist modifies a value in the form of an existing DatatypeProperty, |
+| **If** | the ontologist modifies a value in the form of an existing `DatatypeProperty`, |
 |---|---|
 | **Then** | the change is saved automatically, without the user having to manually trigger a save action. |
 
@@ -220,11 +220,11 @@
 
 ### REQ-DP-015 — Save (create or update) of a DatatypeProperty
 
-| **If** | the ontologist validates the information for a new DatatypeProperty, |
+| **If** | the ontologist validates the information for a new `DatatypeProperty`, |
 |---|---|
 | **Then** | the property is created in the ontology with all the entered information (identifier, annotations, domain, range, super-properties, functional characteristic), and a confirmation message is displayed. |
 
-| **If** | the ontologist modifies an existing DatatypeProperty and triggers the save, |
+| **If** | the ontologist modifies an existing `DatatypeProperty` and triggers the save, |
 |---|---|
 | **Then** | all changes are persisted; if the identifier has changed, the rename is reported to the user. |
 
@@ -234,7 +234,7 @@
 
 ### REQ-DP-016 — Deletion of a DatatypeProperty with confirmation
 
-| **If** | the ontologist requests the deletion of a DatatypeProperty, |
+| **If** | the ontologist requests the deletion of a `DatatypeProperty`, |
 |---|---|
 | **Then** | explicit confirmation is requested before any irreversible action. |
 
@@ -254,9 +254,9 @@
 
 ### REQ-DP-017 — HTML option generation for DatatypeProperties
 
-| **If** | another tab of the application presents a dropdown list referencing DatatypeProperties, |
+| **If** | another tab of the application presents a dropdown list referencing `DatatypeProperties`, |
 |---|---|
-| **Then** | all DatatypeProperties in the ontology are offered as options, with the current value pre-selected where applicable. |
+| **Then** | all `DatatypeProperties` in the ontology are offered as options, with the current value pre-selected where applicable. |
 
 ---
 
@@ -274,7 +274,7 @@
 
 ### REQ-DP-019 — Rendering of a tree node with drag & drop handling
 
-| **If** | a node of the DatatypeProperties tree is displayed, |
+| **If** | a node of the `DatatypeProperties` tree is displayed, |
 |---|---|
 | **Then** | it is visually indented according to its rank in the hierarchy, accompanied by an expansion indicator if it has subproperties, and it is interactive for selection, context menu, and reorganization by drag & drop. |
 
@@ -284,7 +284,7 @@
 
 ### REQ-DP-020 — Rendering of the full tree with owl:topDataProperty root
 
-| **If** | the DatatypeProperties tab is displayed, |
+| **If** | the `DatatypeProperties` tab is displayed, |
 |---|---|
 | **Then** | the tree is presented with `owl:topDataProperty` (or its equivalent according to the OWL profile of the ontology) as the universal root, followed by all the ontology's properties organized in a hierarchy; if no property exists, an informative message indicates this. |
 
@@ -294,7 +294,7 @@
 
 ### REQ-DP-021 — Rendering of the two-panel (split) layout
 
-| **If** | the DatatypeProperties tab is initialized, |
+| **If** | the `DatatypeProperties` tab is initialized, |
 |---|---|
 | **Then** | the interface is divided into a hierarchical navigation panel on the left and a detail panel on the right, separated by a resize handle, with creation actions available from the moment it opens. |
 
@@ -304,7 +304,7 @@
 
 ### REQ-DP-022 — Selection restoration after re-render
 
-| **If** | the DatatypeProperties tab is re-rendered following a change, |
+| **If** | the `DatatypeProperties` tab is re-rendered following a change, |
 |---|---|
 | **Then** | the previously selected property remains active and visible in the tree, preserving the ontologist's working context. |
 
@@ -324,11 +324,11 @@
 
 ### REQ-DP-024 — Update of the "Super Properties" panel
 
-| **If** | no DatatypeProperty is selected, |
+| **If** | no `DatatypeProperty` is selected, |
 |---|---|
 | **Then** | the lower-left panel displays a message inviting the ontologist to select a property. |
 
-| **If** | a DatatypeProperty is selected, |
+| **If** | a `DatatypeProperty` is selected, |
 |---|---|
 | **Then** | the panel displays the complete specialization chain from the selected property up to `owl:topDatatypeProperty`, with direct super-properties equipped with a delete button, and a picker allowing a new super-property to be added from those available. |
 
@@ -348,7 +348,7 @@
 
 ### REQ-DP-026 — Selection of a DatatypeProperty in the tree
 
-| **If** | the ontologist selects a DatatypeProperty in the tree, |
+| **If** | the ontologist selects a `DatatypeProperty` in the tree, |
 |---|---|
 | **Then** | the property is highlighted, its complete edit form is displayed in the detail panel, and the "Super Properties" panel as well as the action buttons are updated to reflect the context of this property. |
 
@@ -362,7 +362,7 @@
 |---|---|
 | **Then** | only the child property creation action is available; the sibling creation and deletion actions are hidden as they are not applicable to the root. |
 
-| **If** | a concrete DatatypeProperty is selected, |
+| **If** | a concrete `DatatypeProperty` is selected, |
 |---|---|
 | **Then** | the child creation, sibling creation, and deletion actions are all available. |
 
@@ -406,7 +406,7 @@
 
 ### REQ-DP-031 — Start of a property drag
 
-| **If** | the ontologist begins dragging a DatatypeProperty in the tree to reposition it, |
+| **If** | the ontologist begins dragging a `DatatypeProperty` in the tree to reposition it, |
 |---|---|
 | **Then** | the dragged property is visually distinguished from the other nodes, clearly signaling that a move operation is in progress. |
 
@@ -426,7 +426,7 @@
 
 ### REQ-DP-033 — Rendering of the DatatypeProperty edit form
 
-| **If** | the ontologist selects or creates a DatatypeProperty, |
+| **If** | the ontologist selects or creates a `DatatypeProperty`, |
 |---|---|
 | **Then** | a complete form is displayed in the detail panel, presenting all the editable characteristics of the property: identifier, full IRI, annotations (labels, comments, others), domain classes, range data type, super-properties, functional characteristic, and usages in the ontology's rules. |
 
@@ -444,7 +444,7 @@
 
 ### REQ-DP-034 — Adding / removing an annotation row (label / comment)
 
-| **If** | the ontologist adds a label or comment annotation to a DatatypeProperty, |
+| **If** | the ontologist adds a label or comment annotation to a `DatatypeProperty`, |
 |---|---|
 | **Then** | a new input row appears in the annotation table, and the change is automatically saved if a property is currently being edited. |
 
