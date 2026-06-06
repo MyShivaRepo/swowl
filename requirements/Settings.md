@@ -42,7 +42,7 @@
 
 | **If** | the user opens the application, |
 |---|---|
-| **Then** | their previously saved preferences are automatically restored; if no preference has ever been saved, the application initialises with default values: French as the preferred and sole active language, and the simple counter format for individual identifiers. |
+| **Then** | their previously saved preferences are automatically restored; if no preference has ever been saved, the application initialises with default values: French as the preferred and sole active language, and the simple counter format for `individual` identifiers. |
 
 **Source code:** `app.js` → `Settings.load()` — Reads the `swowl_settings` entry from `localStorage` and rehydrates the fields `preferredLang`, `activeLangs` and `namingFormat`; applies default values (`preferredLang: 'fr'`, `activeLangs: ['fr']`, `namingFormat: 'individual_counter'`) if no value is stored.
 
@@ -112,17 +112,17 @@
 
 ### REQ-SET-014 — Selecting the individual identifier format
 
-| **If** | the user chooses the naming convention for new individuals, |
+| **If** | the user chooses the naming convention for new `individuals`, |
 |---|---|
-| **Then** | the application immediately adopts this format for generating identifiers for the next individuals created, and the choice is saved. |
+| **Then** | the application immediately adopts this format for generating identifiers for the next `individuals` created, and the choice is saved. |
 
 **Source code:** `app.js` → `Settings.setNamingFormat(format)` — Assigns the chosen value (`individual_counter`, `class_counter` or `alphanumeric`) to `namingFormat`, then calls `Settings.save()` and refreshes the interface.
 
 ### REQ-SET-015 — Automatic generation of an identifier for a new individual
 
-| **If** | the user creates a new individual, |
+| **If** | the user creates a new `individual`, |
 |---|---|
-| **Then** | the application automatically suggests an identifier conforming to the chosen naming convention: a global counter if the format is by individual count, a per-class counter if the format is by class, or a unique random string if the alphanumeric format is selected. |
+| **Then** | the application automatically suggests an identifier conforming to the chosen naming convention: a global counter if the format is by `individual` count, a per-class counter if the format is by class, or a unique random string if the alphanumeric format is selected. |
 
 **Source code:** `app.js` → `Settings.generateIndividualId(classId)` — Depending on the value of `namingFormat`: **`individual_counter`** returns `Individual_N` where `N` is `APP.state.individuals.length + 1`; **`class_counter`** returns `<classId>_N` if `classId` is provided, otherwise `Individual_N`; **`alphanumeric`** generates a string `xxxxx-xxxxx-xxxxx-xxxxx` composed of 4 segments of 5 random alphanumeric characters, with the first character of the first segment being mandatorily a letter.
 
