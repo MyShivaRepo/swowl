@@ -52,7 +52,7 @@
 
 ### REQ-SWR-005 — Rule search/filtering
 
-| **If** | the `ontologist` wants to find a `SWRL rule` by typing a term in the search field, |
+| **If** | the ontologist wants to find a `SWRL rule` by typing a term in the search field, |
 |---|---|
 | **Then** | only rules whose identifier, label, comment or atom terms (`classes`, `properties`, variables, subjects, objects, values) match the entered term — case-insensitively — are displayed. |
 
@@ -62,7 +62,7 @@
 
 ### REQ-SWR-007 — Selecting an existing rule
 
-| **If** | the `ontologist` selects a rule from the list, |
+| **If** | the ontologist selects a rule from the list, |
 |---|---|
 | **Then** | the rule content is loaded into the editing form, ready to be modified, without affecting persisted data until a save is triggered. |
 
@@ -72,7 +72,7 @@
 
 ### REQ-SWR-008 — Creating a new rule
 
-| **If** | the `ontologist` wants to create a new `SWRL rule`, |
+| **If** | the ontologist wants to create a new `SWRL rule`, |
 |---|---|
 | **Then** | an empty rule is immediately created with a unique identifier, persisted in the `ontology`, and its editing form is opened to allow input without delay. |
 
@@ -92,7 +92,7 @@
 
 ### REQ-SWR-011 — Synchronising metadata from the DOM
 
-| **If** | the system collects metadata entered by the `ontologist` before a save, |
+| **If** | the system collects metadata entered by the ontologist before a save, |
 |---|---|
 | **Then** | the identifier, label and comment of the rule are read from the input fields and updated in the rule being edited; spaces in the identifier are automatically replaced by underscores. |
 
@@ -102,7 +102,7 @@
 
 ### REQ-SWR-012 — Automatic save on metadata change
 
-| **If** | the `ontologist` modifies the identifier, label or comment of an already existing rule and leaves the field, |
+| **If** | the ontologist modifies the identifier, label or comment of an already existing rule and leaves the field, |
 |---|---|
 | **Then** | the changes are automatically persisted without any further action on their part. |
 
@@ -114,7 +114,7 @@
 
 | **If** | the system must persist the rule being edited, |
 |---|---|
-| **Then** | the rule is created or updated in the `ontology` depending on whether it is new or existing; in case of failure, the `ontologist` is informed by an explicit error message. |
+| **Then** | the rule is created or updated in the `ontology` depending on whether it is new or existing; in case of failure, the ontologist is informed by an explicit error message. |
 
 ---
 
@@ -122,9 +122,9 @@
 
 ### REQ-SWR-014 — Renaming an existing rule
 
-| **If** | the `ontologist` modifies the identifier of an existing rule and saves, |
+| **If** | the ontologist modifies the identifier of an existing rule and saves, |
 |---|---|
-| **Then** | the rule is renamed in the `ontology` and the `ontologist` receives a confirmation indicating the new name. |
+| **Then** | the rule is renamed in the `ontology` and the ontologist receives a confirmation indicating the new name. |
 
 ---
 
@@ -132,7 +132,7 @@
 
 ### REQ-SWR-015 — Deleting a rule
 
-| **If** | the `ontologist` requests the deletion of a rule and confirms their intention, |
+| **If** | the ontologist requests the deletion of a rule and confirms their intention, |
 |---|---|
 | **Then** | the rule is permanently removed from the `ontology`, the selection is reset and the editing panel is cleared. |
 
@@ -142,7 +142,7 @@
 
 ### REQ-SWR-016 — Adding an atom to a section
 
-| **If** | the `ontologist` wants to add an atom to the premise or conclusion of a rule, |
+| **If** | the ontologist wants to add an atom to the premise or conclusion of a rule, |
 |---|---|
 | **Then** | an atom of the chosen type is inserted into the relevant section, the form is immediately updated and the rule is automatically saved if it already exists. |
 
@@ -152,7 +152,7 @@
 
 ### REQ-SWR-017 — Deleting an atom
 
-| **If** | the `ontologist` deletes an atom from a rule, |
+| **If** | the ontologist deletes an atom from a rule, |
 |---|---|
 | **Then** | the atom is removed from the relevant section, the form is updated and the rule is automatically saved if it already exists. |
 
@@ -162,7 +162,7 @@
 
 ### REQ-SWR-018 — Editing an atom field
 
-| **If** | the `ontologist` modifies the value of an atom field (variable, subject, object, literal value, operator, etc.), |
+| **If** | the ontologist modifies the value of an atom field (variable, subject, object, literal value, operator, etc.), |
 |---|---|
 | **Then** | the change is applied to the rule and automatically saved if the rule already exists. |
 
@@ -172,7 +172,7 @@
 
 ### REQ-SWR-025 — Selecting a class in the picker
 
-| **If** | the `ontologist` chooses a class in the class picker of an atom, |
+| **If** | the ontologist chooses a class in the class picker of an atom, |
 |---|---|
 | **Then** | the selected class is associated with the relevant atom, the picker closes, the form is updated and the rule is automatically saved. |
 
@@ -182,7 +182,7 @@
 
 ### REQ-SWR-027 — Selecting a property in the picker
 
-| **If** | the `ontologist` chooses a `property` in the `property` picker of an atom, |
+| **If** | the ontologist chooses a `property` in the `property` picker of an atom, |
 |---|---|
 | **Then** | the selected `property` is associated with the relevant atom, the picker closes, the form is updated and the rule is automatically saved. |
 
@@ -192,7 +192,7 @@
 
 ### REQ-SWR-029 — Filtering individuals by class in the picker
 
-| **If** | the `ontologist` selects a class in the filter panel of the `individual` picker, |
+| **If** | the ontologist selects a class in the filter panel of the `individual` picker, |
 |---|---|
 | **Then** | only `individuals` belonging to that class or one of its subclasses are displayed; if the root class is selected, all `individuals` are shown. |
 
@@ -202,11 +202,11 @@
 
 ### REQ-SWR-030 — Selecting an individual in the picker
 
-| **If** | the `ontologist` clicks on an `individual` in the picker list, |
+| **If** | the ontologist clicks on an `individual` in the picker list, |
 |---|---|
 | **Then** | the `individual` is highlighted and the confirm button is enabled. |
 
-| **If** | the `ontologist` double-clicks on an `individual`, |
+| **If** | the ontologist double-clicks on an `individual`, |
 |---|---|
 | **Then** | the `individual` is selected and confirmation is triggered immediately. |
 
@@ -216,7 +216,7 @@
 
 ### REQ-SWR-031 — Confirming the selection of an individual
 
-| **If** | the `ontologist` confirms the choice of an `individual` in the picker, |
+| **If** | the ontologist confirms the choice of an `individual` in the picker, |
 |---|---|
 | **Then** | the selected `individual` is associated with the relevant equality atom, the picker closes, the form is updated and the rule is automatically saved. |
 
@@ -236,11 +236,11 @@
 
 ### REQ-SWR-034 — Drag-and-drop to reorder atoms
 
-| **If** | the `ontologist` reorders atoms in a section via drag-and-drop, |
+| **If** | the ontologist reorders atoms in a section via drag-and-drop, |
 |---|---|
 | **Then** | the atom order is updated in the rule, the form reflects the new order and the rule is automatically saved. |
 
-| **If** | the `ontologist` attempts to move an atom to a different section from its origin, |
+| **If** | the ontologist attempts to move an atom to a different section from its origin, |
 |---|---|
 | **Then** | the move is rejected and no change is made. |
 
@@ -266,7 +266,7 @@
 
 ### REQ-SWR-002 — Resizing the list panel
 
-| **If** | the `ontologist` resizes the list panel by dragging the divider between the two panels, |
+| **If** | the ontologist resizes the list panel by dragging the divider between the two panels, |
 |---|---|
 | **Then** | the width of the list panel adjusts freely between a minimum and a maximum width, without overflowing onto the editing panel. |
 
@@ -296,11 +296,11 @@
 
 ### REQ-SWR-006 — Dynamic filtering update
 
-| **If** | the `ontologist` types or modifies a term in the search field, |
+| **If** | the ontologist types or modifies a term in the search field, |
 |---|---|
 | **Then** | the rule list is filtered instantly and a clear button appears as long as the field contains text. |
 
-| **If** | the `ontologist` clicks the clear button, |
+| **If** | the ontologist clicks the clear button, |
 |---|---|
 | **Then** | the search field is cleared and all rules are displayed again. |
 
@@ -312,7 +312,7 @@
 
 | **If** | a rule is selected and the editing form is displayed, |
 |---|---|
-| **Then** | the `ontologist` has fields to enter the identifier (with automatic normalisation of spaces), the label and the comment of the rule, as well as two distinct sections for the premise (body) and the conclusion (head), each allowing atoms of the relevant types to be added depending on the section. |
+| **Then** | the ontologist has fields to enter the identifier (with automatic normalisation of spaces), the label and the comment of the rule, as well as two distinct sections for the premise (body) and the conclusion (head), each allowing atoms of the relevant types to be added depending on the section. |
 
 ---
 
@@ -322,7 +322,7 @@
 
 | **If** | a class membership atom is displayed in the form, |
 |---|---|
-| **Then** | the `ontologist` sees the relevant variable, the semantic keyword `is a` and the associated class; if the class has been deleted from the `ontology`, a warning is displayed instead; if it exists, its identifier is clickable to navigate directly to the `classes` `view`. |
+| **Then** | the ontologist sees the relevant variable, the semantic keyword `is a` and the associated class; if the class has been deleted from the `ontology`, a warning is displayed instead; if it exists, its identifier is clickable to navigate directly to the `classes` `view`. |
 
 ---
 
@@ -332,7 +332,7 @@
 
 | **If** | a `property` atom is displayed in the form, |
 |---|---|
-| **Then** | the `ontologist` sees the subject, the `property` and the object of the relation; the `property` type (object or datatype) is visually distinguished; if the `property` has been deleted, a warning is displayed; if it exists, its identifier is clickable to navigate to the corresponding `properties` `view`. |
+| **Then** | the ontologist sees the subject, the `property` and the object of the relation; the `property` type (object or datatype) is visually distinguished; if the `property` has been deleted, a warning is displayed; if it exists, its identifier is clickable to navigate to the corresponding `properties` `view`. |
 
 ---
 
@@ -342,7 +342,7 @@
 
 | **If** | a comparison atom is displayed in the form, |
 |---|---|
-| **Then** | the `ontologist` sees the variable, the comparison operator and the value; if the value corresponds to a known `individual` in the `ontology`, that `individual` is displayed as a navigable chip; otherwise a free-text input is provided; a separate button allows the `individual` picker to be opened. |
+| **Then** | the ontologist sees the variable, the comparison operator and the value; if the value corresponds to a known `individual` in the `ontology`, that `individual` is displayed as a navigable chip; otherwise a free-text input is provided; a separate button allows the `individual` picker to be opened. |
 
 ---
 
@@ -352,7 +352,7 @@
 
 | **If** | a negation (NAF) block is displayed in the form, |
 |---|---|
-| **Then** | the `ontologist` sees a clearly labelled `NAF` container in which nested atoms can be added and viewed. |
+| **Then** | the ontologist sees a clearly labelled `NAF` container in which nested atoms can be added and viewed. |
 
 ---
 
@@ -362,7 +362,7 @@
 
 | **If** | a conditional atom is displayed in the conclusion of a rule, |
 |---|---|
-| **Then** | the `ontologist` sees two nested `if` and `then` subsections, each allowing atoms of the appropriate type to be added, with automatic normalisation of legacy formats. |
+| **Then** | the ontologist sees two nested `if` and `then` subsections, each allowing atoms of the appropriate type to be added, with automatic normalisation of legacy formats. |
 
 ---
 
@@ -370,11 +370,11 @@
 
 ### REQ-SWR-024 — Class picker for `type_atom` atoms
 
-| **If** | the `ontologist` opens the class picker of an atom, |
+| **If** | the ontologist opens the class picker of an atom, |
 |---|---|
 | **Then** | a dropdown menu listing the `classes` of the `ontology` appears positioned near the trigger, and any already open class picker closes automatically. |
 
-| **If** | the `ontologist` clicks outside the dropdown menu, |
+| **If** | the ontologist clicks outside the dropdown menu, |
 |---|---|
 | **Then** | the menu closes automatically. |
 
@@ -384,7 +384,7 @@
 
 ### REQ-SWR-026 — Property picker for `property_atom` atoms
 
-| **If** | the `ontologist` opens the `property` picker of an atom, |
+| **If** | the ontologist opens the `property` picker of an atom, |
 |---|---|
 | **Then** | a dropdown menu presents the `object properties` and `datatype properties` of the `ontology`, visually distinguished, sorted alphabetically within each group. |
 
@@ -394,7 +394,7 @@
 
 ### REQ-SWR-028 — Two-panel individual picker (modal)
 
-| **If** | the `ontologist` opens the `individual` picker, |
+| **If** | the ontologist opens the `individual` picker, |
 |---|---|
 | **Then** | a modal window is displayed with, on the left, the hierarchical class tree of the `ontology` (including the root class with the total number of `individuals`) and, on the right, the list of `individuals` filterable by class. |
 
@@ -414,11 +414,11 @@
 
 ### REQ-SWR-035 — Navigating to a referenced entity from an atom
 
-| **If** | a class, `property` or `individual` referenced in an atom exists in the `ontology` and the `ontologist` clicks on its identifier displayed in the form, |
+| **If** | a class, `property` or `individual` referenced in an atom exists in the `ontology` and the ontologist clicks on its identifier displayed in the form, |
 |---|---|
 | **Then** | the application navigates directly to the corresponding management `view` and focuses the clicked entity. |
 
-| **If** | the `ontologist` hovers over the identifier of a referenced entity, |
+| **If** | the ontologist hovers over the identifier of a referenced entity, |
 |---|---|
 | **Then** | an underline and an accent colour visually indicate that the element is navigable. |
 
