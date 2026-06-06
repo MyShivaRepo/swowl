@@ -45,9 +45,9 @@
 
 ### REQ-VW-003 — Construction de l'arbre hiérarchique des classes
 
-| **Si** | l'ontologie est chargée et contient des classes organisées en hiérarchie, |
+| **Si** | l'`ontologie` est chargée et contient des `classes` organisées en hiérarchie, |
 |---|---|
-| **Alors** | l'arbre des classes reflète fidèlement les relations de spécialisation : chaque classe est positionnée sous son concept parent, les classes sans parent sont rattachées à la racine universelle `owl:Thing`, et la hiérarchie est construite récursivement en exposant pour chaque nœud son niveau de profondeur, son label et ses enfants. |
+| **Alors** | l'arbre des `classes` reflète fidèlement les relations de spécialisation : chaque `classe` est positionnée sous son concept parent, les `classes` sans parent sont rattachées à la racine universelle `owl:Thing`, et la hiérarchie est construite récursivement en exposant pour chaque nœud son niveau de profondeur, son label et ses enfants. |
 
 ---
 
@@ -55,9 +55,9 @@
 
 ### REQ-VW-004 — Résolution du meilleur label de classe
 
-| **Si** | l'ontologiste consulte l'arbre des classes et qu'une classe possède plusieurs annotations de label dans des langues différentes, |
+| **Si** | l'`ontologiste` consulte l'arbre des `classes` et qu'une `classe` possède plusieurs annotations de label dans des langues différentes, |
 |---|---|
-| **Alors** | l'application affiche le label dans la langue préférée de l'utilisateur ; à défaut, le premier label disponible ; à défaut encore, l'identifiant technique de la classe. |
+| **Alors** | l'application affiche le label dans la langue préférée de l'utilisateur ; à défaut, le premier label disponible ; à défaut encore, l'identifiant technique de la `classe`. |
 
 ---
 
@@ -65,9 +65,9 @@
 
 ### REQ-VW-005 — Algorithme de placement hyperbolique (disque de Poincaré)
 
-| **Si** | l'ontologiste visualise l'arbre des classes dans le graphe hyperbolique, |
+| **Si** | l'`ontologiste` visualise l'arbre des `classes` dans le graphe hyperbolique, |
 |---|---|
-| **Alors** | les classes sont disposées dans un espace hyperbolique de type disque de Poincaré : chaque niveau de hiérarchie est espacé de manière constante, les enfants d'un nœud sont distribués en secteurs angulaires égaux autour de leur parent, et les translations entre niveaux respectent la géométrie hyperbolique. |
+| **Alors** | les `classes` sont disposées dans un espace hyperbolique de type disque de Poincaré : chaque niveau de hiérarchie est espacé de manière constante, les enfants d'un nœud sont distribués en secteurs angulaires égaux autour de leur parent, et les translations entre niveaux respectent la géométrie hyperbolique. |
 
 ---
 
@@ -75,9 +75,9 @@
 
 ### REQ-VW-007 — Clic sur un nœud : centrage par transformation de Möbius
 
-| **Si** | l'ontologiste clique sur une classe dans le graphe hyperbolique pour l'explorer, |
+| **Si** | l'`ontologiste` clique sur une `classe` dans le graphe hyperbolique pour l'explorer, |
 |---|---|
-| **Alors** | la classe sélectionnée se déplace vers le centre du disque, permettant de la mettre en focus et de visualiser ses voisins proches avec plus de détails. |
+| **Alors** | la `classe` sélectionnée se déplace vers le centre du disque, permettant de la mettre en focus et de visualiser ses voisins proches avec plus de détails. |
 
 ---
 
@@ -85,9 +85,9 @@
 
 ### REQ-VW-008 — Double-clic (second clic au centre) : navigation vers l'éditeur de classes
 
-| **Si** | l'ontologiste double-clique sur une classe au centre du graphe hyperbolique pour l'éditer, |
+| **Si** | l'`ontologiste` double-clique sur une `classe` au centre du graphe hyperbolique pour l'éditer, |
 |---|---|
-| **Alors** | l'application navigue automatiquement vers la fiche d'édition de cette classe, sans manipulation supplémentaire. |
+| **Alors** | l'application navigue automatiquement vers la fiche d'édition de cette `classe`, sans manipulation supplémentaire. |
 
 ---
 
@@ -95,9 +95,9 @@
 
 ### REQ-VW-009 — Réinitialisation du focus vers la racine
 
-| **Si** | l'ontologiste souhaite revenir à la vue d'ensemble de l'ontologie après avoir navigué dans le graphe hyperbolique, |
+| **Si** | l'`ontologiste` souhaite revenir à la `vue` d'ensemble de l'`ontologie` après avoir navigué dans le graphe hyperbolique, |
 |---|---|
-| **Alors** | le graphe retrouve sa disposition initiale, avec toutes les classes repositionnées à leur emplacement de départ, accompagné d'une animation de retour. |
+| **Alors** | le graphe retrouve sa disposition initiale, avec toutes les `classes` repositionnées à leur emplacement de départ, accompagné d'une animation de retour. |
 
 ---
 
@@ -105,13 +105,13 @@
 
 ### REQ-VW-010 — Filtrage des classes par texte dans le graphe hyperbolique
 
-| **Si** | l'ontologiste saisit un terme pour rechercher une classe dans le graphe hyperbolique, |
+| **Si** | l'`ontologiste` saisit un terme pour rechercher une `classe` dans le graphe hyperbolique, |
 |---|---|
-| **Alors** | les classes dont le nom ou l'identifiant correspond au terme saisi sont mises en évidence visuellement, tandis que les autres classes restent visibles mais sans surbrillance. |
+| **Alors** | les `classes` dont le nom ou l'identifiant correspond au terme saisi sont mises en évidence visuellement, tandis que les autres `classes` restent visibles mais sans surbrillance. |
 
-| **Si** | l'ontologiste efface le terme de recherche, |
+| **Si** | l'`ontologiste` efface le terme de recherche, |
 |---|---|
-| **Alors** | toutes les classes retrouvent leur apparence normale et le graphe est redessiné sans surbrillance. |
+| **Alors** | toutes les `classes` retrouvent leur apparence normale et le graphe est redessiné sans surbrillance. |
 
 ---
 
@@ -119,9 +119,9 @@
 
 ### REQ-VW-013 — Construction des nœuds (individuals) et liens (assertions)
 
-| **Si** | l'ontologie est chargée et contient des individuals reliés par des propriétés d'objet, |
+| **Si** | l'`ontologie` est chargée et contient des `individuals` reliés par des `propriétés d'objet`, |
 |---|---|
-| **Alors** | chaque individual est représenté comme un nœud du graphe, et chaque assertion entre deux individuals existants est représentée comme un lien orienté entre les nœuds correspondants. |
+| **Alors** | chaque `individual` est représenté comme un nœud du graphe, et chaque assertion entre deux `individuals` existants est représentée comme un lien orienté entre les nœuds correspondants. |
 
 ---
 
@@ -129,11 +129,11 @@
 
 ### REQ-VW-014 — Palette de couleurs par classe
 
-| **Si** | l'ontologiste visualise le graphe Knowledge Base contenant des individuals appartenant à différentes classes, |
+| **Si** | l'`ontologiste` visualise le graphe Knowledge Base contenant des `individuals` appartenant à différentes `classes`, |
 |---|---|
-| **Alors** | chaque classe est identifiée par une couleur distincte et cohérente tout au long de la session, permettant de distinguer visuellement les individuals selon leur type. |
+| **Alors** | chaque `classe` est identifiée par une couleur distincte et cohérente tout au long de la session, permettant de distinguer visuellement les `individuals` selon leur type. |
 
-| **Si** | la même classe est rencontrée à nouveau, |
+| **Si** | la même `classe` est rencontrée à nouveau, |
 |---|---|
 | **Alors** | la même couleur lui est appliquée sans modification. |
 
@@ -143,9 +143,9 @@
 
 ### REQ-VW-015 — Résolution du meilleur label d'individual
 
-| **Si** | l'ontologiste consulte le graphe Knowledge Base et qu'un individual possède plusieurs labels dans des langues différentes, |
+| **Si** | l'`ontologiste` consulte le graphe Knowledge Base et qu'un `individual` possède plusieurs labels dans des langues différentes, |
 |---|---|
-| **Alors** | l'application affiche le label dans la langue préférée de l'utilisateur ; à défaut, le premier label disponible ; à défaut encore, l'identifiant technique de l'individual. |
+| **Alors** | l'application affiche le label dans la langue préférée de l'utilisateur ; à défaut, le premier label disponible ; à défaut encore, l'identifiant technique de l'`individual`. |
 
 ---
 
@@ -153,9 +153,9 @@
 
 ### REQ-VW-020 — Clic sur un nœud individual : navigation vers l'éditeur d'individuals
 
-| **Si** | l'ontologiste clique sur un individual dans le graphe Knowledge Base pour consulter ou modifier ses propriétés, |
+| **Si** | l'`ontologiste` clique sur un `individual` dans le graphe Knowledge Base pour consulter ou modifier ses `propriétés`, |
 |---|---|
-| **Alors** | l'application navigue automatiquement vers la fiche d'édition de cet individual, sans manipulation supplémentaire. |
+| **Alors** | l'application navigue automatiquement vers la fiche d'édition de cet `individual`, sans manipulation supplémentaire. |
 
 ---
 
@@ -163,15 +163,15 @@
 
 ### REQ-VW-022 — Glisser-déposer des nœuds dans le graphe Knowledge Base
 
-| **Si** | l'ontologiste commence à déplacer un individual dans le graphe Knowledge Base, |
+| **Si** | l'`ontologiste` commence à déplacer un `individual` dans le graphe Knowledge Base, |
 |---|---|
 | **Alors** | la simulation s'anime et le nœud suit le mouvement du curseur. |
 
-| **Si** | l'ontologiste déplace le curseur, |
+| **Si** | l'`ontologiste` déplace le curseur, |
 |---|---|
 | **Alors** | le nœud suit la position du curseur en temps réel. |
 
-| **Si** | l'ontologiste relâche le nœud, |
+| **Si** | l'`ontologiste` relâche le nœud, |
 |---|---|
 | **Alors** | la simulation reprend son comportement naturel et le nœud est libéré pour se repositionner librement. |
 
@@ -181,9 +181,9 @@
 
 ### REQ-VW-023 — Simulation de force D3 avec paramètres configurés
 
-| **Si** | l'ontologiste ouvre le graphe Knowledge Base contenant des individuals et des assertions, |
+| **Si** | l'`ontologiste` ouvre le graphe Knowledge Base contenant des `individuals` et des assertions, |
 |---|---|
-| **Alors** | les nœuds se positionnent automatiquement dans l'espace en appliquant des forces d'attraction entre individuals reliés, de répulsion entre tous les nœuds, d'attraction vers le centre, et d'évitement de chevauchement, afin de produire une disposition lisible et équilibrée. |
+| **Alors** | les nœuds se positionnent automatiquement dans l'espace en appliquant des forces d'attraction entre `individuals` reliés, de répulsion entre tous les nœuds, d'attraction vers le centre, et d'évitement de chevauchement, afin de produire une disposition lisible et équilibrée. |
 
 ---
 
@@ -191,7 +191,7 @@
 
 ### REQ-VW-024 — Redémarrage de la simulation de force
 
-| **Si** | l'ontologiste souhaite réorganiser le graphe Knowledge Base après avoir déplacé des nœuds ou modifié des données, |
+| **Si** | l'`ontologiste` souhaite réorganiser le graphe Knowledge Base après avoir déplacé des nœuds ou modifié des données, |
 |---|---|
 | **Alors** | la simulation reprend depuis son état courant avec une énergie initiale élevée, permettant aux nœuds de trouver une nouvelle disposition équilibrée. |
 
@@ -201,11 +201,11 @@
 
 ### REQ-VW-025 — Filtrage des individuals par texte dans le graphe Knowledge Base
 
-| **Si** | l'ontologiste saisit un terme pour rechercher un individual ou un type de classe dans le graphe Knowledge Base, |
+| **Si** | l'`ontologiste` saisit un terme pour rechercher un `individual` ou un type de `classe` dans le graphe Knowledge Base, |
 |---|---|
 | **Alors** | les nœuds correspondant au terme restent pleinement visibles, tandis que les autres sont fortement estompés pour mettre en évidence les résultats pertinents. |
 
-| **Si** | l'ontologiste efface le terme de recherche, |
+| **Si** | l'`ontologiste` efface le terme de recherche, |
 |---|---|
 | **Alors** | tous les nœuds et leurs labels retrouvent une visibilité complète. |
 
@@ -215,9 +215,9 @@
 
 ### REQ-VW-027 — Blocage de l'onglet Views si aucune ontologie n'est connectée
 
-| **Si** | l'ontologiste tente d'accéder à la section `Views` sans avoir préalablement chargé une ontologie, |
+| **Si** | l'`ontologiste` tente d'accéder à la section `Views` sans avoir préalablement chargé une `ontologie`, |
 |---|---|
-| **Alors** | l'application affiche un message informatif invitant l'utilisateur à connecter une ontologie, avec un accès direct à la section de gestion des ontologies, et n'affiche pas les graphes. |
+| **Alors** | l'application affiche un message informatif invitant l'utilisateur à connecter une `ontologie`, avec un accès direct à la section de gestion des `ontologies`, et n'affiche pas les graphes. |
 
 ---
 
@@ -225,7 +225,7 @@
 
 ### REQ-VW-028 — Initialisation différée des graphes après rendu HTML
 
-| **Si** | l'ontologiste navigue vers l'onglet `Views` et que le HTML vient d'être injecté dans la page, |
+| **Si** | l'`ontologiste` navigue vers l'onglet `Views` et que le HTML vient d'être injecté dans la page, |
 |---|---|
 | **Alors** | le graphe correspondant au sous-onglet actif est initialisé après un court délai, garantissant que la zone d'affichage est disponible avant le début du rendu graphique. |
 
@@ -243,13 +243,13 @@
 
 ### REQ-VW-001 — Rendu de l'onglet Views avec sous-onglets
 
-| **Si** | l'ontologiste navigue vers l'onglet `Views`, |
+| **Si** | l'`ontologiste` navigue vers l'onglet `Views`, |
 |---|---|
-| **Alors** | l'application affiche deux sous-onglets de visualisation — « `Ontology` » pour explorer la hiérarchie des classes, et « Knowledge Base » pour explorer les individuals et leurs relations — l'onglet actif étant mémorisé entre les navigations. |
+| **Alors** | l'application affiche deux sous-onglets de visualisation — « `Ontology` » pour explorer la hiérarchie des `classes`, et « Knowledge Base » pour explorer les `individuals` et leurs relations — l'onglet actif étant mémorisé entre les navigations. |
 
-| **Si** | l'ontologiste sélectionne un sous-onglet, |
+| **Si** | l'`ontologiste` sélectionne un sous-onglet, |
 |---|---|
-| **Alors** | la vue se rafraîchit pour afficher le graphe correspondant. |
+| **Alors** | la `vue` se rafraîchit pour afficher le graphe correspondant. |
 
 ---
 
@@ -257,9 +257,9 @@
 
 ### REQ-VW-002 — Sous-onglet « Ontology » : arbre hyperbolique D3
 
-| **Si** | l'ontologiste ouvre le sous-onglet « `Ontology` », |
+| **Si** | l'`ontologiste` ouvre le sous-onglet « `Ontology` », |
 |---|---|
-| **Alors** | l'application affiche un graphe hyperbolique interactif de l'arbre des classes, accompagné d'un bouton de réinitialisation de la vue, d'un champ de recherche pour filtrer les classes, d'une aide contextuelle sur les interactions disponibles, d'un compteur de classes et de la zone de visualisation. |
+| **Alors** | l'application affiche un graphe hyperbolique interactif de l'arbre des `classes`, accompagné d'un bouton de réinitialisation de la `vue`, d'un champ de recherche pour filtrer les `classes`, d'une aide contextuelle sur les interactions disponibles, d'un compteur de `classes` et de la zone de visualisation. |
 
 ---
 
@@ -269,7 +269,7 @@
 
 | **Si** | le graphe hyperbolique est affiché, |
 |---|---|
-| **Alors** | les classes proches du centre sont représentées par des nœuds plus grands, plus opaques et avec des labels plus lisibles, tandis que les classes éloignées du centre apparaissent plus petites et plus transparentes, leurs labels étant masqués au-delà d'un certain seuil d'éloignement. |
+| **Alors** | les `classes` proches du centre sont représentées par des nœuds plus grands, plus opaques et avec des labels plus lisibles, tandis que les `classes` éloignées du centre apparaissent plus petites et plus transparentes, leurs labels étant masqués au-delà d'un certain seuil d'éloignement. |
 
 | **Si** | une animation est déclenchée lors d'un changement de focus, |
 |---|---|
@@ -281,9 +281,9 @@
 
 ### REQ-VW-011 — Compteur de classes affiché dans la barre d'outils
 
-| **Si** | l'ontologiste consulte le graphe hyperbolique, |
+| **Si** | l'`ontologiste` consulte le graphe hyperbolique, |
 |---|---|
-| **Alors** | le nombre total de classes présentes dans l'ontologie est affiché dans la barre d'outils du graphe. |
+| **Alors** | le nombre total de `classes` présentes dans l'`ontologie` est affiché dans la barre d'outils du graphe. |
 
 ---
 
@@ -291,9 +291,9 @@
 
 ### REQ-VW-012 — Sous-onglet « Knowledge Base » : graphe de force D3
 
-| **Si** | l'ontologiste ouvre le sous-onglet « Knowledge Base », |
+| **Si** | l'`ontologiste` ouvre le sous-onglet « Knowledge Base », |
 |---|---|
-| **Alors** | l'application affiche un graphe de force interactif des individuals et de leurs relations, accompagné d'un bouton de relance de la simulation, d'un champ de recherche pour filtrer les individuals, d'une légende des types de classes, d'un compteur et de la zone de visualisation. |
+| **Alors** | l'application affiche un graphe de force interactif des `individuals` et de leurs relations, accompagné d'un bouton de relance de la simulation, d'un champ de recherche pour filtrer les `individuals`, d'une légende des types de `classes`, d'un compteur et de la zone de visualisation. |
 
 ---
 
@@ -301,9 +301,9 @@
 
 ### REQ-VW-016 — Légende des classes dans le graphe Knowledge Base
 
-| **Si** | l'ontologiste visualise le graphe Knowledge Base contenant des individuals de plusieurs types, |
+| **Si** | l'`ontologiste` visualise le graphe Knowledge Base contenant des `individuals` de plusieurs types, |
 |---|---|
-| **Alors** | une légende affiche la correspondance entre chaque type de classe et sa couleur dans le graphe, permettant d'identifier visuellement les individuals selon leur appartenance. |
+| **Alors** | une légende affiche la correspondance entre chaque type de `classe` et sa couleur dans le graphe, permettant d'identifier visuellement les `individuals` selon leur appartenance. |
 
 ---
 
@@ -311,7 +311,7 @@
 
 ### REQ-VW-017 — Arrowheads SVG sur les arêtes directionnelles
 
-| **Si** | le graphe Knowledge Base affiche des assertions entre individuals, |
+| **Si** | le graphe Knowledge Base affiche des assertions entre `individuals`, |
 |---|---|
 | **Alors** | chaque lien est orienté et porte une flèche à son extrémité, indiquant la direction de la relation ; les liens mis en évidence lors du survol utilisent une flèche de couleur distincte. |
 
@@ -321,9 +321,9 @@
 
 ### REQ-VW-018 — Zoom et pan sur le graphe Knowledge Base
 
-| **Si** | l'ontologiste souhaite naviguer dans le graphe Knowledge Base pour explorer des zones denses ou s'éloigner pour une vue d'ensemble, |
+| **Si** | l'`ontologiste` souhaite naviguer dans le graphe Knowledge Base pour explorer des zones denses ou s'éloigner pour une `vue` d'ensemble, |
 |---|---|
-| **Alors** | l'application permet de zoomer et de déplacer la vue librement, avec un facteur de zoom compris entre 0.1× et 4×. |
+| **Alors** | l'application permet de zoomer et de déplacer la `vue` librement, avec un facteur de zoom compris entre 0.1× et 4×. |
 
 ---
 
@@ -331,9 +331,9 @@
 
 ### REQ-VW-019 — Labels de propriétés sur les arêtes
 
-| **Si** | le graphe Knowledge Base affiche des assertions entre individuals, |
+| **Si** | le graphe Knowledge Base affiche des assertions entre `individuals`, |
 |---|---|
-| **Alors** | le nom de la propriété d'objet est affiché au milieu de chaque lien, permettant à l'ontologiste d'identifier la nature de la relation sans avoir à cliquer sur l'arête. |
+| **Alors** | le nom de la `propriété d'objet` est affiché au milieu de chaque lien, permettant à l'`ontologiste` d'identifier la nature de la relation sans avoir à cliquer sur l'arête. |
 
 ---
 
@@ -341,11 +341,11 @@
 
 ### REQ-VW-021 — Survol d'un nœud : mise en évidence des connexions
 
-| **Si** | l'ontologiste survole un individual dans le graphe Knowledge Base, |
+| **Si** | l'`ontologiste` survole un `individual` dans le graphe Knowledge Base, |
 |---|---|
-| **Alors** | seuls ce nœud et ses voisins directement connectés restent pleinement visibles ; les autres nœuds, arêtes et labels sont fortement estompés, permettant de se concentrer sur les relations immédiates de l'individual. |
+| **Alors** | seuls ce nœud et ses voisins directement connectés restent pleinement visibles ; les autres nœuds, arêtes et labels sont fortement estompés, permettant de se concentrer sur les relations immédiates de l'`individual`. |
 
-| **Si** | l'ontologiste quitte le nœud, |
+| **Si** | l'`ontologiste` quitte le nœud, |
 |---|---|
 | **Alors** | tous les éléments du graphe retrouvent leur visibilité normale. |
 
@@ -355,9 +355,9 @@
 
 ### REQ-VW-026 — Compteur d'individuals et de connexions
 
-| **Si** | l'ontologiste consulte le graphe Knowledge Base, |
+| **Si** | l'`ontologiste` consulte le graphe Knowledge Base, |
 |---|---|
-| **Alors** | le nombre total d'individuals et le nombre total de connexions entre eux sont affichés dans la barre d'outils du graphe. |
+| **Alors** | le nombre total d'`individuals` et le nombre total de connexions entre eux sont affichés dans la barre d'outils du graphe. |
 
 ---
 
