@@ -56,263 +56,261 @@
 
 ### REQ-IND-002 — Arbre de classes avec compteurs transitifs
 
-| **Si** | l'ontologie est chargée et contient des classes OWL reliées par des relations `subClassOf`, |
+| **Si** | l'ontologie est chargée et contient des classes organisées en hiérarchie, |
 |---|---|
-| **Alors** | le système construit et affiche un arbre des classes via `ClassEditor.buildTree()` :<br>- le nœud racine `owl:Thing` indique le nombre total d'individuals,<br>- chaque classe affiche un compteur **transitif** du nombre d'individuals dont au moins un type appartient à l'ensemble de ses descendants (calculé par BFS via `allDescendants()`),<br>- l'indentation de chaque nœud est proportionnelle à sa profondeur (`depth * 16 + 6` px),<br>- chaque nœud est une zone cible pour le glisser-déposer. |
+| **Alors** | l'arbre des classes reflète fidèlement les relations de spécialisation entre concepts : le nœud racine `owl:Thing` indique le nombre total d'individuals, chaque classe affiche le nombre d'individuals qu'elle contient en comptant également ceux de toutes ses sous-classes, et chaque nœud est une zone cible pour le glisser-déposer. |
 
 ---
 
-**Code source :** `owl_editor.js` → `_renderClassTree()`
+**Code source :** `owl_editor.js` → `_renderClassTree()` — Appelle `ClassEditor.buildTree()` pour construire l'arbre hiérarchique à partir des relations `subClassOf`. Pour chaque nœud, calcule un compteur transitif via `allDescendants()` (BFS) qui remonte tous les descendants. L'indentation visuelle est proportionnelle à la profondeur du nœud (`depth * 16 + 6` px). Chaque nœud est rendu avec l'attribut `draggable` pour accepter les dépôts d'individuals.
 
 ### REQ-IND-003 — Liste des individuals filtrée et triée
 
-| **Si** | l'onglet Individuals est affiché, **et** qu'une classe est éventuellement sélectionnée dans l'arbre (`_selectedClassId`), |
+| **Si** | l'ontologiste consulte la liste des individuals, éventuellement après avoir sélectionné une classe dans l'arbre, |
 |---|---|
-| **Alors** | - si aucune classe n'est sélectionnée, tous les individuals sont listés,<br>- si une classe est sélectionnée, seuls les individuals dont au moins un type appartient à cette classe ou à l'une de ses sous-classes (filtrage transitif par BFS) sont affichés,<br>- la liste est triée alphabétiquement par le label d'affichage résolu (`_resolveDisplayLabel()`), ou par identifiant si aucun label n'est défini,<br>- chaque item affiche le label principal et, si distinct, l'identifiant en sous-texte,<br>- chaque item est draggable. |
+| **Alors** | seuls les individuals appartenant à cette classe ou à l'une de ses sous-classes sont affichés, triés alphabétiquement par leur nom d'affichage ; sans sélection de classe, tous les individuals sont listés ; chaque individual peut être déplacé par glisser-déposer. |
 
 ---
 
-**Code source :** `owl_editor.js` → `_renderIndList()`
+**Code source :** `owl_editor.js` → `_renderIndList()` — Filtre les individuals dont au moins un type appartient à la classe sélectionnée (`_selectedClassId`) ou à l'un de ses descendants (BFS transitif via `allDescendants()`). Trie la liste alphabétiquement par le label résolu via `_resolveDisplayLabel()`, ou par identifiant si aucun label n'est défini. Chaque item affiche le label principal et, si distinct, l'identifiant en sous-texte. Chaque item est rendu avec l'attribut `draggable`.
 
 ### REQ-IND-007 — Création d'un nouvel individual
 
-| **Si** | l'utilisateur déclenche la création d'un nouvel individual, |
+| **Si** | l'ontologiste souhaite créer un nouvel individual, |
 |---|---|
-| **Alors** | - la sélection courante est vidée,<br>- un placeholder fantôme `new individual…` est inséré en tête de la liste (colonne 2),<br>- le formulaire vierge est affiché dans la colonne 3 via `renderForm(null, selectedClassId)`,<br>- après 30 ms, `Settings.generateIndividualId()` pré-remplit le champ ID, le focus lui est donné et son contenu est sélectionné. |
+| **Alors** | un formulaire vierge s'ouvre immédiatement, pré-rempli avec un identifiant généré automatiquement, prêt à être saisi sans manipulation préalable. |
 
 ---
 
-**Code source :** `owl_editor.js` → `newIndividual()`
+**Code source :** `owl_editor.js` → `newIndividual()` — Réinitialise la sélection courante, insère un placeholder fantôme `new individual…` en tête de la liste (colonne 2), affiche le formulaire vierge via `renderForm(null, selectedClassId)` dans la colonne 3. Après 30 ms, appelle `Settings.generateIndividualId()` pour pré-remplir le champ ID, lui donne le focus et sélectionne son contenu.
 
 ### REQ-IND-009 — Suppression d'un ou plusieurs individuals
 
-| **Si** | l'utilisateur confirme la suppression d'un ou plusieurs individuals sélectionnés (`_selectedIndIds`), |
+| **Si** | l'ontologiste confirme la suppression d'un ou plusieurs individuals sélectionnés, |
 |---|---|
-| **Alors** | - une confirmation `UI.confirm()` est affichée (message adapté au singulier ou au pluriel),<br>- `API.deleteIndividual()` est appelé en boucle pour chaque ID,<br>- en cas de succès, toute la sélection est réinitialisée, l'état est rafraîchi via `APP.refresh()`, les colonnes 1 et 2 sont regénérées, et la colonne 3 affiche un état vide. |
+| **Alors** | les individuals sont supprimés de l'ontologie, la liste est mise à jour et le formulaire affiche un état vide. |
 
 ---
 
-**Code source :** `owl_editor.js` → `deleteSelected()`
+**Code source :** `owl_editor.js` → `deleteSelected()` — Affiche une confirmation via `UI.confirm()` avec un message adapté au singulier ou au pluriel. Appelle `API.deleteIndividual()` en boucle pour chaque identifiant de `_selectedIndIds`. En cas de succès, réinitialise toute la sélection, rafraîchit l'état via `APP.refresh()`, régénère les colonnes 1 et 2, et affiche un état vide en colonne 3.
 
 ### REQ-IND-010 — Déplacement par glisser-déposer vers une classe
 
-| **Si** | l'utilisateur dépose un individual sur un nœud de classe dans l'arbre, |
+| **Si** | l'ontologiste dépose un individual sur une classe de l'arbre, |
 |---|---|
-| **Alors** | le système applique l'une des trois logiques suivantes :<br>- (a) si la classe source est connue et présente dans les types de l'individual, elle est **remplacée** par la classe cible,<br>- (b) si l'individual n'a qu'un seul type, celui-ci est remplacé par la classe cible,<br>- (c) sinon, la classe cible est **ajoutée** aux types existants sans doublon, |
-
-puis la modification est envoyée via `API.updateIndividual()`, la section est re-rendue et l'individual reste sélectionné.
+| **Alors** | le type de l'individual est mis à jour pour refléter sa nouvelle appartenance : si l'individual avait déjà un type connu, ce type est remplacé par la classe cible ; sinon, la classe cible est ajoutée à ses types existants, sans doublon. |
 
 ---
 
-**Code source :** `owl_editor.js` → `_onClassDrop()`
+**Code source :** `owl_editor.js` → `_onClassDrop()` — Applique l'une des trois logiques : (a) si la classe source est présente dans les types de l'individual, elle est remplacée par la classe cible ; (b) si l'individual n'a qu'un seul type, celui-ci est remplacé ; (c) sinon, la classe cible est ajoutée sans doublon. Envoie la modification via `API.updateIndividual()`, re-rend la section et maintient l'individual sélectionné.
 
 ### REQ-IND-015 — Gestion des types (rdf:type)
 
-| **Si** | l'utilisateur ajoute un type à un individual, |
+| **Si** | l'ontologiste ajoute un type à un individual, |
 |---|---|
-| **Alors** | `addType()` insère le type dans la liste `ind-types-list` via `_addListItem()` et déclenche l'autoSave si l'individual est en cours d'édition. |
+| **Alors** | le nouveau type apparaît dans la liste des types de l'individual et la sauvegarde est déclenchée automatiquement si l'individual est déjà enregistré. |
 
-| **Si** | l'utilisateur supprime un type d'un individual, |
+| **Si** | l'ontologiste supprime un type d'un individual, |
 |---|---|
-| **Alors** | `removeType()` retire le type via `_removeListItem()` ; si la liste devient vide, le placeholder `owl:NamedIndividual` est réinséré ; l'autoSave est déclenché dans les deux cas. |
+| **Alors** | le type est retiré de la liste ; si la liste devient vide, `owl:NamedIndividual` est automatiquement maintenu comme type minimal, et la sauvegarde est déclenchée. |
 
 ---
 
-**Code source :** `owl_editor.js` → `addType()`, `removeType()`
+**Code source :** `owl_editor.js` → `addType()`, `removeType()` — `addType()` insère le type dans la liste `ind-types-list` via `_addListItem()` et déclenche `autoSave()` si `_editingId !== null`. `removeType()` retire le type via `_removeListItem()` ; si la liste devient vide, réinsère le placeholder `owl:NamedIndividual` ; déclenche `autoSave()` dans les deux cas.
 
 ### REQ-IND-018 — Gestion de la cardinalité fonctionnelle des propriétés
 
-| **Si** | une propriété est marquée comme fonctionnelle (`opData?.characteristics?.functional` ou `dpData?.functional`) et qu'une valeur existe déjà, |
+| **Si** | une propriété est fonctionnelle et qu'une valeur a déjà été assignée à un individual, |
 |---|---|
-| **Alors** | - le bouton `+` d'ajout de valeur est masqué (`addBtnHidden`) lors du rendu du panneau,<br>- `_refreshAddBtn()` maintient cette visibilité à jour après chaque ajout ou suppression,<br>- `confirmPicker()` bloque l'insertion d'une nouvelle valeur si le panneau est en mode `single` et contient déjà une valeur. |
+| **Alors** | l'ontologiste ne peut pas ajouter une deuxième valeur pour cette propriété : le contrôle d'ajout est masqué et toute tentative d'insertion est bloquée. |
 
 ---
 
-**Code source :** `owl_editor.js` → `_renderPropPanel()`, `_refreshAddBtn()`, `confirmPicker()`
+**Code source :** `owl_editor.js` → `_renderPropPanel()`, `_refreshAddBtn()`, `confirmPicker()` — Lors du rendu, si `opData?.characteristics?.functional` ou `dpData?.functional` est vrai et qu'une valeur existe, le bouton `+` est masqué (`addBtnHidden`). `_refreshAddBtn()` maintient cette visibilité à jour après chaque ajout ou suppression. `confirmPicker()` bloque l'insertion si le panneau est en mode `single` et contient déjà une valeur.
 
 ### REQ-IND-020 — Création d'un individual à la volée depuis le sélecteur
 
-| **Si** | l'utilisateur demande la création d'un nouvel individual depuis le sélecteur (`pickerCreateNew()`), |
+| **Si** | l'ontologiste souhaite créer un nouvel individual directement depuis le sélecteur d'une propriété, |
 |---|---|
-| **Alors** | - un champ de saisie inline est inséré dans la liste du sélecteur (un seul champ à la fois),<br>- l'ID est pré-rempli via `Settings.generateIndividualId()`,<br>- la touche `Enter` confirme la création, la touche `Escape` annule. |
+| **Alors** | un champ de saisie apparaît dans la liste du sélecteur avec un identifiant pré-généré ; il peut confirmer la création avec Entrée ou annuler avec Échap. |
 
-| **Si** | l'utilisateur confirme la création (`_pickerConfirmNew()`), |
+| **Si** | l'ontologiste confirme la création depuis le sélecteur, |
 |---|---|
-| **Alors** | l'individual est créé via `API.createIndividual()` avec les types initiaux correspondant à la classe sélectionnée dans le picker, la liste est rafraîchie et le nouvel individual est sélectionné. |
+| **Alors** | le nouvel individual est créé avec les types correspondant à la classe sélectionnée, la liste est rafraîchie et le nouvel individual est immédiatement disponible pour sélection. |
 
 ---
 
-**Code source :** `owl_editor.js` → `pickerCreateNew()`, `_pickerConfirmNew()`
+**Code source :** `owl_editor.js` → `pickerCreateNew()`, `_pickerConfirmNew()` — `pickerCreateNew()` insère un champ de saisie inline dans la liste (un seul à la fois), pré-remplit l'ID via `Settings.generateIndividualId()`, gère `keydown` pour Entrée (confirmation) et Échap (annulation). `_pickerConfirmNew()` appelle `API.createIndividual()` avec les types initiaux correspondant à la classe sélectionnée dans le picker, rafraîchit la liste et sélectionne le nouvel individual.
 
 ### REQ-IND-021 — Sauvegarde automatique (autoSave)
 
-| **Si** | un champ du formulaire est modifié via `onchange` **et** qu'un individual existant est en cours d'édition (`_editingId !== null`), |
+| **Si** | l'ontologiste modifie un champ du formulaire d'un individual déjà enregistré, |
 |---|---|
-| **Alors** | `save(false)` est appelé automatiquement pour persister les modifications. |
+| **Alors** | les modifications sont sauvegardées automatiquement sans action explicite de sa part. |
 
 ---
 
-**Code source :** `owl_editor.js` → `autoSave()`
+**Code source :** `owl_editor.js` → `autoSave()` — Déclenché via l'événement `onchange` de chaque champ du formulaire. Appelle `save(false)` uniquement si `_editingId !== null`, c'est-à-dire si un individual existant est en cours d'édition.
 
 ### REQ-IND-022 — Sauvegarde explicite : création et mise à jour
 
-| **Si** | l'utilisateur déclenche une sauvegarde explicite, |
+| **Si** | l'ontologiste déclenche une sauvegarde explicite d'un individual, |
 |---|---|
-| **Alors** | le système collecte :<br>- l'ID (espaces remplacés par des underscores),<br>- les annotations via `_collectAnnotations()`,<br>- les types via `_collectList()`,<br>- les `objectAssertions` et `dataAssertions` depuis les panneaux DOM. |
+| **Alors** | toutes les informations saisies sont collectées (identifiant, annotations, types, assertions de propriétés d'objet et de données) et persistées dans l'ontologie. |
 
-| **Si** | `isNew=true`, |
+| **Si** | l'individual est nouveau, |
 |---|---|
-| **Alors** | `API.createIndividual()` est appelé, `_selectedIndId` et `_editingId` sont mis à jour, les trois colonnes sont re-rendues et `APP.refresh()` est appelé. |
+| **Alors** | il est créé dans l'ontologie, l'arbre et la liste sont mis à jour, et l'individual nouvellement créé est sélectionné dans l'interface. |
 
-| **Si** | `isNew=false`, |
+| **Si** | l'individual existe déjà, |
 |---|---|
-| **Alors** | `API.updateIndividual(originalId, ind)` est appelé ; si l'ID a changé, un message de renommage est affiché ; `APP.refresh()` est appelé dans les deux cas. |
+| **Alors** | il est mis à jour ; si son identifiant a changé, un message de confirmation de renommage est affiché ; l'ontologie est rafraîchie dans les deux cas. |
 
 ---
 
-**Code source :** `owl_editor.js` → `save()`
+**Code source :** `owl_editor.js` → `save()` — Collecte l'ID (espaces remplacés par des underscores), les annotations via `_collectAnnotations()`, les types via `_collectList()`, les `objectAssertions` depuis les panneaux DOM `.ind-prop-panel[data-kind="op"]` et les `dataAssertions` depuis `.ind-prop-panel[data-kind="dp"]`. Si `isNew=true` : appelle `API.createIndividual()`, met à jour `_selectedIndId` et `_editingId`, re-rend les trois colonnes et appelle `APP.refresh()`. Si `isNew=false` : appelle `API.updateIndividual(originalId, ind)`, affiche un message si l'ID a changé, appelle `APP.refresh()`.
 
 ### REQ-IND-023 — Suppression unitaire d'un individual depuis le formulaire
 
-| **Si** | l'utilisateur confirme la suppression d'un individual depuis le formulaire (`UI.confirm()`), |
+| **Si** | l'ontologiste supprime un individual depuis son formulaire de détail, |
 |---|---|
-| **Alors** | - `API.deleteIndividual()` est appelé,<br>- si l'individual supprimé était sélectionné (`_selectedIndId === id`), `_selectedIndId` et `_editingId` sont réinitialisés et la colonne 3 affiche l'état vide,<br>- les colonnes 1 et 2 sont regénérées. |
+| **Alors** | l'individual est retiré de l'ontologie, la liste est mise à jour et le formulaire affiche un état vide si l'individual supprimé était celui en cours de consultation. |
 
 ---
 
-**Code source :** `owl_editor.js` → `delete()`
+**Code source :** `owl_editor.js` → `delete()` — Appelle `API.deleteIndividual()`. Si l'individual supprimé était sélectionné (`_selectedIndId === id`), réinitialise `_selectedIndId` et `_editingId` et affiche l'état vide en colonne 3. Régénère les colonnes 1 et 2.
 
 ### REQ-IND-024 — Préservation de sameAs et differentFrom lors de la sauvegarde
 
 | **Si** | une sauvegarde est déclenchée pour un individual, |
 |---|---|
-| **Alors** | les valeurs existantes de `sameAs` et `differentFrom` sont récupérées depuis `APP.state.individuals` (via l'ID original ou le nouvel ID) et incluses systématiquement dans l'objet envoyé à l'API, sans possibilité de modification via le formulaire principal. |
+| **Alors** | les relations d'identité (`sameAs`) et de différence (`differentFrom`) déjà définies sont conservées intégralement, même si elles ne sont pas éditables depuis le formulaire principal. |
 
 ---
 
-**Code source :** `owl_editor.js` → `save()`
+**Code source :** `owl_editor.js` → `save()` — Récupère les valeurs existantes de `sameAs` et `differentFrom` depuis `APP.state.individuals` (via l'ID original ou le nouvel ID) et les inclut systématiquement dans l'objet envoyé à l'API, sans permettre leur modification via le formulaire principal.
 
 ### REQ-IND-025 — Collecte des assertions d'objet depuis les panneaux
 
 | **Si** | une sauvegarde est déclenchée, |
 |---|---|
-| **Alors** | le système interroge tous les éléments DOM `.ind-prop-panel[data-kind="op"]` : pour chaque `.ind-op-target` (input hidden ou select) dont la valeur est non vide, un objet `{ property, target }` est construit à partir de `panel.dataset.prop` et ajouté au tableau `objectAssertions`. |
+| **Alors** | toutes les relations entre l'individual et d'autres individuals (assertions d'objet) saisies dans les panneaux de propriétés sont collectées et incluses dans la sauvegarde. |
 
 ---
 
-**Code source :** `owl_editor.js` → `save()`
+**Code source :** `owl_editor.js` → `save()` — Interroge tous les éléments DOM `.ind-prop-panel[data-kind="op"]` : pour chaque `.ind-op-target` (input hidden ou select) dont la valeur est non vide, construit un objet `{ property, target }` à partir de `panel.dataset.prop` et l'ajoute au tableau `objectAssertions`.
 
 ### REQ-IND-026 — Collecte des assertions de données depuis les panneaux
 
 | **Si** | une sauvegarde est déclenchée, |
 |---|---|
-| **Alors** | le système interroge tous les éléments DOM `.ind-prop-panel[data-kind="dp"]` : pour chaque `.ind-prop-row` contenant une valeur `.ind-dp-value` non vide, un objet `{ property, value, datatype }` est construit — le datatype est lu depuis `dataset.dtype` de l'élément `.ind-dp-type`, avec `xsd:string` comme valeur par défaut. |
+| **Alors** | toutes les valeurs littérales saisies dans les panneaux de propriétés de données sont collectées avec leur type de données et incluses dans la sauvegarde. |
 
 ---
 
-**Code source :** `owl_editor.js` → `save()`
+**Code source :** `owl_editor.js` → `save()` — Interroge tous les éléments DOM `.ind-prop-panel[data-kind="dp"]` : pour chaque `.ind-prop-row` contenant une valeur `.ind-dp-value` non vide, construit un objet `{ property, value, datatype }` — le datatype est lu depuis `dataset.dtype` de l'élément `.ind-dp-type`, avec `xsd:string` comme valeur par défaut.
 
 ### REQ-IND-027 — Règle d'affichage simple (propriété unique)
 
-| **Si** | l'utilisateur ouvre le modal de règle d'affichage via `_openDisplayPropModal()`, |
+| **Si** | l'ontologiste souhaite définir comment les individuals d'une classe sont nommés dans l'interface, |
 |---|---|
-| **Alors** | toutes les propriétés disponibles pour la classe sélectionnée sont listées (annotations, propriétés héritées, directes et via domaine), avec un marquage `(inherited)` pour celles déjà actives par héritage. |
+| **Alors** | il peut choisir une propriété dont la valeur sera utilisée comme label d'affichage, en voyant clairement quelles propriétés sont disponibles et lesquelles sont déjà héritées d'une classe parente. |
 
-| **Si** | l'utilisateur sélectionne ou supprime une propriété via `setDisplayProp()`, |
+| **Si** | l'ontologiste sélectionne ou retire une propriété d'affichage, |
 |---|---|
-| **Alors** | la règle est enregistrée (ou supprimée si `null`) dans `_displayProps[classId \|\| '__root__']` ; `_getEffectiveDisplayProp()` remonte récursivement la hiérarchie de classes pour déterminer la règle applicable à un individual donné. |
+| **Alors** | la règle est enregistrée pour la classe concernée et propagée automatiquement aux sous-classes qui n'ont pas de règle propre. |
 
 ---
 
-**Code source :** `owl_editor.js` → `setDisplayProp()`, `_openDisplayPropModal()`, `_getEffectiveDisplayProp()`
+**Code source :** `owl_editor.js` → `setDisplayProp()`, `_openDisplayPropModal()`, `_getEffectiveDisplayProp()` — `_openDisplayPropModal()` liste toutes les propriétés disponibles pour la classe sélectionnée (annotations, propriétés héritées, directes et via domaine), avec un marquage `(inherited)` pour celles actives par héritage. `setDisplayProp()` enregistre (ou supprime si `null`) la règle dans `_displayProps[classId || '__root__']`. `_getEffectiveDisplayProp()` remonte récursivement la hiérarchie de classes pour déterminer la règle applicable à un individual donné.
 
 ### REQ-IND-028 — Règle d'affichage composite (multi-propriétés avec séparateur)
 
-| **Si** | l'utilisateur ouvre le modal de règle d'affichage composite via `_openDisplayPropsMultiModal()`, |
+| **Si** | l'ontologiste souhaite composer le label d'affichage des individuals à partir de plusieurs propriétés, |
 |---|---|
-| **Alors** | un modal avec des lignes `{séparateur, propriété}` éditables est affiché ; `_addDisplayMultiRow()` permet d'ajouter une ligne vide. |
+| **Alors** | il peut définir une règle composite associant plusieurs propriétés avec des séparateurs personnalisés, et ajouter autant de lignes que nécessaire. |
 
-| **Si** | l'utilisateur confirme via `_confirmDisplayMulti()`, |
+| **Si** | l'ontologiste confirme la règle composite, |
 |---|---|
-| **Alors** | `setDisplayPropsMulti()` sauvegarde la règle composite dans `_displayPropsMulti[classId \|\| '__root__']` (ou la supprime si `null`/vide) ; `_getEffectiveDisplayMulti()` remonte la hiérarchie de classes de manière analogue à `_getEffectiveDisplayProp()`. |
+| **Alors** | la règle est enregistrée pour la classe concernée et propagée aux sous-classes sans règle propre, de la même façon que la règle simple. |
 
 ---
 
-**Code source :** `owl_editor.js` → `_openDisplayPropsMultiModal()`, `_addDisplayMultiRow()`, `_confirmDisplayMulti()`, `setDisplayPropsMulti()`, `_getEffectiveDisplayMulti()`
+**Code source :** `owl_editor.js` → `_openDisplayPropsMultiModal()`, `_addDisplayMultiRow()`, `_confirmDisplayMulti()`, `setDisplayPropsMulti()`, `_getEffectiveDisplayMulti()` — `_openDisplayPropsMultiModal()` affiche un modal avec des lignes `{séparateur, propriété}` éditables. `_addDisplayMultiRow()` insère une ligne vide. `_confirmDisplayMulti()` appelle `setDisplayPropsMulti()` qui sauvegarde la règle dans `_displayPropsMulti[classId || '__root__']` (ou la supprime si `null`/vide). `_getEffectiveDisplayMulti()` remonte la hiérarchie de classes de manière analogue à `_getEffectiveDisplayProp()`.
 
 ### REQ-IND-029 — Résolution du label d'affichage par héritage de classe
 
-| **Si** | le système doit afficher le label d'un individual, |
+| **Si** | l'application doit afficher le nom d'un individual, |
 |---|---|
-| **Alors** | il cherche une règle d'affichage applicable selon la priorité suivante : 1. types propres de l'individual, 2. classe de contexte (classe sélectionnée dans l'arbre ou classe du picker), 3. règle racine (`__root__`), |
-
-en vérifiant pour chaque classe candidate d'abord la règle composite (`_getEffectiveDisplayMulti()`) puis la règle simple (`_getEffectiveDisplayProp()`) ; le label est construit via `_buildMultiLabel()` ou `_getDisplayLabel()` selon le type de règle.
+| **Alors** | elle recherche la règle d'affichage la plus pertinente selon la hiérarchie de classes : d'abord les types propres de l'individual, puis la classe de contexte sélectionnée, puis la règle racine globale ; la règle composite est prioritaire sur la règle simple. |
 
 ---
 
-**Code source :** `owl_editor.js` → `_resolveDisplayLabel()`
+**Code source :** `owl_editor.js` → `_resolveDisplayLabel()` — Pour chaque classe candidate (types propres de l'individual, classe de contexte, `__root__`), vérifie d'abord la règle composite via `_getEffectiveDisplayMulti()` puis la règle simple via `_getEffectiveDisplayProp()`. Construit le label via `_buildMultiLabel()` ou `_getDisplayLabel()` selon le type de règle retenu.
 
 ### REQ-IND-030 — Résolution du label rdfs:label multilingue
 
-| **Si** | le système résout le label d'affichage d'un individual à partir d'une propriété `rdfs:label`, |
+| **Si** | l'application résout le label d'affichage d'un individual à partir de la propriété `rdfs:label`, |
 |---|---|
-| **Alors** | - pour la forme `rdfs:label@{lang}`, il cherche d'abord la langue exacte demandée, puis les autres langues actives (`Settings.activeLangs`) dans l'ordre, puis le premier label disponible quelle que soit la langue,<br>- pour la forme sans langue, il utilise `Settings.preferredLang` en priorité, ou le premier label disponible,<br>- les formes `rdfs:comment`, annotations `other` (par propriété), `dataAssertions` et `objectAssertions` (retourne la cible) sont également supportées. |
+| **Alors** | elle respecte les préférences linguistiques de l'ontologiste : la langue demandée est prioritaire, puis les autres langues actives dans l'ordre de préférence, puis n'importe quel label disponible en dernier recours. |
 
 ---
 
-**Code source :** `owl_editor.js` → `_getDisplayLabel()`
+**Code source :** `owl_editor.js` → `_getDisplayLabel()` — Pour la forme `rdfs:label@{lang}` : cherche d'abord la langue exacte demandée, puis les autres langues actives (`Settings.activeLangs`) dans l'ordre, puis le premier label disponible. Pour la forme sans langue : utilise `Settings.preferredLang` en priorité, ou le premier label disponible. Supporte également `rdfs:comment`, annotations `other` (par propriété), `dataAssertions` et `objectAssertions` (retourne la cible).
 
 ### REQ-IND-031 — Persistance des règles d'affichage dans l'ontologie
 
 | **Si** | les règles d'affichage sont modifiées, |
 |---|---|
-| **Alors** | `_saveDisplayRules()` construit un objet `{ single: _displayProps, multi: _displayPropsMulti }`, l'envoie via `API.updateDisplayRules()` et met à jour `APP.state.ontology.display_rules` en mémoire. |
+| **Alors** | elles sont sauvegardées dans l'ontologie et restituées à l'identique lors du prochain chargement. |
 
 | **Si** | l'ontologie est chargée, |
 |---|---|
-| **Alors** | `_loadDisplayRules()` lit `APP.state.ontology?.display_rules` et initialise les deux maps internes `_displayProps` et `_displayPropsMulti`. |
+| **Alors** | les règles d'affichage précédemment définies sont automatiquement restaurées. |
 
 ---
 
-**Code source :** `owl_editor.js` → `_saveDisplayRules()`, `_loadDisplayRules()`
+**Code source :** `owl_editor.js` → `_saveDisplayRules()`, `_loadDisplayRules()` — `_saveDisplayRules()` construit un objet `{ single: _displayProps, multi: _displayPropsMulti }`, l'envoie via `API.updateDisplayRules()` et met à jour `APP.state.ontology.display_rules` en mémoire. `_loadDisplayRules()` lit `APP.state.ontology?.display_rules` et initialise les deux maps internes `_displayProps` et `_displayPropsMulti`.
 
 ### REQ-IND-032 — Génération automatique de l'identifiant d'un nouvel individual
 
-| **Si** | le formulaire de création d'un nouvel individual est affiché (`newIndividual()`) **ou** qu'un champ de saisie inline est inséré dans le sélecteur (`pickerCreateNew()`), |
+| **Si** | l'ontologiste initie la création d'un nouvel individual, que ce soit depuis le formulaire principal ou depuis le sélecteur d'une propriété, |
 |---|---|
-| **Alors** | après 30 ms, `Settings.generateIndividualId(this._selectedClassId)` est appelé pour pré-remplir le champ ID correspondant. |
+| **Alors** | un identifiant unique et cohérent avec les conventions de l'ontologie est proposé automatiquement, sans que l'ontologiste ait à le saisir manuellement. |
 
 ---
 
-**Code source :** `owl_editor.js` → `newIndividual()`, `pickerCreateNew()`
+**Code source :** `owl_editor.js` → `newIndividual()`, `pickerCreateNew()` — Dans les deux cas, après 30 ms (délai permettant l'insertion du DOM), appelle `Settings.generateIndividualId(this._selectedClassId)` pour pré-remplir le champ ID correspondant avec un identifiant généré selon les conventions configurées.
 
 ### REQ-IND-037 — Profondeur hiérarchique des classes pour l'ordonnancement
 
-| **Si** | le système doit ordonner les propriétés d'un individual par profondeur hiérarchique, |
+| **Si** | l'application doit ordonner les propriétés d'un individual selon la hiérarchie de classes, |
 |---|---|
-| **Alors** | `_classDepth()` calcule la profondeur de chaque classe par BFS itératif en remontant les parents (`subClassOf` de type string uniquement), avec protection contre les cycles (marquage `visited`) ; le résultat est utilisé dans `_getClassProperties()` pour ordonner les propriétés du plus haut au plus bas dans la hiérarchie. |
+| **Alors** | les propriétés héritées des classes les plus générales apparaissent en premier, suivies de celles des classes plus spécialisées. |
 
 ---
 
-**Code source :** `owl_editor.js` → `_classDepth()`
+**Code source :** `owl_editor.js` → `_classDepth()` — Calcule la profondeur de chaque classe par BFS itératif en remontant les parents via les relations `subClassOf` (de type string uniquement), avec protection contre les cycles par marquage `visited`. Le résultat est utilisé dans `_getClassProperties()` pour trier les propriétés du plus haut au plus bas dans la hiérarchie.
 
 ### REQ-IND-038 — Collecte séparée des propriétés héritées et directes
 
-| **Si** | le formulaire d'un individual est rendu, |
+| **Si** | l'ontologiste consulte le formulaire d'un individual, |
 |---|---|
-| **Alors** | `_getClassProperties()` analyse les types de l'individual et retourne deux maps :<br>- `asserted` : restrictions définies sur les types directs, ordonnées par profondeur croissante puis alphabétiquement,<br>- `inherited` : restrictions définies sur les ancêtres, sans doublon avec `asserted`, |
-
-la nature de chaque propriété (`op` ou `dp`) étant déterminée en cherchant dans `APP.state.object_properties` ; les panneaux hérités sont affichés avant les directs.
+| **Alors** | les propriétés héritées des classes parentes sont distinguées visuellement des propriétés définies directement sur les types de l'individual, sans duplication. |
 
 ---
 
-**Code source :** `owl_editor.js` → `_getClassProperties()`
+**Code source :** `owl_editor.js` → `_getClassProperties()` — Analyse les types de l'individual et retourne deux maps : `asserted` (restrictions des types directs, ordonnées par profondeur croissante puis alphabétiquement) et `inherited` (restrictions des ancêtres, sans doublon avec `asserted`). La nature de chaque propriété (`op` ou `dp`) est déterminée en cherchant dans `APP.state.object_properties`. Les panneaux hérités sont affichés avant les directs.
 
 ### REQ-IND-039 — Filtre des individuals candidats par range d'une OP
 
-| **Si** | le système doit proposer les individuals compatibles avec le range d'une Object Property, |
+| **Si** | l'ontologiste doit sélectionner une valeur pour une Object Property, |
 |---|---|
-| **Alors** | `_indsOfRange()` retourne la liste des individuals dont au moins un type appartient à l'ensemble calculé (descendants des classes du range inclus via `ClassEditor.buildTree()`), en excluant l'individual en cours d'édition ; si `rangeClasses` est vide ou null, tous les individuals (sauf l'exclu) sont retournés. |
+| **Alors** | seuls les individuals compatibles avec le domaine de valeurs de cette propriété lui sont proposés, à l'exclusion de l'individual en cours d'édition ; si aucune contrainte de domaine n'est définie, tous les individuals sont proposés. |
+
+---
+
+**Code source :** `owl_editor.js` → `_indsOfRange()` — Retourne la liste des individuals dont au moins un type appartient à l'ensemble calculé (descendants des classes du range inclus via `ClassEditor.buildTree()`), en excluant l'individual en cours d'édition (`_editingId`). Si `rangeClasses` est vide ou null, retourne tous les individuals sauf l'exclu.
 
 ---
 
@@ -320,188 +318,188 @@ la nature de chaque propriété (`op` ou `dp`) étant déterminée en cherchant 
 
 > Exigences relatives à l'affichage : layout, composants visuels, interactions, navigation, styles.
 
-**Code source :** `owl_editor.js` → `_indsOfRange()`
-
 ### REQ-IND-001 — Rendu en trois colonnes
 
-| **Si** | l'onglet Individuals est chargé, |
+| **Si** | l'ontologiste ouvre l'onglet Individuals, |
 |---|---|
-| **Alors** | le système génère une mise en page `section-split` à trois colonnes :<br>- colonne 1 : arbre des classes (`ind-tree-panel`),<br>- colonne 2 : liste des individuals (`ind-list-panel`),<br>- colonne 3 : panneau de détail/formulaire (`ind-detail`), affichant par défaut un état vide invitant à sélectionner ou créer un individual, |
-
-avec deux séparateurs redimensionnables (`ind-split-h1`, `ind-split-h2`) insérés entre les colonnes.
+| **Alors** | l'interface présente trois zones de travail côte à côte : la hiérarchie des classes, la liste des individuals, et le formulaire de détail ; par défaut, le formulaire invite à sélectionner ou créer un individual. |
 
 ---
 
-**Code source :** `owl_editor.js` → `renderSplit()`
+**Code source :** `owl_editor.js` → `renderSplit()` — Génère une mise en page `section-split` à trois colonnes : colonne 1 `ind-tree-panel` (arbre des classes), colonne 2 `ind-list-panel` (liste des individuals), colonne 3 `ind-detail` (formulaire, état vide par défaut). Insère deux séparateurs redimensionnables `ind-split-h1` et `ind-split-h2` entre les colonnes.
 
 ### REQ-IND-004 — Sélection d'une classe dans l'arbre
 
-| **Si** | l'utilisateur clique sur une classe dans l'arbre, |
+| **Si** | l'ontologiste sélectionne une classe dans l'arbre, |
 |---|---|
-| **Alors** | - `_selectedClassId` est mis à jour,<br>- toutes les sélections d'individuals sont réinitialisées,<br>- le surlignage de la colonne 1 est actualisé,<br>- le titre de la colonne 2 est mis à jour,<br>- la liste filtrée est regénérée via `_renderIndList()`,<br>- la colonne 3 affiche un état vide avec le message `owl:Thing` et un bouton de création. |
+| **Alors** | la liste des individuals est filtrée pour n'afficher que ceux appartenant à cette classe ou ses sous-classes, et le formulaire affiche un état vide invitant à sélectionner ou créer un individual dans ce contexte. |
 
 ---
 
-**Code source :** `owl_editor.js` → `selectClass()`
+**Code source :** `owl_editor.js` → `selectClass()` — Met à jour `_selectedClassId`, réinitialise toutes les sélections d'individuals, actualise le surlignage en colonne 1, met à jour le titre de la colonne 2, régénère la liste filtrée via `_renderIndList()`, affiche un état vide en colonne 3 avec le message `owl:Thing` et un bouton de création.
 
 ### REQ-IND-005 — Sélection simple d'un individual
 
-| **Si** | l'utilisateur clique sur un individual sans maintenir la touche Shift, |
+| **Si** | l'ontologiste clique sur un individual dans la liste, |
 |---|---|
-| **Alors** | - `_selectedIndIds` est initialisé avec le seul identifiant cliqué,<br>- le point d'ancrage `_anchorIndId` est positionné,<br>- le formulaire de l'individual est affiché via `renderForm()` dans la colonne 3,<br>- le bouton de suppression est activé via `_setDelBtn()`. |
+| **Alors** | le formulaire de détail de cet individual s'affiche et le bouton de suppression devient actif. |
 
 ---
 
-**Code source :** `owl_editor.js` → `selectIndividual()`
+**Code source :** `owl_editor.js` → `selectIndividual()` — Initialise `_selectedIndIds` avec le seul identifiant cliqué, positionne le point d'ancrage `_anchorIndId`, affiche le formulaire via `renderForm()` en colonne 3, active le bouton de suppression via `_setDelBtn()`.
 
 ### REQ-IND-006 — Sélection multiple par Shift+Clic
 
-| **Si** | l'utilisateur clique sur un individual avec la touche Shift (`isShift === true`) **et** qu'un point d'ancrage existe, |
+| **Si** | l'ontologiste clique sur un individual en maintenant la touche Maj et qu'un point d'ancrage existe, |
 |---|---|
-| **Alors** | la plage d'indices entre l'ancre et l'item cliqué dans la liste DOM est calculée et tous les items intermédiaires sont sélectionnés ; si la sélection dépasse un individual, la colonne 3 affiche un résumé `N individuals selected` avec un bouton de suppression groupée et `_editingId` est mis à `null`. |
+| **Alors** | tous les individuals compris entre l'ancre et l'item cliqué sont sélectionnés ; si la sélection compte plus d'un individual, le formulaire affiche un résumé indiquant le nombre d'individuals sélectionnés avec une option de suppression groupée. |
 
 ---
 
-**Code source :** `owl_editor.js` → `selectIndividual()`
+**Code source :** `owl_editor.js` → `selectIndividual()` — Calcule la plage d'indices entre `_anchorIndId` et l'item cliqué dans la liste DOM, sélectionne tous les items intermédiaires dans `_selectedIndIds`. Si la sélection dépasse un individual, affiche `N individuals selected` en colonne 3 avec un bouton de suppression groupée et met `_editingId` à `null`.
 
 ### REQ-IND-008 — Annulation du formulaire de création
 
-| **Si** | l'utilisateur annule le formulaire de création, |
+| **Si** | l'ontologiste annule la création d'un nouvel individual, |
 |---|---|
-| **Alors** | - toutes les variables de sélection et d'édition sont réinitialisées,<br>- le placeholder fantôme est supprimé de la liste,<br>- la colonne 3 restaure l'état vide avec le message de démarrage et le bouton de création. |
+| **Alors** | le formulaire se ferme, la liste revient à son état précédent et l'interface retrouve son état de repos. |
 
 ---
 
-**Code source :** `owl_editor.js` → `_cancelForm()`
+**Code source :** `owl_editor.js` → `_cancelForm()` — Réinitialise toutes les variables de sélection et d'édition, supprime le placeholder fantôme de la liste, restaure l'état vide en colonne 3 avec le message de démarrage et le bouton de création.
 
 ### REQ-IND-011 — Formulaire de détail d'un individual
 
 | **Si** | un individual est sélectionné ou en cours de création, |
 |---|---|
-| **Alors** | `renderForm()` génère le formulaire complet avec les blocs suivants :<br>- champ ID avec sanitisation en temps réel (`_sanitizeId()`),<br>- section Annotations,<br>- section Types (`rdf:type`),<br>- panneaux de propriétés dynamiques via `_getClassProperties()` et `_renderPropPanel()`,<br>- pour un individual existant, un bloc `_whereUsedFrame()` en bas du formulaire,<br>- pour un nouvel individual, le champ ID déclenche `save(true)` au `blur`. |
+| **Alors** | le formulaire affiche toutes ses informations éditables : identifiant, annotations, types, et panneaux de propriétés ; pour un individual existant, les entités qui le référencent sont également affichées en bas du formulaire. |
 
 ---
 
-**Code source :** `owl_editor.js` → `renderForm()`
+**Code source :** `owl_editor.js` → `renderForm()` — Génère le formulaire complet avec : champ ID (sanitisation en temps réel via `_sanitizeId()`), section Annotations, section Types (`rdf:type`), panneaux de propriétés dynamiques via `_getClassProperties()` et `_renderPropPanel()`. Pour un individual existant, insère `_whereUsedFrame()` en bas. Pour un nouvel individual, le champ ID déclenche `save(true)` au `blur`.
 
 ### REQ-IND-012 — Identifiant IRI affiché dans l'en-tête du formulaire
 
-| **Si** | l'ontologie possède un IRI de base (`APP.state.ontology?.id`) **et** que l'individual a un identifiant, |
+| **Si** | l'ontologie possède un IRI de base et que l'individual a un identifiant, |
 |---|---|
-| **Alors** | l'IRI complet sous la forme `{baseIri}#{id}` est affiché dans l'élément `cls-editor-iri` de l'en-tête du formulaire ; cette ligne n'est pas affichée pour les nouveaux individuals (IRI vide). |
+| **Alors** | l'IRI complet de l'individual est affiché dans l'en-tête du formulaire pour permettre à l'ontologiste de l'identifier sans ambiguïté ; cette information n'est pas affichée pour les nouveaux individuals non encore enregistrés. |
 
 ---
 
-**Code source :** `owl_editor.js` → `renderForm()`
+**Code source :** `owl_editor.js` → `renderForm()` — Si `APP.state.ontology?.id` est défini et que l'individual a un identifiant, affiche `{baseIri}#{id}` dans l'élément `cls-editor-iri` de l'en-tête. La ligne n'est pas affichée pour les nouveaux individuals (IRI vide).
 
 ### REQ-IND-013 — Annotations : labels et commentaires
 
-| **Si** | le formulaire est affiché, les annotations existantes (`labels`, `comments`, `other`) sont rendues via `_annoRow()`.  **Si** l'utilisateur ajoute une ligne d'annotation via `addAnnotRow()`, |
+| **Si** | le formulaire est affiché, les annotations existantes sont présentées en lignes éditables. **Si** l'ontologiste ajoute une annotation, |
 |---|---|
-| **Alors** | une nouvelle ligne est insérée dynamiquement dans `ind-annotations-body` via `_makeAnnotRow()`, avec `onchange` activé pour l'autoSave si l'individual est en cours d'édition. |
+| **Alors** | une nouvelle ligne est insérée dynamiquement dans le tableau des annotations, avec sauvegarde automatique si l'individual est déjà enregistré. |
 
-| **Si** | l'utilisateur supprime une ligne via `removeAnnotRow()`, |
+| **Si** | l'ontologiste supprime une annotation, |
 |---|---|
-| **Alors** | la ligne DOM est supprimée et l'autoSave est déclenché. |
+| **Alors** | la ligne est retirée et la sauvegarde est déclenchée automatiquement. |
 
 ---
 
-**Code source :** `owl_editor.js` → `renderForm()`, `addAnnotRow()`, `removeAnnotRow()`
+**Code source :** `owl_editor.js` → `renderForm()`, `addAnnotRow()`, `removeAnnotRow()` — Les annotations existantes (`labels`, `comments`, `other`) sont rendues via `_annoRow()`. `addAnnotRow()` insère une nouvelle ligne via `_makeAnnotRow()` dans `ind-annotations-body`, avec `onchange` activé pour l'autoSave si `_editingId !== null`. `removeAnnotRow()` supprime la ligne DOM et déclenche `autoSave()`.
 
 ### REQ-IND-014 — Annotations de propriétés personnalisées
 
-| **Si** | l'utilisateur sélectionne une propriété dans le sélecteur `ind-anno-picker`, |
+| **Si** | l'ontologiste sélectionne une propriété d'annotation personnalisée dans le sélecteur dédié, |
 |---|---|
-| **Alors** | `addOtherAnnotRow()` ajoute une ligne d'annotation `other` dans le tableau des annotations en utilisant la propriété passée en paramètre, puis masque le sélecteur. |
+| **Alors** | une ligne d'annotation pour cette propriété est ajoutée au formulaire et le sélecteur se referme. |
 
 ---
 
-**Code source :** `owl_editor.js` → `addOtherAnnotRow()`
+**Code source :** `owl_editor.js` → `addOtherAnnotRow()` — Ajoute une ligne d'annotation `other` dans le tableau des annotations en utilisant la propriété passée en paramètre (lue depuis `ind-anno-picker`), puis masque le sélecteur.
 
 ### REQ-IND-016 — Panneaux de propriétés dynamiques (Object Properties)
 
-| **Si** | le formulaire d'un individual est rendu et que des Object Properties sont associées à ses types, |
+| **Si** | l'ontologiste consulte le formulaire d'un individual qui possède des Object Properties, |
 |---|---|
-| **Alors** | `_renderPropPanel()` génère un panneau par propriété `op` : chaque `objectAssertion` existante est affichée avec le label de la cible (via `_labelForId()`), un lien de navigation vers l'individual cible et un bouton de suppression ; `addPropValue()` (pour `kind='op'`) construit un `<select>` peuplé par `_indsOfRange()` filtré sur le range effectif de la propriété. |
+| **Alors** | chaque Object Property est présentée dans un panneau dédié affichant les individuals cibles déjà assignés, avec la possibilité de naviguer vers chacun d'eux, d'ajouter de nouvelles relations ou d'en supprimer. |
 
 ---
 
-**Code source :** `owl_editor.js` → `_renderPropPanel()`, `addPropValue()`
+**Code source :** `owl_editor.js` → `_renderPropPanel()`, `addPropValue()` — Pour chaque propriété `op`, génère un panneau listant les `objectAssertions` existantes avec le label de la cible via `_labelForId()`, un lien de navigation et un bouton de suppression. `addPropValue()` (pour `kind='op'`) construit un `<select>` peuplé par `_indsOfRange()` filtré sur le range effectif de la propriété.
 
 ### REQ-IND-017 — Panneaux de propriétés dynamiques (Datatype Properties)
 
-| **Si** | le formulaire d'un individual est rendu et que des Datatype Properties sont associées à ses types, |
+| **Si** | l'ontologiste consulte le formulaire d'un individual qui possède des Datatype Properties, |
 |---|---|
-| **Alors** | `_renderPropPanel()` génère un panneau par propriété `dp` : chaque `dataAssertion` existante est affichée avec un champ texte éditable, le datatype (`xsd:string` par défaut ou premier range de la propriété) et un bouton de suppression ; si la valeur est une URL (`/^https?:\/\//i`), un lien `🔗` cliquable est affiché ; `addPropValue()` (pour `kind='dp'`) crée un champ texte vide avec le datatype par défaut. |
+| **Alors** | chaque Datatype Property est présentée dans un panneau dédié affichant les valeurs déjà saisies avec leur type de données, avec la possibilité d'ajouter de nouvelles valeurs ou d'en supprimer ; les valeurs de type URL sont présentées comme des liens cliquables. |
 
 ---
 
-**Code source :** `owl_editor.js` → `_renderPropPanel()`, `addPropValue()`
+**Code source :** `owl_editor.js` → `_renderPropPanel()`, `addPropValue()` — Pour chaque propriété `dp`, génère un panneau listant les `dataAssertions` existantes avec un champ texte éditable, le datatype (`xsd:string` par défaut ou premier range de la propriété) et un bouton de suppression. Si la valeur correspond à `/^https?:\/\//i`, insère un lien `🔗` cliquable. `addPropValue()` (pour `kind='dp'`) crée un champ texte vide avec le datatype par défaut.
 
 ### REQ-IND-019 — Ouverture du sélecteur d'individual pour une Object Property
 
-| **Si** | l'utilisateur ouvre le sélecteur pour une Object Property via `openPicker()`, |
+| **Si** | l'ontologiste souhaite assigner un individual à une Object Property, |
 |---|---|
-| **Alors** | un modal overlay est affiché avec deux panneaux : arbre des classes autorisées (filtrées selon le `effectiveRange` de la propriété, ou toutes les classes si aucun range) et liste des individuals. |
+| **Alors** | un sélecteur s'ouvre avec l'arbre des classes et la liste des individuals compatibles avec le domaine de valeurs de la propriété. |
 
-| **Si** | l'utilisateur sélectionne une classe dans le picker via `pickerSelectClass()`, |
+| **Si** | l'ontologiste sélectionne une classe dans le sélecteur, |
 |---|---|
-| **Alors** | la liste des individuals est mise à jour (filtrage transitif) en excluant l'individual en cours d'édition. |
+| **Alors** | la liste des individuals est filtrée pour cette classe et ses sous-classes, en excluant l'individual en cours d'édition. |
 
-| **Si** | l'utilisateur sélectionne un individual via `pickerSelectInd()`, |
+| **Si** | l'ontologiste sélectionne un individual dans le sélecteur, |
 |---|---|
-| **Alors** | le bouton OK est activé. |
+| **Alors** | le bouton de confirmation devient actif. |
 
-| **Si** | l'utilisateur confirme via `confirmPicker()`, |
+| **Si** | l'ontologiste confirme son choix, |
 |---|---|
-| **Alors** | l'individual choisi est inséré comme nouvelle ligne dans le panneau de la propriété. |
+| **Alors** | l'individual sélectionné est ajouté comme valeur de la propriété dans le formulaire. |
 
-| **Si** | l'utilisateur ferme le picker via `closePicker()`, |
+| **Si** | l'ontologiste ferme le sélecteur sans confirmer, |
 |---|---|
-| **Alors** | l'overlay est supprimé du DOM. |
+| **Alors** | le sélecteur disparaît sans modification. |
 
 ---
 
-**Code source :** `owl_editor.js` → `openPicker()`, `pickerSelectClass()`, `pickerSelectInd()`, `confirmPicker()`, `closePicker()`
+**Code source :** `owl_editor.js` → `openPicker()`, `pickerSelectClass()`, `pickerSelectInd()`, `confirmPicker()`, `closePicker()` — `openPicker()` affiche un modal overlay avec deux panneaux (arbre des classes filtrées selon `effectiveRange`, ou toutes les classes si aucun range ; liste des individuals). `pickerSelectClass()` filtre la liste par descendance transitive en excluant `_editingId`. `pickerSelectInd()` active le bouton OK. `confirmPicker()` insère l'individual choisi comme nouvelle ligne dans le panneau de la propriété (bloque si mode `single` et valeur déjà présente). `closePicker()` supprime l'overlay du DOM.
 
 ### REQ-IND-033 — Navigation vers un individual cible depuis une Object Property
 
-| **Si** | un panneau de type `op` affiche des valeurs, |
+| **Si** | un panneau d'Object Property affiche des individuals cibles, |
 |---|---|
-| **Alors** | chaque valeur comporte un lien `onclick="APP.navigateTo('individuals','${a.target}')"` permettant de naviguer directement vers l'individual cible dans l'onglet Individuals ; ce même lien est généré après sélection via `confirmPicker()`. |
+| **Alors** | chaque valeur est cliquable et permet de naviguer directement vers le formulaire de l'individual cible. |
 
 ---
 
-**Code source :** `owl_editor.js` → `_renderPropPanel()`
+**Code source :** `owl_editor.js` → `_renderPropPanel()` — Chaque valeur d'assertion d'objet est rendue avec un lien `onclick="APP.navigateTo('individuals','${a.target}')"` permettant la navigation directe. Ce lien est également généré après sélection via `confirmPicker()`.
 
 ### REQ-IND-034 — Lien cliquable pour les valeurs de données de type URL
 
-| **Si** | la valeur d'une `dataAssertion` dans un panneau `dp` correspond à l'expression régulière `/^https?:\/\//i`, |
+| **Si** | la valeur d'une propriété de données est une URL, |
 |---|---|
-| **Alors** | un lien `<a>` avec l'icône `🔗` est inséré à droite du champ texte, ouvrant l'URL dans un nouvel onglet (`target="_blank"`). |
+| **Alors** | un lien cliquable est affiché à côté de la valeur pour l'ouvrir directement dans un nouvel onglet. |
 
 ---
 
-**Code source :** `owl_editor.js` → `_renderPropPanel()`
+**Code source :** `owl_editor.js` → `_renderPropPanel()` — Si la valeur correspond à l'expression régulière `/^https?:\/\//i`, insère un lien `<a>` avec l'icône `🔗` à droite du champ texte, avec l'attribut `target="_blank"`.
 
 ### REQ-IND-035 — Panneau "Where Used" dans le formulaire
 
-| **Si** | le formulaire affiche un individual existant (`ind` non null), |
+| **Si** | l'ontologiste consulte le formulaire d'un individual existant, |
 |---|---|
-| **Alors** | `_whereUsedFrame(r => _ruleUsesIndividual(r, ind.id))` est appelé et son résultat est inséré en bas du formulaire, listant les règles SWRL ou autres entités qui référencent l'individual. |
+| **Alors** | une section en bas du formulaire liste les autres entités de l'ontologie qui référencent cet individual. |
 
 ---
 
-**Code source :** `owl_editor.js` → `renderForm()`
+**Code source :** `owl_editor.js` → `renderForm()` — Appelle `_whereUsedFrame(r => _ruleUsesIndividual(r, ind.id))` et insère le résultat en bas du formulaire, listant les règles SWRL ou autres entités qui référencent l'individual par son identifiant.
 
 ### REQ-IND-036 — Redimensionnement des colonnes par glisser-déposer
 
-| **Si** | l'utilisateur fait glisser un séparateur de colonne (`ind-split-h1` ou `ind-split-h2`), |
+| **Si** | l'ontologiste fait glisser un séparateur entre deux colonnes, |
 |---|---|
-| **Alors** | `_initHandle()` ajuste en temps réel la largeur CSS du panneau adjacent via les écouteurs `mousedown`/`mousemove`/`mouseup` sur `document`, dans les limites suivantes :<br>- `ind-split-h1` / `ind-tree-panel` : entre 120 et 520 px,<br>- `ind-split-h2` / `ind-list-panel` : entre 100 et 400 px. |
+| **Alors** | la largeur des colonnes adjacentes s'ajuste en temps réel, dans des limites garantissant la lisibilité de chaque zone. |
 
 ---
 
 *Document généré par analyse statique du code source de `owl_editor.js` — aucune fonctionnalité extrapolée.*
 
-**Code source :** `owl_editor.js` → `_initHandle()`, `_initSplitPanes()`
+**Code source :** `owl_editor.js` → `_initHandle()`, `_initSplitPanes()` — `_initHandle()` gère les événements `mousedown`/`mousemove`/`mouseup` sur `document` pour ajuster en temps réel la largeur CSS du panneau adjacent. Limites : `ind-split-h1` / `ind-tree-panel` entre 120 et 520 px ; `ind-split-h2` / `ind-list-panel` entre 100 et 400 px.
+
+---
+
+*— claude-sonnet-4-6*
