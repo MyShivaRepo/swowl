@@ -33,7 +33,9 @@
 
 ### REQ-INF-001 — Récupération des inférences via l'API
 
-L'application effectue un appel HTTP GET vers l'endpoint `/api/inferences` pour récupérer l'ensemble des données d'inférence calculées par le backend. La réponse est un objet JSON contenant les champs `violations`, `subclass_closure`, `inherited_restrictions`, `inferred_inverse_restrictions`, `inferred_types`, `symmetric_assertions`, `transitive_assertions`, `chain_assertions` et `inferred_inverse_properties`.
+**Si** l'application doit récupérer les données d'inférence calculées par le backend,
+
+**Alors** elle effectue un appel HTTP GET vers l'endpoint `/api/inferences` et traite la réponse JSON contenant les champs `violations`, `subclass_closure`, `inherited_restrictions`, `inferred_inverse_restrictions`, `inferred_types`, `symmetric_assertions`, `transitive_assertions`, `chain_assertions` et `inferred_inverse_properties`.
 
 ---
 
@@ -41,7 +43,11 @@ L'application effectue un appel HTTP GET vers l'endpoint `/api/inferences` pour 
 
 ### REQ-INF-002 — Rafraîchissement automatique du panneau
 
-Lorsque l'onglet "Inferences" est actif (`APP.currentSection === 'inferences'`), le panneau se rafraîchit automatiquement à intervalle régulier. L'intervalle par défaut est de 3000 ms. La fonction appelle `setInterval()` qui déclenche `InferenceUI.refresh()` à chaque cycle, et arrête préalablement tout intervalle existant via `stopAutoRefresh()` avant d'en créer un nouveau.
+**Si** l'onglet "Inferences" est actif (`APP.currentSection === 'inferences'`),
+
+**Alors** :
+- le panneau se rafraîchit automatiquement toutes les 3000 ms via `setInterval()` déclenchant `InferenceUI.refresh()` à chaque cycle
+- tout intervalle de rafraîchissement existant est préalablement arrêté via `stopAutoRefresh()` avant la création du nouveau cycle
 
 ---
 
@@ -49,7 +55,9 @@ Lorsque l'onglet "Inferences" est actif (`APP.currentSection === 'inferences'`),
 
 ### REQ-INF-003 — Arrêt du rafraîchissement automatique
 
-La fonction arrête l'intervalle de rafraîchissement automatique en appelant `clearInterval()` sur la référence `_autoRefresh` et en remettant celle-ci à `null`. Cette fonction est appelée systématiquement avant tout démarrage d'un nouveau cycle de rafraîchissement.
+**Si** la fonction d'arrêt du rafraîchissement automatique est appelée,
+
+**Alors** l'intervalle en cours est annulé via `clearInterval()` sur la référence `_autoRefresh` et cette référence est remise à `null`, garantissant qu'aucun cycle résiduel ne subsiste avant le démarrage d'un nouveau cycle.
 
 ---
 
@@ -57,7 +65,12 @@ La fonction arrête l'intervalle de rafraîchissement automatique en appelant `c
 
 ### REQ-INF-016 — Gestion des erreurs lors de la récupération des inférences
 
-En cas d'échec de l'appel à `API.getInferences()`, l'exception est interceptée par un bloc `catch`. Le contenu de l'élément HTML `#inference-panel` est remplacé par un paragraphe de classe CSS `error` affichant le message d'erreur (`e.message`). Aucune donnée partielle n'est conservée en cas d'erreur.
+**Si** l'appel à `API.getInferences()` échoue,
+
+**Alors** :
+- l'exception est interceptée par un bloc `catch`
+- le contenu de l'élément HTML `#inference-panel` est remplacé par un paragraphe de classe CSS `error` affichant le message d'erreur (`e.message`)
+- aucune donnée partielle n'est conservée
 
 ---
 
@@ -69,7 +82,12 @@ En cas d'échec de l'appel à `API.getInferences()`, l'exception est intercepté
 
 ### REQ-INF-004 — Affichage de l'état de cohérence de l'ontologie
 
-L'en-tête du panneau affiche un badge d'état calculé à partir des violations dont la sévérité est `'error'`. Si des erreurs existent, le badge affiche "🔴 N error(s)" avec la classe CSS `badge-error`. Si aucune erreur n'est présente, le badge affiche "🟢 Consistent" avec la classe CSS `badge-ok`. Les avertissements (`severity === 'warning'`) génèrent un badge supplémentaire "⚠️ N warning(s)" avec la classe `badge-warn`.
+**Si** l'ontologie est chargée et que le panneau d'inférences est affiché,
+
+**Alors** :
+- si des violations de sévérité `'error'` existent, un badge "🔴 N error(s)" avec la classe CSS `badge-error` est affiché dans l'en-tête
+- si aucune erreur n'est présente, un badge "🟢 Consistent" avec la classe CSS `badge-ok` est affiché
+- si des avertissements de sévérité `'warning'` existent, un badge supplémentaire "⚠️ N warning(s)" avec la classe `badge-warn` est affiché
 
 ---
 
@@ -77,7 +95,10 @@ L'en-tête du panneau affiche un badge d'état calculé à partir des violations
 
 ### REQ-INF-005 — Affichage des violations de cohérence
 
-La section "Violations" liste toutes les violations retournées par le backend. Chaque violation est affichée avec : une icône selon la sévérité (🔴 pour `'error'`, 🟡 pour `'warning'`), l'identifiant de l'entité concernée (`v.entity`) formaté en `<code>`, et le message descriptif (`v.message`). Si aucune violation n'est présente, le message "No violations detected." est affiché.
+**Si** le panneau d'inférences est rendu et que des violations ont été retournées par le backend,
+
+**Alors** la section "Violations" liste chaque violation avec une icône de sévérité (🔴 pour `'error'`, 🟡 pour `'warning'`), l'identifiant de l'entité concernée (`v.entity`) formaté en `<code>`, et le message descriptif (`v.message`) ;
+**et** si aucune violation n'est présente, le message "No violations detected." est affiché à la place.
 
 ---
 
@@ -85,7 +106,9 @@ La section "Violations" liste toutes les violations retournées par le backend. 
 
 ### REQ-INF-006 — Affichage de la fermeture transitive de la hiérarchie de classes
 
-La section "Resolved hierarchy" affiche, sous forme de tableau, la fermeture transitive des relations `subClassOf` de l'ontologie. Pour chaque classe ayant au moins un ancêtre, le tableau présente la classe source et l'ensemble de ses ancêtres à tous les niveaux, chaque ancêtre formaté avec la classe CSS `tag-class`. Les entrées sans ancêtres sont filtrées avant rendu (`ancs.length > 0`).
+**Si** l'ontologie est chargée et contient des classes reliées par des relations `subClassOf`,
+
+**Alors** la section "Resolved hierarchy" affiche un tableau de la fermeture transitive de ces relations, présentant pour chaque classe ayant au moins un ancêtre la classe source et l'ensemble de ses ancêtres à tous les niveaux (chaque ancêtre formaté avec la classe CSS `tag-class`), les entrées sans ancêtres étant filtrées avant rendu.
 
 ---
 
@@ -93,7 +116,9 @@ La section "Resolved hierarchy" affiche, sous forme de tableau, la fermeture tra
 
 ### REQ-INF-007 — Affichage des restrictions héritées par héritage de classes
 
-La section "Inherited restrictions" affiche un tableau des restrictions OWL héritées par propagation de la hiérarchie de classes. Pour chaque entrée, le tableau présente : la classe qui hérite (`r.class_id`), la classe parente dont la restriction est héritée (`r.inherited_from`), et la description textuelle de la restriction construite à partir des champs `restr.type`, `restr.property`, `restr.filler` et `restr.cardinality`.
+**Si** l'ontologie est chargée et que des restrictions OWL ont été propagées par la hiérarchie de classes,
+
+**Alors** la section "Inherited restrictions" affiche un tableau présentant pour chaque entrée : la classe qui hérite (`r.class_id`), la classe parente dont la restriction est héritée (`r.inherited_from`), et la description textuelle de la restriction construite à partir des champs `restr.type`, `restr.property`, `restr.filler` et `restr.cardinality`.
 
 ---
 
@@ -101,7 +126,9 @@ La section "Inherited restrictions" affiche un tableau des restrictions OWL hér
 
 ### REQ-INF-008 — Affichage des types inférés via domaine/portée des propriétés
 
-La section "Inferred types" affiche un tableau des types OWL inférés pour les individus à partir des domaines et portées (`domain`/`range`) des propriétés. Pour chaque individu, le tableau présente : le label de l'individu résolu via `IndividualEditor._labelForId()` (avec l'IRI complet en attribut `title` si le label diffère), le type inféré (`t.inferred_type`), et la justification textuelle (`t.reason`).
+**Si** l'ontologie est chargée et que des types ont été inférés pour des individus à partir des domaines et portées (`domain`/`range`) des propriétés,
+
+**Alors** la section "Inferred types" affiche un tableau présentant pour chaque individu : son label résolu via `IndividualEditor._labelForId()` (avec l'IRI complet en attribut `title` si le label diffère), le type inféré (`t.inferred_type`), et la justification textuelle (`t.reason`).
 
 ---
 
@@ -109,7 +136,10 @@ La section "Inferred types" affiche un tableau des types OWL inférés pour les 
 
 ### REQ-INF-009 — Affichage des assertions symétriques inférées
 
-La section "Inferred symmetric assertions" liste les assertions sur individus inférées par application de la caractéristique `owl:SymmetricProperty`. Chaque ligne du tableau présente : l'individu source (label résolu via `IndividualEditor._labelForId()`), la propriété (`a.property`), l'individu cible (label résolu de même), et la justification (`a.reason`). La section n'est pas rendue si la liste est vide.
+**Si** l'ontologie est chargée et que des assertions ont été inférées par application de la caractéristique `owl:SymmetricProperty`
+**et** que la liste résultante est non vide,
+
+**Alors** la section "Inferred symmetric assertions" affiche un tableau présentant pour chaque assertion : l'individu source (label résolu via `IndividualEditor._labelForId()`), la propriété (`a.property`), l'individu cible (label résolu de même), et la justification (`a.reason`).
 
 ---
 
@@ -117,7 +147,10 @@ La section "Inferred symmetric assertions" liste les assertions sur individus in
 
 ### REQ-INF-010 — Affichage des assertions transitives inférées
 
-La section "Inferred transitive assertions" liste les assertions sur individus inférées par application de la caractéristique `owl:TransitiveProperty`. Le rendu est identique à REQ-INF-009 (même fonction `_renderAssertions()` appelée avec un titre différent et la liste `transitive_assertions`). La section n'est pas rendue si la liste est vide.
+**Si** l'ontologie est chargée et que des assertions ont été inférées par application de la caractéristique `owl:TransitiveProperty`
+**et** que la liste résultante est non vide,
+
+**Alors** la section "Inferred transitive assertions" affiche un tableau au format identique à REQ-INF-009, avec la liste `transitive_assertions` comme source de données.
 
 ---
 
@@ -125,7 +158,10 @@ La section "Inferred transitive assertions" liste les assertions sur individus i
 
 ### REQ-INF-011 — Affichage des assertions inférées par chaînes de propriétés et inverses
 
-La section "Assertions (chains + inverses)" liste les assertions sur individus inférées par application des chaînes de propriétés (`owl:propertyChainAxiom`) et des propriétés inverses. Le rendu est identique à REQ-INF-009 et REQ-INF-010 (même fonction `_renderAssertions()` appelée avec la liste `chain_assertions`). La section n'est pas rendue si la liste est vide.
+**Si** l'ontologie est chargée et que des assertions ont été inférées par application des chaînes de propriétés (`owl:propertyChainAxiom`) et des propriétés inverses
+**et** que la liste résultante est non vide,
+
+**Alors** la section "Assertions (chains + inverses)" affiche un tableau au format identique à REQ-INF-009 et REQ-INF-010, avec la liste `chain_assertions` comme source de données.
 
 ---
 
@@ -133,7 +169,10 @@ La section "Assertions (chains + inverses)" liste les assertions sur individus i
 
 ### REQ-INF-012 — Affichage des restrictions inverses inférées sur les classes
 
-La section "Inferred inverse restrictions" affiche un tableau des restrictions existentielles inférées sur les classes par inversion de propriétés. La description de chaque restriction est construite sous la forme `∃<property>.<filler>` à partir des champs `r.property` et `r.filler`. Le tableau présente également la classe concernée (`i.class_id`) et la justification (`i.reason`). La section n'est pas rendue si la liste est vide.
+**Si** l'ontologie est chargée et que des restrictions existentielles ont été inférées sur des classes par inversion de propriétés
+**et** que la liste résultante est non vide,
+
+**Alors** la section "Inferred inverse restrictions" affiche un tableau présentant pour chaque restriction : la classe concernée (`i.class_id`), la description de la restriction sous la forme `∃<property>.<filler>` construite à partir des champs `r.property` et `r.filler`, et la justification (`i.reason`).
 
 ---
 
@@ -141,7 +180,11 @@ La section "Inferred inverse restrictions" affiche un tableau des restrictions e
 
 ### REQ-INF-013 — Affichage des propriétés inverses inférées par owl:inverseOf
 
-La section "Inferred inverse properties" affiche un tableau des propriétés OWL inférées par symétrie de la relation `owl:inverseOf`. Pour chaque entrée, le tableau présente : la propriété inférée (`i.property_id`), la propriété dont elle est l'inverse (`i.inverse_of`), et la justification (`i.reason`). Si aucune propriété inverse n'est inférée, le message "No inverse inferred by owl:inverseOf symmetry." est affiché.
+**Si** l'ontologie est chargée et que des propriétés OWL ont été inférées par symétrie de la relation `owl:inverseOf`,
+
+**Alors** :
+- la section "Inferred inverse properties" affiche un tableau présentant pour chaque entrée : la propriété inférée (`i.property_id`), la propriété dont elle est l'inverse (`i.inverse_of`), et la justification (`i.reason`)
+- si aucune propriété inverse n'est inférée, le message "No inverse inferred by owl:inverseOf symmetry." est affiché à la place
 
 ---
 
@@ -149,7 +192,9 @@ La section "Inferred inverse properties" affiche un tableau des propriétés OWL
 
 ### REQ-INF-014 — Bouton de recalcul manuel des inférences
 
-L'en-tête du panneau contient un bouton "↻" dont le gestionnaire d'événement `onclick` appelle directement `InferenceUI.refresh()`. Ce bouton permet à l'utilisateur de déclencher manuellement un recalcul et un rechargement des inférences depuis le backend, indépendamment du cycle de rafraîchissement automatique.
+**Si** l'utilisateur clique sur le bouton "↻" affiché dans l'en-tête du panneau d'inférences,
+
+**Alors** `InferenceUI.refresh()` est appelé immédiatement, déclenchant un recalcul et un rechargement complet des inférences depuis le backend, indépendamment du cycle de rafraîchissement automatique.
 
 ---
 
@@ -157,7 +202,13 @@ L'en-tête du panneau contient un bouton "↻" dont le gestionnaire d'événemen
 
 ### REQ-INF-015 — Sections rétractables (collapsible) pour les résultats d'inférence
 
-Toutes les sections de résultats contenant au moins un élément sont rendues avec la classe CSS `collapsible`. Un gestionnaire `onclick` sur l'élément de titre appelle `this.parentElement.classList.toggle('open')`, permettant à l'utilisateur de replier ou déplier chaque section individuellement. Un indicateur visuel `▶` (classe CSS `caret`) est affiché dans le titre.
+**Si** une section de résultats d'inférence contient au moins un élément
+**et** que l'utilisateur clique sur son titre,
+
+**Alors** :
+- la section bascule entre les états replié et déplié via `this.parentElement.classList.toggle('open')`
+- la section est rendue avec la classe CSS `collapsible`
+- un indicateur visuel `▶` (classe CSS `caret`) est affiché dans le titre
 
 ---
 
