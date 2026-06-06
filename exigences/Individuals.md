@@ -320,7 +320,7 @@
 
 ### REQ-IND-001 — Rendu en trois colonnes
 
-| **Si** | l'ontologiste ouvre l'onglet Individuals, |
+| **Si** | l'ontologiste ouvre l'onglet `Individuals`, |
 |---|---|
 | **Alors** | l'interface présente trois zones de travail côte à côte : la hiérarchie des classes, la liste des individuals, et le formulaire de détail ; par défaut, le formulaire invite à sélectionner ou créer un individual. |
 
