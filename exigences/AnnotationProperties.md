@@ -54,9 +54,9 @@
 
 ### REQ-AP-002 — Détection des propriétés built-in vs. utilisateur
 
-| **Si** | l'application doit distinguer une `AnnotationProperty` standard OWL 2 d'une `propriété` définie par l'ontologiste, |
+| **Si** | l'application doit distinguer une `AnnotationProperty` standard OWL 2 d'une `AnnotationProperty` définie par l'ontologiste, |
 |---|---|
-| **Alors** | elle identifie correctement toute `propriété` appartenant aux groupes `rdfs:` ou `owl:` comme étant une `propriété` intégrée, et traite les autres comme des `propriétés` utilisateur éditables. |
+| **Alors** | elle identifie correctement toute `AnnotationProperty` appartenant aux groupes `rdfs:` ou `owl:` comme étant une `AnnotationProperty` intégrée, et traite les autres comme des `AnnotationProperties` utilisateur éditables. |
 
 ---
 
@@ -64,9 +64,9 @@
 
 ### REQ-AP-003 — Construction de l'arbre hiérarchique des propriétés
 
-| **Si** | l'`ontologie` contient des `AnnotationProperty` organisées en hiérarchie de sous-`propriétés`, |
+| **Si** | l'`ontologie` contient des `AnnotationProperty` organisées en hiérarchie de sous-`AnnotationProperties`, |
 |---|---|
-| **Alors** | l'arbre des `AnnotationProperty` reflète fidèlement les relations de spécialisation entre `propriétés`, en distinguant les `propriétés` racines, les `propriétés` attachées à un parent intégré et celles attachées à un parent utilisateur. |
+| **Alors** | l'arbre des `AnnotationProperty` reflète fidèlement les relations de spécialisation entre `AnnotationProperties`, en distinguant les `AnnotationProperties` racines, les `AnnotationProperties` attachées à un parent intégré et celles attachées à un parent utilisateur. |
 
 ---
 
@@ -76,7 +76,7 @@
 
 | **Si** | l'ontologiste crée une nouvelle `AnnotationProperty` sans en préciser l'identifiant, |
 |---|---|
-| **Alors** | l'application lui propose automatiquement un identifiant unique, sans conflit avec les `propriétés` déjà présentes dans l'`ontologie`. |
+| **Alors** | l'application lui propose automatiquement un identifiant unique, sans conflit avec les `AnnotationProperties` déjà présentes dans l'`ontologie`. |
 
 ---
 
@@ -84,9 +84,9 @@
 
 ### REQ-AP-005 — Création d'une propriété enfant (sub-property)
 
-| **Si** | l'ontologiste souhaite spécialiser une `AnnotationProperty` existante en créant une sous-`propriété` directement positionnée sous celle-ci, |
+| **Si** | l'ontologiste souhaite spécialiser une `AnnotationProperty` existante en créant une sous-`AnnotationProperty` directement positionnée sous celle-ci, |
 |---|---|
-| **Alors** | la nouvelle `propriété` est automatiquement rattachée au parent sélectionné, le parent est déplié dans l'arbre, et la nouvelle `propriété` est immédiatement sélectionnée pour édition. |
+| **Alors** | la nouvelle `AnnotationProperty` est automatiquement rattachée au parent sélectionné, le parent est déplié dans l'arbre, et la nouvelle `AnnotationProperty` est immédiatement sélectionnée pour édition. |
 
 ---
 
@@ -94,9 +94,9 @@
 
 ### REQ-AP-006 — Création d'une propriété sœur (même niveau)
 
-| **Si** | l'ontologiste souhaite créer une nouvelle `AnnotationProperty` au même niveau hiérarchique qu'une `propriété` existante, |
+| **Si** | l'ontologiste souhaite créer une nouvelle `AnnotationProperty` au même niveau hiérarchique qu'une `AnnotationProperty` existante, |
 |---|---|
-| **Alors** | la nouvelle `propriété` hérite des mêmes parents que la `propriété` de référence, et ses parents sont dépliés dans l'arbre pour rendre la nouvelle `propriété` immédiatement visible. |
+| **Alors** | la nouvelle `AnnotationProperty` hérite des mêmes parents que la `AnnotationProperty` de référence, et ses parents sont dépliés dans l'arbre pour rendre la nouvelle `AnnotationProperty` immédiatement visible. |
 
 ---
 
@@ -106,7 +106,7 @@
 
 | **Si** | l'ontologiste a renseigné les champs d'une `AnnotationProperty` utilisateur et que l'application doit persister ces informations, |
 |---|---|
-| **Alors** | l'application consolide l'identifiant saisi, les relations de sous-`propriété` existantes et l'ensemble des annotations (labels, commentaires, autres) en une représentation cohérente prête à être sauvegardée. |
+| **Alors** | l'application consolide l'identifiant saisi, les relations de sous-`AnnotationProperty` existantes et l'ensemble des annotations (labels, commentaires, autres) en une représentation cohérente prête à être sauvegardée. |
 
 ---
 
@@ -136,7 +136,7 @@
 
 | **Si** | l'ontologiste souhaite déplacer une `AnnotationProperty` utilisateur dans la hiérarchie en la faisant glisser vers un autre emplacement de l'arbre, |
 |---|---|
-| **Alors** | la `propriété` déplacée est rattachée au nouveau parent cible, ou promue au rang de `propriété` racine si elle est déposée sur une racine de `namespace`, et ce changement est immédiatement persisté. |
+| **Alors** | la `AnnotationProperty` déplacée est rattachée au nouveau parent cible, ou promue au rang de `AnnotationProperty` racine si elle est déposée sur une racine de `namespace`, et ce changement est immédiatement persisté. |
 
 ---
 
@@ -146,7 +146,7 @@
 
 | **Si** | l'ontologiste tente de déplacer une `AnnotationProperty` vers l'un de ses propres descendants dans la hiérarchie, |
 |---|---|
-| **Alors** | l'application refuse ce déplacement afin de préserver la cohérence acyclique de la hiérarchie des sous-`propriétés`. |
+| **Alors** | l'application refuse ce déplacement afin de préserver la cohérence acyclique de la hiérarchie des sous-`AnnotationProperties`. |
 
 ---
 
@@ -156,7 +156,7 @@
 
 | **Si** | l'ontologiste souhaite supprimer définitivement une `AnnotationProperty` utilisateur, |
 |---|---|
-| **Alors** | l'application demande une confirmation explicite avant toute suppression, puis retire la `propriété` de l'`ontologie`, réinitialise la sélection et rafraîchit l'arbre. |
+| **Alors** | l'application demande une confirmation explicite avant toute suppression, puis retire la `AnnotationProperty` de l'`ontologie`, réinitialise la sélection et rafraîchit l'arbre. |
 
 ---
 
@@ -188,9 +188,9 @@
 
 ### REQ-AP-015 — Rendu des nœuds built-in dans l'arbre
 
-| **Si** | l'arbre des `AnnotationProperty` affiche une `propriété` intégrée OWL 2, |
+| **Si** | l'arbre des `AnnotationProperty` affiche une `AnnotationProperty` intégrée OWL 2, |
 |---|---|
-| **Alors** | cette `propriété` est présentée avec une indication visuelle de son statut non éditable, un contrôle d'expansion si elle possède des sous-`propriétés` utilisateur, et ses sous-`propriétés` éventuelles sont affichées en dessous. Elle peut recevoir des `propriétés` glissées mais ne peut pas elle-même être déplacée. |
+| **Alors** | cette `AnnotationProperty` est présentée avec une indication visuelle de son statut non éditable, un contrôle d'expansion si elle possède des sous-`AnnotationProperties` utilisateur, et ses sous-`AnnotationProperties` éventuelles sont affichées en dessous. Elle peut recevoir des `AnnotationProperties` glissées mais ne peut pas elle-même être déplacée. |
 
 ---
 
@@ -198,9 +198,9 @@
 
 ### REQ-AP-016 — Rendu des nœuds utilisateur dans l'arbre
 
-| **Si** | l'arbre des `AnnotationProperty` affiche une `propriété` définie par l'ontologiste, |
+| **Si** | l'arbre des `AnnotationProperty` affiche une `AnnotationProperty` définie par l'ontologiste, |
 |---|---|
-| **Alors** | cette `propriété` est visuellement indentée selon sa profondeur dans la hiérarchie, peut être glissée vers un autre emplacement, et ses sous-`propriétés` sont affichées en dessous lorsqu'elle est dépliée. |
+| **Alors** | cette `AnnotationProperty` est visuellement indentée selon sa profondeur dans la hiérarchie, peut être glissée vers un autre emplacement, et ses sous-`AnnotationProperties` sont affichées en dessous lorsqu'elle est dépliée. |
 
 ---
 
@@ -210,7 +210,7 @@
 
 | **Si** | l'onglet des `AnnotationProperty` est affiché pour une `ontologie` OWL standard, |
 |---|---|
-| **Alors** | l'arbre présente deux racines de `namespace` (`rdfs:` et `owl:`) regroupant les `propriétés` intégrées correspondantes, suivies des `propriétés` utilisateur organisées en sous-arbre. Les `propriétés` utilisateur sans rattachement connu à un `namespace` sont affichées à la racine de l'arbre. |
+| **Alors** | l'arbre présente deux racines de `namespace` (`rdfs:` et `owl:`) regroupant les `AnnotationProperties` intégrées correspondantes, suivies des `AnnotationProperties` utilisateur organisées en sous-arbre. Les `AnnotationProperties` utilisateur sans rattachement connu à un `namespace` sont affichées à la racine de l'arbre. |
 
 ---
 
@@ -220,7 +220,7 @@
 
 | **Si** | l'ontologiste ouvre l'onglet des `AnnotationProperty`, |
 |---|---|
-| **Alors** | l'interface présente un panneau gauche contenant l'arbre des `propriétés` et les actions disponibles, et un panneau droit affichant le détail de la `propriété` sélectionnée ou une invitation à en créer une nouvelle. Les actions de création sont désactivées tant qu'aucune `propriété` n'est sélectionnée. |
+| **Alors** | l'interface présente un panneau gauche contenant l'arbre des `AnnotationProperties` et les actions disponibles, et un panneau droit affichant le détail de la `AnnotationProperty` sélectionnée ou une invitation à en créer une nouvelle. Les actions de création sont désactivées tant qu'aucune `AnnotationProperty` n'est sélectionnée. |
 
 ---
 
@@ -248,9 +248,9 @@
 
 ### REQ-AP-021 — Sélection d'une propriété dans l'arbre
 
-| **Si** | l'ontologiste clique sur une `propriété` dans l'arbre des `AnnotationProperty`, |
+| **Si** | l'ontologiste clique sur une `AnnotationProperty` dans l'arbre des `AnnotationProperty`, |
 |---|---|
-| **Alors** | la `propriété` est mise en évidence visuellement, les actions disponibles sont mises à jour selon son type, et le panneau de détail affiche les informations correspondantes : description pour une racine de `namespace`, `vue` en lecture seule pour une `propriété` intégrée, formulaire d'édition pour une `propriété` utilisateur. |
+| **Alors** | la `AnnotationProperty` est mise en évidence visuellement, les actions disponibles sont mises à jour selon son type, et le panneau de détail affiche les informations correspondantes : description pour une racine de `namespace`, `vue` en lecture seule pour une `AnnotationProperty` intégrée, formulaire d'édition pour une `AnnotationProperty` utilisateur. |
 
 ---
 
@@ -260,7 +260,7 @@
 
 | **Si** | la sélection dans l'arbre des `AnnotationProperty` change, |
 |---|---|
-| **Alors** | les actions proposées s'adaptent au type de l'élément sélectionné : une racine de `namespace` ne propose aucune action, une `propriété` intégrée permet uniquement de créer une sous-`propriété`, et une `propriété` utilisateur autorise la création de sous-`propriété`, la création de `propriété` sœur et la suppression. |
+| **Alors** | les actions proposées s'adaptent au type de l'élément sélectionné : une racine de `namespace` ne propose aucune action, une `AnnotationProperty` intégrée permet uniquement de créer une sous-`AnnotationProperty`, et une `AnnotationProperty` utilisateur autorise la création de sous-`AnnotationProperty`, la création de `AnnotationProperty` sœur et la suppression. |
 
 ---
 
@@ -290,7 +290,7 @@
 
 | **Si** | l'ontologiste sélectionne une `AnnotationProperty` qu'il a définie, |
 |---|---|
-| **Alors** | le panneau de détail affiche un formulaire permettant de modifier l'identifiant local de la `propriété`, de consulter son IRI complète dans l'`ontologie`, et de gérer ses annotations (labels, commentaires, annotations personnalisées). |
+| **Alors** | le panneau de détail affiche un formulaire permettant de modifier l'identifiant local de la `AnnotationProperty`, de consulter son IRI complète dans l'`ontologie`, et de gérer ses annotations (labels, commentaires, annotations personnalisées). |
 
 ---
 
@@ -310,7 +310,7 @@
 
 | **Si** | l'ontologiste sélectionne une `AnnotationProperty` dans l'arbre, |
 |---|---|
-| **Alors** | le panneau des super-`propriétés` affiche, pour chaque parent direct, la chaîne complète d'héritage jusqu'à la racine de `namespace`, chaque ancêtre étant présenté avec une indentation croissante et constituant un lien de navigation vers cet ancêtre. |
+| **Alors** | le panneau des super-`AnnotationProperties` affiche, pour chaque parent direct, la chaîne complète d'héritage jusqu'à la racine de `namespace`, chaque ancêtre étant présenté avec une indentation croissante et constituant un lien de navigation vers cet ancêtre. |
 
 ---
 
