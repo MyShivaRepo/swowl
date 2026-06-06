@@ -33,7 +33,7 @@
 
 ### REQ-INF-001 — Inference retrieval via the API
 
-| **If** | the `ontologist` opens the `inference` panel, |
+| **If** | the ontologist opens the `inference` panel, |
 |---|---|
 | **Then** | the application retrieves from the reasoner the full set of computed results: consistency violations, hierarchy closure, inherited `restrictions`, inferred inverse `restrictions`, inferred types, symmetric assertions, transitive assertions, `property` chain assertions, and inverse `properties`. |
 
@@ -43,7 +43,7 @@
 
 ### REQ-INF-002 — Automatic panel refresh
 
-| **If** | the `ontologist` navigates to the `inferences` tab, |
+| **If** | the ontologist navigates to the `inferences` tab, |
 |---|---|
 | **Then** | the panel updates automatically on a regular basis, without any user intervention, so as to permanently reflect the current state of reasoning over the `ontology`. |
 
@@ -53,7 +53,7 @@
 
 ### REQ-INF-003 — Stopping automatic refresh
 
-| **If** | the `ontologist` leaves the `inferences` tab or a new refresh cycle is about to start, |
+| **If** | the ontologist leaves the `inferences` tab or a new refresh cycle is about to start, |
 |---|---|
 | **Then** | any ongoing automatic update is immediately stopped, leaving no residual active cycle running in the background. |
 
@@ -65,7 +65,7 @@
 
 | **If** | retrieving `inferences` from the reasoner fails, |
 |---|---|
-| **Then** | the `ontologist` is informed of the failure by an explicit error message displayed in the panel, and no partial or stale data is retained on screen. |
+| **Then** | the ontologist is informed of the failure by an explicit error message displayed in the panel, and no partial or stale data is retained on screen. |
 
 ---
 
@@ -81,7 +81,7 @@
 
 ### REQ-INF-004 — Displaying the ontology consistency status
 
-| **If** | the `ontologist` opens the `inference` panel, |
+| **If** | the ontologist opens the `inference` panel, |
 |---|---|
 | **Then** | the panel header clearly indicates whether the `ontology` is consistent, in error, or carrying warnings, with a distinct visual indicator for each severity level. |
 
@@ -103,7 +103,7 @@
 
 | **If** | the `ontology` contains `classes` organised in a hierarchy, |
 |---|---|
-| **Then** | the "Resolved hierarchy" section presents for each class the full set of its ancestors at every level, allowing the `ontologist` to visualise at a glance the entire specialisation chain without having to traverse the relations one by one manually. |
+| **Then** | the "Resolved hierarchy" section presents for each class the full set of its ancestors at every level, allowing the ontologist to visualise at a glance the entire specialisation chain without having to traverse the relations one by one manually. |
 
 ---
 
@@ -113,7 +113,7 @@
 
 | **If** | OWL `restrictions` have been defined on parent `classes` and propagated to their subclasses through the hierarchy, |
 |---|---|
-| **Then** | the "Inherited `restrictions`" section indicates for each subclass which `restrictions` it inherits, from which parent class they originate, and what they consist of, so that the `ontologist` understands the transitive impact of the hierarchy on `individual` constraints. |
+| **Then** | the "Inherited `restrictions`" section indicates for each subclass which `restrictions` it inherits, from which parent class they originate, and what they consist of, so that the ontologist understands the transitive impact of the hierarchy on `individual` constraints. |
 
 ---
 
@@ -181,7 +181,7 @@
 
 ### REQ-INF-014 — Manual inference recalculation button
 
-| **If** | the `ontologist` wishes to force an immediate update of the `inference` results without waiting for the next automatic cycle, |
+| **If** | the ontologist wishes to force an immediate update of the `inference` results without waiting for the next automatic cycle, |
 |---|---|
 | **Then** | they can trigger a full recalculation on demand, and the panel updates instantly with the latest results from the reasoner. |
 
@@ -191,7 +191,7 @@
 
 ### REQ-INF-015 — Collapsible sections for inference results
 
-| **If** | the `ontologist` wants to focus on a particular category of `inferences`, |
+| **If** | the ontologist wants to focus on a particular category of `inferences`, |
 |---|---|
 | **Then** | they can collapse or expand each results section individually by clicking on its title, and a visual indicator signals the current state (collapsed or expanded) of each section. |
 
