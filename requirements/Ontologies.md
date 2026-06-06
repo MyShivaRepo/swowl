@@ -43,9 +43,9 @@
 
 ### REQ-ONT-001 — Sorting ontologies in the registry
 
-| **If** | the ontology registry is consulted, |
+| **If** | the `ontology` registry is consulted, |
 |---|---|
-| **Then** | the user's ontologies appear first, sorted alphabetically, followed by the read-only W3C ontologies, presented in a logical dependency order (OWL, then RDFS, then RDF). |
+| **Then** | the user's `ontologies` appear first, sorted alphabetically, followed by the read-only W3C `ontologies`, presented in a logical dependency order (OWL, then RDFS, then RDF). |
 
 ---
 
@@ -53,9 +53,9 @@
 
 ### REQ-ONT-002 — Auto-selection of the connected ontology
 
-| **If** | the ontologist opens the `Ontologies` tab without having made a manual selection beforehand, |
+| **If** | the `ontologist` opens the `Ontologies` tab without having made a manual selection beforehand, |
 |---|---|
-| **Then** | the currently connected ontology is automatically highlighted in the registry, without any further action from the user. |
+| **Then** | the currently connected `ontology` is automatically highlighted in the registry, without any further action from the user. |
 
 ---
 
@@ -63,9 +63,9 @@
 
 ### REQ-ONT-003 — Creating a new ontology
 
-| **If** | the ontologist wishes to create a new ontology and fills in its name, storage directory, prefix, and namespace URI, |
+| **If** | the `ontologist` wishes to create a new `ontology` and fills in its name, storage directory, prefix, and `namespace` URI, |
 |---|---|
-| **Then** | the ontology is registered in the system; if the ontologist requests it, it is immediately connected; if any required field is missing, an error message is displayed and no registration is performed. |
+| **Then** | the `ontology` is registered in the system; if the `ontologist` requests it, it is immediately connected; if any required field is missing, an error message is displayed and no registration is performed. |
 
 ---
 
@@ -73,9 +73,9 @@
 
 ### REQ-ONT-004 — Importing an OWL/TTL ontology
 
-| **If** | the ontologist wishes to import an existing ontology from a source file (OWL, Turtle, or RDF format) and fills in the target name, destination directory, prefix, and URI, |
+| **If** | the `ontologist` wishes to import an existing `ontology` from a source file (OWL, Turtle, or RDF format) and fills in the target name, destination directory, prefix, and URI, |
 |---|---|
-| **Then** | the file is converted and registered in the system; if the ontologist does not request immediate connection, the ontology remains disconnected; if any of the five required fields is missing, the import is cancelled. |
+| **Then** | the file is converted and registered in the system; if the `ontologist` does not request immediate connection, the `ontology` remains disconnected; if any of the five required fields is missing, the import is cancelled. |
 
 ---
 
@@ -83,9 +83,9 @@
 
 ### REQ-ONT-005 — Automatic reading of prefix and URI from a source file
 
-| **If** | the ontologist selects a source file during an import and requests automatic reading of its metadata, |
+| **If** | the `ontologist` selects a source file during an import and requests automatic reading of its metadata, |
 |---|---|
-| **Then** | the prefix and namespace URI are extracted from the file and injected into the form; the ontology name is also suggested if the field is still empty. |
+| **Then** | the prefix and `namespace` URI are extracted from the file and injected into the form; the `ontology` name is also suggested if the field is still empty. |
 
 ---
 
@@ -93,9 +93,9 @@
 
 ### REQ-ONT-006 — Loading a JSON ontology
 
-| **If** | the ontologist wishes to register in the system an ontology already serialized in JSON format and fills in the source file, name, prefix, and URI, |
+| **If** | the `ontologist` wishes to register in the system an `ontology` already serialized in JSON format and fills in the source file, name, prefix, and URI, |
 |---|---|
-| **Then** | the ontology is registered in the registry; if the ontologist requests it, it is immediately connected; if the source file or name is missing, the loading is cancelled. |
+| **Then** | the `ontology` is registered in the registry; if the `ontologist` requests it, it is immediately connected; if the source file or name is missing, the loading is cancelled. |
 
 ---
 
@@ -103,9 +103,9 @@
 
 ### REQ-ONT-007 — Automatic reading of metadata from a JSON file
 
-| **If** | the ontologist selects a JSON file during loading and requests automatic reading of its metadata, |
+| **If** | the `ontologist` selects a JSON file during loading and requests automatic reading of its metadata, |
 |---|---|
-| **Then** | the name, prefix, and namespace URI are extracted from the file and injected into the form fields, replacing any previously entered values. |
+| **Then** | the name, prefix, and `namespace` URI are extracted from the file and injected into the form fields, replacing any previously entered values. |
 
 ---
 
@@ -113,7 +113,7 @@
 
 ### REQ-ONT-008 — Saving changes to an ontology
 
-| **If** | the ontologist modifies the attributes of an already registered ontology (name, directory, prefix, or namespace URI) and confirms the changes, |
+| **If** | the `ontologist` modifies the attributes of an already registered `ontology` (name, directory, prefix, or `namespace` URI) and confirms the changes, |
 |---|---|
 | **Then** | the registry is updated with the new values; if any required field is missing, the save is cancelled. |
 
@@ -123,13 +123,13 @@
 
 ### REQ-ONT-009 — Connecting and disconnecting an ontology
 
-| **If** | the ontologist requests connection of an ontology, |
+| **If** | the `ontologist` requests connection of an `ontology`, |
 |---|---|
-| **Then** | that ontology becomes the active working ontology, clearly identified in the registry, and the editing tabs become accessible. |
+| **Then** | that `ontology` becomes the active working `ontology`, clearly identified in the registry, and the editing tabs become accessible. |
 
-| **If** | the ontologist requests disconnection of the current ontology, |
+| **If** | the `ontologist` requests disconnection of the current `ontology`, |
 |---|---|
-| **Then** | no ontology is active and the editing tabs become inaccessible until a new connection is made. |
+| **Then** | no `ontology` is active and the editing tabs become inaccessible until a new connection is made. |
 
 ---
 
@@ -137,9 +137,9 @@
 
 ### REQ-ONT-010 — Unregistering an ontology
 
-| **If** | the ontologist wishes to remove an ontology from the registry and confirms the operation after being informed that the file on disk will not be deleted, |
+| **If** | the `ontologist` wishes to remove an `ontology` from the registry and confirms the operation after being informed that the file on disk will not be deleted, |
 |---|---|
-| **Then** | the ontology disappears from the registry without any physical file being deleted. |
+| **Then** | the `ontology` disappears from the registry without any physical file being deleted. |
 
 ---
 
@@ -147,9 +147,9 @@
 
 ### REQ-ONT-011 — Downloading built-in W3C ontologies
 
-| **If** | the ontologist wishes to have the W3C reference ontologies (RDF, RDFS, OWL) available in the local registry, |
+| **If** | the `ontologist` wishes to have the W3C reference `ontologies` (RDF, RDFS, OWL) available in the local registry, |
 |---|---|
-| **Then** | the system downloads and registers these ontologies from the official sources (`w3.org`) and informs the ontologist of the number of ontologies actually retrieved. |
+| **Then** | the system downloads and registers these `ontologies` from the official sources (`w3.org`) and informs the `ontologist` of the number of `ontologies` actually retrieved. |
 
 ---
 
@@ -157,9 +157,9 @@
 
 ### REQ-ONT-012 — Exporting an ontology by name (OWL/TTL/SWRL/SWORD)
 
-| **If** | the ontologist selects an ontology from the registry and chooses an export format from the available semantic formats, |
+| **If** | the `ontologist` selects an `ontology` from the registry and chooses an export format from the available semantic formats, |
 |---|---|
-| **Then** | the corresponding file is generated and offered for download with a filename reflecting the ontology name and the chosen format. |
+| **Then** | the corresponding file is generated and offered for download with a filename reflecting the `ontology` name and the chosen format. |
 
 ---
 
@@ -167,7 +167,7 @@
 
 ### REQ-ONT-013 — Exporting the currently connected ontology
 
-| **If** | the ontologist wishes to export the ontology they are currently working on by choosing a format, |
+| **If** | the `ontologist` wishes to export the `ontology` they are currently working on by choosing a format, |
 |---|---|
 | **Then** | the file is generated and offered for download under a generic name associated with the chosen format. |
 
@@ -177,9 +177,9 @@
 
 ### REQ-ONT-014 — Blocking editing tabs when no ontology is connected
 
-| **If** | the ontologist attempts to access an editing tab while no ontology is connected, |
+| **If** | the `ontologist` attempts to access an editing tab while no `ontology` is connected, |
 |---|---|
-| **Then** | access is denied and a message guides the ontologist to the `Ontologies` tab to connect one. |
+| **Then** | access is denied and a message guides the `ontologist` to the `Ontologies` tab to connect one. |
 
 ---
 
@@ -187,13 +187,13 @@
 
 ### REQ-ONT-015 — Computing virtual roots based on the ontology prefix
 
-| **If** | the ontologist is working on a low-level ontology (RDF or RDFS), |
+| **If** | the `ontologist` is working on a low-level `ontology` (RDF or RDFS), |
 |---|---|
-| **Then** | the class and property trees are rooted at `rdfs:Resource` and `rdf:Property` respectively, in accordance with the semantics of those vocabularies. |
+| **Then** | the class and `property` trees are rooted at `rdfs:Resource` and `rdf:Property` respectively, in accordance with the semantics of those vocabularies. |
 
-| **If** | the ontologist is working on any other ontology (or no ontology is connected), |
+| **If** | the `ontologist` is working on any other `ontology` (or no `ontology` is connected), |
 |---|---|
-| **Then** | the class and property trees are rooted at `owl:Thing` and `owl:topObjectProperty` respectively, in accordance with OWL conventions. |
+| **Then** | the class and `property` trees are rooted at `owl:Thing` and `owl:topObjectProperty` respectively, in accordance with OWL conventions. |
 
 ---
 
@@ -201,9 +201,9 @@
 
 ### REQ-ONT-016 — Implicit OWL import for user ontologies
 
-| **If** | a user ontology declares no explicit imports, |
+| **If** | a user `ontology` declares no explicit imports, |
 |---|---|
-| **Then** | the import tree automatically assigns it the reference OWL ontology (`http://www.w3.org/2002/07/owl#`), reflecting the implicit import inherent to any OWL ontology. |
+| **Then** | the import tree automatically assigns it the reference OWL `ontology` (`http://www.w3.org/2002/07/owl#`), reflecting the implicit import inherent to any OWL `ontology`. |
 
 ---
 
@@ -217,9 +217,9 @@
 
 ### REQ-ONT-017 — Displaying the Ontologies tab
 
-| **If** | the ontologist navigates to the `Ontologies` tab, |
+| **If** | the `ontologist` navigates to the `Ontologies` tab, |
 |---|---|
-| **Then** | the page displays a header, the available actions (create, import, load, download W3C ontologies), an initially hidden assisted input panel, and the registry table with columns Name, Directory, Prefix, and Namespace. |
+| **Then** | the page displays a header, the available actions (create, import, load, download W3C `ontologies`), an initially hidden assisted input panel, and the registry table with columns Name, Directory, Prefix, and `Namespace`. |
 
 ---
 
@@ -229,7 +229,7 @@
 
 | **If** | the `Ontologies` tab is displayed, |
 |---|---|
-| **Then** | the list of all registered ontologies is loaded and displayed in the table; if loading fails, an error message is displayed in place of the table. |
+| **Then** | the list of all registered `ontologies` is loaded and displayed in the table; if loading fails, an error message is displayed in place of the table. |
 
 ---
 
@@ -237,7 +237,7 @@
 
 ### REQ-ONT-019 — Selecting a registry row
 
-| **If** | the ontologist clicks on an ontology in the registry table, |
+| **If** | the `ontologist` clicks on an `ontology` in the registry table, |
 |---|---|
 | **Then** | the selected row is visually highlighted and any previous selection is cleared. |
 
@@ -249,7 +249,7 @@
 
 | **If** | the registry is loaded, |
 |---|---|
-| **Then** | the total number of registered ontologies is displayed, with a label correctly inflected in the singular or plural. |
+| **Then** | the total number of registered `ontologies` is displayed, with a label correctly inflected in the singular or plural. |
 
 ---
 
@@ -257,7 +257,7 @@
 
 ### REQ-ONT-021 — Editing the attributes of an existing ontology
 
-| **If** | the ontologist wishes to modify the attributes of an already registered ontology, |
+| **If** | the `ontologist` wishes to modify the attributes of an already registered `ontology`, |
 |---|---|
 | **Then** | a form pre-filled with the current values (name, directory, prefix, URI) opens to allow them to make changes, and the directory can be selected via a file browser. |
 
@@ -267,9 +267,9 @@
 
 ### REQ-ONT-022 — Export format selection dropdown
 
-| **If** | the ontologist wishes to export an ontology or a set of rules and clicks the export button, |
+| **If** | the `ontologist` wishes to export an `ontology` or a set of rules and clicks the export button, |
 |---|---|
-| **Then** | a context menu presents the available formats depending on the type of content to export (OWL and Turtle formats for an ontology; SWRL and SWORD formats for rules); clicking outside the menu closes it. |
+| **Then** | a context menu presents the available formats depending on the type of content to export (OWL and Turtle formats for an `ontology`; SWRL and SWORD formats for rules); clicking outside the menu closes it. |
 
 ---
 
@@ -277,9 +277,9 @@
 
 ### REQ-ONT-023 — Displaying the import tree with expand/collapse
 
-| **If** | the registry is displayed and an ontology declares imports, |
+| **If** | the registry is displayed and an `ontology` declares imports, |
 |---|---|
-| **Then** | the imported ontologies are displayed as indented sub-rows; if an import itself has sub-imports, the ontologist can expand or collapse that tree node; import cycles are detected and do not cause an infinite loop. |
+| **Then** | the imported `ontologies` are displayed as indented sub-rows; if an import itself has sub-imports, the `ontologist` can expand or collapse that tree node; import cycles are detected and do not cause an infinite loop. |
 
 ---
 
@@ -287,9 +287,9 @@
 
 ### REQ-ONT-024 — Navigating to a registry entry from the import tree
 
-| **If** | the ontologist clicks on the name of an ontology in the import tree, |
+| **If** | the `ontologist` clicks on the name of an `ontology` in the import tree, |
 |---|---|
-| **Then** | the corresponding row in the registry table is visually highlighted and scrolled into view, so the ontologist can locate it easily. |
+| **Then** | the corresponding row in the registry table is visually highlighted and scrolled into `view`, so the `ontologist` can locate it easily. |
 
 ---
 
@@ -297,9 +297,9 @@
 
 ### REQ-ONT-025 — Opening the directory in Finder
 
-| **If** | the ontologist clicks on the directory of an ontology in the table, |
+| **If** | the `ontologist` clicks on the directory of an `ontology` in the table, |
 |---|---|
-| **Then** | the storage directory of that ontology is opened in the system file manager; if this action fails, a warning message is displayed. |
+| **Then** | the storage directory of that `ontology` is opened in the system file manager; if this action fails, a warning message is displayed. |
 
 ---
 
@@ -307,13 +307,13 @@
 
 ### REQ-ONT-026 — Toggleable wizard panel (open/close)
 
-| **If** | the ontologist clicks an action button and the assisted input panel is already showing the form corresponding to that action, |
+| **If** | the `ontologist` clicks an action button and the assisted input panel is already showing the form corresponding to that action, |
 |---|---|
 | **Then** | the panel closes (toggle behavior). |
 
-| **If** | the ontologist clicks an action button and the panel is showing a different form or is closed, |
+| **If** | the `ontologist` clicks an action button and the panel is showing a different form or is closed, |
 |---|---|
-| **Then** | the panel opens and displays the form corresponding to the requested action (create, import, or load an ontology). |
+| **Then** | the panel opens and displays the form corresponding to the requested action (create, import, or load an `ontology`). |
 
 ---
 
