@@ -44,7 +44,7 @@
 
 ### REQ-AP-001 — Definition of built-in annotation properties
 
-| **If** | the `ontologist` uses standard OWL 2 `annotation properties` in their `ontology`, |
+| **If** | the ontologist uses standard OWL 2 `annotation properties` in their `ontology`, |
 |---|---|
 | **Then** | the application natively recognizes two groups of predefined read-only `annotation properties`:<br>- the `rdfs:` group: `rdfs:label`, `rdfs:comment`, `rdfs:seeAlso`, `rdfs:isDefinedBy`<br>- the `owl:` group: `owl:versionInfo`, `owl:deprecated`, `owl:priorVersion`, `owl:backwardCompatibleWith`, `owl:incompatibleWith`<br>each accompanied by an English description accessible to the user. |
 
@@ -54,7 +54,7 @@
 
 ### REQ-AP-002 — Detection of built-in vs. user-defined properties
 
-| **If** | the application must distinguish a standard OWL 2 `annotation property` from a `property` defined by the `ontologist`, |
+| **If** | the application must distinguish a standard OWL 2 `annotation property` from a `property` defined by the ontologist, |
 |---|---|
 | **Then** | it correctly identifies any `property` belonging to the `rdfs:` or `owl:` groups as a built-in `property`, and treats all others as editable user `properties`. |
 
@@ -74,7 +74,7 @@
 
 ### REQ-AP-004 — Automatic generation of a unique identifier
 
-| **If** | the `ontologist` creates a new `annotation property` without specifying its identifier, |
+| **If** | the ontologist creates a new `annotation property` without specifying its identifier, |
 |---|---|
 | **Then** | the application automatically proposes a unique identifier, with no conflict with the `properties` already present in the `ontology`. |
 
@@ -84,7 +84,7 @@
 
 ### REQ-AP-005 — Creation of a child property (sub-property)
 
-| **If** | the `ontologist` wishes to specialize an existing `annotation property` by creating a subproperty directly positioned beneath it, |
+| **If** | the ontologist wishes to specialize an existing `annotation property` by creating a subproperty directly positioned beneath it, |
 |---|---|
 | **Then** | the new `property` is automatically attached to the selected parent, the parent is expanded in the tree, and the new `property` is immediately selected for editing. |
 
@@ -94,7 +94,7 @@
 
 ### REQ-AP-006 — Creation of a sibling property (same level)
 
-| **If** | the `ontologist` wishes to create a new `annotation property` at the same hierarchical level as an existing `property`, |
+| **If** | the ontologist wishes to create a new `annotation property` at the same hierarchical level as an existing `property`, |
 |---|---|
 | **Then** | the new `property` inherits the same parents as the reference `property`, and its parents are expanded in the tree to make the new `property` immediately visible. |
 
@@ -104,7 +104,7 @@
 
 ### REQ-AP-007 — Collection of form data
 
-| **If** | the `ontologist` has filled in the fields of a user `annotation property` and the application must persist this information, |
+| **If** | the ontologist has filled in the fields of a user `annotation property` and the application must persist this information, |
 |---|---|
 | **Then** | the application consolidates the entered identifier, the existing subproperty relationships, and all annotations (labels, comments, others) into a coherent representation ready to be saved. |
 
@@ -114,7 +114,7 @@
 
 ### REQ-AP-008 — Automatic save on every modification
 
-| **If** | the `ontologist` modifies a field in the form of a user `annotation property`, |
+| **If** | the ontologist modifies a field in the form of a user `annotation property`, |
 |---|---|
 | **Then** | modifications are persisted immediately and automatically, without any additional action from the user, and the display remains synchronized with the saved state. |
 
@@ -124,7 +124,7 @@
 
 ### REQ-AP-009 — Explicit manual save
 
-| **If** | the `ontologist` explicitly triggers the save of a user `annotation property`, |
+| **If** | the ontologist explicitly triggers the save of a user `annotation property`, |
 |---|---|
 | **Then** | the application validates the identifier, persists the modifications, updates the current selection to reflect a possible rename, and refreshes the tree display. |
 
@@ -134,7 +134,7 @@
 
 ### REQ-AP-010 — Drag-and-drop to reorganize the hierarchy
 
-| **If** | the `ontologist` wishes to move a user `annotation property` within the hierarchy by dragging it to another location in the tree, |
+| **If** | the ontologist wishes to move a user `annotation property` within the hierarchy by dragging it to another location in the tree, |
 |---|---|
 | **Then** | the moved `property` is attached to the new target parent, or promoted to root `property` if dropped onto a `namespace` root, and this change is immediately persisted. |
 
@@ -144,7 +144,7 @@
 
 ### REQ-AP-011 — Cycle prevention during drag-and-drop
 
-| **If** | the `ontologist` attempts to move an `annotation property` onto one of its own descendants in the hierarchy, |
+| **If** | the ontologist attempts to move an `annotation property` onto one of its own descendants in the hierarchy, |
 |---|---|
 | **Then** | the application rejects this move in order to preserve the acyclic consistency of the subproperty hierarchy. |
 
@@ -154,7 +154,7 @@
 
 ### REQ-AP-012 — Deletion of a user property with confirmation
 
-| **If** | the `ontologist` wishes to permanently delete a user `annotation property`, |
+| **If** | the ontologist wishes to permanently delete a user `annotation property`, |
 |---|---|
 | **Then** | the application requests explicit confirmation before any deletion, then removes the `property` from the `ontology`, resets the selection and refreshes the tree. |
 
@@ -164,7 +164,7 @@
 
 ### REQ-AP-013 — Collection of annotations (labels, comments, others)
 
-| **If** | the `ontologist` has entered textual annotations (labels, comments, or custom annotations) on an `annotation property`, |
+| **If** | the ontologist has entered textual annotations (labels, comments, or custom annotations) on an `annotation property`, |
 |---|---|
 | **Then** | the application groups these annotations by category (labels, comments, other `annotation properties`), preserving for each one the value, the language, and, for custom annotations, the `annotation property` used. |
 
@@ -174,7 +174,7 @@
 
 ### REQ-AP-014 — Annotation property selection picker
 
-| **If** | the `ontologist` wishes to add an annotation using a specific `annotation property`, |
+| **If** | the ontologist wishes to add an annotation using a specific `annotation property`, |
 |---|---|
 | **Then** | the application offers a visual selector listing all available `annotation properties` — built-in and user-defined — organized hierarchically and navigable by a simple click. |
 
@@ -198,7 +198,7 @@
 
 ### REQ-AP-016 — Rendering of user nodes in the tree
 
-| **If** | the `annotation property` tree displays a `property` defined by the `ontologist`, |
+| **If** | the `annotation property` tree displays a `property` defined by the ontologist, |
 |---|---|
 | **Then** | this `property` is visually indented according to its depth in the hierarchy, can be dragged to another location, and its subproperties are displayed beneath it when it is expanded. |
 
@@ -218,7 +218,7 @@
 
 ### REQ-AP-018 — Split pane layout
 
-| **If** | the `ontologist` opens the `annotation properties` tab, |
+| **If** | the ontologist opens the `annotation properties` tab, |
 |---|---|
 | **Then** | the interface presents a left panel containing the `property` tree and available actions, and a right panel displaying the detail of the selected `property` or an invitation to create a new one. Creation actions are disabled as long as no `property` is selected. |
 
@@ -228,7 +228,7 @@
 
 ### REQ-AP-019 — Left panel resizing by drag-and-drop
 
-| **If** | the `ontologist` wishes to adjust the width of the navigation panel relative to the detail panel, |
+| **If** | the ontologist wishes to adjust the width of the navigation panel relative to the detail panel, |
 |---|---|
 | **Then** | they can drag the divider between the two panels to freely resize the left panel, within the minimum and maximum limits defined by the interface. |
 
@@ -238,7 +238,7 @@
 
 ### REQ-AP-020 — Expanding/collapsing tree nodes
 
-| **If** | the `ontologist` clicks the expansion indicator of a tree node, |
+| **If** | the ontologist clicks the expansion indicator of a tree node, |
 |---|---|
 | **Then** | the node toggles between expanded and collapsed states, and the tree redraws immediately to reflect this change. The `rdfs:` and `owl:` `namespace` roots are expanded by default when the tab is opened. |
 
@@ -248,7 +248,7 @@
 
 ### REQ-AP-021 — Selection of a property in the tree
 
-| **If** | the `ontologist` clicks on a `property` in the `annotation property` tree, |
+| **If** | the ontologist clicks on a `property` in the `annotation property` tree, |
 |---|---|
 | **Then** | the `property` is highlighted visually, the available actions are updated according to its type, and the detail panel displays the corresponding information: description for a `namespace` root, read-only `view` for a built-in `property`, edit form for a user-defined `property`. |
 
@@ -268,7 +268,7 @@
 
 ### REQ-AP-023 — Detail display of a namespace root
 
-| **If** | the `ontologist` selects a `namespace` root in the tree, |
+| **If** | the ontologist selects a `namespace` root in the tree, |
 |---|---|
 | **Then** | the detail panel presents in read-only mode all the built-in `annotation properties` belonging to that `namespace`, with their identifier and description, and clearly indicates that the `namespace` root is not itself an `annotation property`. |
 
@@ -278,7 +278,7 @@
 
 ### REQ-AP-024 — Detail display of a built-in property (read-only)
 
-| **If** | the `ontologist` selects an OWL 2 built-in `annotation property` in the tree, |
+| **If** | the ontologist selects an OWL 2 built-in `annotation property` in the tree, |
 |---|---|
 | **Then** | the detail panel presents its identifier and normative description in read-only mode, explicitly indicating that it cannot be modified. |
 
@@ -288,7 +288,7 @@
 
 ### REQ-AP-025 — Edit form for a user-defined property
 
-| **If** | the `ontologist` selects an `annotation property` they have defined, |
+| **If** | the ontologist selects an `annotation property` they have defined, |
 |---|---|
 | **Then** | the detail panel displays a form allowing modification of the local identifier of the `property`, consultation of its full IRI in the `ontology`, and management of its annotations (labels, comments, custom annotations). |
 
@@ -298,7 +298,7 @@
 
 ### REQ-AP-026 — Adding an annotation row in the form
 
-| **If** | the `ontologist` wishes to add an annotation (label, comment, or custom annotation) to a user-defined `annotation property`, |
+| **If** | the ontologist wishes to add an annotation (label, comment, or custom annotation) to a user-defined `annotation property`, |
 |---|---|
 | **Then** | a new empty row is inserted in the form to enter the value, the language, and, for custom annotations, the `annotation property` to use. |
 
@@ -308,7 +308,7 @@
 
 ### REQ-AP-027 — Super-properties panel with inheritance chain
 
-| **If** | the `ontologist` selects an `annotation property` in the tree, |
+| **If** | the ontologist selects an `annotation property` in the tree, |
 |---|---|
 | **Then** | the super-`properties` panel displays, for each direct parent, the complete inheritance chain up to the `namespace` root, each ancestor being presented with increasing indentation and constituting a navigation link to that ancestor. |
 
