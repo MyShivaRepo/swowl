@@ -52,197 +52,201 @@
 
 ### REQ-SWR-005 — Recherche/filtrage des règles
 
-| **Si** | l'utilisateur saisit une requête textuelle dans le champ de recherche (`#swrl-search`), |
+| **Si** | l'ontologiste souhaite retrouver une règle SWRL en saisissant un terme dans le champ de recherche, |
 |---|---|
-| **Alors** | le système filtre la liste des règles en effectuant une correspondance insensible à la casse sur les champs `id`, `label` et `comment` de chaque règle, ainsi que sur les champs `class_id`, `property_id`, `var`, `subject`, `object` et `value` de chaque atome du corps (`body`) et de la tête (`head`). |
+| **Alors** | seules les règles dont l'identifiant, le libellé, le commentaire ou les termes des atomes (classes, propriétés, variables, sujets, objets, valeurs) correspondent au terme saisi — sans distinction de casse — sont présentées. |
 
 ---
 
-**Code source :** `swrl_editor.js` → `_filterRules()`
+**Code source :** `swrl_editor.js` → `_filterRules()` — Parcourt `APP.state.swrl_rules` et teste, insensiblement à la casse, les champs `id`, `label`, `comment` de chaque règle ainsi que les champs `class_id`, `property_id`, `var`, `subject`, `object` et `value` de chaque atome des listes `body` et `head`.
 
 ### REQ-SWR-007 — Sélection d'une règle existante
 
-| **Si** | l'utilisateur clique sur une règle dans la liste, |
+| **Si** | l'ontologiste sélectionne une règle dans la liste, |
 |---|---|
-| **Alors** | - le système récupère la règle correspondante dans `APP.state.swrl_rules` et en effectue une copie profonde (`JSON.parse(JSON.stringify(rule))`)<br>- la copie est affectée à `_editingRule`<br>- le formulaire d'édition est rendu dans le panneau droit<br>- la classe CSS `selected` est appliquée à l'élément de liste correspondant |
+| **Alors** | le contenu de la règle est chargé dans le formulaire d'édition, prêt à être modifié, sans affecter les données persistées tant qu'aucune sauvegarde n'est déclenchée. |
 
 ---
 
-**Code source :** `swrl_editor.js` → `selectRule()`
+**Code source :** `swrl_editor.js` → `selectRule()` — Récupère la règle dans `APP.state.swrl_rules`, en effectue une copie profonde via `JSON.parse(JSON.stringify(rule))`, l'affecte à `_editingRule`, rend le formulaire dans le panneau droit et applique la classe CSS `selected` à l'entrée de liste correspondante.
 
 ### REQ-SWR-008 — Création d'une nouvelle règle
 
-| **Si** | l'utilisateur clique sur le bouton ➕, |
+| **Si** | l'ontologiste souhaite créer une nouvelle règle SWRL, |
 |---|---|
-| **Alors** | - le système génère un identifiant unique<br>- une règle vide est créée (`body: [], head: [], enabled: true`)<br>- la règle est envoyée via `API.createSWRLRule()`<br>- l'état de l'application est rafraîchi et la liste est mise à jour<br>- le formulaire d'édition de la nouvelle règle est affiché et la règle est sélectionnée |
+| **Alors** | une règle vide est immédiatement créée avec un identifiant unique, persistée dans l'ontologie, et son formulaire d'édition est ouvert pour permettre la saisie sans délai. |
 
 ---
 
-**Code source :** `swrl_editor.js` → `newRule()`
+**Code source :** `swrl_editor.js` → `newRule()` — Génère un identifiant via `_generateRuleName()`, crée un objet `{body: [], head: [], enabled: true}`, appelle `API.createSWRLRule()`, rafraîchit `APP.state`, met à jour la liste et sélectionne la nouvelle règle via `selectRule()`.
 
 ### REQ-SWR-009 — Génération automatique d'un identifiant unique
 
-| **Si** | le système doit générer un identifiant pour une nouvelle règle, |
+| **Si** | le système doit attribuer un identifiant à une nouvelle règle SWRL, |
 |---|---|
-| **Alors** | il part de la valeur `NewRule`, puis tente successivement `NewRule1`, `NewRule2`, etc., jusqu'à trouver un identifiant absent de `APP.state.swrl_rules`. |
+| **Alors** | l'identifiant généré est garanti unique parmi toutes les règles existantes de l'ontologie. |
 
 ---
 
-**Code source :** `swrl_editor.js` → `_generateRuleName()`
+**Code source :** `swrl_editor.js` → `_generateRuleName()` — Part de la valeur `NewRule`, puis tente successivement `NewRule1`, `NewRule2`, etc., jusqu'à trouver une valeur absente de `APP.state.swrl_rules`.
 
 ### REQ-SWR-011 — Synchronisation des métadonnées depuis le DOM
 
-| **Si** | le système déclenche une synchronisation des métadonnées, |
+| **Si** | le système collecte les métadonnées saisies par l'ontologiste avant une sauvegarde, |
 |---|---|
-| **Alors** | il lit les valeurs des champs `#swrl-id`, `#swrl-label` et `#swrl-comment` depuis le DOM, les écrit dans `_editingRule`, et remplace les espaces dans l'identifiant par `_`. |
+| **Alors** | l'identifiant, le libellé et le commentaire de la règle sont lus depuis les champs de saisie et mis à jour dans la règle en cours d'édition ; les espaces dans l'identifiant sont automatiquement remplacés par des tirets bas. |
 
 ---
 
-**Code source :** `swrl_editor.js` → `_syncFromDom()`
+**Code source :** `swrl_editor.js` → `_syncFromDom()` — Lit les valeurs des champs `#swrl-id`, `#swrl-label` et `#swrl-comment` depuis le DOM, les écrit dans `_editingRule`, et remplace les espaces dans l'identifiant par `_`.
 
 ### REQ-SWR-012 — Sauvegarde automatique lors de la modification des métadonnées
 
-| **Si** | l'utilisateur déclenche un événement `onchange` sur les champs `ID`, `Label` ou `Comment` **et** que la règle en cours d'édition n'est pas nouvelle, |
+| **Si** | l'ontologiste modifie l'identifiant, le libellé ou le commentaire d'une règle déjà existante et quitte le champ, |
 |---|---|
-| **Alors** | le système synchronise les métadonnées depuis le DOM via `_syncFromDom()` puis déclenche automatiquement une sauvegarde via `save(false)`. |
+| **Alors** | les modifications sont automatiquement persistées sans action supplémentaire de sa part. |
 
 ---
 
-**Code source :** `swrl_editor.js` → `_syncAndSave()`
+**Code source :** `swrl_editor.js` → `_syncAndSave()` — Déclenché par l'événement `onchange` sur les champs ID, Label ou Comment ; appelle `_syncFromDom()` puis `save(false)` uniquement si la règle n'est pas nouvelle.
 
 ### REQ-SWR-013 — Sauvegarde d'une règle (création ou mise à jour)
 
-| **Si** | le système doit enregistrer la règle en cours d'édition, |
+| **Si** | le système doit persister la règle en cours d'édition, |
 |---|---|
-| **Alors** | - si la règle est nouvelle, il appelle `API.createSWRLRule()`<br>- sinon, il appelle `API.updateSWRLRule(originalId, rule)`<br>- après la sauvegarde, l'état de l'application est rafraîchi et la liste est mise à jour<br>- en cas d'erreur, un message est affiché via `UI.error()` |
+| **Alors** | la règle est créée ou mise à jour dans l'ontologie selon qu'elle est nouvelle ou existante ; en cas d'échec, l'ontologiste est informé par un message d'erreur explicite. |
 
 ---
 
-**Code source :** `swrl_editor.js` → `save()`
+**Code source :** `swrl_editor.js` → `save()` — Appelle `API.createSWRLRule()` pour une nouvelle règle ou `API.updateSWRLRule(originalId, rule)` pour une règle existante ; rafraîchit `APP.state` et la liste après succès ; affiche une erreur via `UI.error()` en cas d'échec.
 
 ### REQ-SWR-014 — Renommage d'une règle existante
 
-| **Si** | le système enregistre une mise à jour **et** que l'identifiant courant de la règle (`rule.id`) diffère de l'identifiant original (`_editingId`), |
+| **Si** | l'ontologiste modifie l'identifiant d'une règle existante et sauvegarde, |
 |---|---|
-| **Alors** | le système appelle `API.updateSWRLRule(originalId, rule)` avec l'ancien identifiant et affiche un message de succès indiquant le nouveau nom. |
+| **Alors** | la règle est renommée dans l'ontologie et l'ontologiste reçoit une confirmation indiquant le nouveau nom. |
 
 ---
 
-**Code source :** `swrl_editor.js` → `save()`
+**Code source :** `swrl_editor.js` → `save()` — Détecte que `rule.id` diffère de `_editingId` et appelle `API.updateSWRLRule(originalId, rule)` avec l'ancien identifiant, puis affiche un message de succès mentionnant le nouveau nom.
 
 ### REQ-SWR-015 — Suppression d'une règle
 
-| **Si** | l'utilisateur demande la suppression d'une règle **et** qu'il confirme la demande, |
+| **Si** | l'ontologiste demande la suppression d'une règle et confirme son intention, |
 |---|---|
-| **Alors** | - le système appelle `API.deleteSWRLRule(id)` (une erreur 404 est ignorée)<br>- la sélection et la règle en cours d'édition sont réinitialisées<br>- l'état de l'application est rafraîchi et la liste est mise à jour<br>- le panneau de détail est vidé |
+| **Alors** | la règle est définitivement retirée de l'ontologie, la sélection est réinitialisée et le panneau d'édition est vidé. |
 
 ---
 
-**Code source :** `swrl_editor.js` → `delete()`
+**Code source :** `swrl_editor.js` → `delete()` — Appelle `API.deleteSWRLRule(id)` (une erreur 404 est ignorée), réinitialise `_editingRule` et `_editingId`, rafraîchit `APP.state`, met à jour la liste et vide le panneau de détail.
 
 ### REQ-SWR-016 — Ajout d'un atome dans une section
 
-| **Si** | l'utilisateur ajoute un atome d'un type donné dans une section (`body`, `head`, ou un sous-chemin d'atome imbriqué), |
+| **Si** | l'ontologiste souhaite ajouter un atome dans la prémisse ou la conclusion d'une règle, |
 |---|---|
-| **Alors** | - le système crée un nouvel atome via `_makeAtom()` et l'ajoute à la liste désignée par le chemin<br>- le formulaire est re-rendu<br>- si la règle n'est pas nouvelle, une sauvegarde automatique est déclenchée |
+| **Alors** | un atome du type choisi est inséré dans la section concernée, le formulaire est immédiatement mis à jour et la règle est automatiquement sauvegardée si elle existe déjà. |
 
 ---
 
-**Code source :** `swrl_editor.js` → `addAtom()`
+**Code source :** `swrl_editor.js` → `addAtom()` — Crée un atome via `_makeAtom()`, l'insère dans la liste désignée par le chemin (sous-chemin de `_editingRule` correspondant à `body`, `head` ou un atome imbriqué), re-rend le formulaire et déclenche `save(false)` si la règle n'est pas nouvelle.
 
 ### REQ-SWR-017 — Suppression d'un atome
 
-| **Si** | l'utilisateur supprime un atome désigné par son chemin, |
+| **Si** | l'ontologiste supprime un atome d'une règle, |
 |---|---|
-| **Alors** | - le système résout le chemin dans `_editingRule` et supprime l'atome<br>- le formulaire est re-rendu<br>- si la règle n'est pas nouvelle, une sauvegarde automatique est déclenchée |
+| **Alors** | l'atome est retiré de la section concernée, le formulaire est mis à jour et la règle est automatiquement sauvegardée si elle existe déjà. |
 
 ---
 
-**Code source :** `swrl_editor.js` → `removeAtom()`
+**Code source :** `swrl_editor.js` → `removeAtom()` — Résout le chemin de l'atome dans `_editingRule` via la notation pointée, supprime l'élément par `splice()`, re-rend le formulaire et déclenche `save(false)` si la règle n'est pas nouvelle.
 
 ### REQ-SWR-018 — Modification d'un champ d'atome
 
-| **Si** | l'utilisateur modifie la valeur d'un champ (`var`, `subject`, `object`, `value`, `operator`, etc.) d'un atome désigné par son chemin, |
+| **Si** | l'ontologiste modifie la valeur d'un champ d'un atome (variable, sujet, objet, valeur littérale, opérateur, etc.), |
 |---|---|
-| **Alors** | le système met à jour la valeur correspondante dans `_editingRule` et déclenche une sauvegarde automatique si la règle n'est pas nouvelle. |
+| **Alors** | la modification est prise en compte dans la règle et automatiquement sauvegardée si la règle existe déjà. |
 
 ---
 
-**Code source :** `swrl_editor.js` → `updateField()`
+**Code source :** `swrl_editor.js` → `updateField()` — Résout le chemin du champ dans `_editingRule`, met à jour la valeur, puis appelle `save(false)` si la règle n'est pas nouvelle.
 
 ### REQ-SWR-025 — Sélection d'une classe dans le picker
 
-| **Si** | l'utilisateur sélectionne une classe dans le picker de classe, |
+| **Si** | l'ontologiste choisit une classe dans le sélecteur de classe d'un atome, |
 |---|---|
-| **Alors** | - le système met à jour le champ `class_id` de l'atome désigné par `_currentPickerPath`<br>- tous les pickers de classe ouverts sont fermés<br>- le formulaire est re-rendu<br>- une sauvegarde automatique est déclenchée |
+| **Alors** | la classe sélectionnée est associée à l'atome concerné, le sélecteur se ferme, le formulaire est mis à jour et la règle est automatiquement sauvegardée. |
 
 ---
 
-**Code source :** `swrl_editor.js` → `onClassPickerSelect()`
+**Code source :** `swrl_editor.js` → `onClassPickerSelect()` — Met à jour le champ `class_id` de l'atome désigné par `_currentPickerPath`, ferme tous les pickers de classe ouverts via `querySelectorAll`, re-rend le formulaire et appelle `save(false)`.
 
 ### REQ-SWR-027 — Sélection d'une propriété dans le picker
 
-| **Si** | l'utilisateur sélectionne une propriété dans le picker de propriété, |
+| **Si** | l'ontologiste choisit une propriété dans le sélecteur de propriété d'un atome, |
 |---|---|
-| **Alors** | - le système met à jour le champ `property_id` de l'atome désigné par `_currentPropPickerPath`<br>- tous les pickers de propriété ouverts sont fermés<br>- le formulaire est re-rendu<br>- une sauvegarde automatique est déclenchée |
+| **Alors** | la propriété sélectionnée est associée à l'atome concerné, le sélecteur se ferme, le formulaire est mis à jour et la règle est automatiquement sauvegardée. |
 
 ---
 
-**Code source :** `swrl_editor.js` → `onPropPickerSelect()`
+**Code source :** `swrl_editor.js` → `onPropPickerSelect()` — Met à jour le champ `property_id` de l'atome désigné par `_currentPropPickerPath`, ferme tous les pickers de propriété ouverts, re-rend le formulaire et appelle `save(false)`.
 
 ### REQ-SWR-029 — Filtrage des individus par classe dans le picker
 
-| **Si** | l'utilisateur sélectionne une classe dans le panneau gauche du picker d'individus, |
+| **Si** | l'ontologiste sélectionne une classe dans le panneau de filtrage du sélecteur d'individus, |
 |---|---|
-| **Alors** | - si `owl:Thing` est sélectionné, tous les individus sont affichés<br>- sinon, seuls les individus dont le champ `types` inclut la classe sélectionnée ou une de ses sous-classes sont affichés<br>- le libellé de chaque individu est résolu via `IndividualEditor._labelForId()` |
+| **Alors** | seuls les individus appartenant à cette classe ou à l'une de ses sous-classes sont présentés ; si la classe racine est choisie, tous les individus sont affichés. |
 
 ---
 
-**Code source :** `swrl_editor.js` → `swrlIndPickerSelectClass()`
+**Code source :** `swrl_editor.js` → `swrlIndPickerSelectClass()` — Si `owl:Thing` est sélectionné, affiche tous les individus de `APP.state.individuals` ; sinon filtre par `types` incluant la classe ou ses descendants (calculés via la hiérarchie `subClassOf`) ; résout le libellé de chaque individu via `IndividualEditor._labelForId()`.
 
 ### REQ-SWR-030 — Sélection d'un individu dans le picker
 
-| **Si** | l'utilisateur clique sur un individu dans la liste du picker, |
+| **Si** | l'ontologiste clique sur un individu dans la liste du sélecteur, |
 |---|---|
-| **Alors** | l'individu est marqué comme sélectionné dans `_swrlIndPicker.selectedInd` et le bouton `OK` est activé. |
+| **Alors** | l'individu est mis en surbrillance et le bouton de confirmation est activé. |
 
-| **Si** | l'utilisateur double-clique sur un individu, |
+| **Si** | l'ontologiste double-clique sur un individu, |
 |---|---|
 | **Alors** | l'individu est sélectionné et la confirmation est déclenchée immédiatement. |
 
 ---
 
-**Code source :** `swrl_editor.js` → `swrlIndPickerSelectInd()`
+**Code source :** `swrl_editor.js` → `swrlIndPickerSelectInd()` — Au simple clic, affecte l'identifiant à `_swrlIndPicker.selectedInd` et active le bouton OK ; au double-clic, appelle en plus `confirmIndPicker()` directement.
 
 ### REQ-SWR-031 — Confirmation de la sélection d'un individu
 
-| **Si** | l'utilisateur clique sur le bouton `OK` ou double-clique sur un individu dans le picker, |
+| **Si** | l'ontologiste confirme le choix d'un individu dans le sélecteur, |
 |---|---|
-| **Alors** | - le système appelle `onIndPickerSelect()` avec l'identifiant de l'individu sélectionné<br>- le champ `value` de l'atome `equality_atom` concerné est mis à jour<br>- le formulaire est re-rendu et une sauvegarde automatique est déclenchée<br>- la modale est fermée |
+| **Alors** | l'individu sélectionné est associé à l'atome d'égalité concerné, le sélecteur se ferme, le formulaire est mis à jour et la règle est automatiquement sauvegardée. |
 
 ---
 
-**Code source :** `swrl_editor.js` → `confirmIndPicker()`
+**Code source :** `swrl_editor.js` → `confirmIndPicker()` — Appelle `onIndPickerSelect()` avec l'identifiant de `_swrlIndPicker.selectedInd`, met à jour le champ `value` de l'atome `equality_atom` désigné par `_swrlIndPicker.atomPath`, re-rend le formulaire, appelle `save(false)` puis `closeIndPicker()`.
 
 ### REQ-SWR-032 — Fermeture du picker d'individu
 
-| **Si** | le système ferme le picker d'individu, |
+| **Si** | le sélecteur d'individu se ferme (confirmation ou annulation), |
 |---|---|
-| **Alors** | - l'élément `#swrl-ind-picker-modal` est supprimé du DOM<br>- l'état interne `_swrlIndPicker` est réinitialisé (chemin d'atome, classe sélectionnée, individu sélectionné) |
+| **Alors** | la fenêtre modale disparaît et l'état interne du sélecteur est entièrement réinitialisé. |
 
 ---
 
-**Code source :** `swrl_editor.js` → `closeIndPicker()`
+**Code source :** `swrl_editor.js` → `closeIndPicker()` — Supprime l'élément `#swrl-ind-picker-modal` du DOM et réinitialise `_swrlIndPicker` (champs `atomPath`, `selectedClass`, `selectedInd` remis à `null`).
 
 ### REQ-SWR-034 — Glisser-déposer pour réordonner les atomes
 
-| **Si** | l'utilisateur fait glisser un atome via la poignée `⠿` et le dépose sur un autre atome de la même liste (`listPath`), |
+| **Si** | l'ontologiste réordonne les atomes d'une section par glisser-déposer, |
 |---|---|
-| **Alors** | - les atomes sont réordonnés dans `_editingRule` via `splice()`<br>- le formulaire est re-rendu<br>- une sauvegarde automatique est déclenchée |
+| **Alors** | l'ordre des atomes est mis à jour dans la règle, le formulaire reflète le nouvel ordre et la règle est automatiquement sauvegardée. |
 
-| **Si** | la liste source et la liste cible sont différentes, |
+| **Si** | l'ontologiste tente de déplacer un atome vers une section différente de celle d'origine, |
 |---|---|
-| **Alors** | le dépôt est refusé. |
+| **Alors** | le déplacement est refusé et aucune modification n'est apportée. |
+
+---
+
+**Code source :** `swrl_editor.js` → `onDragStart()`, `onDragOver()`, `onDragLeave()`, `onDrop()`, `onDragEnd()` — `onDragStart()` mémorise l'index source et le `listPath` ; `onDragOver()` autorise le drop uniquement si le `listPath` cible est identique ; `onDrop()` réordonne les atomes via `splice()` dans `_editingRule`, re-rend le formulaire et appelle `save(false)`.
 
 ---
 
@@ -250,174 +254,174 @@
 
 > Exigences relatives à l'affichage : layout, composants visuels, interactions, navigation, styles.
 
-**Code source :** `swrl_editor.js` → `onDragStart()`, `onDragOver()`, `onDragLeave()`, `onDrop()`, `onDragEnd()`
-
 ### REQ-SWR-001 — Affichage de l'interface en deux panneaux
 
 | **Si** | l'onglet SwrlRules est affiché, |
 |---|---|
-| **Alors** | - le système présente une interface divisée en deux panneaux : un panneau gauche (`#swrl-list-panel`) contenant la liste des règles et un champ de recherche, et un panneau droit (`#swrl-detail`) destiné au formulaire d'édition<br>- si aucune règle n'est sélectionnée, le panneau droit affiche un message d'invite |
+| **Alors** | l'interface présente un panneau gauche listant les règles avec un champ de recherche, et un panneau droit dédié à l'édition ; si aucune règle n'est sélectionnée, le panneau droit affiche un message invitant à sélectionner ou créer une règle. |
 
 ---
 
-**Code source :** `swrl_editor.js` → `renderSplit()`
+**Code source :** `swrl_editor.js` → `renderSplit()` — Génère le squelette HTML avec `#swrl-list-panel` à gauche et `#swrl-detail` à droite ; affiche le message d'invite si `_editingRule` est null.
 
 ### REQ-SWR-002 — Redimensionnement du panneau liste
 
-| **Si** | l'utilisateur fait glisser la poignée `#swrl-split-h`, |
+| **Si** | l'ontologiste redimensionne le panneau liste en faisant glisser la séparation entre les deux panneaux, |
 |---|---|
-| **Alors** | le système redimensionne horizontalement le panneau liste avec une largeur minimale de 120 px et une largeur maximale de 400 px. |
+| **Alors** | la largeur du panneau liste s'ajuste librement entre une largeur minimale et une largeur maximale, sans débordement sur le panneau d'édition. |
 
 ---
 
-**Code source :** `swrl_editor.js` → `_initSplitHandle()`
+**Code source :** `swrl_editor.js` → `_initSplitHandle()` — Écoute les événements `mousedown` sur la poignée `#swrl-split-h` et ajuste la propriété CSS `width` du panneau liste lors du `mousemove`, avec un minimum de 120 px et un maximum de 400 px.
 
 ### REQ-SWR-003 — Affichage de la liste des règles SWRL
 
-| **Si** | la liste des règles SWRL est affichée (filtrée ou complète), |
+| **Si** | la liste des règles SWRL est affichée, filtrée ou complète, |
 |---|---|
-| **Alors** | - chaque entrée présente le libellé (`label`) ou l'identifiant (`id`) de la règle, l'identifiant en sous-texte lorsqu'un libellé existe, une icône ⚙️ et un bouton de suppression<br>- la règle sélectionnée est mise en surbrillance via la classe CSS `selected`<br>- si aucune règle n'est présente ou ne correspond au filtre, un message vide est affiché |
+| **Alors** | chaque règle est présentée avec son libellé ou son identifiant, son identifiant en sous-texte lorsqu'un libellé distinct existe, et un bouton de suppression ; la règle en cours d'édition est visuellement mise en surbrillance ; si aucune règle n'est disponible, un message vide est affiché. |
 
 ---
 
-**Code source :** `swrl_editor.js` → `renderList()`
+**Code source :** `swrl_editor.js` → `renderList()` — Itère sur le tableau filtré de règles, génère un `<li>` par règle avec le libellé (`label` ou `id`), l'identifiant en `<small>` si libellé distinct, une icône ⚙️, un bouton de suppression et la classe CSS `selected` si la règle correspond à `_editingId`.
 
 ### REQ-SWR-004 — Indicateur visuel de références cassées
 
-| **Si** | une règle référence une classe ou une propriété qui n'existe plus dans `APP.state`, |
+| **Si** | une règle référence une classe ou une propriété qui a été supprimée de l'ontologie, |
 |---|---|
-| **Alors** | - l'entrée de la règle dans la liste est colorée en rouge (`var(--red,#ef4444)`)<br>- les atomes concernés affichent un badge `⚠ deleted` dans le formulaire d'édition<br>- la détection porte sur les atomes `type_atom` (champ `class_id`), `property_atom` (champ `property_id`), ainsi que sur les atomes imbriqués dans les blocs `naf_block` et `conditional` |
+| **Alors** | la règle est signalée visuellement dans la liste, et les atomes concernés affichent un avertissement dans le formulaire d'édition. |
 
 ---
 
-**Code source :** `swrl_editor.js` → `_ruleHasBrokenRefs()` et `renderList()`
+**Code source :** `swrl_editor.js` → `_ruleHasBrokenRefs()` et `renderList()` — `_ruleHasBrokenRefs()` vérifie les champs `class_id` des atomes `type_atom` et `property_id` des atomes `property_atom`, y compris dans les blocs `naf_block` et `conditional` imbriqués, en contrôlant leur présence dans `APP.state.classes` et `APP.state.object_properties` / `APP.state.datatype_properties` ; `renderList()` applique `color: var(--red,#ef4444)` à l'entrée concernée ; `_renderAtom()` affiche un badge `⚠ deleted` sur les atomes en défaut.
 
 ### REQ-SWR-006 — Mise à jour dynamique du filtrage
 
-| **Si** | l'utilisateur saisit ou modifie la requête dans le champ de recherche, |
+| **Si** | l'ontologiste saisit ou modifie un terme dans le champ de recherche, |
 |---|---|
-| **Alors** | - la liste affichée dans `#swrl-list` est mise à jour instantanément<br>- un bouton ✕ est ajouté dynamiquement au champ lorsque la requête est non vide, et supprimé lorsqu'elle est effacée |
+| **Alors** | la liste des règles est filtrée instantanément et un bouton d'effacement apparaît tant que le champ contient du texte. |
 
-| **Si** | l'utilisateur clique sur le bouton ✕, |
+| **Si** | l'ontologiste clique sur le bouton d'effacement, |
 |---|---|
-| **Alors** | la requête est réinitialisée et le filtrage est relancé. |
+| **Alors** | le champ de recherche est vidé et toutes les règles sont de nouveau affichées. |
 
 ---
 
-**Code source :** `swrl_editor.js` → `_applySearch()`
+**Code source :** `swrl_editor.js` → `_applySearch()` — Écoute l'événement `input` sur `#swrl-search`, appelle `_filterRules()` puis `renderList()` ; insère ou supprime dynamiquement un bouton ✕ dans le champ selon que la valeur est non vide ou non.
 
 ### REQ-SWR-010 — Formulaire d'édition d'une règle
 
 | **Si** | une règle est sélectionnée et que le formulaire d'édition est affiché, |
 |---|---|
-| **Alors** | le système présente :<br>- un champ `ID` obligatoire avec remplacement automatique des espaces par `_`<br>- un champ `Label`<br>- une zone de texte `Comment`<br>- une section `if` (corps) et une section `then` (tête), chacune avec des boutons pour ajouter des atomes de type `type_atom`, `property_atom`, `equality_atom`<br>- la section `body` propose en plus le type `naf_block` ; la section `head` propose le type `conditional` à la place de `naf_block` |
+| **Alors** | l'ontologiste dispose de champs pour saisir l'identifiant (avec normalisation automatique des espaces), le libellé et le commentaire de la règle, ainsi que de deux sections distinctes pour la prémisse (corps) et la conclusion (tête), chacune permettant l'ajout d'atomes des types pertinents selon la section. |
 
 ---
 
-**Code source :** `swrl_editor.js` → `_renderForm()`
+**Code source :** `swrl_editor.js` → `_renderForm()` — Génère les champs `#swrl-id`, `#swrl-label`, `#swrl-comment` avec leurs gestionnaires `onchange` ; génère les sections `body` (avec boutons `type_atom`, `property_atom`, `equality_atom`, `naf_block`) et `head` (avec boutons `type_atom`, `property_atom`, `equality_atom`, `conditional`) via `_renderAtomList()`.
 
 ### REQ-SWR-019 — Rendu d'un atome de type `type_atom`
 
-| **Si** | un atome de type `type_atom` est rendu dans le formulaire, |
+| **Si** | un atome d'appartenance à une classe est affiché dans le formulaire, |
 |---|---|
-| **Alors** | - le système affiche un champ variable (`?var`) suivi du mot-clé `is a` et d'un sélecteur de classe<br>- si la classe référencée n'existe plus dans `APP.state.classes`, le sélecteur affiche `⚠ deleted` en rouge<br>- si la classe existe, elle est cliquable et navigue vers la vue `classes` via `APP.navigateTo()` |
+| **Alors** | l'ontologiste voit la variable concernée, le mot-clé sémantique `is a` et la classe associée ; si la classe a été supprimée de l'ontologie, un avertissement est affiché à la place ; si elle existe, son identifiant est cliquable pour naviguer directement vers la vue des classes. |
 
 ---
 
-**Code source :** `swrl_editor.js` → `_renderAtom()` (branche `case 'type_atom'`)
+**Code source :** `swrl_editor.js` → `_renderAtom()` (branche `case 'type_atom'`) — Affiche un champ `?var`, le libellé `is a` et un sélecteur de classe ; si `class_id` est absent de `APP.state.classes`, affiche `⚠ deleted` en rouge ; sinon rend un lien déclenchant `APP.navigateTo('classes', class_id)`.
 
 ### REQ-SWR-020 — Rendu d'un atome de type `property_atom`
 
-| **Si** | un atome de type `property_atom` est rendu dans le formulaire, |
+| **Si** | un atome de propriété est affiché dans le formulaire, |
 |---|---|
-| **Alors** | - le système affiche un champ sujet (`?subj`), un sélecteur de propriété (object property ou datatype property, distinguées par leur point coloré) et un champ objet (`?obj / ?_`)<br>- si la propriété n'existe plus, le sélecteur affiche `⚠ deleted`<br>- si elle existe, elle est cliquable et navigue vers `object-properties` ou `datatype-properties` selon son type |
+| **Alors** | l'ontologiste voit le sujet, la propriété et l'objet de la relation ; le type de propriété (objet ou donnée) est distingué visuellement ; si la propriété a été supprimée, un avertissement est affiché ; si elle existe, son identifiant est cliquable pour naviguer vers la vue de propriétés correspondante. |
 
 ---
 
-**Code source :** `swrl_editor.js` → `_renderAtom()` (branche `case 'property_atom'`)
+**Code source :** `swrl_editor.js` → `_renderAtom()` (branche `case 'property_atom'`) — Affiche les champs `?subj` et `?obj / ?_`, un sélecteur de propriété avec un point coloré `op-prop-dot` pour les object properties et `dp-prop-dot` pour les datatype properties ; si `property_id` est absent de `APP.state`, affiche `⚠ deleted` ; sinon rend un lien vers `APP.navigateTo('object-properties' | 'datatype-properties', property_id)`.
 
 ### REQ-SWR-021 — Rendu d'un atome de type `equality_atom`
 
-| **Si** | un atome de type `equality_atom` est rendu dans le formulaire, |
+| **Si** | un atome de comparaison est affiché dans le formulaire, |
 |---|---|
-| **Alors** | - le système affiche un champ variable (`?var`), un sélecteur d'opérateur parmi `=`, `!=`, `>`, `>=`, `<`, `<=`, et un champ valeur<br>- si la valeur correspond à un individu connu dans `APP.state.individuals`, elle est affichée sous forme de pastille navigable (clic → `APP.navigateTo('individuals', ...)`)<br>- sinon, un champ texte libre est affiché<br>- un bouton distinct permet d'ouvrir le picker d'individu |
+| **Alors** | l'ontologiste voit la variable, l'opérateur de comparaison et la valeur ; si la valeur correspond à un individu connu de l'ontologie, cet individu est affiché sous forme de pastille navigable ; sinon un champ de saisie libre est proposé ; un bouton distinct permet d'ouvrir le sélecteur d'individus. |
 
 ---
 
-**Code source :** `swrl_editor.js` → `_renderAtom()` (branche `case 'equality_atom'`)
+**Code source :** `swrl_editor.js` → `_renderAtom()` (branche `case 'equality_atom'`) — Affiche un champ `?var`, un sélecteur d'opérateur (`=`, `!=`, `>`, `>=`, `<`, `<=`) et, si `value` correspond à une clé de `APP.state.individuals`, une pastille avec lien `APP.navigateTo('individuals', value)` ; sinon un champ texte libre ; ajoute un bouton ouvrant `openIndPicker()`.
 
 ### REQ-SWR-022 — Rendu d'un bloc NAF
 
-| **Si** | un bloc NAF est rendu dans le formulaire, |
+| **Si** | un bloc de négation (NAF) est affiché dans le formulaire, |
 |---|---|
-| **Alors** | le système affiche :<br>- un en-tête étiqueté `NAF`<br>- des boutons pour ajouter des atomes de type `type_atom`, `property_atom` ou `equality_atom` à l'intérieur du bloc<br>- le rendu récursif des atomes imbriqués via `_renderAtomList()` |
+| **Alors** | l'ontologiste voit un conteneur clairement étiqueté `NAF`, dans lequel il peut ajouter et visualiser des atomes imbriqués. |
 
 ---
 
-**Code source :** `swrl_editor.js` → `_renderAtom()` (branche `case 'naf_block'`)
+**Code source :** `swrl_editor.js` → `_renderAtom()` (branche `case 'naf_block'`) — Génère un conteneur avec en-tête `NAF`, des boutons d'ajout d'atomes (`type_atom`, `property_atom`, `equality_atom`) et appelle récursivement `_renderAtomList()` sur `atom.atoms`.
 
 ### REQ-SWR-023 — Rendu d'un atome conditionnel imbriqué
 
-| **Si** | un atome de type `conditional` est rendu dans le formulaire, |
+| **Si** | un atome conditionnel est affiché dans la conclusion d'une règle, |
 |---|---|
-| **Alors** | - le système affiche deux sous-sections `if` et `then` imbriquées, chacune avec des boutons pour ajouter des atomes (`type_atom`, `property_atom`, `equality_atom`, `naf_block` dans la condition ; `conditional` supplémentaire dans le conséquent)<br>- les formats anciens (objet unique → liste) sont normalisés au rendu pour les champs `condition` et `consequent` |
+| **Alors** | l'ontologiste voit deux sous-sections `if` et `then` imbriquées, chacune permettant l'ajout d'atomes du type approprié, avec normalisation automatique des formats anciens. |
 
 ---
 
-**Code source :** `swrl_editor.js` → `_renderAtom()` (branche `case 'conditional'`)
+**Code source :** `swrl_editor.js` → `_renderAtom()` (branche `case 'conditional'`) — Génère deux sous-sections `condition` et `consequent` avec leurs boutons d'ajout respectifs (`type_atom`, `property_atom`, `equality_atom`, `naf_block` dans la condition ; `conditional` supplémentaire dans le conséquent) ; normalise les champs `condition` et `consequent` d'objet unique en tableau si nécessaire.
 
 ### REQ-SWR-024 — Picker de classe pour les atomes `type_atom`
 
-| **Si** | l'utilisateur ouvre le picker de classe, |
+| **Si** | l'ontologiste ouvre le sélecteur de classe d'un atome, |
 |---|---|
-| **Alors** | - tous les autres pickers de classe ouverts sont fermés<br>- un dropdown est affiché en `position:fixed` sous (ou au-dessus si l'espace est insuffisant) du bouton déclencheur |
+| **Alors** | un menu déroulant listant les classes de l'ontologie apparaît positionné près du déclencheur, et tout sélecteur de classe déjà ouvert se ferme automatiquement. |
 
-| **Si** | l'utilisateur clique en dehors du dropdown, |
+| **Si** | l'ontologiste clique en dehors du menu déroulant, |
 |---|---|
-| **Alors** | le dropdown se ferme automatiquement. |
+| **Alors** | le menu se ferme automatiquement. |
 
 ---
 
-**Code source :** `swrl_editor.js` → `toggleClassPicker()`
+**Code source :** `swrl_editor.js` → `toggleClassPicker()` — Ferme tous les éléments `.swrl-class-picker-dropdown` ouverts, crée un `<div>` positionné en `position:fixed` via `_positionDropdown()`, peuple la liste depuis `APP.state.classes` triées alphabétiquement, et pose un écouteur `mousedown` sur `document` pour fermer au clic extérieur.
 
 ### REQ-SWR-026 — Picker de propriété pour les atomes `property_atom`
 
-| **Si** | l'utilisateur ouvre le picker de propriété, |
+| **Si** | l'ontologiste ouvre le sélecteur de propriété d'un atome, |
 |---|---|
-| **Alors** | - le système affiche un dropdown en `position:fixed` dont le contenu est construit dynamiquement à partir de `APP.state.object_properties` et `APP.state.datatype_properties`, triés alphabétiquement, avec un séparateur visuel entre les deux groupes<br>- les object properties sont distinguées par un point de couleur `op-prop-dot` et les datatype properties par `dp-prop-dot` |
+| **Alors** | un menu déroulant présente les propriétés objet et les propriétés de données de l'ontologie, visuellement distinguées, triées alphabétiquement au sein de chaque groupe. |
 
 ---
 
-**Code source :** `swrl_editor.js` → `togglePropPicker()`
+**Code source :** `swrl_editor.js` → `togglePropPicker()` — Génère un `<div>` en `position:fixed` via `_positionDropdown()` ; peuple la liste depuis `APP.state.object_properties` (point `op-prop-dot`) et `APP.state.datatype_properties` (point `dp-prop-dot`), chaque groupe trié alphabétiquement, séparés par un `<hr>`.
 
 ### REQ-SWR-028 — Picker d'individu bi-panneau (modal)
 
-| **Si** | l'utilisateur ouvre le picker d'individu, |
+| **Si** | l'ontologiste ouvre le sélecteur d'individus, |
 |---|---|
-| **Alors** | le système affiche une fenêtre modale (`#swrl-ind-picker-modal`) composée de :<br>- un panneau gauche avec un arbre de classes (construit via `ClassEditor.buildTree()`) incluant `owl:Thing` en première entrée avec le nombre total d'individus ; le nombre d'individus de chaque classe tient compte de la hiérarchie (classes descendantes incluses)<br>- un panneau droit avec la liste des individus |
+| **Alors** | une fenêtre modale s'affiche avec, à gauche, l'arbre hiérarchique des classes de l'ontologie (incluant la classe racine avec le nombre total d'individus) et, à droite, la liste des individus filtrables par classe. |
 
 ---
 
-**Code source :** `swrl_editor.js` → `openIndPicker()`
+**Code source :** `swrl_editor.js` → `openIndPicker()` — Insère `#swrl-ind-picker-modal` dans le DOM ; construit l'arbre des classes via `ClassEditor.buildTree()` en ajoutant `owl:Thing` en première entrée avec le décompte total ; le décompte par classe tient compte des sous-classes via la hiérarchie `subClassOf` ; appelle `swrlIndPickerSelectClass('owl:Thing')` pour initialiser la liste des individus.
 
 ### REQ-SWR-033 — Positionnement dynamique des dropdowns
 
-| **Si** | le système doit positionner un dropdown en `position:fixed`, |
+| **Si** | le système doit afficher un menu déroulant à proximité d'un élément déclencheur, |
 |---|---|
-| **Alors** | - il calcule l'espace disponible sous et au-dessus du bouton déclencheur<br>- si l'espace sous le bouton est insuffisant, le dropdown s'ouvre vers le haut<br>- la largeur minimale est celle du bouton déclencheur ou la valeur `width` passée en paramètre (défaut 200 px)<br>- la hauteur maximale est bornée à 260 px ou l'espace disponible |
+| **Alors** | le menu s'ouvre vers le bas si l'espace disponible le permet, sinon vers le haut, avec une largeur au moins égale à celle du déclencheur et une hauteur bornée pour éviter tout débordement hors de la fenêtre. |
 
 ---
 
-**Code source :** `swrl_editor.js` → `_positionDropdown()`
+**Code source :** `swrl_editor.js` → `_positionDropdown()` — Calcule via `getBoundingClientRect()` l'espace disponible sous et au-dessus du déclencheur ; positionne le dropdown en `position:fixed` vers le haut si l'espace inférieur est insuffisant ; applique `min-width` égale à la largeur du déclencheur ou au paramètre `width` (défaut 200 px) ; borne `max-height` à 260 px ou à l'espace disponible.
 
 ### REQ-SWR-035 — Navigation vers une entité référencée depuis un atome
 
-| **Si** | une entité référencée dans un atome (classe, propriété ou individu) existe dans l'état de l'application **et** que l'utilisateur clique sur son identifiant affiché, |
+| **Si** | une classe, une propriété ou un individu référencé dans un atome existe dans l'ontologie et que l'ontologiste clique sur son identifiant affiché dans le formulaire, |
 |---|---|
-| **Alors** | le système appelle `APP.navigateTo()` avec l'onglet cible (`classes`, `object-properties`, `datatype-properties`, `individuals`) et l'identifiant de l'entité. |
+| **Alors** | l'application navigue directement vers la vue de gestion correspondante et positionne l'entité cliquée en focus. |
 
-| **Si** | l'utilisateur survole l'identifiant, |
+| **Si** | l'ontologiste survole l'identifiant d'une entité référencée, |
 |---|---|
-| **Alors** | un soulignement et une couleur d'accentuation sont appliqués. |
+| **Alors** | un soulignement et une couleur d'accentuation indiquent visuellement que l'élément est navigable. |
 
-**Code source :** `swrl_editor.js` → `_renderAtom()` (branches `type_atom`, `property_atom`, `equality_atom`)
+---
+
+**Code source :** `swrl_editor.js` → `_renderAtom()` (branches `type_atom`, `property_atom`, `equality_atom`) — Génère un élément cliquable avec gestionnaire `onclick` appelant `APP.navigateTo(tab, id)` où `tab` vaut `'classes'`, `'object-properties'`, `'datatype-properties'` ou `'individuals'` selon le type d'entité ; applique les styles `text-decoration: underline` et `color: var(--accent)` au survol via CSS.
