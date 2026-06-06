@@ -56,9 +56,9 @@
 
 ### REQ-IND-002 — Arbre de classes avec compteurs transitifs
 
-| **Si** | l'ontologie est chargée et contient des classes organisées en hiérarchie, |
+| **Si** | l'`ontologie` est chargée et contient des `classes` organisées en hiérarchie, |
 |---|---|
-| **Alors** | l'arbre des classes reflète fidèlement les relations de spécialisation entre concepts : le nœud racine `owl:Thing` indique le nombre total d'individuals, chaque classe affiche le nombre d'individuals qu'elle contient en comptant également ceux de toutes ses sous-classes, et chaque nœud est une zone cible pour le glisser-déposer. |
+| **Alors** | l'arbre des `classes` reflète fidèlement les relations de spécialisation entre concepts : le nœud racine `owl:Thing` indique le nombre total d'`individuals`, chaque `classe` affiche le nombre d'`individuals` qu'elle contient en comptant également ceux de toutes ses sous-`classes`, et chaque nœud est une zone cible pour le glisser-déposer. |
 
 ---
 
@@ -66,9 +66,9 @@
 
 ### REQ-IND-003 — Liste des individuals filtrée et triée
 
-| **Si** | l'ontologiste consulte la liste des individuals, éventuellement après avoir sélectionné une classe dans l'arbre, |
+| **Si** | l'`ontologiste` consulte la liste des `individuals`, éventuellement après avoir sélectionné une `classe` dans l'arbre, |
 |---|---|
-| **Alors** | seuls les individuals appartenant à cette classe ou à l'une de ses sous-classes sont affichés, triés alphabétiquement par leur nom d'affichage ; sans sélection de classe, tous les individuals sont listés ; chaque individual peut être déplacé par glisser-déposer. |
+| **Alors** | seuls les `individuals` appartenant à cette `classe` ou à l'une de ses sous-`classes` sont affichés, triés alphabétiquement par leur nom d'affichage ; sans sélection de `classe`, tous les `individuals` sont listés ; chaque `individual` peut être déplacé par glisser-déposer. |
 
 ---
 
@@ -76,7 +76,7 @@
 
 ### REQ-IND-007 — Création d'un nouvel individual
 
-| **Si** | l'ontologiste souhaite créer un nouvel individual, |
+| **Si** | l'`ontologiste` souhaite créer un nouvel `individual`, |
 |---|---|
 | **Alors** | un formulaire vierge s'ouvre immédiatement, pré-rempli avec un identifiant généré automatiquement, prêt à être saisi sans manipulation préalable. |
 
@@ -86,9 +86,9 @@
 
 ### REQ-IND-009 — Suppression d'un ou plusieurs individuals
 
-| **Si** | l'ontologiste confirme la suppression d'un ou plusieurs individuals sélectionnés, |
+| **Si** | l'`ontologiste` confirme la suppression d'un ou plusieurs `individuals` sélectionnés, |
 |---|---|
-| **Alors** | les individuals sont supprimés de l'ontologie, la liste est mise à jour et le formulaire affiche un état vide. |
+| **Alors** | les `individuals` sont supprimés de l'`ontologie`, la liste est mise à jour et le formulaire affiche un état vide. |
 
 ---
 
@@ -96,9 +96,9 @@
 
 ### REQ-IND-010 — Déplacement par glisser-déposer vers une classe
 
-| **Si** | l'ontologiste dépose un individual sur une classe de l'arbre, |
+| **Si** | l'`ontologiste` dépose un `individual` sur une `classe` de l'arbre, |
 |---|---|
-| **Alors** | le type de l'individual est mis à jour pour refléter sa nouvelle appartenance : si l'individual avait déjà un type connu, ce type est remplacé par la classe cible ; sinon, la classe cible est ajoutée à ses types existants, sans doublon. |
+| **Alors** | le type de l'`individual` est mis à jour pour refléter sa nouvelle appartenance : si l'`individual` avait déjà un type connu, ce type est remplacé par la `classe` cible ; sinon, la `classe` cible est ajoutée à ses types existants, sans doublon. |
 
 ---
 
@@ -106,11 +106,11 @@
 
 ### REQ-IND-015 — Gestion des types (rdf:type)
 
-| **Si** | l'ontologiste ajoute un type à un individual, |
+| **Si** | l'`ontologiste` ajoute un type à un `individual`, |
 |---|---|
-| **Alors** | le nouveau type apparaît dans la liste des types de l'individual et la sauvegarde est déclenchée automatiquement si l'individual est déjà enregistré. |
+| **Alors** | le nouveau type apparaît dans la liste des types de l'`individual` et la sauvegarde est déclenchée automatiquement si l'`individual` est déjà enregistré. |
 
-| **Si** | l'ontologiste supprime un type d'un individual, |
+| **Si** | l'`ontologiste` supprime un type d'un `individual`, |
 |---|---|
 | **Alors** | le type est retiré de la liste ; si la liste devient vide, `owl:NamedIndividual` est automatiquement maintenu comme type minimal, et la sauvegarde est déclenchée. |
 
@@ -120,9 +120,9 @@
 
 ### REQ-IND-018 — Gestion de la cardinalité fonctionnelle des propriétés
 
-| **Si** | une propriété est fonctionnelle et qu'une valeur a déjà été assignée à un individual, |
+| **Si** | une `propriété` est fonctionnelle et qu'une valeur a déjà été assignée à un `individual`, |
 |---|---|
-| **Alors** | l'ontologiste ne peut pas ajouter une deuxième valeur pour cette propriété : le contrôle d'ajout est masqué et toute tentative d'insertion est bloquée. |
+| **Alors** | l'`ontologiste` ne peut pas ajouter une deuxième valeur pour cette `propriété` : le contrôle d'ajout est masqué et toute tentative d'insertion est bloquée. |
 
 ---
 
@@ -130,13 +130,13 @@
 
 ### REQ-IND-020 — Création d'un individual à la volée depuis le sélecteur
 
-| **Si** | l'ontologiste souhaite créer un nouvel individual directement depuis le sélecteur d'une propriété, |
+| **Si** | l'`ontologiste` souhaite créer un nouvel `individual` directement depuis le sélecteur d'une `propriété`, |
 |---|---|
 | **Alors** | un champ de saisie apparaît dans la liste du sélecteur avec un identifiant pré-généré ; il peut confirmer la création avec Entrée ou annuler avec Échap. |
 
-| **Si** | l'ontologiste confirme la création depuis le sélecteur, |
+| **Si** | l'`ontologiste` confirme la création depuis le sélecteur, |
 |---|---|
-| **Alors** | le nouvel individual est créé avec les types correspondant à la classe sélectionnée, la liste est rafraîchie et le nouvel individual est immédiatement disponible pour sélection. |
+| **Alors** | le nouvel `individual` est créé avec les types correspondant à la `classe` sélectionnée, la liste est rafraîchie et le nouvel `individual` est immédiatement disponible pour sélection. |
 
 ---
 
@@ -144,7 +144,7 @@
 
 ### REQ-IND-021 — Sauvegarde automatique (autoSave)
 
-| **Si** | l'ontologiste modifie un champ du formulaire d'un individual déjà enregistré, |
+| **Si** | l'`ontologiste` modifie un champ du formulaire d'un `individual` déjà enregistré, |
 |---|---|
 | **Alors** | les modifications sont sauvegardées automatiquement sans action explicite de sa part. |
 
@@ -154,17 +154,17 @@
 
 ### REQ-IND-022 — Sauvegarde explicite : création et mise à jour
 
-| **Si** | l'ontologiste déclenche une sauvegarde explicite d'un individual, |
+| **Si** | l'`ontologiste` déclenche une sauvegarde explicite d'un `individual`, |
 |---|---|
-| **Alors** | toutes les informations saisies sont collectées (identifiant, annotations, types, assertions de propriétés d'objet et de données) et persistées dans l'ontologie. |
+| **Alors** | toutes les informations saisies sont collectées (identifiant, annotations, types, assertions de `propriétés d'objet` et de données) et persistées dans l'`ontologie`. |
 
-| **Si** | l'individual est nouveau, |
+| **Si** | l'`individual` est nouveau, |
 |---|---|
-| **Alors** | il est créé dans l'ontologie, l'arbre et la liste sont mis à jour, et l'individual nouvellement créé est sélectionné dans l'interface. |
+| **Alors** | il est créé dans l'`ontologie`, l'arbre et la liste sont mis à jour, et l'`individual` nouvellement créé est sélectionné dans l'interface. |
 
-| **Si** | l'individual existe déjà, |
+| **Si** | l'`individual` existe déjà, |
 |---|---|
-| **Alors** | il est mis à jour ; si son identifiant a changé, un message de confirmation de renommage est affiché ; l'ontologie est rafraîchie dans les deux cas. |
+| **Alors** | il est mis à jour ; si son identifiant a changé, un message de confirmation de renommage est affiché ; l'`ontologie` est rafraîchie dans les deux cas. |
 
 ---
 
@@ -172,9 +172,9 @@
 
 ### REQ-IND-023 — Suppression unitaire d'un individual depuis le formulaire
 
-| **Si** | l'ontologiste supprime un individual depuis son formulaire de détail, |
+| **Si** | l'`ontologiste` supprime un `individual` depuis son formulaire de détail, |
 |---|---|
-| **Alors** | l'individual est retiré de l'ontologie, la liste est mise à jour et le formulaire affiche un état vide si l'individual supprimé était celui en cours de consultation. |
+| **Alors** | l'`individual` est retiré de l'`ontologie`, la liste est mise à jour et le formulaire affiche un état vide si l'`individual` supprimé était celui en cours de consultation. |
 
 ---
 
@@ -182,7 +182,7 @@
 
 ### REQ-IND-024 — Préservation de sameAs et differentFrom lors de la sauvegarde
 
-| **Si** | une sauvegarde est déclenchée pour un individual, |
+| **Si** | une sauvegarde est déclenchée pour un `individual`, |
 |---|---|
 | **Alors** | les relations d'identité (`sameAs`) et de différence (`differentFrom`) déjà définies sont conservées intégralement, même si elles ne sont pas éditables depuis le formulaire principal. |
 
@@ -194,7 +194,7 @@
 
 | **Si** | une sauvegarde est déclenchée, |
 |---|---|
-| **Alors** | toutes les relations entre l'individual et d'autres individuals (assertions d'objet) saisies dans les panneaux de propriétés sont collectées et incluses dans la sauvegarde. |
+| **Alors** | toutes les relations entre l'`individual` et d'autres `individuals` (assertions d'objet) saisies dans les panneaux de `propriétés` sont collectées et incluses dans la sauvegarde. |
 
 ---
 
@@ -204,7 +204,7 @@
 
 | **Si** | une sauvegarde est déclenchée, |
 |---|---|
-| **Alors** | toutes les valeurs littérales saisies dans les panneaux de propriétés de données sont collectées avec leur type de données et incluses dans la sauvegarde. |
+| **Alors** | toutes les valeurs littérales saisies dans les panneaux de `propriétés de données` sont collectées avec leur type de données et incluses dans la sauvegarde. |
 
 ---
 
@@ -212,13 +212,13 @@
 
 ### REQ-IND-027 — Règle d'affichage simple (propriété unique)
 
-| **Si** | l'ontologiste souhaite définir comment les individuals d'une classe sont nommés dans l'interface, |
+| **Si** | l'`ontologiste` souhaite définir comment les `individuals` d'une `classe` sont nommés dans l'interface, |
 |---|---|
-| **Alors** | il peut choisir une propriété dont la valeur sera utilisée comme label d'affichage, en voyant clairement quelles propriétés sont disponibles et lesquelles sont déjà héritées d'une classe parente. |
+| **Alors** | il peut choisir une `propriété` dont la valeur sera utilisée comme label d'affichage, en voyant clairement quelles `propriétés` sont disponibles et lesquelles sont déjà héritées d'une `classe` parente. |
 
-| **Si** | l'ontologiste sélectionne ou retire une propriété d'affichage, |
+| **Si** | l'`ontologiste` sélectionne ou retire une `propriété` d'affichage, |
 |---|---|
-| **Alors** | la règle est enregistrée pour la classe concernée et propagée automatiquement aux sous-classes qui n'ont pas de règle propre. |
+| **Alors** | la règle est enregistrée pour la `classe` concernée et propagée automatiquement aux sous-`classes` qui n'ont pas de règle propre. |
 
 ---
 
@@ -226,13 +226,13 @@
 
 ### REQ-IND-028 — Règle d'affichage composite (multi-propriétés avec séparateur)
 
-| **Si** | l'ontologiste souhaite composer le label d'affichage des individuals à partir de plusieurs propriétés, |
+| **Si** | l'`ontologiste` souhaite composer le label d'affichage des `individuals` à partir de plusieurs `propriétés`, |
 |---|---|
-| **Alors** | il peut définir une règle composite associant plusieurs propriétés avec des séparateurs personnalisés, et ajouter autant de lignes que nécessaire. |
+| **Alors** | il peut définir une règle composite associant plusieurs `propriétés` avec des séparateurs personnalisés, et ajouter autant de lignes que nécessaire. |
 
-| **Si** | l'ontologiste confirme la règle composite, |
+| **Si** | l'`ontologiste` confirme la règle composite, |
 |---|---|
-| **Alors** | la règle est enregistrée pour la classe concernée et propagée aux sous-classes sans règle propre, de la même façon que la règle simple. |
+| **Alors** | la règle est enregistrée pour la `classe` concernée et propagée aux sous-`classes` sans règle propre, de la même façon que la règle simple. |
 
 ---
 
@@ -240,9 +240,9 @@
 
 ### REQ-IND-029 — Résolution du label d'affichage par héritage de classe
 
-| **Si** | l'application doit afficher le nom d'un individual, |
+| **Si** | l'application doit afficher le nom d'un `individual`, |
 |---|---|
-| **Alors** | elle recherche la règle d'affichage la plus pertinente selon la hiérarchie de classes : d'abord les types propres de l'individual, puis la classe de contexte sélectionnée, puis la règle racine globale ; la règle composite est prioritaire sur la règle simple. |
+| **Alors** | elle recherche la règle d'affichage la plus pertinente selon la hiérarchie de `classes` : d'abord les types propres de l'`individual`, puis la `classe` de contexte sélectionnée, puis la règle racine globale ; la règle composite est prioritaire sur la règle simple. |
 
 ---
 
@@ -250,9 +250,9 @@
 
 ### REQ-IND-030 — Résolution du label rdfs:label multilingue
 
-| **Si** | l'application résout le label d'affichage d'un individual à partir de la propriété `rdfs:label`, |
+| **Si** | l'application résout le label d'affichage d'un `individual` à partir de la `propriété` `rdfs:label`, |
 |---|---|
-| **Alors** | elle respecte les préférences linguistiques de l'ontologiste : la langue demandée est prioritaire, puis les autres langues actives dans l'ordre de préférence, puis n'importe quel label disponible en dernier recours. |
+| **Alors** | elle respecte les préférences linguistiques de l'`ontologiste` : la langue demandée est prioritaire, puis les autres langues actives dans l'ordre de préférence, puis n'importe quel label disponible en dernier recours. |
 
 ---
 
@@ -262,9 +262,9 @@
 
 | **Si** | les règles d'affichage sont modifiées, |
 |---|---|
-| **Alors** | elles sont sauvegardées dans l'ontologie et restituées à l'identique lors du prochain chargement. |
+| **Alors** | elles sont sauvegardées dans l'`ontologie` et restituées à l'identique lors du prochain chargement. |
 
-| **Si** | l'ontologie est chargée, |
+| **Si** | l'`ontologie` est chargée, |
 |---|---|
 | **Alors** | les règles d'affichage précédemment définies sont automatiquement restaurées. |
 
@@ -274,9 +274,9 @@
 
 ### REQ-IND-032 — Génération automatique de l'identifiant d'un nouvel individual
 
-| **Si** | l'ontologiste initie la création d'un nouvel individual, que ce soit depuis le formulaire principal ou depuis le sélecteur d'une propriété, |
+| **Si** | l'`ontologiste` initie la création d'un nouvel `individual`, que ce soit depuis le formulaire principal ou depuis le sélecteur d'une `propriété`, |
 |---|---|
-| **Alors** | un identifiant unique et cohérent avec les conventions de l'ontologie est proposé automatiquement, sans que l'ontologiste ait à le saisir manuellement. |
+| **Alors** | un identifiant unique et cohérent avec les conventions de l'`ontologie` est proposé automatiquement, sans que l'`ontologiste` ait à le saisir manuellement. |
 
 ---
 
@@ -284,9 +284,9 @@
 
 ### REQ-IND-037 — Profondeur hiérarchique des classes pour l'ordonnancement
 
-| **Si** | l'application doit ordonner les propriétés d'un individual selon la hiérarchie de classes, |
+| **Si** | l'application doit ordonner les `propriétés` d'un `individual` selon la hiérarchie de `classes`, |
 |---|---|
-| **Alors** | les propriétés héritées des classes les plus générales apparaissent en premier, suivies de celles des classes plus spécialisées. |
+| **Alors** | les `propriétés` héritées des `classes` les plus générales apparaissent en premier, suivies de celles des `classes` plus spécialisées. |
 
 ---
 
@@ -294,9 +294,9 @@
 
 ### REQ-IND-038 — Collecte séparée des propriétés héritées et directes
 
-| **Si** | l'ontologiste consulte le formulaire d'un individual, |
+| **Si** | l'`ontologiste` consulte le formulaire d'un `individual`, |
 |---|---|
-| **Alors** | les propriétés héritées des classes parentes sont distinguées visuellement des propriétés définies directement sur les types de l'individual, sans duplication. |
+| **Alors** | les `propriétés` héritées des `classes` parentes sont distinguées visuellement des `propriétés` définies directement sur les types de l'`individual`, sans duplication. |
 
 ---
 
@@ -304,9 +304,9 @@
 
 ### REQ-IND-039 — Filtre des individuals candidats par range d'une OP
 
-| **Si** | l'ontologiste doit sélectionner une valeur pour une Object Property, |
+| **Si** | l'`ontologiste` doit sélectionner une valeur pour une `Object Property`, |
 |---|---|
-| **Alors** | seuls les individuals compatibles avec le domaine de valeurs de cette propriété lui sont proposés, à l'exclusion de l'individual en cours d'édition ; si aucune contrainte de domaine n'est définie, tous les individuals sont proposés. |
+| **Alors** | seuls les `individuals` compatibles avec le domaine de valeurs de cette `propriété` lui sont proposés, à l'exclusion de l'`individual` en cours d'édition ; si aucune contrainte de domaine n'est définie, tous les `individuals` sont proposés. |
 
 ---
 
@@ -320,9 +320,9 @@
 
 ### REQ-IND-001 — Rendu en trois colonnes
 
-| **Si** | l'ontologiste ouvre l'onglet `Individuals`, |
+| **Si** | l'`ontologiste` ouvre l'onglet `Individuals`, |
 |---|---|
-| **Alors** | l'interface présente trois zones de travail côte à côte : la hiérarchie des classes, la liste des individuals, et le formulaire de détail ; par défaut, le formulaire invite à sélectionner ou créer un individual. |
+| **Alors** | l'interface présente trois zones de travail côte à côte : la hiérarchie des `classes`, la liste des `individuals`, et le formulaire de détail ; par défaut, le formulaire invite à sélectionner ou créer un `individual`. |
 
 ---
 
@@ -330,9 +330,9 @@
 
 ### REQ-IND-004 — Sélection d'une classe dans l'arbre
 
-| **Si** | l'ontologiste sélectionne une classe dans l'arbre, |
+| **Si** | l'`ontologiste` sélectionne une `classe` dans l'arbre, |
 |---|---|
-| **Alors** | la liste des individuals est filtrée pour n'afficher que ceux appartenant à cette classe ou ses sous-classes, et le formulaire affiche un état vide invitant à sélectionner ou créer un individual dans ce contexte. |
+| **Alors** | la liste des `individuals` est filtrée pour n'afficher que ceux appartenant à cette `classe` ou ses sous-`classes`, et le formulaire affiche un état vide invitant à sélectionner ou créer un `individual` dans ce contexte. |
 
 ---
 
@@ -340,9 +340,9 @@
 
 ### REQ-IND-005 — Sélection simple d'un individual
 
-| **Si** | l'ontologiste clique sur un individual dans la liste, |
+| **Si** | l'`ontologiste` clique sur un `individual` dans la liste, |
 |---|---|
-| **Alors** | le formulaire de détail de cet individual s'affiche et le bouton de suppression devient actif. |
+| **Alors** | le formulaire de détail de cet `individual` s'affiche et le bouton de suppression devient actif. |
 
 ---
 
@@ -350,9 +350,9 @@
 
 ### REQ-IND-006 — Sélection multiple par Shift+Clic
 
-| **Si** | l'ontologiste clique sur un individual en maintenant la touche Maj et qu'un point d'ancrage existe, |
+| **Si** | l'`ontologiste` clique sur un `individual` en maintenant la touche Maj et qu'un point d'ancrage existe, |
 |---|---|
-| **Alors** | tous les individuals compris entre l'ancre et l'item cliqué sont sélectionnés ; si la sélection compte plus d'un individual, le formulaire affiche un résumé indiquant le nombre d'individuals sélectionnés avec une option de suppression groupée. |
+| **Alors** | tous les `individuals` compris entre l'ancre et l'item cliqué sont sélectionnés ; si la sélection compte plus d'un `individual`, le formulaire affiche un résumé indiquant le nombre d'`individuals` sélectionnés avec une option de suppression groupée. |
 
 ---
 
@@ -360,7 +360,7 @@
 
 ### REQ-IND-008 — Annulation du formulaire de création
 
-| **Si** | l'ontologiste annule la création d'un nouvel individual, |
+| **Si** | l'`ontologiste` annule la création d'un nouvel `individual`, |
 |---|---|
 | **Alors** | le formulaire se ferme, la liste revient à son état précédent et l'interface retrouve son état de repos. |
 
@@ -370,9 +370,9 @@
 
 ### REQ-IND-011 — Formulaire de détail d'un individual
 
-| **Si** | un individual est sélectionné ou en cours de création, |
+| **Si** | un `individual` est sélectionné ou en cours de création, |
 |---|---|
-| **Alors** | le formulaire affiche toutes ses informations éditables : identifiant, annotations, types, et panneaux de propriétés ; pour un individual existant, les entités qui le référencent sont également affichées en bas du formulaire. |
+| **Alors** | le formulaire affiche toutes ses informations éditables : identifiant, annotations, types, et panneaux de `propriétés` ; pour un `individual` existant, les entités qui le référencent sont également affichées en bas du formulaire. |
 
 ---
 
@@ -380,9 +380,9 @@
 
 ### REQ-IND-012 — Identifiant IRI affiché dans l'en-tête du formulaire
 
-| **Si** | l'ontologie possède un IRI de base et que l'individual a un identifiant, |
+| **Si** | l'`ontologie` possède un IRI de base et que l'`individual` a un identifiant, |
 |---|---|
-| **Alors** | l'IRI complet de l'individual est affiché dans l'en-tête du formulaire pour permettre à l'ontologiste de l'identifier sans ambiguïté ; cette information n'est pas affichée pour les nouveaux individuals non encore enregistrés. |
+| **Alors** | l'IRI complet de l'`individual` est affiché dans l'en-tête du formulaire pour permettre à l'`ontologiste` de l'identifier sans ambiguïté ; cette information n'est pas affichée pour les nouveaux `individuals` non encore enregistrés. |
 
 ---
 
@@ -390,11 +390,11 @@
 
 ### REQ-IND-013 — Annotations : labels et commentaires
 
-| **Si** | le formulaire est affiché, les annotations existantes sont présentées en lignes éditables. **Si** l'ontologiste ajoute une annotation, |
+| **Si** | le formulaire est affiché, les annotations existantes sont présentées en lignes éditables. **Si** l'`ontologiste` ajoute une annotation, |
 |---|---|
-| **Alors** | une nouvelle ligne est insérée dynamiquement dans le tableau des annotations, avec sauvegarde automatique si l'individual est déjà enregistré. |
+| **Alors** | une nouvelle ligne est insérée dynamiquement dans le tableau des annotations, avec sauvegarde automatique si l'`individual` est déjà enregistré. |
 
-| **Si** | l'ontologiste supprime une annotation, |
+| **Si** | l'`ontologiste` supprime une annotation, |
 |---|---|
 | **Alors** | la ligne est retirée et la sauvegarde est déclenchée automatiquement. |
 
@@ -404,9 +404,9 @@
 
 ### REQ-IND-014 — Annotations de propriétés personnalisées
 
-| **Si** | l'ontologiste sélectionne une propriété d'annotation personnalisée dans le sélecteur dédié, |
+| **Si** | l'`ontologiste` sélectionne une `propriété d'annotation` personnalisée dans le sélecteur dédié, |
 |---|---|
-| **Alors** | une ligne d'annotation pour cette propriété est ajoutée au formulaire et le sélecteur se referme. |
+| **Alors** | une ligne d'annotation pour cette `propriété` est ajoutée au formulaire et le sélecteur se referme. |
 
 ---
 
@@ -414,9 +414,9 @@
 
 ### REQ-IND-016 — Panneaux de propriétés dynamiques (Object Properties)
 
-| **Si** | l'ontologiste consulte le formulaire d'un individual qui possède des Object Properties, |
+| **Si** | l'`ontologiste` consulte le formulaire d'un `individual` qui possède des `Object Properties`, |
 |---|---|
-| **Alors** | chaque Object Property est présentée dans un panneau dédié affichant les individuals cibles déjà assignés, avec la possibilité de naviguer vers chacun d'eux, d'ajouter de nouvelles relations ou d'en supprimer. |
+| **Alors** | chaque `Object Property` est présentée dans un panneau dédié affichant les `individuals` cibles déjà assignés, avec la possibilité de naviguer vers chacun d'eux, d'ajouter de nouvelles relations ou d'en supprimer. |
 
 ---
 
@@ -424,9 +424,9 @@
 
 ### REQ-IND-017 — Panneaux de propriétés dynamiques (Datatype Properties)
 
-| **Si** | l'ontologiste consulte le formulaire d'un individual qui possède des Datatype Properties, |
+| **Si** | l'`ontologiste` consulte le formulaire d'un `individual` qui possède des `Datatype Properties`, |
 |---|---|
-| **Alors** | chaque Datatype Property est présentée dans un panneau dédié affichant les valeurs déjà saisies avec leur type de données, avec la possibilité d'ajouter de nouvelles valeurs ou d'en supprimer ; les valeurs de type URL sont présentées comme des liens cliquables. |
+| **Alors** | chaque `Datatype Property` est présentée dans un panneau dédié affichant les valeurs déjà saisies avec leur type de données, avec la possibilité d'ajouter de nouvelles valeurs ou d'en supprimer ; les valeurs de type URL sont présentées comme des liens cliquables. |
 
 ---
 
@@ -434,23 +434,23 @@
 
 ### REQ-IND-019 — Ouverture du sélecteur d'individual pour une Object Property
 
-| **Si** | l'ontologiste souhaite assigner un individual à une Object Property, |
+| **Si** | l'`ontologiste` souhaite assigner un `individual` à une `Object Property`, |
 |---|---|
-| **Alors** | un sélecteur s'ouvre avec l'arbre des classes et la liste des individuals compatibles avec le domaine de valeurs de la propriété. |
+| **Alors** | un sélecteur s'ouvre avec l'arbre des `classes` et la liste des `individuals` compatibles avec le domaine de valeurs de la `propriété`. |
 
-| **Si** | l'ontologiste sélectionne une classe dans le sélecteur, |
+| **Si** | l'`ontologiste` sélectionne une `classe` dans le sélecteur, |
 |---|---|
-| **Alors** | la liste des individuals est filtrée pour cette classe et ses sous-classes, en excluant l'individual en cours d'édition. |
+| **Alors** | la liste des `individuals` est filtrée pour cette `classe` et ses sous-`classes`, en excluant l'`individual` en cours d'édition. |
 
-| **Si** | l'ontologiste sélectionne un individual dans le sélecteur, |
+| **Si** | l'`ontologiste` sélectionne un `individual` dans le sélecteur, |
 |---|---|
 | **Alors** | le bouton de confirmation devient actif. |
 
-| **Si** | l'ontologiste confirme son choix, |
+| **Si** | l'`ontologiste` confirme son choix, |
 |---|---|
-| **Alors** | l'individual sélectionné est ajouté comme valeur de la propriété dans le formulaire. |
+| **Alors** | l'`individual` sélectionné est ajouté comme valeur de la `propriété` dans le formulaire. |
 
-| **Si** | l'ontologiste ferme le sélecteur sans confirmer, |
+| **Si** | l'`ontologiste` ferme le sélecteur sans confirmer, |
 |---|---|
 | **Alors** | le sélecteur disparaît sans modification. |
 
@@ -460,9 +460,9 @@
 
 ### REQ-IND-033 — Navigation vers un individual cible depuis une Object Property
 
-| **Si** | un panneau d'Object Property affiche des individuals cibles, |
+| **Si** | un panneau d'`Object Property` affiche des `individuals` cibles, |
 |---|---|
-| **Alors** | chaque valeur est cliquable et permet de naviguer directement vers le formulaire de l'individual cible. |
+| **Alors** | chaque valeur est cliquable et permet de naviguer directement vers le formulaire de l'`individual` cible. |
 
 ---
 
@@ -470,7 +470,7 @@
 
 ### REQ-IND-034 — Lien cliquable pour les valeurs de données de type URL
 
-| **Si** | la valeur d'une propriété de données est une URL, |
+| **Si** | la valeur d'une `propriété de données` est une URL, |
 |---|---|
 | **Alors** | un lien cliquable est affiché à côté de la valeur pour l'ouvrir directement dans un nouvel onglet. |
 
@@ -480,9 +480,9 @@
 
 ### REQ-IND-035 — Panneau "Where Used" dans le formulaire
 
-| **Si** | l'ontologiste consulte le formulaire d'un individual existant, |
+| **Si** | l'`ontologiste` consulte le formulaire d'un `individual` existant, |
 |---|---|
-| **Alors** | une section en bas du formulaire liste les autres entités de l'ontologie qui référencent cet individual. |
+| **Alors** | une section en bas du formulaire liste les autres entités de l'`ontologie` qui référencent cet `individual`. |
 
 ---
 
@@ -490,7 +490,7 @@
 
 ### REQ-IND-036 — Redimensionnement des colonnes par glisser-déposer
 
-| **Si** | l'ontologiste fait glisser un séparateur entre deux colonnes, |
+| **Si** | l'`ontologiste` fait glisser un séparateur entre deux colonnes, |
 |---|---|
 | **Alors** | la largeur des colonnes adjacentes s'ajuste en temps réel, dans des limites garantissant la lisibilité de chaque zone. |
 
