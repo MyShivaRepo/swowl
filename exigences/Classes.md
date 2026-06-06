@@ -261,7 +261,7 @@ Dans les deux cas, la modification est sauvegardée automatiquement si la classe
 
 ### REQ-CLS-020 — Rendu de l'arbre des classes avec nœud racine owl:Thing
 
-| **Si** | l'ontologiste ouvre l'onglet Classes d'une ontologie chargée, |
+| **Si** | l'ontologiste ouvre l'onglet `Classes` d'une ontologie chargée, |
 |---|---|
 | **Alors** | l'arbre affiche en tête le concept racine universel (`owl:Thing` ou le label personnalisé de l'ontologie), suivi de l'ensemble des classes organisées en hiérarchie. Si l'ontologie ne contient aucune classe locale, un message d'absence est affiché. |
 
