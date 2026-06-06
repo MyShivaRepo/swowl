@@ -43,98 +43,167 @@
 
 
 ### REQ-AP-001 — Définition des propriétés d'annotation intégrées (built-ins)
-La constante `AP_BUILTINS` définit deux groupes de propriétés d'annotation OWL 2 en lecture seule : le groupe `rdfs:` contenant `rdfs:label`, `rdfs:comment`, `rdfs:seeAlso`, `rdfs:isDefinedBy`, et le groupe `owl:` contenant `owl:versionInfo`, `owl:deprecated`, `owl:priorVersion`, `owl:backwardCompatibleWith`, `owl:incompatibleWith`. Chaque entrée porte un identifiant et un commentaire descriptif en anglais.
+
+**Si** l'ontologie est chargée et exploite des propriétés d'annotation OWL 2 standard,
+
+**Alors** le système dispose d'une constante `AP_BUILTINS` définissant deux groupes de propriétés en lecture seule :
+- le groupe `rdfs:` contenant `rdfs:label`, `rdfs:comment`, `rdfs:seeAlso`, `rdfs:isDefinedBy`
+- le groupe `owl:` contenant `owl:versionInfo`, `owl:deprecated`, `owl:priorVersion`, `owl:backwardCompatibleWith`, `owl:incompatibleWith`
+
+chaque entrée portant un identifiant et un commentaire descriptif en anglais.
 
 ---
 
 **Code source :** `owl_editor.js` → `AP_BUILTINS` (constante objet)
 
 ### REQ-AP-002 — Détection des propriétés built-in vs. utilisateur
-La méthode `_isBuiltin(id)` détermine si un identifiant donné correspond à une propriété built-in en vérifiant sa présence dans les tableaux `AP_BUILTINS['rdfs:']` et `AP_BUILTINS['owl:']`. Elle retourne `true` si l'identifiant est trouvé dans l'un ou l'autre groupe.
+
+**Si** le système évalue un identifiant de propriété d'annotation,
+
+**Alors** il détermine si cet identifiant est une propriété built-in en vérifiant sa présence dans les tableaux `AP_BUILTINS['rdfs:']` et `AP_BUILTINS['owl:']`, et retourne `true` si l'identifiant est trouvé dans l'un ou l'autre groupe.
 
 ---
 
 **Code source :** `owl_editor.js` → `APEditor._isBuiltin()`
 
 ### REQ-AP-003 — Construction de l'arbre hiérarchique des propriétés
-La méthode `_buildUserTree(props)` construit les maps de relations parent-enfant à partir du tableau des propriétés utilisateur. Elle produit : `childrenOf` (map user→[enfants user]), `builtinChildrenOf` (map builtin→[enfants user]) et `roots` (propriétés sans parent, triées alphabétiquement). Les propriétés dont le parent direct est un identifiant built-in sont placées dans `builtinChildrenOf`.
+
+**Si** l'ontologie est chargée et contient des propriétés d'annotation utilisateur,
+
+**Alors** le système construit les maps de relations parent-enfant et produit :
+- `childrenOf` (map user → [enfants user])
+- `builtinChildrenOf` (map builtin → [enfants user])
+- `roots` (propriétés sans parent, triées alphabétiquement)
+
+les propriétés dont le parent direct est un identifiant built-in étant placées dans `builtinChildrenOf`.
 
 ---
 
 **Code source :** `owl_editor.js` → `APEditor._buildUserTree()`
 
 ### REQ-AP-004 — Génération automatique d'un identifiant unique
-La méthode `_generatePropName()` génère un identifiant unique pour une nouvelle propriété. Elle part de la chaîne `'NewAnnotationProperty'` et incrémente un suffixe numérique (`NewAnnotationProperty1`, `NewAnnotationProperty2`, …) jusqu'à trouver un identifiant absent de `APP.state.annotation_properties`.
+
+**Si** l'utilisateur demande la création d'une nouvelle propriété d'annotation,
+
+**Alors** le système génère un identifiant unique en partant de la chaîne `'NewAnnotationProperty'` et en incrémentant un suffixe numérique (`NewAnnotationProperty1`, `NewAnnotationProperty2`, …) jusqu'à trouver un identifiant absent de `APP.state.annotation_properties`.
 
 ---
 
 **Code source :** `owl_editor.js` → `APEditor._generatePropName()`
 
 ### REQ-AP-005 — Création d'une propriété enfant (sub-property)
-La méthode `createChild()` détermine le parent depuis `APEditor._selectedId`. Si le sélectionné n'est pas une racine de namespace, il est placé dans le tableau `subPropertyOf` de la nouvelle propriété. Le nœud parent est expansé dans `APEditor._expanded`. La création est déléguée à `_createAndSelect()` qui appelle `API.createAP(prop)` puis rafraîchit l'affichage.
+
+**Si** l'utilisateur clique sur le bouton "Child" avec une propriété sélectionnée dans l'arbre,
+
+**Alors** :
+- si la propriété sélectionnée n'est pas une racine de namespace, elle est placée dans le tableau `subPropertyOf` de la nouvelle propriété
+- le nœud parent est expansé dans `APEditor._expanded`
+- la nouvelle propriété est créée via `API.createAP(prop)` et immédiatement sélectionnée
 
 ---
 
 **Code source :** `owl_editor.js` → `APEditor.createChild()`
 
 ### REQ-AP-006 — Création d'une propriété sœur (même niveau)
-La méthode `createSibling()` récupère les parents (`subPropertyOf`) de la propriété actuellement sélectionnée depuis `APP.state.annotation_properties`, les place comme parents de la nouvelle propriété, et expande ces parents dans `APEditor._expanded`. La création est ensuite déléguée à `_createAndSelect()`.
+
+**Si** l'utilisateur clique sur le bouton "Sibling" avec une propriété sélectionnée dans l'arbre,
+
+**Alors** les parents (`subPropertyOf`) de la propriété sélectionnée sont récupérés depuis `APP.state.annotation_properties`, placés comme parents de la nouvelle propriété, ces parents sont expansés dans `APEditor._expanded`, et la création est déléguée à `_createAndSelect()`.
 
 ---
 
 **Code source :** `owl_editor.js` → `APEditor.createSibling()`
 
 ### REQ-AP-007 — Collecte des données du formulaire
-La méthode `_collectForm()` lit l'identifiant depuis le champ `ap-id` (avec normalisation des espaces en `_`), récupère le `subPropertyOf` existant depuis `APP.state.annotation_properties` pour le conserver (le formulaire ne l'expose pas directement), puis appelle `_collectAnnotations('ap-annotations-body')` pour collecter labels, commentaires et autres annotations.
+
+**Si** le système collecte les données saisies dans le formulaire d'une propriété d'annotation utilisateur,
+
+**Alors** :
+- l'identifiant est lu depuis le champ `ap-id` avec normalisation des espaces en `_`
+- le `subPropertyOf` existant est conservé depuis `APP.state.annotation_properties` (le formulaire ne l'expose pas directement)
+- les labels, commentaires et autres annotations sont collectés via `_collectAnnotations('ap-annotations-body')`
 
 ---
 
 **Code source :** `owl_editor.js` → `APEditor._collectForm()`
 
 ### REQ-AP-008 — Sauvegarde automatique à chaque modification
-La méthode `_autoSave()` est déclenchée par `onchange` sur tous les champs du formulaire. Elle vérifie que la sélection courante est une propriété utilisateur (non racine, non built-in), collecte les données via `_collectForm()`, appelle `API.updateAP(id, data)`, détecte un éventuel renommage (si `data.id !== id`), puis rafraîchit l'état et restaure la sélection via `APP.refresh()` et `APEditor.restoreSelection()`.
+
+**Si** l'utilisateur modifie un champ du formulaire d'une propriété utilisateur (non racine, non built-in),
+
+**Alors** le système collecte les données via `_collectForm()`, appelle `API.updateAP(id, data)`, détecte un éventuel renommage (si `data.id !== id`), puis rafraîchit l'état et restaure la sélection via `APP.refresh()` et `APEditor.restoreSelection()`.
 
 ---
 
 **Code source :** `owl_editor.js` → `APEditor._autoSave()`
 
 ### REQ-AP-009 — Sauvegarde manuelle explicite
-La méthode `save()` collecte les données via `_collectForm()`, valide l'identifiant via `_validateId()`, appelle `API.updateAP()` avec l'identifiant d'édition original (`_editingId`) ou le nouvel identifiant, met à jour `_editingId` et `_selectedId`, expande le nœud sauvegardé, puis rafraîchit l'affichage.
+
+**Si** l'utilisateur déclenche une sauvegarde manuelle sur une propriété utilisateur,
+
+**Alors** le système collecte les données via `_collectForm()`, valide l'identifiant via `_validateId()`, appelle `API.updateAP()` avec l'identifiant d'édition original (`_editingId`) ou le nouvel identifiant, met à jour `_editingId` et `_selectedId`, expande le nœud sauvegardé, puis rafraîchit l'affichage.
 
 ---
 
 **Code source :** `owl_editor.js` → `APEditor.save()`
 
 ### REQ-AP-010 — Glisser-déposer pour réorganiser la hiérarchie
-`onDragStart(event, id)` initialise le glisser en stockant l'identifiant dans `APEditor._dragId` et en utilisant `event.dataTransfer`. `onDragOver(event, targetId)` autorise le dépôt sur des cibles valides. `onDrop(event, targetId)` recalcule le nouveau `subPropertyOf` : si la cible est une racine de namespace, `subPropertyOf` devient `[]` ; sinon, `subPropertyOf = [targetId]`. La mise à jour est persistée via `API.updateAP()`.
+
+**Si** l'utilisateur glisse une propriété utilisateur et la dépose sur une cible valide dans l'arbre,
+
+**Alors** :
+- si la cible est une racine de namespace, `subPropertyOf` devient `[]`
+- sinon, `subPropertyOf = [targetId]`
+- la mise à jour est persistée via `API.updateAP()`
 
 ---
 
 **Code source :** `owl_editor.js` → `APEditor.onDragStart()` | `APEditor.onDragOver()` | `APEditor.onDrop()`
 
 ### REQ-AP-011 — Prévention des cycles lors du glisser-déposer
-La méthode `_isDescendant(potentialDesc, ancestorId)` parcourt récursivement l'arbre `childrenOf` pour déterminer si `potentialDesc` est un descendant de `ancestorId`. Dans `onDragOver()`, si la cible est un descendant de la propriété glissée, le drop est refusé (`event.preventDefault()` n'est pas appelé).
+
+**Si** l'utilisateur tente de déposer une propriété sur l'un de ses propres descendants dans l'arbre,
+
+**Alors** le dépôt est refusé afin de prévenir la formation d'un cycle hiérarchique, en ne déclenchant pas `event.preventDefault()` dans `onDragOver()`.
 
 ---
 
 **Code source :** `owl_editor.js` → `APEditor._isDescendant()` | `APEditor.onDragOver()`
 
 ### REQ-AP-012 — Suppression d'une propriété utilisateur avec confirmation
-La méthode `deleteSelected()` bloque la suppression si la sélection est une racine ou une propriété built-in. Elle affiche une boîte de confirmation via `UI.confirm()` avec le message `"Delete annotation property <strong>${id}</strong>?"`. En cas de confirmation, elle appelle `API.deleteAP(id)`, remet `_selectedId` à `null`, rafraîchit l'état via `APP.refresh()`, réinitialise le panneau de détail avec le message d'invite vide, et redessine l'arbre.
+
+**Si** l'utilisateur clique sur "Delete" avec une propriété utilisateur sélectionnée (non racine, non built-in)
+**et** confirme la suppression dans la boîte de dialogue `UI.confirm()`,
+
+**Alors** :
+- `API.deleteAP(id)` est appelé
+- `_selectedId` est remis à `null`
+- l'état est rafraîchi via `APP.refresh()`
+- le panneau de détail est réinitialisé avec le message d'invite vide
+- l'arbre est redessiné
 
 ---
 
 **Code source :** `owl_editor.js` → `APEditor.deleteSelected()`
 
 ### REQ-AP-013 — Collecte des annotations (labels, commentaires, autres)
-La fonction globale `_collectAnnotations(tbodyId)` parcourt toutes les lignes CSS `.anno-row` du tableau identifié par `tbodyId`. Pour chaque ligne non vide, elle lit la valeur (`.anno-value`) et la langue (`.anno-lang-inp`), puis classe l'entrée dans `labels`, `comments` ou `other` selon `row.dataset.type`. Pour les lignes `'other'`, la propriété cible est lue dans `row.dataset.prop`.
+
+**Si** le système collecte les annotations d'un formulaire identifié par `tbodyId`,
+
+**Alors** il parcourt toutes les lignes CSS `.anno-row` du tableau, et pour chaque ligne non vide :
+- lit la valeur (`.anno-value`) et la langue (`.anno-lang-inp`)
+- classe l'entrée dans `labels`, `comments` ou `other` selon `row.dataset.type`
+- pour les lignes `'other'`, lit la propriété cible dans `row.dataset.prop`
 
 ---
 
 **Code source :** `owl_editor.js` → `_collectAnnotations()`
 
 ### REQ-AP-014 — Picker de sélection de propriété d'annotation
-La fonction globale `_annoPickerItems(editorName)` génère le HTML du sélecteur (picker) de propriétés d'annotation disponible dans les formulaires de tous les éditeurs (dont `APEditor`). Elle appelle `APEditor._buildUserTree()` pour obtenir la hiérarchie des propriétés utilisateur, puis rend un arbre cliquable composé des built-ins (`AP_BUILTINS`) et des propriétés utilisateur. Un clic sur un élément appelle `<editorName>.addOtherAnnotRow(id)`.
+
+**Si** un formulaire d'éditeur affiche le sélecteur (picker) de propriétés d'annotation,
+
+**Alors** le système génère un arbre cliquable composé des propriétés built-in (`AP_BUILTINS`) et des propriétés utilisateur issues de `APEditor._buildUserTree()`, un clic sur un élément déclenchant `<editorName>.addOtherAnnotRow(id)`.
 
 ---
 
@@ -145,91 +214,145 @@ La fonction globale `_annoPickerItems(editorName)` génère le HTML du sélecteu
 > Exigences relatives à l'affichage : layout, composants visuels, interactions, navigation, styles.
 
 ### REQ-AP-015 — Rendu des nœuds built-in dans l'arbre
-La méthode `_renderBuiltinNode(p, childrenOf, builtinChildrenOf, props)` génère le HTML d'un nœud built-in dans l'arbre. Elle affiche l'identifiant de la propriété, un badge textuel `built-in`, un indicateur d'expansion si la propriété a des enfants utilisateur, et rend récursivement les enfants utilisateur via `_renderUserNode()`. Le nœud accepte les événements `ondragover` et `ondrop` mais n'est pas lui-même `draggable`.
+
+**Si** l'arbre des propriétés d'annotation doit afficher une propriété built-in,
+
+**Alors** le système génère un nœud affichant l'identifiant de la propriété, un badge textuel `built-in`, un indicateur d'expansion si la propriété a des enfants utilisateur, et rend récursivement les enfants utilisateur via `_renderUserNode()`. Le nœud accepte les événements `ondragover` et `ondrop` mais n'est pas lui-même `draggable`.
 
 ---
 
 **Code source :** `owl_editor.js` → `APEditor._renderBuiltinNode()`
 
 ### REQ-AP-016 — Rendu des nœuds utilisateur dans l'arbre
-La méthode `_renderUserNode(id, childrenOf, depth, props)` génère le HTML d'un nœud propriété utilisateur avec indentation calculée selon la profondeur (`depth * 16 + 6` pixels). Le nœud est `draggable="true"` et expose les gestionnaires `ondragstart`, `ondragover`, `ondragleave`, `ondrop`, `ondragend`. Il se rend récursivement pour tous les enfants. L'état d'expansion est lu depuis `APEditor._expanded`.
+
+**Si** l'arbre des propriétés d'annotation doit afficher une propriété utilisateur,
+
+**Alors** le système génère un nœud `draggable="true"` avec une indentation calculée selon la profondeur (`depth * 16 + 6` pixels), exposant les gestionnaires `ondragstart`, `ondragover`, `ondragleave`, `ondrop`, `ondragend`, et se rendant récursivement pour tous ses enfants. L'état d'expansion est lu depuis `APEditor._expanded`.
 
 ---
 
 **Code source :** `owl_editor.js` → `APEditor._renderUserNode()`
 
 ### REQ-AP-017 — Rendu complet de l'arbre avec racines de namespace
-La méthode `_renderTree(props)` compose l'arbre complet : deux racines de namespace `rdfs:` et `owl:` (affichées uniquement si `APP.getOntologyRootLabels().classRoot === 'owl:Thing'`), les propriétés utilisateur sans namespace connu ("orphans") rendues à la racine. Chaque racine de namespace est cliquable, expansible, et reçoit les events de drag-over et drop.
+
+**Si** l'onglet des propriétés d'annotation est affiché et que `APP.getOntologyRootLabels().classRoot === 'owl:Thing'`,
+
+**Alors** le système compose l'arbre complet avec deux racines de namespace `rdfs:` et `owl:`, les propriétés utilisateur sans namespace connu ("orphans") rendues à la racine. Chaque racine de namespace est cliquable, expansible, et reçoit les événements de drag-over et drop.
 
 ---
 
 **Code source :** `owl_editor.js` → `APEditor._renderTree()`
 
 ### REQ-AP-018 — Mise en page en panneau divisé (split pane)
-La méthode `renderSplit(props)` génère la mise en page complète de l'onglet : un panneau gauche (`ap-tree-panel`) contenant l'arbre et le panneau des super-propriétés, une poignée de redimensionnement (`ap-split-handle`), et un panneau de détail droit (`ap-detail`). Le panneau gauche présente trois boutons d'action : "Child", "Sibling" et "Delete", initialement désactivés. Un message d'invite et un bouton "＋ Create Annotation Property" s'affichent dans le panneau de détail vide.
+
+**Si** l'onglet des propriétés d'annotation est rendu,
+
+**Alors** le système génère une mise en page complète composée de :
+- un panneau gauche (`ap-tree-panel`) contenant l'arbre et le panneau des super-propriétés, avec trois boutons d'action "Child", "Sibling" et "Delete" initialement désactivés
+- une poignée de redimensionnement (`ap-split-handle`)
+- un panneau de détail droit (`ap-detail`) affichant un message d'invite et un bouton "＋ Create Annotation Property" lorsqu'aucune propriété n'est sélectionnée
 
 ---
 
 **Code source :** `owl_editor.js` → `APEditor.renderSplit()`
 
 ### REQ-AP-019 — Redimensionnement du panneau gauche par glisser-déposer
-La méthode `_initSplitPane()` attache un listener `mousedown` sur la poignée `ap-split-handle`. Lors du glisser, la largeur du panneau `ap-tree-panel` est recalculée en pixels avec un minimum de 160 px et un maximum de 520 px. La méthode appelle aussi `_initHResizers('ap-tree-panel')` pour le redimensionnement horizontal interne.
+
+**Si** l'utilisateur glisse la poignée `ap-split-handle`,
+
+**Alors** la largeur du panneau `ap-tree-panel` est recalculée en pixels avec un minimum de 160 px et un maximum de 520 px, et le redimensionnement horizontal interne est initialisé via `_initHResizers('ap-tree-panel')`.
 
 ---
 
 **Code source :** `owl_editor.js` → `APEditor._initSplitPane()`
 
 ### REQ-AP-020 — Déplier/replier les nœuds de l'arbre
-La méthode `toggleNode(id)` ajoute ou retire l'identifiant du `Set` interne `APEditor._expanded`, puis redéclenche un rendu complet de l'arbre via `_renderTree()` et `_highlightSelected()`. Les nœuds `rdfs:` et `owl:` sont pré-expandus à l'initialisation.
+
+**Si** l'utilisateur clique sur l'indicateur d'expansion d'un nœud de l'arbre,
+
+**Alors** le système ajoute ou retire l'identifiant du `Set` interne `APEditor._expanded`, puis redéclenche un rendu complet de l'arbre via `_renderTree()` et `_highlightSelected()`. Les nœuds `rdfs:` et `owl:` sont pré-expansés à l'initialisation.
 
 ---
 
 **Code source :** `owl_editor.js` → `APEditor.toggleNode()`
 
 ### REQ-AP-021 — Sélection d'une propriété dans l'arbre
-La méthode `selectProp(id)` met à jour `APEditor._selectedId`, rafraîchit la mise en évidence visuelle et les boutons, puis charge le panneau de détail approprié : `_renderRootDetail()` pour une racine de namespace, `_renderBuiltinDetail()` pour une propriété built-in, `_renderForm()` pour une propriété utilisateur. Dans tous les cas, `_updateSuperPanel()` est appelé pour mettre à jour le panneau des super-propriétés.
+
+**Si** l'utilisateur clique sur un nœud de l'arbre des propriétés d'annotation,
+
+**Alors** le système met à jour `APEditor._selectedId`, rafraîchit la mise en évidence visuelle et les boutons, et charge le panneau de détail approprié :
+- `_renderRootDetail()` pour une racine de namespace
+- `_renderBuiltinDetail()` pour une propriété built-in
+- `_renderForm()` pour une propriété utilisateur
+
+dans tous les cas, `_updateSuperPanel()` est appelé pour mettre à jour le panneau des super-propriétés.
 
 ---
 
 **Code source :** `owl_editor.js` → `APEditor.selectProp()`
 
 ### REQ-AP-022 — Gestion de l'état des boutons d'action selon la sélection
-La méthode `_updateButtons()` active ou masque les boutons "Child", "Sibling" et "Delete" selon le type de l'élément sélectionné : si la sélection est une racine de namespace, tous les boutons sont masqués ; si c'est une propriété built-in, seul "Child" est visible ; si c'est une propriété utilisateur, "Child", "Sibling" et "Delete" sont tous visibles et activés.
+
+**Si** la sélection dans l'arbre change,
+
+**Alors** le système active ou masque les boutons "Child", "Sibling" et "Delete" selon le type de l'élément sélectionné :
+- racine de namespace : tous les boutons sont masqués
+- propriété built-in : seul "Child" est visible
+- propriété utilisateur : "Child", "Sibling" et "Delete" sont tous visibles et activés
 
 ---
 
 **Code source :** `owl_editor.js` → `APEditor._updateButtons()`
 
 ### REQ-AP-023 — Affichage du détail d'une racine de namespace
-La méthode `_renderRootDetail(ns)` génère un panneau de détail en lecture seule pour une racine de namespace (`rdfs:` ou `owl:`). Elle liste toutes les propriétés built-in du namespace avec leur identifiant et leur commentaire descriptif. Un badge indique "Namespace root — not an AnnotationProperty".
+
+**Si** l'utilisateur sélectionne une racine de namespace (`rdfs:` ou `owl:`) dans l'arbre,
+
+**Alors** le système affiche un panneau de détail en lecture seule listant toutes les propriétés built-in du namespace avec leur identifiant et leur commentaire descriptif, accompagné d'un badge "Namespace root — not an AnnotationProperty".
 
 ---
 
 **Code source :** `owl_editor.js` → `APEditor._renderRootDetail()`
 
 ### REQ-AP-024 — Affichage du détail d'une propriété built-in (lecture seule)
-La méthode `_renderBuiltinDetail(id)` génère un panneau de détail en lecture seule pour une propriété OWL 2 built-in. Elle affiche l'identifiant, le commentaire descriptif de `AP_BUILTINS`, et la mention en italique "Built-in OWL 2 annotation property — read-only." Aucun formulaire d'édition n'est fourni.
+
+**Si** l'utilisateur sélectionne une propriété OWL 2 built-in dans l'arbre,
+
+**Alors** le système affiche un panneau de détail en lecture seule présentant l'identifiant, le commentaire descriptif issu de `AP_BUILTINS`, et la mention "Built-in OWL 2 annotation property — read-only." Aucun formulaire d'édition n'est fourni.
 
 ---
 
 **Code source :** `owl_editor.js` → `APEditor._renderBuiltinDetail()`
 
 ### REQ-AP-025 — Formulaire d'édition d'une propriété utilisateur
-La méthode `_renderForm(prop)` génère le formulaire d'édition d'une propriété utilisateur. Il contient un champ texte `ap-id` pour l'identifiant local (avec `oninput="_sanitizeId(this)"` et `onchange="APEditor._autoSave()"`), l'IRI complète de la propriété construite depuis `APP.state.ontology.id`, et le libellé `(instance of owl:AnnotationProperty)`. Les lignes d'annotation existantes (`rdfs:label`, `rdfs:comment`, autres) sont pré-remplies via `_annoRow()`.
+
+**Si** l'utilisateur sélectionne une propriété d'annotation utilisateur dans l'arbre,
+
+**Alors** le système affiche un formulaire d'édition contenant :
+- un champ texte `ap-id` pour l'identifiant local (avec `oninput="_sanitizeId(this)"` et `onchange="APEditor._autoSave()"`)
+- l'IRI complète de la propriété construite depuis `APP.state.ontology.id`
+- le libellé `(instance of owl:AnnotationProperty)`
+- les lignes d'annotation existantes (`rdfs:label`, `rdfs:comment`, autres) pré-remplies via `_annoRow()`
 
 ---
 
 **Code source :** `owl_editor.js` → `APEditor._renderForm()`
 
 ### REQ-AP-026 — Ajout d'une ligne d'annotation dans le formulaire
-La méthode `addAnnotRow(type)` ajoute une nouvelle ligne vide dans le tableau `ap-annotations-body` en appelant `_makeAnnotRow(type, 'APEditor', ac)`. Le paramètre `type` peut être `'label'`, `'comment'` ou `'other'`. Chaque ligne créée déclenche `APEditor._autoSave()` à chaque modification.
+
+**Si** l'utilisateur demande l'ajout d'une annotation dans le formulaire d'une propriété utilisateur,
+
+**Alors** le système ajoute une nouvelle ligne vide dans le tableau `ap-annotations-body` via `_makeAnnotRow(type, 'APEditor', ac)`, le paramètre `type` pouvant être `'label'`, `'comment'` ou `'other'`, chaque ligne déclenchant `APEditor._autoSave()` à chaque modification.
 
 ---
 
 **Code source :** `owl_editor.js` → `APEditor.addAnnotRow()`
 
 ### REQ-AP-027 — Panneau des super-propriétés avec chaîne d'héritage
-La méthode `_updateSuperPanel(selectedId)` met à jour le panneau `ap-super-list`. Pour chaque parent direct de la propriété sélectionnée, elle reconstruit la chaîne complète d'héritage (fonction interne `buildChain()`) en remontant récursivement jusqu'à la racine, en ajoutant la racine de namespace (`rdfs:` ou `owl:`) en fin de chaîne. Chaque ancêtre est affiché avec une indentation croissante et un lien de navigation cliquable via `APP.navigateTo()`.
+
+**Si** une propriété d'annotation est sélectionnée dans l'arbre,
+
+**Alors** le système met à jour le panneau `ap-super-list` en reconstruisant pour chaque parent direct la chaîne complète d'héritage (via `buildChain()`) en remontant récursivement jusqu'à la racine, en ajoutant la racine de namespace (`rdfs:` ou `owl:`) en fin de chaîne. Chaque ancêtre est affiché avec une indentation croissante et un lien de navigation cliquable via `APP.navigateTo()`.
 
 ---
 
