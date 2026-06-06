@@ -7,7 +7,7 @@ import logging
 from contextlib import asynccontextmanager
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException, UploadFile, File, Query
+from fastapi import FastAPI, HTTPException, UploadFile, File, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from pydantic import BaseModel as PydanticModel
@@ -1204,6 +1204,168 @@ def reveal_in_finder(path: str = Query(..., description="Host path to reveal in 
             return {"status": "ok", "revealed": host_path}
     except Exception as e:
         raise HTTPException(503, f"Host agent not reachable — start host_agent.py first. ({e})")
+
+
+# ── Sparnatural — config SHACL ────────────────────────────────
+
+@app.get("/api/sparnatural-config", tags=["Queries"])
+def sparnatural_config():
+    """Génère une config SHACL Turtle pour Sparnatural à partir de l'ontologie courante."""
+    onto = store.get()
+    if not onto:
+        raise HTTPException(400, "Aucune ontologie connectée")
+
+    import rdflib as _rdf
+    from rdflib import Graph as _G, Namespace as _NS, RDF as _RDF, RDFS as _RDFS
+    from rdflib import OWL as _OWL, URIRef as _URI, Literal as _Lit, BNode as _BN
+
+    SH   = _NS("http://www.w3.org/ns/shacl#")
+    SPRN = _NS("http://data.sparna.fr/ontologies/sparnatural-config-core#")
+
+    base   = onto.id.rstrip("#/") + "#"
+    prefix = onto.prefix or "onto"
+    NS     = _NS(base)
+
+    g = _G()
+    g.bind("sh",          SH)
+    g.bind("sparnatural", SPRN)
+    g.bind("owl",         _OWL)
+    g.bind("rdfs",        _RDFS)
+    g.bind(prefix,        NS)
+
+    def _iri(local_id: str) -> _URI:
+        if local_id.startswith("http"):
+            return _URI(local_id)
+        return NS[local_id]
+
+    def _best_label(anns):
+        labels = getattr(anns, "labels", []) if anns else []
+        return labels[0] if labels else None
+
+    # ── Séparer OPs avec domaine / sans domaine ────────────────
+    ops_with_domain    = []   # (op, domain_id, range_id_or_None)
+    ops_without_domain = []   # (op, range_id_or_None)
+
+    for op in onto.object_properties:
+        ranges  = op.range or []
+        range_id = ranges[0] if ranges else None
+        domains = op.domain or []
+        if domains:
+            for d in domains:
+                ops_with_domain.append((op, d, range_id))
+        else:
+            ops_without_domain.append((op, range_id))
+
+    # Index domaine → [(op, range_id)]
+    prop_by_domain: dict = {}
+    for op, d, r in ops_with_domain:
+        prop_by_domain.setdefault(d, []).append((op, r))
+
+    # ── NodeShape + PropertyShapes pour chaque classe ──────────
+    for cls in onto.classes:
+        shape = NS[cls.id + "Shape"]
+        g.add((shape, _RDF.type, SH.NodeShape))
+        g.add((shape, _RDF.type, _OWL.Class))
+        g.add((shape, SH.targetClass, _iri(cls.id)))
+
+        lbl = _best_label(cls.annotations)
+        if lbl:
+            lang = lbl.lang or "en"
+            g.add((shape, _RDFS.label, _Lit(lbl.value, lang=lang)))
+        else:
+            g.add((shape, _RDFS.label, _Lit(cls.id)))
+
+        # OPs avec ce domaine + OPs sans domaine (applicables à toutes les classes)
+        class_props = prop_by_domain.get(cls.id, []) + [(op, r) for op, r in ops_without_domain]
+
+        for op, range_id in class_props:
+            # Identifiant unique pour la PropertyShape
+            pshape = NS[f"{cls.id}_{op.id}Shape"]
+            g.add((shape, SH.property, pshape))
+            g.add((pshape, _RDF.type, SH.PropertyShape))
+            g.add((pshape, SH.path,   _iri(op.id)))
+            if range_id:
+                g.add((pshape, SH["class"], _iri(range_id)))
+            plbl = _best_label(op.annotations)
+            if plbl:
+                g.add((pshape, _RDFS.label, _Lit(plbl.value, lang=plbl.lang or "en")))
+            else:
+                g.add((pshape, _RDFS.label, _Lit(op.id)))
+            g.add((pshape, SPRN.searchConfig, SPRN.SearchProperty))
+
+    turtle_str = g.serialize(format="turtle")
+    from fastapi.responses import Response
+    return Response(content=turtle_str, media_type="text/turtle; charset=utf-8")
+
+
+# ── Sparnatural — endpoint SPARQL 1.1 ─────────────────────────
+
+@app.get("/api/sparql", tags=["Queries"])
+@app.post("/api/sparql", tags=["Queries"])
+async def sparql_endpoint(
+    request: Request,
+    query: str = Query(default=None, description="SPARQL query (GET)"),
+):
+    """Endpoint SPARQL 1.1 — exécute une requête sur l'ontologie courante."""
+    onto = store.get()
+    if not onto:
+        raise HTTPException(400, "Aucune ontologie connectée")
+
+    # Récupérer la query depuis le body si POST
+    sparql_query = query
+    if sparql_query is None:
+        content_type = request.headers.get("content-type", "")
+        body = await request.body()
+        if "application/sparql-query" in content_type:
+            sparql_query = body.decode("utf-8")
+        elif "application/x-www-form-urlencoded" in content_type:
+            from urllib.parse import parse_qs
+            parsed = parse_qs(body.decode("utf-8"))
+            sparql_query = (parsed.get("query") or [None])[0]
+
+    if not sparql_query:
+        raise HTTPException(400, "Paramètre 'query' manquant")
+
+    try:
+        # Construire le graphe RDF depuis l'ontologie
+        g = store.to_rdf_graph()
+        result = g.query(sparql_query)
+
+        # Sérialiser en SPARQL JSON (W3C)
+        import json
+        vars_list = [str(v) for v in result.vars] if result.vars else []
+        bindings = []
+        for row in result:
+            binding = {}
+            for v in result.vars:
+                val = row[v]
+                if val is None:
+                    continue
+                import rdflib
+                if isinstance(val, rdflib.URIRef):
+                    binding[str(v)] = {"type": "uri", "value": str(val)}
+                elif isinstance(val, rdflib.Literal):
+                    b = {"type": "literal", "value": str(val)}
+                    if val.language:
+                        b["xml:lang"] = val.language
+                    if val.datatype:
+                        b["datatype"] = str(val.datatype)
+                    binding[str(v)] = b
+                elif isinstance(val, rdflib.BNode):
+                    binding[str(v)] = {"type": "bnode", "value": str(val)}
+            bindings.append(binding)
+
+        sparql_json = {
+            "head": {"vars": vars_list},
+            "results": {"bindings": bindings}
+        }
+        from fastapi.responses import JSONResponse
+        return JSONResponse(
+            content=sparql_json,
+            headers={"Access-Control-Allow-Origin": "*"}
+        )
+    except Exception as e:
+        raise HTTPException(400, f"Erreur SPARQL : {e}")
 
 
 @app.get("/api/health", tags=["Système"])

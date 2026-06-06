@@ -2,6 +2,49 @@
  * app.js — Main application: state, navigation, section rendering
  */
 
+// ── Tab visibility (persisted in localStorage) ──────────────────────
+const TabVisibility = {
+    _key:      'swowl_hidden_tabs',
+    _optional: ['annotation-properties','individuals','swrl-rules','views','queries','inferences'],
+    _hidden:   new Set(),
+
+    load() {
+        try {
+            const arr = JSON.parse(localStorage.getItem(this._key) || '[]');
+            this._hidden = new Set(arr);
+        } catch(_) { this._hidden = new Set(); }
+    },
+
+    save() {
+        localStorage.setItem(this._key, JSON.stringify([...this._hidden]));
+    },
+
+    isHidden(tabId)   { return this._hidden.has(tabId); },
+    isOptional(tabId) { return this._optional.includes(tabId); },
+
+    hide(tabId) {
+        if (!this.isOptional(tabId)) return;
+        this._hidden.add(tabId);
+        this.save();
+        APP._applyTabVisibility();
+        if (APP.currentSection === tabId) APP.navigate('ontologies');
+        if (APP.currentSection === 'settings' && APP._settingsTab === 'gui-tabs')
+            APP.renderSection('settings');
+    },
+
+    show(tabId) {
+        this._hidden.delete(tabId);
+        this.save();
+        APP._applyTabVisibility();
+        if (APP.currentSection === 'settings' && APP._settingsTab === 'gui-tabs')
+            APP.renderSection('settings');
+    },
+
+    toggle(tabId) {
+        if (this.isHidden(tabId)) this.show(tabId); else this.hide(tabId);
+    }
+};
+
 // ── User settings (persisted in localStorage) ───────
 
 const Settings = {
@@ -209,6 +252,7 @@ const APP = {
             item.classList.toggle('active', item.dataset.section === this.currentSection);
         });
         this.updateStats();
+        APP._applyTabVisibility();
     },
 
     // ── History management ──────────────────────────────────────
@@ -358,7 +402,7 @@ const APP = {
         const main = document.getElementById('main-content');
 
         // Block editing tabs if no ontology is connected
-        const editSections = ['classes','object-properties','datatype-properties','individuals','swrl-rules','inferences'];
+        const editSections = ['classes','object-properties','datatype-properties','individuals','swrl-rules','views','queries','inferences'];
         if (!this.state.ontology && editSections.includes(section)) {
             main.innerHTML = this._noOntoMsg();
             return;
@@ -394,6 +438,16 @@ const APP = {
             case 'swrl-rules':
                 main.innerHTML = SWRLEditor.renderSplit(this.state.swrl_rules || []);
                 SWRLEditor.restoreSelection();
+                break;
+            case 'views':
+                main.innerHTML = APP.renderViews();
+                if (APP._viewsTab === 'ontology') setTimeout(() => APP._initHyperbolicGraph(), 80);
+                if (APP._viewsTab === 'knowledge-base') setTimeout(() => APP._initKnowledgeBase(), 80);
+                break;
+            case 'queries':
+                main.innerHTML = APP.renderQueries();
+                if (APP._queriesTab === 'sparnatural') setTimeout(() => APP._initSparnatural(), 80);
+                if (APP._queriesTab === 'vizq')        SparqlEditor.restoreSelection();
                 break;
             case 'inferences':
                 main.innerHTML = `
@@ -1626,9 +1680,836 @@ const GlobalSearch = {
     },
 };
 
+// ── Queries UI ────────────────────────────────────────────────────
+
+APP._queriesTab = APP._queriesTab || 'sparnatural';
+
+APP.renderQueries = function() {
+    const tab = APP._queriesTab;
+
+    // ── Sidebar vertical ──────────────────────────────────────────
+    const tabBtn = (id, icon, label) => {
+        const active = tab === id;
+        return `
+        <div class="settings-vtab${active ? ' active' : ''}"
+             onclick="APP._queriesTab='${id}';APP.renderSection('queries')"
+             style="padding:10px 16px;cursor:pointer;font-size:13px;
+                    font-weight:${active ? '600' : '400'};user-select:none;
+                    border-left:3px solid ${active ? 'var(--accent)' : 'transparent'};
+                    color:${active ? 'var(--accent)' : 'var(--text1)'};
+                    background:${active ? 'var(--bg3)' : 'transparent'};
+                    white-space:nowrap;display:flex;align-items:center;gap:6px">
+            ${icon} ${label}
+        </div>`;
+    };
+
+    const sidebar = `
+        <div style="width:160px;flex-shrink:0;border-right:1px solid var(--border);padding:8px 0">
+            ${tabBtn('sparnatural', '🔎', 'Sparnatural')}
+            ${tabBtn('vizq',        '🎯', 'SPARQL VizQ')}
+        </div>`;
+
+    // ── Tab content ───────────────────────────────────────────────
+    let content = '';
+
+    if (tab === 'sparnatural') {
+        content = `
+        <div style="display:flex;flex-direction:column;height:100%;overflow:hidden">
+            <div id="sparnatural-wrap"
+                 style="flex-shrink:0;padding:16px;border-bottom:1px solid var(--border);
+                        background:var(--bg2)">
+                <p style="color:var(--text-dim);font-style:italic;font-size:13px">
+                    Chargement de Sparnatural…
+                </p>
+            </div>
+            <div style="flex:1;overflow-y:auto">
+                <div id="sparnatural-results" style="padding:16px"></div>
+            </div>
+        </div>`;
+    } else if (tab === 'vizq') {
+        content = SparqlEditor.renderSplit();
+    }
+
+    return `
+    <div style="height:100%;display:flex;overflow:hidden">
+        ${sidebar}
+        <div style="flex:1;overflow:hidden;display:flex;flex-direction:column;min-height:0">
+            ${content}
+        </div>
+    </div>`;
+};
+
+APP._initSparnatural = function() {
+    const wrap = document.getElementById('sparnatural-wrap');
+    if (!wrap) return;
+
+    // Attendre que le custom element soit enregistré (max 5s)
+    const maxWait = 5000;
+    const start   = Date.now();
+    const tryInit = () => {
+        if (customElements.get('spar-natural')) {
+            APP._doInitSparnatural(wrap);
+        } else if (Date.now() - start < maxWait) {
+            setTimeout(tryInit, 200);
+        } else {
+            wrap.innerHTML = `<p style="color:#f87171;font-size:13px">
+                ⚠ Sparnatural n'a pas pu être chargé depuis
+                <a href="https://cdn.jsdelivr.net/npm/sparnatural@9.1.6/dist/sparnatural.js"
+                   target="_blank" style="color:#60a5fa">jsdelivr.net</a> —
+                vérifiez votre connexion réseau.
+            </p>`;
+        }
+    };
+    tryInit();
+};
+
+APP._doInitSparnatural = function(wrap) {
+
+    wrap.innerHTML = `
+        <spar-natural
+            id="sparnatural-widget"
+            src="/api/sparnatural-config"
+            endpoint="/api/sparql"
+            language="${(typeof Settings !== 'undefined' && Settings.preferredLang) || 'en'}"
+            defaultlang="${(typeof Settings !== 'undefined' && Settings.preferredLang) || 'en'}"
+            limit="1000"
+            style="--sparnatural-primary-color:#3b82f6;
+                   --sparnatural-secondary-color:#1d2535;
+                   --sparnatural-background-color:#161b24;
+                   --sparnatural-text-color:#e2e8f0;
+                   --sparnatural-border-color:#2a3347;">
+        </spar-natural>`;
+
+    // Écouter les événements Sparnatural
+    const widget = document.getElementById('sparnatural-widget');
+    if (!widget) return;
+
+    widget.addEventListener('queryUpdated', async (e) => {
+        const sparql = e.detail.queryString;
+        if (!sparql) return;
+        await APP._runSparqlQuery(sparql);
+    });
+
+    widget.addEventListener('submit', async (e) => {
+        const sparql = e.detail.queryString;
+        if (!sparql) return;
+        await APP._runSparqlQuery(sparql);
+    });
+};
+
+APP._runSparqlQuery = async function(sparql) {
+    const resultsDiv = document.getElementById('sparnatural-results');
+    if (!resultsDiv) return;
+    resultsDiv.innerHTML = '<p style="color:var(--text-dim);font-style:italic;font-size:12px">Exécution…</p>';
+    try {
+        const res = await fetch('/api/sparql', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: 'query=' + encodeURIComponent(sparql),
+        });
+        if (!res.ok) throw new Error(await res.text());
+        const data = await res.json();
+        APP._renderSparqlResults(resultsDiv, data);
+    } catch (e) {
+        resultsDiv.innerHTML = `<p style="color:#f87171;font-size:12px">⚠ Erreur : ${e.message}</p>`;
+    }
+};
+
+APP._renderSparqlResults = function(container, data) {
+    const vars = data.head?.vars || [];
+    const rows = data.results?.bindings || [];
+
+    if (!vars.length) {
+        container.innerHTML = '<p style="color:var(--text-dim);font-size:12px;font-style:italic">Aucun résultat.</p>';
+        return;
+    }
+
+    const shortVal = (binding) => {
+        if (!binding) return '';
+        const v = binding.value || '';
+        if (binding.type === 'uri') {
+            // Raccourcir les URIs longues
+            const hash = v.lastIndexOf('#');
+            const slash = v.lastIndexOf('/');
+            const local = v.substring(Math.max(hash, slash) + 1);
+            return `<span title="${v}" style="color:var(--accent);cursor:default">${local || v}</span>`;
+        }
+        return `<span style="color:var(--text1)">${v}</span>`;
+    };
+
+    const thead = `<tr>${vars.map(v => `<th style="padding:6px 12px;text-align:left;border-bottom:1px solid var(--border2);color:var(--text-dim);font-size:11px;font-weight:600;text-transform:uppercase">${v}</th>`).join('')}</tr>`;
+    const tbody = rows.map(row =>
+        `<tr style="border-bottom:1px solid var(--border)">${vars.map(v => `<td style="padding:5px 12px;font-size:12px">${shortVal(row[v])}</td>`).join('')}</tr>`
+    ).join('');
+
+    container.innerHTML = `
+        <div style="font-size:11px;color:var(--text-dim);margin-bottom:8px">
+            ${rows.length} résultat${rows.length > 1 ? 's' : ''}
+        </div>
+        <div style="overflow-x:auto">
+            <table style="width:100%;border-collapse:collapse;background:var(--bg3);border-radius:4px;overflow:hidden">
+                <thead style="background:var(--bg2)">${thead}</thead>
+                <tbody>${tbody}</tbody>
+            </table>
+        </div>`;
+};
+
+// ── Views UI ──────────────────────────────────────────────────
+
+APP._viewsTab = APP._viewsTab || 'ontology';
+
+APP.renderViews = function() {
+    const tab = APP._viewsTab;
+
+    const tabBtn = (id, label) => `
+        <div class="settings-vtab${tab === id ? ' active' : ''}"
+             onclick="APP._viewsTab='${id}';APP.renderSection('views')"
+             style="padding:10px 16px;cursor:pointer;font-size:13px;font-weight:${tab===id?'600':'400'};
+                    border-left:3px solid ${tab===id?'var(--accent)':'transparent'};
+                    color:${tab===id?'var(--accent)':'var(--text1)'};
+                    background:${tab===id?'var(--bg3)':'transparent'};
+                    white-space:nowrap;user-select:none">
+            ${label}
+        </div>`;
+
+    const sidebar = `
+        <div style="width:160px;flex-shrink:0;border-right:1px solid var(--border);padding:8px 0">
+            ${tabBtn('ontology',       '🗂 Ontology')}
+            ${tabBtn('knowledge-base', '🧩 Knowledge Base')}
+        </div>`;
+
+    let tabContent = '';
+    if (tab === 'ontology') {
+        tabContent = `
+        <div style="display:flex;flex-direction:column;height:100%">
+            <div style="display:flex;align-items:center;gap:8px;padding:8px 14px;border-bottom:1px solid var(--border);flex-shrink:0;background:var(--bg2)">
+                <button class="btn-sm" onclick="APP._hypReset()" title="Reset focus to root">⟳ Reset</button>
+                <div style="position:relative;margin-left:8px">
+                    <input id="hyp-filter-input" type="text" placeholder="Filtrer les classes…"
+                           style="background:var(--bg3);border:1px solid var(--border2);color:var(--text1);
+                                  border-radius:4px;padding:3px 8px;font-size:12px;width:200px"
+                           oninput="APP._hypFilter(this.value)">
+                </div>
+                <span style="font-size:10px;color:var(--text-dim);margin-left:6px">
+                    Clic → focus · Double-clic → éditer
+                </span>
+                <span id="cy-node-count" style="margin-left:auto;font-size:11px;color:var(--text-dim)"></span>
+            </div>
+            <div id="cy-ontology" style="flex:1;min-height:0;background:#12161f;overflow:hidden"></div>
+        </div>`;
+    } else {
+        tabContent = `
+        <div style="display:flex;flex-direction:column;height:100%">
+            <div style="display:flex;align-items:center;gap:8px;padding:8px 14px;border-bottom:1px solid var(--border);flex-shrink:0;background:var(--bg2)">
+                <button class="btn-sm" onclick="APP._kbRestart()" title="Relancer la simulation">⟳ Restart</button>
+                <div style="position:relative;margin-left:8px">
+                    <input id="kb-filter-input" type="text" placeholder="Filtrer les individuals…"
+                           style="background:var(--bg3);border:1px solid var(--border2);color:var(--text1);
+                                  border-radius:4px;padding:3px 8px;font-size:12px;width:200px"
+                           oninput="APP._kbFilter(this.value)">
+                </div>
+                <span id="kb-legend" style="display:flex;align-items:center;gap:10px;margin-left:12px;font-size:11px"></span>
+                <span id="kb-count" style="margin-left:auto;font-size:11px;color:var(--text-dim)"></span>
+            </div>
+            <div id="kb-graph" style="flex:1;min-height:0;background:#0e1219;overflow:hidden;position:relative"></div>
+        </div>`;
+    }
+
+    return `
+    <div class="section-split" style="display:flex;flex-direction:column">
+        <div style="padding:12px 20px;border-bottom:1px solid var(--border);flex-shrink:0">
+            <h2 style="margin:0;font-size:16px;font-weight:600;display:flex;align-items:center;gap:8px">
+                <svg width="16" height="12" viewBox="0 0 14 10" fill="none" style="vertical-align:middle"><ellipse cx="7" cy="5" rx="6.5" ry="4.5" stroke="currentColor" stroke-width="1.2"/><circle cx="7" cy="5" r="2" fill="currentColor"/></svg>
+                Views
+            </h2>
+        </div>
+        <div style="display:flex;flex:1;overflow:hidden;min-height:0">
+            ${sidebar}
+            <div style="flex:1;overflow:hidden;display:flex;flex-direction:column;min-height:0">
+                ${tabContent}
+            </div>
+        </div>
+    </div>`;
+};
+
+// ── Ontology Graph (D3 — Hyperbolic Tree / Disque de Poincaré) ────────────────
+
+APP._hypBestLabel = function(cls) {
+    const pref = (typeof Settings !== 'undefined') ? Settings.preferredLang : 'en';
+    const annos = Array.isArray(cls.annotations) ? cls.annotations : [];
+    const isLabel = a => a && (a.property === 'rdfs:label' || a.property === 'label');
+    return (annos.find(a => isLabel(a) && a.lang === pref) || annos.find(a => isLabel(a)) || {}).value || cls.id;
+};
+
+APP._initHyperbolicGraph = function() {
+    const container = document.getElementById('cy-ontology');
+
+    if (!container) { console.error('[SWOWL] #cy-ontology not found'); return; }
+    if (!container || APP._viewsTab !== 'ontology') return;
+    container.innerHTML = '';
+
+    const classes = APP.state.classes || [];
+    if (!classes.length) {
+        container.innerHTML = '<p style="padding:24px;color:var(--text-dim);font-style:italic">No classes in this ontology.</p>';
+        return;
+    }
+    if (typeof d3 === 'undefined') {
+        container.innerHTML = '<p style="padding:24px;color:#f87171">⚠ D3.js not loaded — vérifiez la connexion réseau.</p>';
+        return;
+    }
+
+    // ── 1. Build tree ─────────────────────────────────────────
+    const classMap = {};
+    classes.forEach(c => { classMap[c.id] = c; });
+    const allIds    = new Set(classes.map(c => c.id));
+    const childrenOf      = {};
+    const hasInternalParent = new Set();
+    classes.forEach(cls => {
+        (cls.subClassOf || []).filter(s => typeof s === 'string' && allIds.has(s)).forEach(p => {
+            hasInternalParent.add(cls.id);
+            if (!childrenOf[p]) childrenOf[p] = [];
+            if (!childrenOf[p].includes(cls.id)) childrenOf[p].push(cls.id);
+        });
+    });
+    const roots = classes.filter(c => !hasInternalParent.has(c.id)).map(c => c.id);
+
+    function buildNode(id, depth) {
+        return {
+            id, depth,
+            label: APP._hypBestLabel(classMap[id]),
+            hpos: [0, 0], basePos: [0, 0],
+            children: (childrenOf[id] || []).map(cid => buildNode(cid, depth + 1))
+        };
+    }
+    const treeRoot = {
+        id: 'owl:Thing', label: 'owl:Thing', depth: 0,
+        hpos: [0, 0], basePos: [0, 0],
+        children: roots.map(r => buildNode(r, 1))
+    };
+
+    // ── 2. Complex number / Möbius helpers ────────────────────
+    const cadd  = (a, b) => [a[0]+b[0], a[1]+b[1]];
+    const csub  = (a, b) => [a[0]-b[0], a[1]-b[1]];
+    const cmul  = (a, b) => [a[0]*b[0]-a[1]*b[1], a[0]*b[1]+a[1]*b[0]];
+    const cconj = a => [a[0], -a[1]];
+    const cabs  = a => Math.sqrt(a[0]*a[0]+a[1]*a[1]);
+    const cdiv  = (a, b) => { const d = b[0]*b[0]+b[1]*b[1]; return [(a[0]*b[0]+a[1]*b[1])/d,(a[1]*b[0]-a[0]*b[1])/d]; };
+    const polar = (r, t) => [r*Math.cos(t), r*Math.sin(t)];
+    // Move point `a` to origin
+    const mobiusFocus = (z, a) => cdiv(csub(z,a), csub([1,0], cmul(cconj(a),z)));
+    // Translate origin to `a`
+    const mobiusTranslate = (z, a) => cdiv(cadd(z,a), cadd([1,0], cmul(cconj(a),z)));
+
+    // ── 3. Poincaré layout ────────────────────────────────────
+    const STEP_R = Math.tanh(0.4);
+    function layoutNode(node, pos, angle, wedge) {
+        node.hpos = [...pos]; node.basePos = [...pos];
+        const ch = node.children || [];
+        if (!ch.length) return;
+        const w = Math.min(2*Math.PI/Math.max(1,ch.length), wedge);
+        const start = angle - (w * ch.length) / 2;
+        ch.forEach((child, i) => {
+            const a = start + (i + 0.5) * w;
+            const globalPos = mobiusTranslate(polar(STEP_R, a), pos);
+            layoutNode(child, globalPos, a, w * 0.88);
+        });
+    }
+    layoutNode(treeRoot, [0,0], -Math.PI/2, 2*Math.PI);
+
+    // ── 4. Flatten ────────────────────────────────────────────
+    function flatten(node, parent) {
+        node.parent = parent || null;
+        const res = [node];
+        (node.children || []).forEach(c => res.push(...flatten(c, node)));
+        return res;
+    }
+    const allNodes = flatten(treeRoot, null);
+    APP._hypNodes = allNodes;
+    APP._hypMath  = { cadd, csub, cmul, cconj, cabs, cdiv, polar, mobiusFocus, mobiusTranslate };
+
+    // ── 5. SVG canvas ─────────────────────────────────────────
+    if (container.offsetHeight < 20) container.style.height = (window.innerHeight - 170) + 'px';
+    const W  = container.offsetWidth  || 800;
+    const H  = container.offsetHeight || 600;
+    const R  = Math.min(W, H) * 0.46;
+    const CX = W/2, CY = H/2;
+    APP._hypGeom = { W, H, R, CX, CY };
+    APP._hypToScreen = pos => [CX + pos[0]*R, CY + pos[1]*R];
+
+    const svg = d3.select(container).append('svg')
+        .attr('width', W).attr('height', H).style('display','block');
+    APP._hypSvg = svg;
+
+    // Disk background
+    svg.append('circle').attr('cx',CX).attr('cy',CY).attr('r',R+1)
+        .attr('fill','#0e1219').attr('stroke','#2a3347').attr('stroke-width',1.5);
+    // Guide rings
+    [0.33, 0.60, 0.82].forEach(fr =>
+        svg.append('circle').attr('cx',CX).attr('cy',CY).attr('r',R*fr)
+            .attr('fill','none').attr('stroke','#1a2030').attr('stroke-width',0.5));
+
+    // ── 6. Create DOM elements once ───────────────────────────
+    const svgNS = 'http://www.w3.org/2000/svg';
+    const edgeGroup = document.createElementNS(svgNS, 'g');
+    const nodeGroup = document.createElementNS(svgNS, 'g');
+    svg.node().appendChild(edgeGroup);
+    svg.node().appendChild(nodeGroup);
+    APP._hypEdgeEls = new Map(); // id → <line>
+    APP._hypNodeEls = new Map(); // id → { g, circle, label }
+
+    // Create edge elements
+    allNodes.filter(n => n.parent).forEach(n => {
+        const line = document.createElementNS(svgNS, 'line');
+        line.setAttribute('stroke', '#252f42');
+        line.setAttribute('stroke-width', '0.9');
+        line.setAttribute('stroke-opacity', '0.7');
+        edgeGroup.appendChild(line);
+        APP._hypEdgeEls.set(n.id, line);
+    });
+
+    // Create node elements
+    allNodes.forEach(n => {
+        const g = document.createElementNS(svgNS, 'g');
+        g.style.cursor = 'pointer';
+
+        const circle = document.createElementNS(svgNS, 'circle');
+        const label  = document.createElementNS(svgNS, 'text');
+        label.setAttribute('text-anchor', 'middle');
+        label.setAttribute('font-family', 'system-ui,sans-serif');
+        label.setAttribute('pointer-events', 'none');
+
+        g.appendChild(circle);
+        g.appendChild(label);
+        nodeGroup.appendChild(g);
+        APP._hypNodeEls.set(n.id, { g, circle, label, node: n });
+
+        // Native click event
+        g.addEventListener('click', () => APP._hypClick(n));
+    });
+
+    APP._hypEdgeGroup = edgeGroup;
+    APP._hypNodeGroup = nodeGroup;
+
+    // ── 7. Initial draw ───────────────────────────────────────
+    APP._hypDraw(false);
+
+    const counter = document.getElementById('cy-node-count');
+    if (counter) counter.textContent = `${classes.length} classe${classes.length>1?'s':''}`;
+};
+
+// ── Hyperbolic draw — direct DOM, CSS transitions ─────────────
+APP._hypDraw = function(animated) {
+    if (!APP._hypNodes || !APP._hypNodeEls) return;
+    const { cabs } = APP._hypMath;
+    const toSc = APP._hypToScreen;
+    const TR = animated ? 'transform 0.42s cubic-bezier(0.33,1,0.68,1)' : 'none';
+
+    APP._hypNodes.forEach(node => {
+        const [sx, sy] = toSc(node.hpos);
+        const dist  = cabs(node.hpos);
+        const isRoot = node.id === 'owl:Thing';
+
+        // ── Node visuals ─────────────────────────────────────
+        const el = APP._hypNodeEls.get(node.id);
+        if (!el) return;
+
+        const nr     = isRoot ? 11 : Math.max(3.5, 10 * (1 - dist*0.65));
+        const opc    = Math.max(0.12, 1 - dist*0.55).toFixed(2);
+        const fs     = Math.max(8,  13 * (1 - dist*0.82)).toFixed(1);
+        const fill   = isRoot ? '#1e3a5f' : (dist < 0.35 ? '#1c3350' : '#161e2e');
+        const stroke = isRoot ? '#3b82f6' : (dist < 0.45 ? '#4b8cf5' : '#2a3a55');
+        const sw     = dist < 0.35 ? 1.8 : 1;
+        const tc     = dist < 0.25 ? '#93c5fd' : (dist < 0.55 ? '#a8c4e8' : '#64748b');
+
+        el.circle.setAttribute('r',            nr);
+        el.circle.setAttribute('fill',         fill);
+        el.circle.setAttribute('stroke',       stroke);
+        el.circle.setAttribute('stroke-width', sw);
+        el.circle.setAttribute('opacity',      opc);
+
+        el.label.textContent = dist < 0.78 ? node.label : '';
+        el.label.setAttribute('font-size',   fs);
+        el.label.setAttribute('y',           -(nr + 3));
+        el.label.setAttribute('fill',        tc);
+        el.label.setAttribute('opacity',     opc);
+        el.label.setAttribute('font-weight', dist < 0.15 ? '600' : '400');
+
+        // CSS transition then transform
+        el.g.style.transition = TR;
+        el.g.setAttribute('transform', `translate(${sx.toFixed(1)},${sy.toFixed(1)})`);
+
+        // ── Edge ─────────────────────────────────────────────
+        if (node.parent) {
+            const line = APP._hypEdgeEls.get(node.id);
+            if (line) {
+                const [px, py] = toSc(node.parent.hpos);
+                line.style.transition = TR;
+                line.setAttribute('x1', px.toFixed(1));
+                line.setAttribute('y1', py.toFixed(1));
+                line.setAttribute('x2', sx.toFixed(1));
+                line.setAttribute('y2', sy.toFixed(1));
+            }
+        }
+    });
+};
+
+// ── Click: focus → center, puis 2e clic → éditeur ────────────
+APP._hypClick = function(node) {
+    if (!APP._hypNodes) return;
+    const { cabs, mobiusFocus } = APP._hypMath;
+    const dist = cabs(node.hpos);
+
+    // Nœud déjà au centre → naviguer vers l'éditeur
+    if (dist < 0.10 && node.id !== 'owl:Thing') {
+        APP.navigate('classes');
+        setTimeout(() => {
+            if (typeof ClassEditor !== 'undefined') {
+                ClassEditor._selectedId = node.id;
+                ClassEditor.restoreSelection();
+            }
+        }, 80);
+        return;
+    }
+
+    // Nœud en périphérie → ramener au centre (Möbius)
+    if (dist < 0.02) return;
+    const a = [node.hpos[0], node.hpos[1]];
+    APP._hypNodes.forEach(n => {
+        n.hpos = mobiusFocus(n.hpos, a);
+    });
+    APP._hypDraw(true);
+};
+
+// ── Reset focus ───────────────────────────────────────────────
+APP._hypReset = function() {
+    if (!APP._hypNodes) return;
+    APP._hypNodes.forEach(n => { n.hpos = [...n.basePos]; });
+    APP._hypDraw(true);
+};
+
+// ── Filter ────────────────────────────────────────────────────
+APP._hypFilter = function(q) {
+    if (!APP._hypNodeEls) return;
+    const query = q.trim().toLowerCase();
+    APP._hypNodeEls.forEach((el, id) => {
+        const node  = el.node;
+        const match = !query
+            || node.label.toLowerCase().includes(query)
+            || node.id.toLowerCase().includes(query);
+        if (query && match) {
+            el.circle.setAttribute('stroke', '#10b981');
+            el.circle.setAttribute('stroke-width', '2.5');
+            el.label.setAttribute('fill', '#6ee7b7');
+        } else {
+            el.circle.removeAttribute('stroke');
+            el.circle.removeAttribute('stroke-width');
+            el.label.removeAttribute('fill');
+            // Re-apply normal style
+            APP._hypDraw(false);
+        }
+    });
+};
+
+// ── Knowledge Base Graph (D3 force) ──────────────────────────
+
+APP._kbSim  = null; // D3 simulation
+APP._kbData = null; // { nodes, links }
+
+// Palette de couleurs pour les classes
+APP._kbClassColor = function(classId) {
+    const palette = [
+        '#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6',
+        '#06b6d4','#f97316','#ec4899','#84cc16','#14b8a6',
+        '#a78bfa','#fb923c','#34d399','#60a5fa','#fbbf24',
+    ];
+    if (!APP._kbColorMap) APP._kbColorMap = {};
+    if (!APP._kbColorIndex) APP._kbColorIndex = 0;
+    if (!APP._kbColorMap[classId]) {
+        APP._kbColorMap[classId] = palette[APP._kbColorIndex % palette.length];
+        APP._kbColorIndex++;
+    }
+    return APP._kbColorMap[classId];
+};
+
+APP._kbBestLabel = function(ind) {
+    const pref  = (typeof Settings !== 'undefined') ? Settings.preferredLang : 'en';
+    const labels = (ind.annotations && ind.annotations.labels) ? ind.annotations.labels : [];
+    const found  = labels.find(l => l.lang === pref) || labels[0];
+    return found ? found.value : ind.id;
+};
+
+APP._initKnowledgeBase = function() {
+    const container = document.getElementById('kb-graph');
+    if (!container || APP._viewsTab !== 'knowledge-base') return;
+    container.innerHTML = '';
+    if (APP._kbSim) { APP._kbSim.stop(); APP._kbSim = null; }
+    APP._kbColorMap = {};
+    APP._kbColorIndex = 0;
+
+    const individuals = APP.state.individuals || [];
+    if (!individuals.length) {
+        container.innerHTML = '<p style="padding:24px;color:var(--text-dim);font-style:italic">Aucun individual dans cette ontologie.</p>';
+        return;
+    }
+    if (typeof d3 === 'undefined') {
+        container.innerHTML = '<p style="padding:24px;color:#f87171">⚠ D3.js non chargé.</p>';
+        return;
+    }
+
+    const W  = container.offsetWidth  || 900;
+    const H  = container.offsetHeight || 600;
+    if (container.offsetHeight < 20) container.style.height = (window.innerHeight - 170) + 'px';
+
+    // ── Nodes ─────────────────────────────────────────────────
+    const indMap = {};
+    individuals.forEach(ind => { indMap[ind.id] = ind; });
+
+    const nodes = individuals.map(ind => ({
+        id:      ind.id,
+        label:   APP._kbBestLabel(ind),
+        classId: ind.class_id || ind.types?.[0] || 'Unknown',
+        ind,
+        x: W/2 + (Math.random()-0.5)*200,
+        y: H/2 + (Math.random()-0.5)*200,
+    }));
+
+    // ── Links (object property assertions) ────────────────────
+    const links = [];
+    individuals.forEach(ind => {
+        (ind.objectAssertions || []).forEach(a => {
+            if (indMap[a.target]) {
+                links.push({
+                    source: ind.id,
+                    target: a.target,
+                    property: a.property,
+                    id: `${ind.id}__${a.property}__${a.target}`,
+                });
+            }
+        });
+    });
+
+    APP._kbData = { nodes, links };
+
+    // ── Legend ────────────────────────────────────────────────
+    const classIds = [...new Set(nodes.map(n => n.classId))].sort();
+    classIds.forEach(cid => APP._kbClassColor(cid)); // pre-assign colors
+    const legend = document.getElementById('kb-legend');
+    if (legend) {
+        legend.innerHTML = classIds.map(cid => `
+            <span style="display:flex;align-items:center;gap:4px;color:var(--text-dim)">
+                <span style="width:8px;height:8px;border-radius:50%;background:${APP._kbClassColor(cid)};flex-shrink:0"></span>
+                <span style="font-size:10px">${cid}</span>
+            </span>`).join('');
+    }
+    const counter = document.getElementById('kb-count');
+    if (counter) counter.textContent = `${nodes.length} individual${nodes.length>1?'s':''} · ${links.length} connexion${links.length>1?'s':''}`;
+
+    // ── SVG setup ─────────────────────────────────────────────
+    const svgEl = d3.select(container).append('svg')
+        .attr('width', W).attr('height', H)
+        .style('display','block');
+
+    // Defs: arrowhead marker
+    const defs = svgEl.append('defs');
+    const mkArrow = (id, color) => defs.append('marker')
+        .attr('id', id)
+        .attr('viewBox','0 -4 10 8').attr('refX',18).attr('refY',0)
+        .attr('markerWidth',6).attr('markerHeight',6).attr('orient','auto')
+        .append('path').attr('d','M0,-4L10,0L0,4').attr('fill', color);
+    mkArrow('kb-arrow',     '#3a4a62');
+    mkArrow('kb-arrow-hi',  '#3b82f6');
+
+    // Zoom / pan
+    const zoomG = svgEl.append('g');
+    svgEl.call(d3.zoom().scaleExtent([0.1, 4]).on('zoom', ev => {
+        zoomG.attr('transform', ev.transform);
+    }));
+
+    const linkG = zoomG.append('g').attr('class','kb-links');
+    const labelG = zoomG.append('g').attr('class','kb-edge-labels');
+    const nodeG  = zoomG.append('g').attr('class','kb-nodes');
+
+    // ── Render links ──────────────────────────────────────────
+    const linkEls = linkG.selectAll('line').data(links, d => d.id).enter()
+        .append('line')
+        .attr('stroke','#2a3a55').attr('stroke-width',1.5)
+        .attr('marker-end','url(#kb-arrow)');
+
+    const edgeLabelEls = labelG.selectAll('text').data(links, d => d.id).enter()
+        .append('text')
+        .text(d => d.property)
+        .attr('text-anchor','middle').attr('font-size','9px')
+        .attr('font-family','system-ui,sans-serif')
+        .attr('fill','#4a5a72').attr('pointer-events','none');
+
+    // ── Render nodes ──────────────────────────────────────────
+    const nodeEls = nodeG.selectAll('g').data(nodes, d => d.id).enter()
+        .append('g').attr('class','kb-node').style('cursor','pointer');
+
+    nodeEls.append('circle')
+        .attr('r', 10)
+        .attr('fill', d => APP._kbClassColor(d.classId) + '33') // ~20% opacity fill
+        .attr('stroke', d => APP._kbClassColor(d.classId))
+        .attr('stroke-width', 2);
+
+    nodeEls.append('text').attr('class','kb-node-label')
+        .attr('text-anchor','middle').attr('y', -14)
+        .attr('font-size','11px').attr('font-family','system-ui,sans-serif')
+        .attr('fill','#cbd5e1').attr('pointer-events','none')
+        .text(d => d.label);
+
+    nodeEls.append('text').attr('class','kb-node-class')
+        .attr('text-anchor','middle').attr('y', 22)
+        .attr('font-size','9px').attr('font-family','system-ui,sans-serif')
+        .attr('pointer-events','none')
+        .attr('fill', d => APP._kbClassColor(d.classId))
+        .text(d => d.classId);
+
+    // Click → navigate to individual
+    nodeEls.on('click', (ev, d) => {
+        APP.navigate('individuals');
+        setTimeout(() => {
+            if (typeof IndividualEditor !== 'undefined') {
+                IndividualEditor._selectedId = d.id;
+                IndividualEditor.restoreSelection();
+            }
+        }, 120);
+    });
+
+    // Hover highlight
+    nodeEls.on('mouseover', function(ev, d) {
+        // Highlight connected links
+        const connectedIds = new Set();
+        links.forEach(l => {
+            const sid = typeof l.source === 'object' ? l.source.id : l.source;
+            const tid = typeof l.target === 'object' ? l.target.id : l.target;
+            if (sid === d.id || tid === d.id) { connectedIds.add(sid); connectedIds.add(tid); }
+        });
+        nodeEls.select('circle').attr('opacity', n => connectedIds.has(n.id) ? 1 : 0.2);
+        linkEls.attr('opacity', l => {
+            const sid = typeof l.source === 'object' ? l.source.id : l.source;
+            const tid = typeof l.target === 'object' ? l.target.id : l.target;
+            return (sid === d.id || tid === d.id) ? 1 : 0.05;
+        });
+        edgeLabelEls.attr('opacity', l => {
+            const sid = typeof l.source === 'object' ? l.source.id : l.source;
+            const tid = typeof l.target === 'object' ? l.target.id : l.target;
+            return (sid === d.id || tid === d.id) ? 1 : 0.05;
+        });
+    }).on('mouseout', function() {
+        nodeEls.select('circle').attr('opacity', 1);
+        linkEls.attr('opacity', 1);
+        edgeLabelEls.attr('opacity', 1);
+    });
+
+    // Drag
+    nodeEls.call(d3.drag()
+        .on('start', (ev, d) => { if (!ev.active) APP._kbSim.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
+        .on('drag',  (ev, d) => { d.fx = ev.x; d.fy = ev.y; })
+        .on('end',   (ev, d) => { if (!ev.active) APP._kbSim.alphaTarget(0); d.fx = null; d.fy = null; })
+    );
+
+    // ── Force simulation ──────────────────────────────────────
+    APP._kbSim = d3.forceSimulation(nodes)
+        .force('link', d3.forceLink(links).id(d => d.id).distance(120).strength(0.6))
+        .force('charge', d3.forceManyBody().strength(-350))
+        .force('center', d3.forceCenter(W/2, H/2).strength(0.05))
+        .force('collision', d3.forceCollide(28))
+        .on('tick', () => {
+            linkEls
+                .attr('x1', d => d.source.x).attr('y1', d => d.source.y)
+                .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
+            edgeLabelEls
+                .attr('x', d => (d.source.x + d.target.x) / 2)
+                .attr('y', d => (d.source.y + d.target.y) / 2 - 4);
+            nodeEls.attr('transform', d => `translate(${d.x},${d.y})`);
+        });
+
+    APP._kbNodeEls = nodeEls;
+    APP._kbLinkEls = linkEls;
+};
+
+APP._kbRestart = function() {
+    if (APP._kbSim) { APP._kbSim.alpha(0.8).restart(); }
+};
+
+APP._kbFilter = function(q) {
+    if (!APP._kbNodeEls) return;
+    const query = q.trim().toLowerCase();
+    APP._kbNodeEls.select('circle').attr('opacity', d => {
+        if (!query) return 1;
+        return (d.label.toLowerCase().includes(query) || d.classId.toLowerCase().includes(query)) ? 1 : 0.1;
+    });
+    APP._kbNodeEls.selectAll('.kb-node-label,.kb-node-class').attr('opacity', d => {
+        if (!query) return 1;
+        return (d.label.toLowerCase().includes(query) || d.classId.toLowerCase().includes(query)) ? 1 : 0.1;
+    });
+};
+
 // ── Settings UI ───────────────────────────────────────────────
 
-APP._settingsTab = APP._settingsTab || 'languages';
+// ── Tab visibility: apply to DOM ──────────────────────────────────
+APP._applyTabVisibility = function() {
+    TabVisibility._optional.forEach(id => {
+        const el = document.querySelector(`.nav-item[data-section="${id}"]`);
+        if (el) el.style.display = TabVisibility.isHidden(id) ? 'none' : '';
+    });
+};
+
+// ── GUI Tabs sub-tab content ──────────────────────────────────────
+APP.renderGuiTabs = function() {
+    const ALL_TABS = [
+        { id: 'ontologies',            label: 'Ontologies',           icon: `<svg width="14" height="12" viewBox="0 0 14 12" fill="currentColor" style="vertical-align:middle;color:var(--accent)"><circle cx="7" cy="1.5" r="1.5"/><circle cx="1.5" cy="10.5" r="1.5"/><circle cx="12.5" cy="10.5" r="1.5"/><line x1="7" y1="3" x2="2.5" y2="9" stroke="currentColor" stroke-width="1"/><line x1="7" y1="3" x2="11.5" y2="9" stroke="currentColor" stroke-width="1"/><line x1="3" y1="10.5" x2="11" y2="10.5" stroke="currentColor" stroke-width="1"/></svg>`, fixed: true  },
+        { id: 'settings',              label: 'Settings',             icon: '🛠️', fixed: true  },
+        { id: 'classes',               label: 'Classes',              icon: '<span class="cls-dot" style="display:inline-block;vertical-align:middle"></span>',        fixed: true  },
+        { id: 'object-properties',     label: 'ObjectProperties',     icon: '<span class="op-prop-dot" style="display:inline-block;vertical-align:middle"></span>',    fixed: true  },
+        { id: 'datatype-properties',   label: 'DatatypeProperties',   icon: '<span class="dp-prop-dot" style="display:inline-block;vertical-align:middle"></span>',    fixed: true  },
+        { id: 'annotation-properties', label: 'AnnotationProperties', icon: '<span class="anno-prop-dot" style="display:inline-block;vertical-align:middle"></span>',  fixed: false },
+        { id: 'individuals',           label: 'Individuals',          icon: '<span class="xsd-dot" style="display:inline-block;vertical-align:middle;margin:0"></span>',fixed: false },
+        { id: 'swrl-rules',            label: 'SWRL Rules',           icon: '⚙️', fixed: false },
+        { id: 'views',                 label: 'Views',                icon: `<svg width="14" height="10" viewBox="0 0 14 10" fill="none" style="vertical-align:middle;color:var(--text1)"><ellipse cx="7" cy="5" rx="6.5" ry="4.5" stroke="currentColor" stroke-width="1.2"/><circle cx="7" cy="5" r="2" fill="currentColor"/></svg>`, fixed: false },
+        { id: 'queries',               label: 'Queries',              icon: '🎯', fixed: false },
+        { id: 'inferences',            label: 'Inferences',           icon: '🧠', fixed: false },
+    ];
+
+    const rows = ALL_TABS.map(t => {
+        const visible = !TabVisibility.isHidden(t.id);
+        if (t.fixed) {
+            return `
+            <div style="display:flex;align-items:center;gap:10px;padding:8px 14px;
+                        border-radius:6px;background:var(--bg3);border:1px solid var(--border);
+                        opacity:0.55;cursor:default">
+                <input type="checkbox" checked disabled
+                       style="width:15px;height:15px;accent-color:var(--accent);flex-shrink:0;pointer-events:none">
+                <span style="display:flex;align-items:center;gap:6px;font-size:13px">${t.icon} ${t.label}</span>
+                <span style="margin-left:auto;font-size:10px;color:var(--text-dim);
+                             font-family:var(--font-mono);letter-spacing:.04em">required</span>
+            </div>`;
+        }
+        return `
+        <div style="display:flex;align-items:center;gap:10px;padding:8px 14px;
+                    border-radius:6px;background:var(--bg2);border:1px solid var(--border);
+                    cursor:pointer;transition:background .15s;user-select:none"
+             onmouseenter="this.style.background='var(--bg3)'"
+             onmouseleave="this.style.background='var(--bg2)'"
+             onclick="TabVisibility.toggle('${t.id}')">
+            <input type="checkbox" ${visible ? 'checked' : ''}
+                   style="width:15px;height:15px;accent-color:var(--accent);flex-shrink:0;pointer-events:none">
+            <span style="display:flex;align-items:center;gap:6px;font-size:13px">${t.icon} ${t.label}</span>
+        </div>`;
+    }).join('');
+
+    return `
+    <div style="display:flex;flex-direction:column;gap:6px;padding:16px;flex:1;overflow-y:auto">
+        <p style="margin:0 0 10px;font-size:11px;color:var(--text-dim)">
+            Choisissez les onglets visibles dans la barre de navigation.
+            Les onglets requis ne peuvent pas être masqués.
+        </p>
+        ${rows}
+    </div>`;
+};
+
+APP._settingsTab = APP._settingsTab || 'gui-tabs';
 
 APP.renderSettings = function() {
     const tab = APP._settingsTab;
@@ -1645,7 +2526,8 @@ APP.renderSettings = function() {
         </div>`;
 
     const sidebar = `
-        <div style="width:150px;flex-shrink:0;border-right:1px solid var(--border);padding:8px 0">
+        <div style="width:160px;flex-shrink:0;border-right:1px solid var(--border);padding:8px 0">
+            ${tabBtn('gui-tabs',      '🗂️ GUI Tabs')}
             ${tabBtn('languages',     '🌐 Languages')}
             ${tabBtn('naming-rules',  '🏷 IDs Rules')}
         </div>`;
@@ -1733,6 +2615,8 @@ APP.renderSettings = function() {
                 </div>
             </div>
         </div>`;
+    } else if (tab === 'gui-tabs') {
+        tabContent = APP.renderGuiTabs();
     } else if (tab === 'naming-rules') {
         const fmt = Settings.namingFormat;
         const fmtOption = (id, label, example, desc) => `

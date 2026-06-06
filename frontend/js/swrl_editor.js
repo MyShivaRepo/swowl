@@ -138,7 +138,7 @@ const SWRLEditor = {
             <div class="tree-item${r.id === sel ? ' selected' : ''}" data-id="${r.id}"
                  style="align-items:center${broken ? ';color:var(--red,#ef4444)' : ''}"
                  onclick="SWRLEditor.selectRule('${r.id}')">
-                <span class="tree-leaf">◦</span>
+                <span style="font-size:13px;flex-shrink:0;line-height:1;${broken ? 'color:var(--red,#ef4444)' : 'color:var(--text-dim)'}">⚙️</span>
                 <span style="flex:1;overflow:hidden;min-width:0">
                     <span class="tree-label" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block${broken ? ';color:var(--red,#ef4444)' : ''}">${mainText}</span>
                     ${subText ? `<span style="font-size:10px;color:${broken ? 'var(--red,#ef4444)' : 'var(--text-faint)'};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block">${subText}</span>` : ''}
