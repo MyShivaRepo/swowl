@@ -156,7 +156,7 @@
 
 | **Si** | l'ontologiste déclenche une sauvegarde explicite d'un `individual`, |
 |---|---|
-| **Alors** | toutes les informations saisies sont collectées (identifiant, annotations, types, assertions de `propriétés d'objet` et de données) et persistées dans l'`ontologie`. |
+| **Alors** | toutes les informations saisies sont collectées (identifiant, annotations, types, assertions de `ObjectProperty` et de données) et persistées dans l'`ontologie`. |
 
 | **Si** | l'`individual` est nouveau, |
 |---|---|
@@ -204,7 +204,7 @@
 
 | **Si** | une sauvegarde est déclenchée, |
 |---|---|
-| **Alors** | toutes les valeurs littérales saisies dans les panneaux de `propriétés de données` sont collectées avec leur type de données et incluses dans la sauvegarde. |
+| **Alors** | toutes les valeurs littérales saisies dans les panneaux de `DatatypeProperty` sont collectées avec leur type de données et incluses dans la sauvegarde. |
 
 ---
 
@@ -404,7 +404,7 @@
 
 ### REQ-IND-014 — Annotations de propriétés personnalisées
 
-| **Si** | l'ontologiste sélectionne une `propriété d'annotation` personnalisée dans le sélecteur dédié, |
+| **Si** | l'ontologiste sélectionne une `AnnotationProperty` personnalisée dans le sélecteur dédié, |
 |---|---|
 | **Alors** | une ligne d'annotation pour cette `propriété` est ajoutée au formulaire et le sélecteur se referme. |
 
@@ -470,7 +470,7 @@
 
 ### REQ-IND-034 — Lien cliquable pour les valeurs de données de type URL
 
-| **Si** | la valeur d'une `propriété de données` est une URL, |
+| **Si** | la valeur d'une `DatatypeProperty` est une URL, |
 |---|---|
 | **Alors** | un lien cliquable est affiché à côté de la valeur pour l'ouvrir directement dans un nouvel onglet. |
 
