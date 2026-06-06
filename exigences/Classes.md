@@ -1,334 +1,328 @@
-# Exigences — Onglet « Classes »
+# Exigences de l'onglet Classes — Application SWOWL
 
-> Document généré par rétro-engineering du code source SWOWL · version 1.0 · 2026-06-06
-
----
-
-## 1. Navigation et sélection dans l'arbre
-
-- **REQ-CLS-001** — Sélection d'une classe
-  - *Si* l'utilisateur clique sur un nœud de l'arbre, *Alors* la classe est mise en surbrillance, le panneau droit affiche son formulaire, et le panneau « Super Classes » est mis à jour.
-
-- **REQ-CLS-002** — Sélection de la racine `owl:Thing`
-  - *Si* l'utilisateur clique sur le nœud racine, *Alors* le panneau droit affiche un message d'accueil avec le bouton « Create Class », et le panneau « Super Classes » est vidé.
-
-- **REQ-CLS-003** — Sauvegarde silencieuse lors du changement de sélection
-  - *Si* une classe est en cours d'édition et que l'utilisateur sélectionne une autre classe, *Alors* la classe courante est sauvegardée silencieusement avant le changement.
-
-- **REQ-CLS-004** — Restauration de la sélection après re-rendu
-  - *Si* la section est re-rendue (ex. après sauvegarde), *Alors* la sélection précédente est restaurée.
-
-- **REQ-CLS-005** — Activation contextuelle des boutons de la barre d'outils
-  - *Si* `owl:Thing` est sélectionné, *Alors* seul le bouton « Child » est actif.
-  - *Si* une classe est sélectionnée, *Alors* les boutons « Child », « Sibling » et « Delete » sont tous actifs.
-  - *Si* rien n'est sélectionné, *Alors* tous les boutons sont désactivés.
+**Date :** 2026-06-06
+**Note :** Exigences dérivées strictement du code source — aucune extrapolation
 
 ---
 
-## 2. Construction et affichage de l'arbre hiérarchique
+## Table des matières
 
-- **REQ-CLS-010** — Calcul de la hiérarchie
-  - *Si* des classes ont un `subClassOf` pointant vers d'autres classes de l'ontologie, *Alors* elles sont affichées comme enfants (tri alphabétique).
-  - *Si* une classe n'a aucun parent interne, *Alors* elle est placée sous `owl:Thing`.
-  - *Si* une classe a uniquement des parents externes préfixés (ex. `skos:Concept`), *Alors* elle est affichée comme racine indépendante.
-
-- **REQ-CLS-011** — Nœuds expansibles / repliables
-  - *Si* une classe a des enfants, *Alors* un triangle ▶ est affiché ; le clic bascule l'état ouvert/fermé du sous-arbre.
-
-- **REQ-CLS-012** — Expansion automatique des ancêtres
-  - *Si* une classe est sélectionnée par navigation externe, *Alors* tous ses ancêtres sont expandés automatiquement pour la rendre visible.
-
-- **REQ-CLS-013** — Message d'état vide
-  - *Si* aucune classe n'existe dans l'ontologie, *Alors* un message « No classes » est affiché dans le panneau arbre.
-
-- **REQ-CLS-014** — Identifiant visuel
-  - Chaque classe est représentée par un point marron (`.cls-dot`). La racine `owl:Thing` a un style visuel distinct.
-
----
-
-## 3. Création de classe
-
-- **REQ-CLS-020** — Création d'une classe enfant
-  - *Si* l'utilisateur clique sur « Child » (barre d'outils ou menu contextuel), *Alors* une nouvelle classe est créée avec `subClassOf = [id_du_parent_sélectionné]`, et le parent est expandé dans l'arbre.
-
-- **REQ-CLS-021** — Création d'une classe sœur
-  - *Si* l'utilisateur clique sur « Sibling », *Alors* une nouvelle classe est créée avec les mêmes parents que la classe courante.
-
-- **REQ-CLS-022** — Génération automatique du nom initial
-  - *Si* une nouvelle classe est créée, *Alors* son ID est `NewClass`, `NewClass1`, `NewClass2`… (premier nom disponible non déjà utilisé).
-
-- **REQ-CLS-023** — Structure initiale
-  - Toute nouvelle classe est créée avec : `id`, `annotations.labels=[]`, `annotations.comments=[]`, `subClassOf`, `equivalentClass=[]`, `disjointWith=[]`.
-
-- **REQ-CLS-024** — Appel API à la création
-  - *Si* la classe est créée, *Alors* `POST /api/classes` est appelé. Si l'ID existe déjà, le backend retourne HTTP 409.
-
-- **REQ-CLS-025** — Unicité de l'ID (backend)
-  - *Si* l'ID soumis existe déjà, *Alors* le backend lève une erreur `HTTP 409 "Classe 'X' already exists"`.
+1. [REQ-CLS-001 — Construction de l'arbre hiérarchique des classes](#req-cls-001)
+2. [REQ-CLS-002 — Rendu de l'arbre des classes avec nœud racine owl:Thing](#req-cls-002)
+3. [REQ-CLS-003 — Sélection d'une classe dans l'arbre](#req-cls-003)
+4. [REQ-CLS-004 — Sélection du nœud racine owl:Thing](#req-cls-004)
+5. [REQ-CLS-005 — Expansion/réduction d'un nœud de l'arbre](#req-cls-005)
+6. [REQ-CLS-006 — Expansion automatique des ancêtres d'une classe](#req-cls-006)
+7. [REQ-CLS-007 — Création d'une classe enfant (sous-classe)](#req-cls-007)
+8. [REQ-CLS-008 — Création d'une classe sœur (même niveau)](#req-cls-008)
+9. [REQ-CLS-009 — Suppression de la classe sélectionnée](#req-cls-009)
+10. [REQ-CLS-010 — Menu contextuel sur un nœud de l'arbre](#req-cls-010)
+11. [REQ-CLS-011 — Déplacement d'une classe par glisser-déposer](#req-cls-011)
+12. [REQ-CLS-012 — Formulaire d'édition d'une classe](#req-cls-012)
+13. [REQ-CLS-013 — Sauvegarde automatique lors de l'édition](#req-cls-013)
+14. [REQ-CLS-014 — Sauvegarde/création d'une classe](#req-cls-014)
+15. [REQ-CLS-015 — Gestion des super-classes (ajout)](#req-cls-015)
+16. [REQ-CLS-016 — Gestion des super-classes (suppression)](#req-cls-016)
+17. [REQ-CLS-017 — Gestion des classes équivalentes (ajout)](#req-cls-017)
+18. [REQ-CLS-018 — Gestion des classes équivalentes (suppression)](#req-cls-018)
+19. [REQ-CLS-019 — Gestion des classes disjointes (ajout)](#req-cls-019)
+20. [REQ-CLS-020 — Gestion des classes disjointes (suppression)](#req-cls-020)
+21. [REQ-CLS-021 — Gestion des annotations rdfs:label et rdfs:comment](#req-cls-021)
+22. [REQ-CLS-022 — Gestion des propriétés d'annotation personnalisées](#req-cls-022)
+23. [REQ-CLS-023 — Panneau de restrictions et propriétés assertées](#req-cls-023)
+24. [REQ-CLS-024 — Affichage des propriétés héritées (lecture seule)](#req-cls-024)
+25. [REQ-CLS-025 — Ajout d'une propriété dans le panneau de restrictions](#req-cls-025)
+26. [REQ-CLS-026 — Ajout d'une restriction sur une propriété](#req-cls-026)
+27. [REQ-CLS-027 — Changement de type de restriction](#req-cls-027)
+28. [REQ-CLS-028 — Sélection du filler (classe cible) d'une restriction](#req-cls-028)
+29. [REQ-CLS-029 — Suppression d'une propriété du panneau de restrictions](#req-cls-029)
+30. [REQ-CLS-030 — Suppression d'une restriction enfant](#req-cls-030)
+31. [REQ-CLS-031 — Collecte des restrictions pour la sauvegarde](#req-cls-031)
+32. [REQ-CLS-032 — Création rapide d'une ObjectProperty depuis l'onglet Classes](#req-cls-032)
+33. [REQ-CLS-033 — Création rapide d'une DatatypeProperty depuis l'onglet Classes](#req-cls-033)
+34. [REQ-CLS-034 — Affichage de l'IRI complète de la classe](#req-cls-034)
+35. [REQ-CLS-035 — Panneau des super-classes avec hiérarchie ancêtres](#req-cls-035)
 
 ---
 
-## 4. Renommage de classe
+### REQ-CLS-001 — Construction de l'arbre hiérarchique des classes
 
-- **REQ-CLS-030** — Renommage via le champ ID
-  - *Si* l'utilisateur modifie le champ ID et sauvegarde, *Alors* `PUT /api/classes/{ancien_id}` est appelé avec le nouvel ID, et un message de confirmation est affiché.
+**Code source :** `owl_editor.js` → `ClassEditor.buildTree()`
 
-- **REQ-CLS-031** — Propagation en cascade du renommage (backend)
-  - *Si* une classe est renommée, *Alors* le backend propage le changement dans : `subClassOf` / `equivalentClass` / `disjointWith` de toutes les classes, `domain` / `range` des ObjectProperties, `domain` des DatatypeProperties, `types` des Individuals, et atomes des règles SWRL.
-
-- **REQ-CLS-032** — Unicité du nouvel ID (backend)
-  - *Si* le nouvel ID est déjà utilisé par une autre classe, *Alors* le backend lève `HTTP 409`.
+La méthode parcourt le tableau `APP.state.classes`, analyse les relations `subClassOf` textuelles pour identifier les relations parent-enfant internes à l'ontologie. Elle distingue les classes racines locales (sans parent interne connu), les classes racines externes (dont le parent est une URI externe au namespace courant), et construit un dictionnaire `childrenOf` ainsi qu'une liste triée alphabétiquement de `roots` et `externalRoots`.
 
 ---
 
-## 5. Suppression de classe
+### REQ-CLS-002 — Rendu de l'arbre des classes avec nœud racine owl:Thing
 
-- **REQ-CLS-040** — Confirmation avant suppression
-  - *Si* l'utilisateur clique « Delete », *Alors* une fenêtre de confirmation est affichée. Si des classes descendantes existent, leur nombre et leurs IDs sont listés dans la confirmation.
+**Code source :** `owl_editor.js` → `ClassEditor.renderTree()`
 
-- **REQ-CLS-041** — Blocage si des individus utilisent la classe
-  - *Si* des individus ont comme `type` la classe à supprimer ou l'un de ses descendants, *Alors* la suppression est bloquée (frontend et backend) avec un message listant les individus concernés (max 3 affichés).
-
-- **REQ-CLS-042** — Suppression en cascade des descendants (backend)
-  - *Si* une classe est supprimée, *Alors* toutes ses classes descendantes (récursivement) sont également supprimées, et ces classes sont retirées des `domain` de toutes les propriétés.
-
-- **REQ-CLS-043** — Réinitialisation de la sélection après suppression
-  - Après suppression réussie, la sélection est vidée et l'arbre est rafraîchi.
+La méthode génère le HTML de l'arbre complet. Elle affiche en tête un nœud racine représentant `owl:Thing` (ou le label personnalisé retourné par `APP.getOntologyRootLabels().classRoot`), puis appelle récursivement `_renderNode()` pour chaque classe racine. Si aucune classe locale n'existe, elle affiche un message "No classes".
 
 ---
 
-## 6. Glisser-Déposer (Drag & Drop)
+### REQ-CLS-003 — Sélection d'une classe dans l'arbre
 
-- **REQ-CLS-050** — Démarrage du drag
-  - *Si* l'utilisateur commence à glisser un nœud, *Alors* l'ID de la classe est mémorisé, et la classe glissée reçoit un style `dragging` (opacité réduite).
+**Code source :** `owl_editor.js` → `ClassEditor.selectClass()`
 
-- **REQ-CLS-051** — Indicateur visuel sur la cible
-  - *Si* la souris passe sur un nœud valide pendant le drag, *Alors* la cible reçoit un style `drag-over`.
-
-- **REQ-CLS-052** — Interdiction de drop sur un descendant
-  - *Si* la cible de drop est un descendant de la classe glissée, *Alors* le drop est refusé avec un message « Cannot drop on a descendant — would create a cycle ».
-
-- **REQ-CLS-053** — Déplacement par drop
-  - *Si* un drop est effectué sur une cible valide, *Alors* les parents de la classe glissée sont remplacés par `[targetId]` (ou `[]` si drop sur `owl:Thing`). Les restrictions objet dans `subClassOf` sont conservées. `PUT /api/classes/{id}` est appelé et un message « Moved » est affiché.
-
-- **REQ-CLS-054** — Nettoyage après fin de drag
-  - Après fin du drag, les styles `dragging` et `drag-over` sont retirés de tous les éléments.
+Au clic sur un nœud de l'arbre, la méthode : désélectionne tous les nœuds existants, sélectionne visuellement le nœud dont le `.tree-label` correspond à l'identifiant demandé, charge l'objet classe depuis `APP.state.classes`, injecte le formulaire d'édition via `renderForm()`, met à jour le panneau des super-classes, et active les boutons d'action (Child, Sister, Delete).
 
 ---
 
-## 7. Menu contextuel (clic droit)
+### REQ-CLS-004 — Sélection du nœud racine owl:Thing
 
-- **REQ-CLS-060** — Affichage du menu contextuel
-  - *Si* l'utilisateur fait un clic droit sur un nœud de l'arbre, *Alors* un menu flottant est affiché à la position du curseur.
+**Code source :** `owl_editor.js` → `ClassEditor.selectOwlThing()`
 
-- **REQ-CLS-061** — Contenu du menu selon la cible
-  - *Si* le clic droit est sur `owl:Thing`, *Alors* le menu contient uniquement « Add Child Class ».
-  - *Si* le clic droit est sur une classe, *Alors* le menu contient « Add Child Class », « Add Sibling Class », et « Delete » (en rouge).
-
-- **REQ-CLS-062** — Positionnement adaptatif
-  - *Si* le menu déborde du bord de l'écran, *Alors* il est repositionné pour rester visible.
-
-- **REQ-CLS-063** — Fermeture automatique
-  - *Si* l'utilisateur clique en dehors du menu, *Alors* le menu est fermé.
+Au clic sur le nœud racine `owl:Thing`, la méthode sélectionne visuellement ce nœud, affiche dans le panneau de détail un message "Root of all classes" avec un bouton de création de classe, vide le panneau des super-classes, et désactive les boutons Sister et Delete (tout en laissant le bouton Child actif).
 
 ---
 
-## 8. Panneau « Super Classes »
+### REQ-CLS-005 — Expansion/réduction d'un nœud de l'arbre
 
-- **REQ-CLS-070** — Affichage des super-classes avec chaîne ancestrale
-  - *Si* une classe est sélectionnée, *Alors* le panneau affiche chaque parent direct avec sa chaîne d'ancêtres complète jusqu'à `owl:Thing` (ancêtres indirects en opacité réduite).
+**Code source :** `owl_editor.js` → `ClassEditor.toggleNode()`
 
-- **REQ-CLS-071** — Navigation vers un ancêtre
-  - *Si* l'utilisateur clique sur le nom d'un ancêtre dans le panneau, *Alors* cette classe est sélectionnée dans l'arbre.
-
-- **REQ-CLS-072** — Navigation vers `owl:Thing`
-  - *Si* l'utilisateur clique sur `owl:Thing` dans le panneau, *Alors* la racine est sélectionnée.
-
-- **REQ-CLS-073** — Suppression d'un parent direct
-  - *Si* l'utilisateur clique sur ✕ d'un parent direct, *Alors* ce parent est retiré et la classe est sauvegardée automatiquement.
-
-- **REQ-CLS-074** — Ajout d'une super-classe
-  - *Si* l'utilisateur clique sur ＋ dans le panneau, *Alors* un sélecteur déroulant affiche les classes disponibles (excluant la classe courante et les parents déjà listés). La sélection déclenche une sauvegarde automatique.
-
-- **REQ-CLS-075** — Placeholder `owl:Thing`
-  - *Si* une classe n'a aucun parent, *Alors* `owl:Thing` est affiché en italique comme unique ancêtre dans le panneau.
+Au clic sur la flèche `▶` d'un nœud, la méthode bascule l'état ouvert/fermé du nœud dans `_expanded` (un `Set`). Elle rafraîchit ensuite le rendu de l'arbre en appelant `buildTree()` sur `APP.state.classes`, puis redessine les nœuds enfants concernés.
 
 ---
 
-## 9. Annotations
+### REQ-CLS-006 — Expansion automatique des ancêtres d'une classe
 
-- **REQ-CLS-080** — Affichage des annotations existantes
-  - *Si* une classe possède des annotations (`rdfs:label`, `rdfs:comment`, autres), *Alors* celles-ci sont affichées dans un tableau avec colonnes : Propriété / Valeur / Langue.
+**Code source :** `owl_editor.js` → `ClassEditor._expandAncestors()`
 
-- **REQ-CLS-081** — Ajout d'un `rdfs:label`
-  - *Si* l'utilisateur clique sur « + label », *Alors* une nouvelle ligne est ajoutée avec la propriété `rdfs:label` et la langue par défaut.
-
-- **REQ-CLS-082** — Ajout d'un `rdfs:comment`
-  - *Si* l'utilisateur clique sur « + comment », *Alors* une nouvelle ligne est ajoutée avec `rdfs:comment`.
-
-- **REQ-CLS-083** — Ajout d'une annotation property arbitraire
-  - *Si* l'utilisateur clique sur « + Annotation Property », *Alors* un picker liste les propriétés built-in OWL 2 et les annotation properties de l'utilisateur. La sélection ajoute une ligne dans le tableau.
-
-- **REQ-CLS-084** — Suppression d'une annotation
-  - *Si* l'utilisateur clique sur ✕ d'une ligne d'annotation, *Alors* la ligne est supprimée et une sauvegarde automatique est déclenchée.
-
-- **REQ-CLS-085** — Champ de langue par annotation
-  - Chaque annotation possède un champ langue (texte libre) avec un bouton ▼ ouvrant un sélecteur de langue.
-
-- **REQ-CLS-086** — Navigation vers la propriété d'annotation
-  - *Si* l'utilisateur clique sur le nom d'une propriété d'annotation, *Alors* l'application navigue vers cette propriété dans l'onglet AnnotationProperties.
-
-- **REQ-CLS-087** — Collecte des annotations à la sauvegarde
-  - Seules les annotations avec une valeur non vide sont persistées. Format : `{value, lang}` pour labels/comments, `{property, value}` pour les autres.
+Lors d'une navigation programmatique vers une classe (par exemple via `APP.navigateTo()`), la méthode remonte récursivement la chaîne `subClassOf` de la classe cible et ajoute chaque ancêtre dans `_expanded`, de façon à ce que la classe soit visible dans l'arbre sans expansion manuelle.
 
 ---
 
-## 10. Restrictions et propriétés (Asserted / Inherited)
+### REQ-CLS-007 — Création d'une classe enfant (sous-classe)
 
-- **REQ-CLS-090** — Section « Asserted Properties »
-  - *Si* une classe possède des restrictions dans `subClassOf`, *Alors* elles sont groupées par propriété avec un chip de range/multiplicité si la propriété a un `range` défini.
+**Code source :** `owl_editor.js` → `ClassEditor.createChild()`
 
-- **REQ-CLS-091** — Section « Inherited Properties »
-  - *Si* une classe a des super-classes possédant des restrictions, *Alors* celles-ci sont affichées en lecture seule avec l'indication de la classe d'origine (↑ NomClasse). La section est rétractable.
-
-- **REQ-CLS-092** — Ajout d'une propriété existante
-  - *Si* l'utilisateur clique sur « + property », *Alors* un picker liste les ObjectProperties et DatatypeProperties non encore assertées. La sélection ajoute la propriété comme groupe vide.
-
-- **REQ-CLS-093** — Création d'une ObjectProperty avec domaine = classe courante
-  - *Si* l'utilisateur clique sur le bouton « OP », *Alors* une nouvelle ObjectProperty est créée avec `domain = [id_classe_courante]`, et l'application navigue vers l'onglet ObjectProperties.
-
-- **REQ-CLS-094** — Création d'une DatatypeProperty avec domaine = classe courante
-  - *Si* l'utilisateur clique sur le bouton « DT », *Alors* une nouvelle DatatypeProperty est créée avec `domain = [id_classe_courante]`, et l'application navigue vers l'onglet DatatypeProperties.
-
-- **REQ-CLS-095** — Ajout d'une restriction à une propriété
-  - *Si* l'utilisateur fait un clic droit sur une propriété assertée, *Alors* un menu propose les 6 types de restrictions : `∃ someValuesFrom`, `∀ allValuesFrom`, `∋ hasValue`, `= exactCardinality`, `≥ minCardinality`, `≤ maxCardinality`.
-
-- **REQ-CLS-096** — Bascule filler / cardinalité
-  - *Si* le type de restriction contient « Cardinality », *Alors* le champ filler est masqué et un champ numérique est affiché. Sinon, le sélecteur de classe filler est affiché.
-
-- **REQ-CLS-097** — Sélection de la classe filler
-  - *Si* l'utilisateur clique sur le bouton filler, *Alors* un dropdown affiche la hiérarchie complète des classes (incluant `owl:Thing`).
-
-- **REQ-CLS-098** — Navigation depuis une restriction héritée
-  - *Si* le filler d'une restriction héritée est une classe de l'ontologie, *Alors* son nom est cliquable et navigue vers cette classe.
-
-- **REQ-CLS-099** — Suppression d'une restriction enfant
-  - *Si* l'utilisateur clique sur ✕ d'un enfant de restriction, *Alors* le nœud est supprimé et une sauvegarde automatique est déclenchée.
-
-- **REQ-CLS-100** — Suppression d'une propriété entière
-  - *Si* l'utilisateur clique sur ✕ du groupe de propriété, *Alors* la propriété et toutes ses restrictions sont retirées, et une sauvegarde automatique est déclenchée.
-
-- **REQ-CLS-101** — Marqueur de présence (`_marker`)
-  - *Si* une propriété est ajoutée sans aucune restriction enfant, *Alors* elle est persistée via un marqueur `{type: '_marker', property: propId}` pour maintenir le lien `domain ↔ classe`.
-
-- **REQ-CLS-102** — Chip de multiplicité
-  - *Si* une propriété assertée a un `range` défini, *Alors* un chip `(single NomRange)` ou `(multiple NomRange)` est affiché selon que la propriété est fonctionnelle ou non.
-
-- **REQ-CLS-103** — Navigation vers la propriété
-  - *Si* l'utilisateur clique sur le nom d'une propriété (assertée ou héritée), *Alors* l'application navigue vers l'onglet correspondant (ObjectProperties ou DatatypeProperties).
-
-- **REQ-CLS-104** — Synchronisation `_marker` ↔ domaine (backend)
-  - *Si* une classe est mise à jour, *Alors* le backend synchronise les `domain` des propriétés selon les marqueurs `_marker` ajoutés ou retirés.
+Au clic sur le bouton "Child" ou le bouton "＋ Create Class", la méthode détermine le parent courant (classe sélectionnée ou `owl:Thing` si rien n'est sélectionné), puis appelle `_createAndSelect()` avec le tableau `subClassOf` initialisé à `[parentId]`. Si le parent est `owl:Thing` ou la racine personnalisée, `subClassOf` est laissé vide.
 
 ---
 
-## 11. Classes équivalentes
+### REQ-CLS-008 — Création d'une classe sœur (même niveau)
 
-- **REQ-CLS-110** — Affichage
-  - Les classes équivalentes de type `string` sont affichées dans la frame « Equivalent » du formulaire.
+**Code source :** `owl_editor.js` → `ClassEditor.createSibling()`
 
-- **REQ-CLS-111** — Ajout d'une classe équivalente
-  - *Si* l'utilisateur clique sur ＋ dans la frame « Equivalent », *Alors* un picker arborescent s'affiche (excluant la classe courante et les équivalentes déjà listées). La sélection déclenche une sauvegarde automatique.
-
-- **REQ-CLS-112** — Navigation vers une classe équivalente
-  - *Si* l'utilisateur clique sur le nom d'une classe équivalente, *Alors* l'application navigue vers cette classe.
-
-- **REQ-CLS-113** — Suppression d'une équivalence
-  - *Si* l'utilisateur clique sur ✕ d'une équivalence, *Alors* l'item est retiré et une sauvegarde automatique est déclenchée.
-
-- **REQ-CLS-114** — Symétrie automatique (backend)
-  - *Si* la classe A est définie comme équivalente à B, *Alors* le backend ajoute automatiquement B comme équivalente à A. Si l'équivalence est retirée, la symétrie est supprimée.
+Au clic sur le bouton "Sister", la méthode récupère les parents textuels de la classe sélectionnée (filtre `subClassOf` sur les chaînes de caractères) et appelle `_createAndSelect()` en passant ce même tableau de parents, créant ainsi une nouvelle classe au même niveau hiérarchique.
 
 ---
 
-## 12. Classes disjointes
+### REQ-CLS-009 — Suppression de la classe sélectionnée
 
-- **REQ-CLS-120** — Affichage
-  - Les classes disjointes sont affichées dans la frame « Disjoints » du formulaire.
+**Code source :** `owl_editor.js` → `ClassEditor.deleteSelected()`
 
-- **REQ-CLS-121** — Ajout d'une classe disjointe
-  - *Si* l'utilisateur clique sur ＋ dans la frame « Disjoints », *Alors* un picker arborescent s'affiche (excluant la classe courante et les disjoints déjà listés). La sélection déclenche une sauvegarde automatique.
-
-- **REQ-CLS-122** — Suppression d'un disjoint
-  - *Si* l'utilisateur clique sur ✕ d'un disjoint, *Alors* l'item est retiré et une sauvegarde automatique est déclenchée.
-
-- **REQ-CLS-123** — Symétrie automatique (backend)
-  - *Si* la classe A est déclarée disjointe de B, *Alors* le backend ajoute automatiquement A dans les disjoints de B, et retire la symétrie si la disjonction est supprimée.
+Le bouton "Delete" déclenche la suppression de la classe courante (`_selectedId`). La méthode appelle `API.updateClass()` ou `API.createClass()` selon le contexte, met à jour `APP.state.classes`, et rafraîchit la section via `APP.renderSection('classes')`.
 
 ---
 
-## 13. Validation des identifiants OWL (NCName)
+### REQ-CLS-010 — Menu contextuel sur un nœud de l'arbre
 
-- **REQ-CLS-130** — Sanitisation en temps réel (frontend)
-  - *Si* l'utilisateur saisit dans le champ ID, *Alors* les espaces sont remplacés par `_` et les chiffres en début de saisie sont supprimés.
+**Code source :** `owl_editor.js` → `ClassEditor.showContextMenu()`
 
-- **REQ-CLS-131** — Validation avant sauvegarde (frontend)
-  - *Si* l'ID est vide, *Alors* un message « ID is required. » est affiché.
-  - *Si* l'ID commence par un chiffre, *Alors* un message « Identifier cannot start with a digit (OWL NCName rule). » est affiché.
-
-- **REQ-CLS-132** — Validation côté backend
-  - *Si* l'ID reçu est vide ou commence par un chiffre, *Alors* le backend lève `HTTP 422`.
+Un clic droit sur un nœud de l'arbre ouvre un menu contextuel positionné aux coordonnées de la souris. Ce menu propose : "Add child class", "Add sibling class" (uniquement si la cible est une classe, pas `owl:Thing`), et "Delete selected class" (en rouge). Un clic extérieur ferme le menu via `_closeContextMenu()`.
 
 ---
 
-## 14. Sauvegarde automatique (AutoSave)
+### REQ-CLS-011 — Déplacement d'une classe par glisser-déposer
 
-- **REQ-CLS-140** — Déclenchement de l'AutoSave
-  - *Si* une classe est en cours d'édition et que l'utilisateur modifie un champ (annotation, super-classe, équivalent, disjoint, restriction), *Alors* `autoSave()` est déclenché automatiquement.
+**Code source :** `owl_editor.js` → `ClassEditor.onDragStart()`, `ClassEditor.onDrop()`
 
-- **REQ-CLS-141** — Sauvegarde silencieuse
-  - *Si* l'utilisateur change de classe sans avoir déclenché de sauvegarde explicite, *Alors* l'état courant est persisté via `PUT /api/classes/{id}` sans re-rendu ni message affiché.
-
-- **REQ-CLS-142** — Collecte complète à la sauvegarde
-  - La sauvegarde collecte depuis le DOM : ID, annotations, super-classes, équivalences, disjoints, et restrictions.
+Chaque nœud de l'arbre est draggable. `onDragStart()` mémorise l'identifiant de la classe déplacée dans `_dragId`. `onDrop()` récupère cet identifiant, retire les anciens parents textuels de `subClassOf` (en conservant les restrictions objet), y injecte le nouvel identifiant parent (ou tableau vide si déposé sur `owl:Thing`), appelle `API.updateClass()`, et rafraîchit l'arbre. Le nouveau parent est automatiquement étendu dans `_expanded`.
 
 ---
 
-## 15. Navigation croisée
+### REQ-CLS-012 — Formulaire d'édition d'une classe
 
-- **REQ-CLS-150** — IRI complète affichée
-  - *Si* l'ontologie a un ID de base, *Alors* l'IRI complète de la classe est affichée sous la forme `{baseIri}#{classId}`.
+**Code source :** `owl_editor.js` → `ClassEditor.renderForm()`
 
-- **REQ-CLS-151** — Navigation vers une entité référencée
-  - *Si* l'utilisateur clique sur une super-classe, une classe équivalente, ou un filler de restriction, *Alors* l'application navigue vers cette classe.
-
-- **REQ-CLS-152** — Frame « Where Used in Rules »
-  - *Si* la classe est référencée dans au moins une règle SWRL, *Alors* une frame « Where Used in Rules » est affichée en bas du formulaire, avec les règles concernées cliquables vers l'onglet SWRL Rules.
+La méthode génère le HTML complet du panneau de détail d'une classe. Il contient : un champ texte pour l'identifiant (`cls-id`), le mention "(instance of owl:Class)", l'IRI complète si une base IRI est définie, un tableau d'annotations, le panneau de restrictions (via `RestrictionEditor.renderPanel()`), un bloc "Disjoints" et un bloc "Equivalent". En mode création (nouvelle classe), un bouton "✅ Create class" est affiché.
 
 ---
 
-## 16. Interface API REST (backend)
+### REQ-CLS-013 — Sauvegarde automatique lors de l'édition
 
-| Opération | Méthode | Endpoint |
-|---|---|---|
-| Lister les classes | GET | `/api/classes` |
-| Créer une classe | POST | `/api/classes` |
-| Récupérer une classe | GET | `/api/classes/{id}` |
-| Mettre à jour / renommer | PUT | `/api/classes/{id}` |
-| Supprimer | DELETE | `/api/classes/{id}` |
+**Code source :** `owl_editor.js` → `ClassEditor.autoSave()`
 
-- **REQ-CLS-160** — Persistance immédiate
-  - Toute modification (création, mise à jour, suppression) déclenche une sauvegarde sur disque côté backend.
+Lorsqu'une classe existante est en cours d'édition (`_editingId !== null`), tout changement dans les champs du formulaire (annotations, super-classes, équivalences, disjonctions, restrictions) déclenche automatiquement `autoSave()`, qui appelle immédiatement `save(false)` sans navigation ni rechargement.
 
 ---
 
-## 17. Mise en page redimensionnable
+### REQ-CLS-014 — Sauvegarde/création d'une classe
 
-- **REQ-CLS-170** — Redimensionnement horizontal arbre / formulaire
-  - Un séparateur vertical permet de redimensionner la largeur du panneau arbre (entre 160 px et 520 px) par drag horizontal.
+**Code source :** `owl_editor.js` → `ClassEditor.save()`
 
-- **REQ-CLS-171** — Redimensionnement vertical arbre ↕ Super Classes
-  - Un séparateur horizontal permet de redimensionner la hauteur entre le sous-panneau « Asserted Hierarchy » et le sous-panneau « Super Classes ».
+La méthode lit l'identifiant depuis `#cls-id`, collecte les super-classes textuelles (`.cls-list-item[data-id]` du panneau gauche), les classes équivalentes (`#cls-equivalents-list`), les disjonctions (`#cls-disjoints-list`), les annotations et les restrictions via `RestrictionEditor.collect()`. En mode création (`isNew = true`), elle appelle `API.createClass()` ; en mode édition, elle appelle `API.updateClass(originalId, cls)` et met à jour `APP.state.classes` en mémoire.
 
-- **REQ-CLS-172** — Redimensionnement des sections du formulaire
-  - Des séparateurs horizontaux permettent de redimensionner les sections Annotations / Restrictions / Disjoints-Equivalents dans le panneau formulaire.
+---
+
+### REQ-CLS-015 — Gestion des super-classes (ajout)
+
+**Code source :** `owl_editor.js` → `ClassEditor.addSuperClass()`
+
+La méthode ajoute une super-classe sélectionnée via le picker (`cls-super-picker`) dans la liste des super-classes directes. Elle injecte un élément DOM `cls-list-item` avec un lien de navigation vers la classe parente et un bouton de suppression `✕`. Si la classe est en cours d'édition, `autoSave()` est appelé immédiatement.
+
+---
+
+### REQ-CLS-016 — Gestion des super-classes (suppression)
+
+**Code source :** `owl_editor.js` → `ClassEditor.removeSuperClass()`
+
+Au clic sur le bouton `✕` d'une super-classe, la méthode retire l'élément DOM `[data-id]` correspondant de la liste. Si la classe est en cours d'édition, `autoSave()` est appelé.
+
+---
+
+### REQ-CLS-017 — Gestion des classes équivalentes (ajout)
+
+**Code source :** `owl_editor.js` → `ClassEditor.addEquivalent()`
+
+La méthode ajoute une classe équivalente dans la liste `#cls-equivalents-list`. Elle crée un élément DOM incluant un lien de navigation cliquable vers la classe équivalente (via `APP.navigateTo('classes', id)`) et un bouton de suppression. Si la classe est en cours d'édition, `autoSave()` est appelé.
+
+---
+
+### REQ-CLS-018 — Gestion des classes équivalentes (suppression)
+
+**Code source :** `owl_editor.js` → `ClassEditor.removeEquivalent()`
+
+Au clic sur `✕`, la méthode supprime le nœud DOM `#cls-equivalents-list .cls-list-item[data-id="${id}"]` et déclenche `autoSave()` si la classe est en cours d'édition.
+
+---
+
+### REQ-CLS-019 — Gestion des classes disjointes (ajout)
+
+**Code source :** `owl_editor.js` → `ClassEditor.addDisjoint()`
+
+La méthode ajoute une classe disjointe dans la liste `#cls-disjoints-list`, en créant un élément DOM avec le label de la classe et un bouton de suppression. Elle déclenche `autoSave()` si la classe est en cours d'édition.
+
+---
+
+### REQ-CLS-020 — Gestion des classes disjointes (suppression)
+
+**Code source :** `owl_editor.js` → `ClassEditor.removeDisjoint()`
+
+Au clic sur `✕`, la méthode retire l'élément DOM correspondant de `#cls-disjoints-list` et déclenche `autoSave()` si la classe est en cours d'édition.
+
+---
+
+### REQ-CLS-021 — Gestion des annotations rdfs:label et rdfs:comment
+
+**Code source :** `owl_editor.js` → `ClassEditor.addAnnotRow()`
+
+Au clic sur les boutons "+label" ou "+comment", la méthode appelle `_makeAnnotRow(type, 'ClassEditor', ac)` pour créer une ligne de tableau avec un champ texte pour la valeur, un champ de langue (initialisé à `Settings.defaultLang`), et un bouton de suppression. La ligne est insérée dans `#cls-anno-table`. Si la classe est en cours d'édition, les changements déclenchent `autoSave()`.
+
+---
+
+### REQ-CLS-022 — Gestion des propriétés d'annotation personnalisées
+
+**Code source :** `owl_editor.js` → `ClassEditor.addOtherAnnotRow()`
+
+Au clic sur une propriété d'annotation dans le picker `cls-anno-picker`, la méthode appelle `_makeAnnotRow('other', 'ClassEditor', ac, prop)` pour créer une ligne d'annotation avec le nom de la propriété, un champ valeur et un champ langue. Elle est utilisée pour des propriétés telles que `rdfs:seeAlso` ou toute propriété d'annotation définie dans l'ontologie.
+
+---
+
+### REQ-CLS-023 — Panneau de restrictions et propriétés assertées
+
+**Code source :** `owl_editor.js` → `RestrictionEditor.renderPanel()`
+
+La méthode génère le HTML du panneau "Properties and Restrictions" intégré dans le formulaire de classe. Elle appelle `_group()` pour regrouper les restrictions par propriété, affiche deux sections repliables ("Inherited Properties" et "Asserted Properties") avec leur compteur respectif, et expose des boutons pour ajouter une propriété existante, créer une ObjectProperty ou une DatatypeProperty directement depuis ce panneau.
+
+---
+
+### REQ-CLS-024 — Affichage des propriétés héritées (lecture seule)
+
+**Code source :** `owl_editor.js` → `RestrictionEditor._computeInherited()`, `RestrictionEditor._renderGroupReadOnly()`
+
+`_computeInherited()` traverse récursivement la chaîne `subClassOf` de la classe courante pour collecter toutes les restrictions définies sur les classes ancêtres. `_renderGroupReadOnly()` affiche ces restrictions en lecture seule, avec indication de la classe source (tag "↑ NomClasse") et un lien de navigation vers la propriété.
+
+---
+
+### REQ-CLS-025 — Ajout d'une propriété dans le panneau de restrictions
+
+**Code source :** `owl_editor.js` → `RestrictionEditor.addProperty()`
+
+Au clic sur une propriété dans le picker `#restr-prop-picker`, la méthode vérifie si un groupe pour cette propriété existe déjà (si oui, elle le sélectionne seulement), sinon crée un nouveau groupe vide via `_renderGroup()`, l'insère dans `#restr-tree` en ordre alphabétique, et sélectionne immédiatement la propriété. Elle retire la propriété du picker et déclenche `autoSave()`.
+
+---
+
+### REQ-CLS-026 — Ajout d'une restriction sur une propriété
+
+**Code source :** `owl_editor.js` → `RestrictionEditor.addRestriction()`, `RestrictionEditor.addRestrictionOfType()`
+
+`addRestriction()` ajoute une restriction de type `someValuesFrom` par défaut sur la propriété sélectionnée. `addRestrictionOfType(type)` (appelée depuis le menu contextuel) permet de choisir parmi six types : `someValuesFrom`, `allValuesFrom`, `hasValue`, `exactCardinality`, `minCardinality`, `maxCardinality`. Les deux méthodes créent un élément DOM via `_renderChild()` et l'ajoutent aux `.restr-children` du groupe concerné.
+
+---
+
+### REQ-CLS-027 — Changement de type de restriction
+
+**Code source :** `owl_editor.js` → `RestrictionEditor.onChildType()`
+
+Lorsque l'utilisateur change le `<select>` de type d'une restriction (`restr-type-sel`), la méthode affiche ou masque le champ de saisie de cardinalité (`restr-card-inp`) et le sélecteur de classe filler selon que le nouveau type contient "Cardinality" ou non. Elle ferme aussi le dropdown filler si on bascule vers un type cardinalité.
+
+---
+
+### REQ-CLS-028 — Sélection du filler (classe cible) d'une restriction
+
+**Code source :** `owl_editor.js` → `RestrictionEditor.toggleFillerPicker()`, `RestrictionEditor.selectFiller()`
+
+`toggleFillerPicker()` ouvre/ferme un dropdown positionné en `position:fixed` sous le bouton filler, en affichant la liste hiérarchique des classes via `_classHierarchyItems()`. `selectFiller()` met à jour la valeur du champ caché `restr-filler-val`, actualise le label affiché, remplace le point coloré (dot), marque l'item sélectionné et déclenche `autoSave()`.
+
+---
+
+### REQ-CLS-029 — Suppression d'une propriété du panneau de restrictions
+
+**Code source :** `owl_editor.js` → `RestrictionEditor.deleteProp()`
+
+Au clic sur `✕` au niveau d'un groupe de propriété, la méthode supprime le `.restr-prop-group` du DOM, réinitialise `_selectedProp`, remet la propriété dans le picker `#restr-prop-picker` en ordre alphabétique avec son icône (OP ou DP), et déclenche `autoSave()`.
+
+---
+
+### REQ-CLS-030 — Suppression d'une restriction enfant
+
+**Code source :** `owl_editor.js` → `RestrictionEditor.deleteChild()`
+
+Au clic sur `✕` au niveau d'une ligne de restriction (`restr-child-row`), la méthode retire l'élément DOM identifié par `restr-child-${gid}` et déclenche `autoSave()`.
+
+---
+
+### REQ-CLS-031 — Collecte des restrictions pour la sauvegarde
+
+**Code source :** `owl_editor.js` → `RestrictionEditor.collect()`
+
+La méthode parcourt tous les `.restr-prop-group` du DOM. Pour chaque groupe sans ligne enfant, elle génère un marqueur `{ type: '_marker', property: prop }` (persisté en JSON mais ignoré en RDF) pour conserver la présence de la propriété. Pour chaque ligne, elle lit le type, le filler (ou value pour `hasValue`) et la cardinalité, et retourne un tableau de restrictions structurées.
+
+---
+
+### REQ-CLS-032 — Création rapide d'une ObjectProperty depuis l'onglet Classes
+
+**Code source :** `owl_editor.js` → `ClassEditor.createOPForClass()`
+
+Depuis le bouton "OP" du panneau de restrictions, la méthode récupère l'identifiant de la classe sélectionnée, crée un objet ObjectProperty avec `domain: [classId]` et des tableaux vides pour `range` et `subPropertyOf`, appelle `API.createObjectProperty()`, puis navigue automatiquement vers l'onglet "object-properties" sur la nouvelle propriété.
+
+---
+
+### REQ-CLS-033 — Création rapide d'une DatatypeProperty depuis l'onglet Classes
+
+**Code source :** `owl_editor.js` → `ClassEditor.createDTPForClass()`
+
+Depuis le bouton "DT" du panneau de restrictions, la méthode crée une DatatypeProperty avec `domain: [classId]`, `functional: false`, et appelle `API.createDatatypeProperty()`, puis navigue vers l'onglet "datatype-properties".
+
+---
+
+### REQ-CLS-034 — Affichage de l'IRI complète de la classe
+
+**Code source :** `owl_editor.js` → `ClassEditor.renderForm()`
+
+Si une base IRI est définie dans les paramètres de l'ontologie (`baseIri`), le formulaire affiche sous le titre la ligne `For Class: <baseIri>#<classId>` en utilisant une balise `<code>`. Cette ligne n'est affichée que si la classe existe déjà (non en mode création pure) et que `baseIri` est non vide.
+
+---
+
+### REQ-CLS-035 — Panneau des super-classes avec hiérarchie ancêtres
+
+**Code source :** `owl_editor.js` → `ClassEditor.renderSplit()` (section `_renderSupersPanel()` interne)
+
+Le panneau gauche bas affiche la liste des super-classes directes avec un bouton de suppression `✕` pour chacune, suivi de leurs ancêtres indirects en italique et opacité réduite (0.75), jusqu'à `owl:Thing` affiché en dernier. Les ancêtres indirects sont cliquables via `APP.navigateTo('classes', id)` mais ne disposent pas de bouton de suppression.
+
+---
+
+*— claude-sonnet-4-6*
