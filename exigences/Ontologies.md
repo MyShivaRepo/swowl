@@ -43,9 +43,9 @@
 
 ### REQ-ONT-001 — Tri des ontologies dans le registre
 
-| **Si** | le registre des ontologies est consulté, |
+| **Si** | le registre des `ontologies` est consulté, |
 |---|---|
-| **Alors** | les ontologies de l'utilisateur apparaissent en premier, triées alphabétiquement, suivies des ontologies W3C en lecture seule, présentées dans un ordre de dépendance logique (OWL, puis RDFS, puis RDF). |
+| **Alors** | les `ontologies` de l'utilisateur apparaissent en premier, triées alphabétiquement, suivies des `ontologies` W3C en lecture seule, présentées dans un ordre de dépendance logique (OWL, puis RDFS, puis RDF). |
 
 ---
 
@@ -53,9 +53,9 @@
 
 ### REQ-ONT-002 — Auto-sélection de l'ontologie connectée
 
-| **Si** | l'ontologiste ouvre l'onglet `Ontologies` sans avoir effectué de sélection manuelle au préalable, |
+| **Si** | l'`ontologiste` ouvre l'onglet `Ontologies` sans avoir effectué de sélection manuelle au préalable, |
 |---|---|
-| **Alors** | l'ontologie actuellement connectée est automatiquement mise en évidence dans le registre, sans action supplémentaire de l'utilisateur. |
+| **Alors** | l'`ontologie` actuellement connectée est automatiquement mise en évidence dans le registre, sans action supplémentaire de l'utilisateur. |
 
 ---
 
@@ -63,9 +63,9 @@
 
 ### REQ-ONT-003 — Création d'une nouvelle ontologie
 
-| **Si** | l'ontologiste souhaite créer une nouvelle ontologie et renseigne son nom, son répertoire de stockage, son préfixe et l'URI de son espace de nommage, |
+| **Si** | l'`ontologiste` souhaite créer une nouvelle `ontologie` et renseigne son nom, son répertoire de stockage, son préfixe et l'URI de son espace de nommage, |
 |---|---|
-| **Alors** | l'ontologie est enregistrée dans le système ; si l'ontologiste le demande, elle est immédiatement connectée ; si l'un des champs obligatoires est absent, un message d'erreur est affiché et aucun enregistrement n'est effectué. |
+| **Alors** | l'`ontologie` est enregistrée dans le système ; si l'`ontologiste` le demande, elle est immédiatement connectée ; si l'un des champs obligatoires est absent, un message d'erreur est affiché et aucun enregistrement n'est effectué. |
 
 ---
 
@@ -73,9 +73,9 @@
 
 ### REQ-ONT-004 — Import d'une ontologie OWL/TTL
 
-| **Si** | l'ontologiste souhaite importer une ontologie existante depuis un fichier source (format OWL, Turtle ou RDF) et renseigne le nom cible, le répertoire de destination, le préfixe et l'URI, |
+| **Si** | l'`ontologiste` souhaite importer une `ontologie` existante depuis un fichier source (format OWL, Turtle ou RDF) et renseigne le nom cible, le répertoire de destination, le préfixe et l'URI, |
 |---|---|
-| **Alors** | le fichier est converti et enregistré dans le système ; si l'ontologiste ne demande pas de connexion immédiate, l'ontologie reste déconnectée ; si l'un des cinq champs obligatoires est absent, l'import est annulé. |
+| **Alors** | le fichier est converti et enregistré dans le système ; si l'`ontologiste` ne demande pas de connexion immédiate, l'`ontologie` reste déconnectée ; si l'un des cinq champs obligatoires est absent, l'import est annulé. |
 
 ---
 
@@ -83,9 +83,9 @@
 
 ### REQ-ONT-005 — Lecture automatique du préfixe et de l'URI depuis un fichier source
 
-| **Si** | l'ontologiste sélectionne un fichier source lors d'un import et demande la lecture automatique de ses métadonnées, |
+| **Si** | l'`ontologiste` sélectionne un fichier source lors d'un import et demande la lecture automatique de ses métadonnées, |
 |---|---|
-| **Alors** | le préfixe et l'URI de l'espace de nommage sont extraits du fichier et injectés dans le formulaire ; le nom de l'ontologie est également proposé si le champ est encore vide. |
+| **Alors** | le préfixe et l'URI de l'espace de nommage sont extraits du fichier et injectés dans le formulaire ; le nom de l'`ontologie` est également proposé si le champ est encore vide. |
 
 ---
 
@@ -93,9 +93,9 @@
 
 ### REQ-ONT-006 — Chargement d'une ontologie JSON
 
-| **Si** | l'ontologiste souhaite enregistrer dans le système une ontologie déjà sérialisée au format JSON et renseigne le fichier source, le nom, le préfixe et l'URI, |
+| **Si** | l'`ontologiste` souhaite enregistrer dans le système une `ontologie` déjà sérialisée au format JSON et renseigne le fichier source, le nom, le préfixe et l'URI, |
 |---|---|
-| **Alors** | l'ontologie est enregistrée dans le registre ; si l'ontologiste le demande, elle est immédiatement connectée ; si le fichier source ou le nom est absent, le chargement est annulé. |
+| **Alors** | l'`ontologie` est enregistrée dans le registre ; si l'`ontologiste` le demande, elle est immédiatement connectée ; si le fichier source ou le nom est absent, le chargement est annulé. |
 
 ---
 
@@ -103,7 +103,7 @@
 
 ### REQ-ONT-007 — Lecture automatique des métadonnées depuis un fichier JSON
 
-| **Si** | l'ontologiste sélectionne un fichier JSON lors du chargement et demande la lecture automatique de ses métadonnées, |
+| **Si** | l'`ontologiste` sélectionne un fichier JSON lors du chargement et demande la lecture automatique de ses métadonnées, |
 |---|---|
 | **Alors** | le nom, le préfixe et l'URI de l'espace de nommage sont extraits du fichier et injectés dans les champs du formulaire, en remplaçant toute valeur précédemment saisie. |
 
@@ -113,7 +113,7 @@
 
 ### REQ-ONT-008 — Sauvegarde des modifications d'une ontologie
 
-| **Si** | l'ontologiste modifie les attributs d'une ontologie déjà enregistrée (nom, répertoire, préfixe ou URI de l'espace de nommage) et confirme les changements, |
+| **Si** | l'`ontologiste` modifie les attributs d'une `ontologie` déjà enregistrée (nom, répertoire, préfixe ou URI de l'espace de nommage) et confirme les changements, |
 |---|---|
 | **Alors** | le registre est mis à jour avec les nouvelles valeurs ; si l'un des champs obligatoires est absent, la sauvegarde est annulée. |
 
@@ -123,13 +123,13 @@
 
 ### REQ-ONT-009 — Connexion et déconnexion d'une ontologie
 
-| **Si** | l'ontologiste demande la connexion d'une ontologie, |
+| **Si** | l'`ontologiste` demande la connexion d'une `ontologie`, |
 |---|---|
-| **Alors** | cette ontologie devient l'ontologie de travail active, clairement identifiée dans le registre, et les onglets d'édition deviennent accessibles. |
+| **Alors** | cette `ontologie` devient l'`ontologie` de travail active, clairement identifiée dans le registre, et les onglets d'édition deviennent accessibles. |
 
-| **Si** | l'ontologiste demande la déconnexion de l'ontologie courante, |
+| **Si** | l'`ontologiste` demande la déconnexion de l'`ontologie` courante, |
 |---|---|
-| **Alors** | aucune ontologie n'est plus active et les onglets d'édition deviennent inaccessibles jusqu'à une nouvelle connexion. |
+| **Alors** | aucune `ontologie` n'est plus active et les onglets d'édition deviennent inaccessibles jusqu'à une nouvelle connexion. |
 
 ---
 
@@ -137,9 +137,9 @@
 
 ### REQ-ONT-010 — Désenregistrement d'une ontologie
 
-| **Si** | l'ontologiste souhaite retirer une ontologie du registre et confirme l'opération après avoir été informé que le fichier sur disque ne sera pas supprimé, |
+| **Si** | l'`ontologiste` souhaite retirer une `ontologie` du registre et confirme l'opération après avoir été informé que le fichier sur disque ne sera pas supprimé, |
 |---|---|
-| **Alors** | l'ontologie disparaît du registre sans qu'aucun fichier physique ne soit effacé. |
+| **Alors** | l'`ontologie` disparaît du registre sans qu'aucun fichier physique ne soit effacé. |
 
 ---
 
@@ -147,9 +147,9 @@
 
 ### REQ-ONT-011 — Téléchargement des ontologies W3C intégrées
 
-| **Si** | l'ontologiste souhaite disposer des ontologies de référence W3C (RDF, RDFS, OWL) dans le registre local, |
+| **Si** | l'`ontologiste` souhaite disposer des `ontologies` de référence W3C (RDF, RDFS, OWL) dans le registre local, |
 |---|---|
-| **Alors** | le système télécharge et enregistre ces ontologies depuis les sources officielles (`w3.org`) et informe l'ontologiste du nombre d'ontologies effectivement récupérées. |
+| **Alors** | le système télécharge et enregistre ces `ontologies` depuis les sources officielles (`w3.org`) et informe l'`ontologiste` du nombre d'`ontologies` effectivement récupérées. |
 
 ---
 
@@ -157,9 +157,9 @@
 
 ### REQ-ONT-012 — Export d'une ontologie par nom (OWL/TTL/SWRL/SWORD)
 
-| **Si** | l'ontologiste sélectionne une ontologie du registre et choisit un format d'export parmi les formats sémantiques disponibles, |
+| **Si** | l'`ontologiste` sélectionne une `ontologie` du registre et choisit un format d'export parmi les formats sémantiques disponibles, |
 |---|---|
-| **Alors** | le fichier correspondant est généré et proposé au téléchargement avec un nom de fichier reflétant le nom de l'ontologie et le format choisi. |
+| **Alors** | le fichier correspondant est généré et proposé au téléchargement avec un nom de fichier reflétant le nom de l'`ontologie` et le format choisi. |
 
 ---
 
@@ -167,7 +167,7 @@
 
 ### REQ-ONT-013 — Export de l'ontologie couramment connectée
 
-| **Si** | l'ontologiste souhaite exporter l'ontologie sur laquelle il travaille actuellement en choisissant un format, |
+| **Si** | l'`ontologiste` souhaite exporter l'`ontologie` sur laquelle il travaille actuellement en choisissant un format, |
 |---|---|
 | **Alors** | le fichier est généré et proposé au téléchargement sous un nom générique associé au format choisi. |
 
@@ -177,9 +177,9 @@
 
 ### REQ-ONT-014 — Blocage des onglets d'édition en l'absence d'ontologie connectée
 
-| **Si** | l'ontologiste tente d'accéder à un onglet d'édition alors qu'aucune ontologie n'est connectée, |
+| **Si** | l'`ontologiste` tente d'accéder à un onglet d'édition alors qu'aucune `ontologie` n'est connectée, |
 |---|---|
-| **Alors** | l'accès est refusé et un message guide l'ontologiste vers l'onglet `Ontologies` pour en connecter une. |
+| **Alors** | l'accès est refusé et un message guide l'`ontologiste` vers l'onglet `Ontologies` pour en connecter une. |
 
 ---
 
@@ -187,13 +187,13 @@
 
 ### REQ-ONT-015 — Calcul des racines virtuelles selon le préfixe de l'ontologie
 
-| **Si** | l'ontologiste travaille sur une ontologie de bas niveau (RDF ou RDFS), |
+| **Si** | l'`ontologiste` travaille sur une `ontologie` de bas niveau (RDF ou RDFS), |
 |---|---|
-| **Alors** | les arborescences de classes et de propriétés sont ancrées respectivement sur `rdfs:Resource` et `rdf:Property`, conformément à la sémantique de ces vocabulaires. |
+| **Alors** | les arborescences de `classes` et de `propriétés` sont ancrées respectivement sur `rdfs:Resource` et `rdf:Property`, conformément à la sémantique de ces vocabulaires. |
 
-| **Si** | l'ontologiste travaille sur toute autre ontologie (ou qu'aucune ontologie n'est connectée), |
+| **Si** | l'`ontologiste` travaille sur toute autre `ontologie` (ou qu'aucune `ontologie` n'est connectée), |
 |---|---|
-| **Alors** | les arborescences de classes et de propriétés sont ancrées respectivement sur `owl:Thing` et `owl:topObjectProperty`, conformément aux conventions OWL. |
+| **Alors** | les arborescences de `classes` et de `propriétés` sont ancrées respectivement sur `owl:Thing` et `owl:topObjectProperty`, conformément aux conventions OWL. |
 
 ---
 
@@ -201,9 +201,9 @@
 
 ### REQ-ONT-016 — Import implicite de OWL pour les ontologies utilisateur
 
-| **Si** | une ontologie de l'utilisateur ne déclare aucun import explicite, |
+| **Si** | une `ontologie` de l'utilisateur ne déclare aucun import explicite, |
 |---|---|
-| **Alors** | l'arbre des imports lui attribue automatiquement l'ontologie OWL de référence (`http://www.w3.org/2002/07/owl#`), reflétant l'import implicite inhérent à toute ontologie OWL. |
+| **Alors** | l'arbre des imports lui attribue automatiquement l'`ontologie` OWL de référence (`http://www.w3.org/2002/07/owl#`), reflétant l'import implicite inhérent à toute `ontologie` OWL. |
 
 ---
 
@@ -217,9 +217,9 @@
 
 ### REQ-ONT-017 — Affichage de l'onglet Ontologies
 
-| **Si** | l'ontologiste navigue vers l'onglet `Ontologies`, |
+| **Si** | l'`ontologiste` navigue vers l'onglet `Ontologies`, |
 |---|---|
-| **Alors** | la page affiche un en-tête, les actions disponibles (créer, importer, charger, télécharger les ontologies W3C), un panneau de saisie assistée initialement masqué, et le tableau du registre avec les colonnes Nom, Répertoire, Préfixe et Espace de nommage. |
+| **Alors** | la page affiche un en-tête, les actions disponibles (créer, importer, charger, télécharger les `ontologies` W3C), un panneau de saisie assistée initialement masqué, et le tableau du registre avec les colonnes Nom, Répertoire, Préfixe et Espace de nommage. |
 
 ---
 
@@ -229,7 +229,7 @@
 
 | **Si** | l'onglet `Ontologies` est affiché, |
 |---|---|
-| **Alors** | la liste de toutes les ontologies enregistrées est chargée et affichée dans le tableau ; si le chargement échoue, un message d'erreur est affiché à la place du tableau. |
+| **Alors** | la liste de toutes les `ontologies` enregistrées est chargée et affichée dans le tableau ; si le chargement échoue, un message d'erreur est affiché à la place du tableau. |
 
 ---
 
@@ -237,7 +237,7 @@
 
 ### REQ-ONT-019 — Sélection d'une ligne du registre
 
-| **Si** | l'ontologiste clique sur une ontologie dans le tableau du registre, |
+| **Si** | l'`ontologiste` clique sur une `ontologie` dans le tableau du registre, |
 |---|---|
 | **Alors** | la ligne sélectionnée est visuellement mise en évidence et toute sélection précédente est annulée. |
 
@@ -249,7 +249,7 @@
 
 | **Si** | le registre est chargé, |
 |---|---|
-| **Alors** | le nombre total d'ontologies enregistrées est affiché, avec un libellé correctement accordé au singulier ou au pluriel. |
+| **Alors** | le nombre total d'`ontologies` enregistrées est affiché, avec un libellé correctement accordé au singulier ou au pluriel. |
 
 ---
 
@@ -257,7 +257,7 @@
 
 ### REQ-ONT-021 — Édition des attributs d'une ontologie existante
 
-| **Si** | l'ontologiste souhaite modifier les attributs d'une ontologie déjà enregistrée, |
+| **Si** | l'`ontologiste` souhaite modifier les attributs d'une `ontologie` déjà enregistrée, |
 |---|---|
 | **Alors** | un formulaire pré-rempli avec les valeurs actuelles (nom, répertoire, préfixe, URI) s'ouvre pour lui permettre d'effectuer ses modifications, et le répertoire peut être sélectionné via un navigateur de fichiers. |
 
@@ -267,9 +267,9 @@
 
 ### REQ-ONT-022 — Menu déroulant de sélection du format d'export
 
-| **Si** | l'ontologiste souhaite exporter une ontologie ou un ensemble de règles et clique sur le bouton d'export, |
+| **Si** | l'`ontologiste` souhaite exporter une `ontologie` ou un ensemble de règles et clique sur le bouton d'export, |
 |---|---|
-| **Alors** | un menu contextuel présente les formats disponibles selon le type de contenu à exporter (formats OWL et Turtle pour une ontologie ; formats SWRL et SWORD pour des règles) ; un clic en dehors du menu le referme. |
+| **Alors** | un menu contextuel présente les formats disponibles selon le type de contenu à exporter (formats OWL et Turtle pour une `ontologie` ; formats SWRL et SWORD pour des règles) ; un clic en dehors du menu le referme. |
 
 ---
 
@@ -277,9 +277,9 @@
 
 ### REQ-ONT-023 — Affichage de l'arbre des imports avec expansion/repli
 
-| **Si** | le registre est affiché et qu'une ontologie déclare des imports, |
+| **Si** | le registre est affiché et qu'une `ontologie` déclare des imports, |
 |---|---|
-| **Alors** | les ontologies importées sont affichées en sous-lignes indentées ; si un import possède lui-même des sous-imports, l'ontologiste peut développer ou réduire ce nœud de l'arbre ; les cycles d'import sont détectés et ne provoquent pas de boucle infinie. |
+| **Alors** | les `ontologies` importées sont affichées en sous-lignes indentées ; si un import possède lui-même des sous-imports, l'`ontologiste` peut développer ou réduire ce nœud de l'arbre ; les cycles d'import sont détectés et ne provoquent pas de boucle infinie. |
 
 ---
 
@@ -287,9 +287,9 @@
 
 ### REQ-ONT-024 — Navigation vers une entrée du registre depuis l'arbre des imports
 
-| **Si** | l'ontologiste clique sur le nom d'une ontologie dans l'arbre des imports, |
+| **Si** | l'`ontologiste` clique sur le nom d'une `ontologie` dans l'arbre des imports, |
 |---|---|
-| **Alors** | la ligne correspondante dans le tableau du registre est mise en évidence visuellement et défilée en vue, afin que l'ontologiste puisse la retrouver facilement. |
+| **Alors** | la ligne correspondante dans le tableau du registre est mise en évidence visuellement et défilée en `vue`, afin que l'`ontologiste` puisse la retrouver facilement. |
 
 ---
 
@@ -297,9 +297,9 @@
 
 ### REQ-ONT-025 — Ouverture du répertoire dans le Finder
 
-| **Si** | l'ontologiste clique sur le répertoire d'une ontologie dans le tableau, |
+| **Si** | l'`ontologiste` clique sur le répertoire d'une `ontologie` dans le tableau, |
 |---|---|
-| **Alors** | le répertoire de stockage de cette ontologie est ouvert dans le gestionnaire de fichiers du système ; si cette action échoue, un message d'avertissement est affiché. |
+| **Alors** | le répertoire de stockage de cette `ontologie` est ouvert dans le gestionnaire de fichiers du système ; si cette action échoue, un message d'avertissement est affiché. |
 
 ---
 
@@ -307,13 +307,13 @@
 
 ### REQ-ONT-026 — Panneau wizard commutable (ouverture/fermeture)
 
-| **Si** | l'ontologiste clique sur un bouton d'action et que le panneau de saisie assistée affiche déjà le formulaire correspondant à cette action, |
+| **Si** | l'`ontologiste` clique sur un bouton d'action et que le panneau de saisie assistée affiche déjà le formulaire correspondant à cette action, |
 |---|---|
 | **Alors** | le panneau se referme (comportement bascule). |
 
-| **Si** | l'ontologiste clique sur un bouton d'action et que le panneau affiche un formulaire différent ou est fermé, |
+| **Si** | l'`ontologiste` clique sur un bouton d'action et que le panneau affiche un formulaire différent ou est fermé, |
 |---|---|
-| **Alors** | le panneau s'ouvre et affiche le formulaire correspondant à l'action demandée (créer, importer ou charger une ontologie). |
+| **Alors** | le panneau s'ouvre et affiche le formulaire correspondant à l'action demandée (créer, importer ou charger une `ontologie`). |
 
 ---
 
