@@ -1,1 +1,1 @@
-Exigencesde l'onglet Ontologies
+Exigences de l'onglet Ontologies
