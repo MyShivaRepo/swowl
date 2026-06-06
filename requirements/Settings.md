@@ -1,39 +1,43 @@
-# Functional Requirements — Settings Tab (SWOWL)
+# Requirements — Settings
 
-**Date:** 2026-06-06
-**Note:** Requirements derived strictly from the source code (`app.js`). No functionality has been extrapolated — each requirement cites the JavaScript function that implements it.
+> Generated on 2026-06-06 | Strictly derived from source code | No hallucination
+
+## Table of contents
+
+### Substance
+- [REQ-SET-001 — Persistence of user settings](#req-set-001--persistence-of-user-settings)
+- [REQ-SET-002 — Loading settings on startup](#req-set-002--loading-settings-on-startup)
+- [REQ-SET-005 — Hiding an optional tab](#req-set-005--hiding-an-optional-tab)
+- [REQ-SET-006 — Showing a previously hidden optional tab](#req-set-006--showing-a-previously-hidden-optional-tab)
+- [REQ-SET-007 — Toggling tab visibility](#req-set-007--toggling-tab-visibility)
+- [REQ-SET-009 — Persisting tab visibility in localStorage](#req-set-009--persisting-tab-visibility-in-localstorage)
+- [REQ-SET-010 — Setting the preferred language](#req-set-010--setting-the-preferred-language)
+- [REQ-SET-011 — Enabling or disabling a language](#req-set-011--enabling-or-disabling-a-language)
+- [REQ-SET-012 — Protecting the preferred language from being disabled](#req-set-012--protecting-the-preferred-language-from-being-disabled)
+- [REQ-SET-013 — Catalogue of available European languages](#req-set-013--catalogue-of-available-european-languages)
+- [REQ-SET-014 — Selecting the individual identifier format](#req-set-014--selecting-the-individual-identifier-format)
+- [REQ-SET-015 — Automatic generation of an identifier for a new individual](#req-set-015--automatic-generation-of-an-identifier-for-a-new-individual)
+
+### Form
+- [REQ-SET-003 — Sub-tab navigation in the Settings page](#req-set-003--sub-tab-navigation-in-the-settings-page)
+- [REQ-SET-004 — Displaying the list of configurable GUI tabs](#req-set-004--displaying-the-list-of-configurable-gui-tabs)
+- [REQ-SET-008 — Immediate application of tab visibility in the DOM](#req-set-008--immediate-application-of-tab-visibility-in-the-dom)
 
 ---
 
-## Table of Contents
+## 1. Substance — Business logic and functional rules
 
-1. [REQ-SET-001 — User settings persistence](#req-set-001-user-settings-persistence)
-2. [REQ-SET-002 — Settings loading at startup](#req-set-002-settings-loading-at-startup)
-3. [REQ-SET-003 — Sub-tab navigation in the Settings page](#req-set-003-sub-tab-navigation-in-the-settings-page)
-4. [REQ-SET-004 — Display of the configurable GUI tabs list](#req-set-004-display-of-the-configurable-gui-tabs-list)
-5. [REQ-SET-005 — Hiding an optional tab](#req-set-005-hiding-an-optional-tab)
-6. [REQ-SET-006 — Showing a previously hidden optional tab](#req-set-006-showing-a-previously-hidden-optional-tab)
-7. [REQ-SET-007 — Tab visibility toggle](#req-set-007-tab-visibility-toggle)
-8. [REQ-SET-008 — Immediate application of tab visibility in the DOM](#req-set-008-immediate-application-of-tab-visibility-in-the-dom)
-9. [REQ-SET-009 — Tab visibility persistence in localStorage](#req-set-009-tab-visibility-persistence-in-localstorage)
-10. [REQ-SET-010 — Preferred language definition](#req-set-010-preferred-language-definition)
-11. [REQ-SET-011 — Enabling or disabling a language](#req-set-011-enabling-or-disabling-a-language)
-12. [REQ-SET-012 — Protection of the preferred language against deactivation](#req-set-012-protection-of-the-preferred-language-against-deactivation)
-13. [REQ-SET-013 — Catalogue of available European languages](#req-set-013-catalogue-of-available-european-languages)
-14. [REQ-SET-014 — Individual identifier format selection](#req-set-014-individual-identifier-format-selection)
-15. [REQ-SET-015 — Automatic identifier generation for a new individual](#req-set-015-automatic-identifier-generation-for-a-new-individual)
+> Requirements independent of the UI: OWL rules, data constraints, algorithms, persistence.
 
----
-
-### REQ-SET-001 — User settings persistence
+### REQ-SET-001 — Persistence of user settings
 
 **Source code:** `app.js` → `Settings.save()`
 
-The `Settings.save()` method serializes the three user settings (`preferredLang`, `activeLangs`, `namingFormat`) as JSON and stores them in `localStorage` under the key `swowl_settings`. It is called upon every modification of a setting.
+The `Settings.save()` method serializes the three user settings (`preferredLang`, `activeLangs`, `namingFormat`) as JSON and stores them in `localStorage` under the key `swowl_settings`. It is called on every modification of a setting.
 
 ---
 
-### REQ-SET-002 — Settings loading at startup
+### REQ-SET-002 — Loading settings on startup
 
 **Source code:** `app.js` → `Settings.load()`
 
@@ -41,27 +45,11 @@ The `Settings.load()` method reads the `swowl_settings` entry from `localStorage
 
 ---
 
-### REQ-SET-003 — Sub-tab navigation in the Settings page
-
-**Source code:** `app.js` → `APP.renderSettings()`
-
-The `APP.renderSettings()` function generates a two-column interface: a left sidebar with three clickable sub-tabs (`GUI Tabs`, `Languages`, `IDs Rules`), and a right content area whose rendering depends on the value of `APP._settingsTab`. Clicking a sub-tab updates `APP._settingsTab` and calls `APP.renderSection('settings')` to re-render the page.
-
----
-
-### REQ-SET-004 — Display of the configurable GUI tabs list
-
-**Source code:** `app.js` → `APP.renderGuiTabs()`
-
-The `APP.renderGuiTabs()` function displays the exhaustive list of the 11 application tabs (`Ontologies`, `Settings`, `Classes`, `ObjectProperties`, `DatatypeProperties`, `AnnotationProperties`, `Individuals`, `SWRL Rules`, `Views`, `Queries`, `Inferences`). Tabs marked `fixed: true` are displayed with a disabled checkbox and the label `required`. Optional tabs are displayed with an interactive checkbox reflecting their current visibility state.
-
----
-
 ### REQ-SET-005 — Hiding an optional tab
 
 **Source code:** `app.js` → `TabVisibility.hide()`
 
-The `TabVisibility.hide(tabId)` method first verifies that the tab is in the `_optional` list. If so, it adds its identifier to the internal `Set` `_hidden`, saves the state, applies the visibility in the DOM, and redirects the user to the `ontologies` tab if the currently active tab is the one that was just hidden.
+The `TabVisibility.hide(tabId)` method first checks that the tab is in the `_optional` list. If so, it adds its identifier to the internal `Set` `_hidden`, saves the state, applies the visibility in the DOM, and redirects the user to the `ontologies` tab if the currently active tab is the one that was just hidden.
 
 ---
 
@@ -73,7 +61,7 @@ The `TabVisibility.show(tabId)` method removes the tab identifier from the `Set`
 
 ---
 
-### REQ-SET-007 — Tab visibility toggle
+### REQ-SET-007 — Toggling tab visibility
 
 **Source code:** `app.js` → `TabVisibility.toggle()`
 
@@ -81,15 +69,7 @@ The `TabVisibility.toggle(tabId)` method calls `TabVisibility.show()` if the tab
 
 ---
 
-### REQ-SET-008 — Immediate application of tab visibility in the DOM
-
-**Source code:** `app.js` → `APP._applyTabVisibility()`
-
-The `APP._applyTabVisibility()` function iterates over the `TabVisibility._optional` list and, for each identifier, selects the `.nav-item[data-section="<id>"]` element in the DOM. It sets `display:none` if the tab is in `_hidden`, or removes the inline style otherwise.
-
----
-
-### REQ-SET-009 — Tab visibility persistence in localStorage
+### REQ-SET-009 — Persisting tab visibility in localStorage
 
 **Source code:** `app.js` → `TabVisibility.save()`
 
@@ -97,11 +77,11 @@ The `TabVisibility.save()` method serializes the contents of the `Set` `_hidden`
 
 ---
 
-### REQ-SET-010 — Preferred language definition
+### REQ-SET-010 — Setting the preferred language
 
 **Source code:** `app.js` → `Settings.setPreferred()`
 
-The `Settings.setPreferred(lang)` method sets `preferredLang` to the value of the provided language code. If that language is not yet in `activeLangs`, it adds it. It then calls `Settings.save()` and `APP.renderSection('settings')` to persist and refresh the interface.
+The `Settings.setPreferred(lang)` method sets `preferredLang` to the provided language code value. If this language is not yet in `activeLangs`, it adds it. It then calls `Settings.save()` and `APP.renderSection('settings')` to persist and refresh the interface.
 
 ---
 
@@ -113,11 +93,11 @@ The `Settings.toggleActive(lang)` method adds the language code to `activeLangs`
 
 ---
 
-### REQ-SET-012 — Protection of the preferred language against deactivation
+### REQ-SET-012 — Protecting the preferred language from being disabled
 
 **Source code:** `app.js` → `Settings.toggleActive()`
 
-Within the `Settings.toggleActive(lang)` method, a guard at the beginning of the function checks whether `lang === this.preferredLang`. If so, the function returns immediately without making any modification, thereby preventing the removal of the preferred language from the active list.
+In the `Settings.toggleActive(lang)` method, a guard at the start of the function checks whether `lang === this.preferredLang`. If so, the function returns immediately without performing any modification, thereby preventing the preferred language from being removed from the active list.
 
 ---
 
@@ -129,7 +109,7 @@ The `Settings` object declares an `availableLangs` property containing an array 
 
 ---
 
-### REQ-SET-014 — Individual identifier format selection
+### REQ-SET-014 — Selecting the individual identifier format
 
 **Source code:** `app.js` → `Settings.setNamingFormat()`
 
@@ -137,7 +117,7 @@ The `Settings.setNamingFormat(fmt)` method assigns the received value to `this.n
 
 ---
 
-### REQ-SET-015 — Automatic identifier generation for a new individual
+### REQ-SET-015 — Automatic generation of an identifier for a new individual
 
 **Source code:** `app.js` → `Settings.generateIndividualId()`
 
@@ -149,4 +129,32 @@ The `Settings.generateIndividualId(classId)` method computes a default identifie
 
 ---
 
-*— claude-sonnet-4-6*
+## 2. Form — Presentation and user interface
+
+> Requirements related to display: layout, visual components, interactions, navigation, styles.
+
+### REQ-SET-003 — Sub-tab navigation in the Settings page
+
+**Source code:** `app.js` → `APP.renderSettings()`
+
+The `APP.renderSettings()` function generates a two-column interface: a left sidebar with three clickable sub-tabs (`GUI Tabs`, `Languages`, `IDs Rules`), and a content area on the right whose rendering depends on the value of `APP._settingsTab`. Clicking a sub-tab updates `APP._settingsTab` and calls `APP.renderSection('settings')` to re-render the page.
+
+---
+
+### REQ-SET-004 — Displaying the list of configurable GUI tabs
+
+**Source code:** `app.js` → `APP.renderGuiTabs()`
+
+The `APP.renderGuiTabs()` function displays the exhaustive list of the application's 11 tabs (`Ontologies`, `Settings`, `Classes`, `ObjectProperties`, `DatatypeProperties`, `AnnotationProperties`, `Individuals`, `SWRL Rules`, `Views`, `Queries`, `Inferences`). Tabs marked `fixed: true` are displayed with a disabled checkbox and the label `required`. Optional tabs are displayed with an interactive checkbox reflecting their current visibility state.
+
+---
+
+### REQ-SET-008 — Immediate application of tab visibility in the DOM
+
+**Source code:** `app.js` → `APP._applyTabVisibility()`
+
+The `APP._applyTabVisibility()` function iterates over the `TabVisibility._optional` list and, for each identifier, selects the `.nav-item[data-section="<id>"]` element in the DOM. It sets `display:none` if the tab is in `_hidden`, or removes the inline style otherwise.
+
+---
+
+— claude-sonnet-4-6
