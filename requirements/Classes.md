@@ -61,7 +61,7 @@
 
 | **If** | the application navigates to a specific class (for example after a creation or an internal link), |
 |---|---|
-| **Then** | all ancestor nodes of that class are automatically expanded in the tree, making the class immediately visible without the `ontologist` having to manually expand each level. |
+| **Then** | all ancestor nodes of that class are automatically expanded in the tree, making the class immediately visible without the ontologist having to manually expand each level. |
 
 **Source code:** `owl_editor.js` → `ClassEditor._expandAncestors()` — Recursively walks up the `subClassOf` chain of the target class and adds each ancestor to the `_expanded` `Set`, triggering a re-render of the tree.
 
@@ -69,7 +69,7 @@
 
 ### REQ-CLS-003 — Creating a child class (subclass)
 
-| **If** | the `ontologist` wants to specialise an existing concept by creating a subclass, |
+| **If** | the ontologist wants to specialise an existing concept by creating a subclass, |
 |---|---|
 | **Then** | the new class is automatically positioned under the selected parent concept in the hierarchy, without any additional manipulation. If no class is selected (or if the root is selected), the class is created without a superclass. In all cases, the new class is immediately selected and ready to be edited. |
 
@@ -79,9 +79,9 @@
 
 ### REQ-CLS-004 — Creating a sibling class (same level)
 
-| **If** | the `ontologist` wants to create a concept parallel to an existing concept at the same level of specialisation, |
+| **If** | the ontologist wants to create a concept parallel to an existing concept at the same level of specialisation, |
 |---|---|
-| **Then** | the new class inherits the same superclasses as the reference class, automatically placing it at the same level in the hierarchy without the `ontologist` having to reconfigure the subclass relations. |
+| **Then** | the new class inherits the same superclasses as the reference class, automatically placing it at the same level in the hierarchy without the ontologist having to reconfigure the subclass relations. |
 
 **Source code:** `owl_editor.js` → `ClassEditor.createSibling()` — Reads the `subClassOf` array of the selected class and creates a new class with that same parent array, then navigates to the new entry.
 
@@ -89,7 +89,7 @@
 
 ### REQ-CLS-005 — Deleting the selected class
 
-| **If** | the `ontologist` wants to delete the concept currently selected in the tree, |
+| **If** | the ontologist wants to delete the concept currently selected in the tree, |
 |---|---|
 | **Then** | the class is removed from the `ontology` and the tree is updated to reflect that state without a page reload. |
 
@@ -99,7 +99,7 @@
 
 ### REQ-CLS-006 — Moving a class by drag and drop
 
-| **If** | the `ontologist` reorganises the hierarchy by dragging a class to a new parent node, |
+| **If** | the ontologist reorganises the hierarchy by dragging a class to a new parent node, |
 |---|---|
 | **Then** | the moved class is attached to the new parent, its former subclass links are replaced by this new link (`object property` `restrictions` defined on the class are preserved), and the new parent node is automatically expanded to make the moved class visible. |
 
@@ -109,9 +109,9 @@
 
 ### REQ-CLS-007 — Auto-save on edit
 
-| **If** | the `ontologist` modifies any field of an already existing class (annotations, superclasses, equivalences, disjointnesses, `restrictions`), |
+| **If** | the ontologist modifies any field of an already existing class (annotations, superclasses, equivalences, disjointnesses, `restrictions`), |
 |---|---|
-| **Then** | the changes are saved immediately and silently, without the `ontologist` having to explicitly confirm each change. |
+| **Then** | the changes are saved immediately and silently, without the ontologist having to explicitly confirm each change. |
 
 **Source code:** `owl_editor.js` → `ClassEditor.autoSave()` — Checks that `_editingId !== null` then calls `save(false)` in silent mode (without navigation or view reload).
 
@@ -119,7 +119,7 @@
 
 ### REQ-CLS-008 — Saving/creating a class
 
-| **If** | the `ontologist` submits the form of a class (new or existing), |
+| **If** | the ontologist submits the form of a class (new or existing), |
 |---|---|
 | **Then** | all entered information (identifier, superclasses, equivalent `classes`, disjointnesses, annotations, `restrictions`) is consolidated and persisted in the `ontology`, whether creating or updating an existing concept. |
 
@@ -129,11 +129,11 @@
 
 ### REQ-CLS-009 — Managing superclasses
 
-| **If** | the `ontologist` adds a superclass to a concept, |
+| **If** | the ontologist adds a superclass to a concept, |
 |---|---|
 | **Then** | the subclass relation is materialised in the dedicated panel with a navigation link to the parent class and the ability to remove it. |
 
-| **If** | the `ontologist` removes a superclass from a concept, |
+| **If** | the ontologist removes a superclass from a concept, |
 |---|---|
 | **Then** | the corresponding subclass relation is removed from the panel. |
 
@@ -145,11 +145,11 @@ In both cases, if the class is being edited, the change is saved automatically.
 
 ### REQ-CLS-010 — Managing equivalent classes
 
-| **If** | the `ontologist` declares two `classes` as equivalent, |
+| **If** | the ontologist declares two `classes` as equivalent, |
 |---|---|
 | **Then** | the equivalent class appears in the dedicated panel with a clickable navigation link to it and the ability to remove the equivalence. |
 
-| **If** | the `ontologist` removes an equivalence between two `classes`, |
+| **If** | the ontologist removes an equivalence between two `classes`, |
 |---|---|
 | **Then** | the equivalence relation is removed from the panel. |
 
@@ -161,11 +161,11 @@ In both cases, the change is saved automatically if the class is being edited.
 
 ### REQ-CLS-011 — Managing disjoint classes
 
-| **If** | the `ontologist` declares two `classes` as disjoint, |
+| **If** | the ontologist declares two `classes` as disjoint, |
 |---|---|
 | **Then** | the disjoint class appears in the dedicated panel with the ability to remove the disjointness. |
 
-| **If** | the `ontologist` removes a disjointness between two `classes`, |
+| **If** | the ontologist removes a disjointness between two `classes`, |
 |---|---|
 | **Then** | the disjointness relation is removed from the panel. |
 
@@ -179,7 +179,7 @@ In both cases, the change is saved automatically if the class is being edited.
 
 | **If** | the selected class has ancestors that define `restrictions` on `properties`, |
 |---|---|
-| **Then** | those inherited `restrictions` are displayed read-only in the current class panel, with an indication of the ancestor class that defines them and a navigation link to the relevant `property`, allowing the `ontologist` to understand the complete profile of the concept without modifying the inherited definitions. |
+| **Then** | those inherited `restrictions` are displayed read-only in the current class panel, with an indication of the ancestor class that defines them and a navigation link to the relevant `property`, allowing the ontologist to understand the complete profile of the concept without modifying the inherited definitions. |
 
 **Source code:** `owl_editor.js` → `RestrictionEditor._computeInherited()` — Recursively traverses the `subClassOf` chain of the current class and collects all ancestor restrictions. | `RestrictionEditor._renderGroupReadOnly()` — Displays each inherited group read-only with an "↑ ClassName" tag and a navigation link to the property.
 
@@ -187,7 +187,7 @@ In both cases, the change is saved automatically if the class is being edited.
 
 ### REQ-CLS-013 — Adding a restriction on a property
 
-| **If** | the `ontologist` wants to constrain the use of a `property` for a class, |
+| **If** | the ontologist wants to constrain the use of a `property` for a class, |
 |---|---|
 | **Then** | they can add a `restriction` by choosing from six semantic types (some values from, all values from, has value, exact cardinality, minimum cardinality or maximum cardinality), or use the default type (some values from) with a single click. |
 
@@ -197,7 +197,7 @@ In both cases, the change is saved automatically if the class is being edited.
 
 ### REQ-CLS-014 — Changing restriction type
 
-| **If** | the `ontologist` changes the type of an existing `restriction` on a `property`, |
+| **If** | the ontologist changes the type of an existing `restriction` on a `property`, |
 |---|---|
 | **Then** | the input form adapts immediately: the cardinality field appears for cardinal types and disappears for others, and the target class selector (filler) is automatically hidden when a cardinal type is chosen. |
 
@@ -207,7 +207,7 @@ In both cases, the change is saved automatically if the class is being edited.
 
 ### REQ-CLS-015 — Removing a property from the restrictions panel
 
-| **If** | the `ontologist` wants to entirely remove a `property` from the `restrictions` panel of a class, |
+| **If** | the ontologist wants to entirely remove a `property` from the `restrictions` panel of a class, |
 |---|---|
 | **Then** | the `property` and all its associated `restrictions` are removed from the panel, the `property` becomes available again in the list of `properties` to add (sorted alphabetically with its type), and the change is saved automatically. |
 
@@ -217,7 +217,7 @@ In both cases, the change is saved automatically if the class is being edited.
 
 ### REQ-CLS-016 — Deleting a child restriction
 
-| **If** | the `ontologist` wants to delete an `individual` `restriction` within a `property` group, |
+| **If** | the ontologist wants to delete an `individual` `restriction` within a `property` group, |
 |---|---|
 | **Then** | only that `restriction` is removed, the other `restrictions` on the same `property` remaining intact, and the change is saved automatically. |
 
@@ -237,9 +237,9 @@ In both cases, the change is saved automatically if the class is being edited.
 
 ### REQ-CLS-018 — Quick creation of an ObjectProperty from the Classes tab
 
-| **If** | the `ontologist` wants to create an `object property` directly associated with the class being edited, |
+| **If** | the ontologist wants to create an `object property` directly associated with the class being edited, |
 |---|---|
-| **Then** | a new `object property` is created with the current class declared as its domain, and the application automatically navigates to that `property` so the `ontologist` can complete it without losing context. |
+| **Then** | a new `object property` is created with the current class declared as its domain, and the application automatically navigates to that `property` so the ontologist can complete it without losing context. |
 
 **Source code:** `owl_editor.js` → `ClassEditor.createOPForClass()` — Creates an ObjectProperty with `domain: [classId]`, `range: []` and `subPropertyOf: []` via `API.createObjectProperty()`, then navigates to the "object-properties" tab on the new property.
 
@@ -247,9 +247,9 @@ In both cases, the change is saved automatically if the class is being edited.
 
 ### REQ-CLS-019 — Quick creation of a DatatypeProperty from the Classes tab
 
-| **If** | the `ontologist` wants to create a data `property` directly associated with the class being edited, |
+| **If** | the ontologist wants to create a data `property` directly associated with the class being edited, |
 |---|---|
-| **Then** | a new data `property` is created with the current class declared as its domain, and the application automatically navigates to the `datatype properties` tab to allow the `ontologist` to complete it. |
+| **Then** | a new data `property` is created with the current class declared as its domain, and the application automatically navigates to the `datatype properties` tab to allow the ontologist to complete it. |
 
 **Source code:** `owl_editor.js` → `ClassEditor.createDTPForClass()` — Creates a DatatypeProperty with `domain: [classId]` and `functional: false` via `API.createDatatypeProperty()`, then navigates to the "datatype-properties" tab.
 
@@ -261,7 +261,7 @@ In both cases, the change is saved automatically if the class is being edited.
 
 ### REQ-CLS-020 — Rendering the class tree with owl:Thing root node
 
-| **If** | the `ontologist` opens the `Classes` tab of a loaded `ontology`, |
+| **If** | the ontologist opens the `Classes` tab of a loaded `ontology`, |
 |---|---|
 | **Then** | the tree displays the universal root concept (`owl:Thing` or the `ontology`'s custom label) at the top, followed by all `classes` organised in a hierarchy. If the `ontology` contains no local `classes`, an absence message is displayed. |
 
@@ -271,7 +271,7 @@ In both cases, the change is saved automatically if the class is being edited.
 
 ### REQ-CLS-021 — Selecting a class in the tree
 
-| **If** | the `ontologist` selects a class in the tree, |
+| **If** | the ontologist selects a class in the tree, |
 |---|---|
 | **Then** | the class is highlighted, its full editing form is displayed in the detail panel, the hierarchy of its superclasses is visible in the side panel, and the available actions (create a subclass, create a sibling class, delete) are enabled. |
 
@@ -281,7 +281,7 @@ In both cases, the change is saved automatically if the class is being edited.
 
 ### REQ-CLS-022 — Selecting the owl:Thing root node
 
-| **If** | the `ontologist` selects the `owl:Thing` root node in the tree, |
+| **If** | the ontologist selects the `owl:Thing` root node in the tree, |
 |---|---|
 | **Then** | the detail panel displays a message indicating that this concept is the root of all `classes`, with a button to create a new class. The "create sibling class" and "delete" actions are disabled; only subclass creation remains available. |
 
@@ -291,7 +291,7 @@ In both cases, the change is saved automatically if the class is being edited.
 
 ### REQ-CLS-023 — Expanding/collapsing a tree node
 
-| **If** | the `ontologist` clicks the expansion indicator of a tree node, |
+| **If** | the ontologist clicks the expansion indicator of a tree node, |
 |---|---|
 | **Then** | the node toggles between the expanded state (subclasses visible) and the collapsed state (subclasses hidden), and this state is remembered for the duration of the session. |
 
@@ -301,11 +301,11 @@ In both cases, the change is saved automatically if the class is being edited.
 
 ### REQ-CLS-024 — Context menu on a tree node
 
-| **If** | the `ontologist` right-clicks on a tree node, |
+| **If** | the ontologist right-clicks on a tree node, |
 |---|---|
 | **Then** | a context menu appears at the cursor position, offering to create a subclass, create a sibling class (only for `classes`, not for `owl:Thing`), or delete the class (highlighted action). |
 
-| **If** | the `ontologist` clicks outside the context menu, |
+| **If** | the ontologist clicks outside the context menu, |
 |---|---|
 | **Then** | the menu closes. |
 
@@ -325,7 +325,7 @@ In both cases, the change is saved automatically if the class is being edited.
 
 ### REQ-CLS-026 — Managing rdfs:label and rdfs:comment annotations
 
-| **If** | the `ontologist` wants to add a label or comment to a concept, |
+| **If** | the ontologist wants to add a label or comment to a concept, |
 |---|---|
 | **Then** | a new annotation row is added to the annotations table, with a value field, a language indicator (initialised to the application's default language) and a delete button. Any subsequent modification of this row is saved automatically. |
 
@@ -335,7 +335,7 @@ In both cases, the change is saved automatically if the class is being edited.
 
 ### REQ-CLS-027 — Managing custom annotation properties
 
-| **If** | the `ontologist` wants to add an annotation via a custom `annotation property` (such as `rdfs:seeAlso` or any `annotation property` defined in the `ontology`), |
+| **If** | the ontologist wants to add an annotation via a custom `annotation property` (such as `rdfs:seeAlso` or any `annotation property` defined in the `ontology`), |
 |---|---|
 | **Then** | an annotation row is added to the table, displaying the name of the selected `property`, a value field and a language field. |
 
@@ -355,7 +355,7 @@ In both cases, the change is saved automatically if the class is being edited.
 
 ### REQ-CLS-029 — Adding a property to the restrictions panel
 
-| **If** | the `ontologist` selects a `property` from the list of available `properties`, |
+| **If** | the ontologist selects a `property` from the list of available `properties`, |
 |---|---|
 | **Then** | a group dedicated to that `property` appears in the `restrictions` panel (or is highlighted if it already existed), the `property` disappears from the list of available `properties`, and the change is saved automatically. |
 
@@ -365,11 +365,11 @@ In both cases, the change is saved automatically if the class is being edited.
 
 ### REQ-CLS-030 — Selecting the filler (target class) of a restriction
 
-| **If** | the `ontologist` wants to designate the target class of a `property` `restriction`, |
+| **If** | the ontologist wants to designate the target class of a `property` `restriction`, |
 |---|---|
 | **Then** | a dropdown menu presenting the complete class hierarchy of the `ontology` opens under the selection button. |
 
-| **If** | the `ontologist` selects a class from this menu, |
+| **If** | the ontologist selects a class from this menu, |
 |---|---|
 | **Then** | the chosen class is displayed as the `restriction` target, the visual indicator is updated, and the change is saved automatically. |
 
@@ -381,7 +381,7 @@ In both cases, the change is saved automatically if the class is being edited.
 
 | **If** | a base IRI is defined in the `ontology` settings and the selected class already exists, |
 |---|---|
-| **Then** | the full and unambiguous IRI of the concept is displayed in the form, allowing the `ontologist` to verify the global identifier of the concept within the `ontology` `namespace`. |
+| **Then** | the full and unambiguous IRI of the concept is displayed in the form, allowing the ontologist to verify the global identifier of the concept within the `ontology` `namespace`. |
 
 **Source code:** `owl_editor.js` → `ClassEditor.renderForm()` — Displays the line `For Class: <baseIri>#<classId>` in a `<code>` tag below the title, only if `baseIri` is defined in the settings and the class is not in pure creation mode.
 
