@@ -7,21 +7,21 @@
 
 ## Table of Contents
 
-1. [REQ-SET-001 — User settings persistence](#req-set-001)
-2. [REQ-SET-002 — Settings loading at startup](#req-set-002)
-3. [REQ-SET-003 — Sub-tab navigation in the Settings page](#req-set-003)
-4. [REQ-SET-004 — Display of the configurable GUI tabs list](#req-set-004)
-5. [REQ-SET-005 — Hiding an optional tab](#req-set-005)
-6. [REQ-SET-006 — Showing a previously hidden optional tab](#req-set-006)
-7. [REQ-SET-007 — Tab visibility toggle](#req-set-007)
-8. [REQ-SET-008 — Immediate application of tab visibility in the DOM](#req-set-008)
-9. [REQ-SET-009 — Tab visibility persistence in localStorage](#req-set-009)
-10. [REQ-SET-010 — Preferred language definition](#req-set-010)
-11. [REQ-SET-011 — Enabling or disabling a language](#req-set-011)
-12. [REQ-SET-012 — Protection of the preferred language against deactivation](#req-set-012)
-13. [REQ-SET-013 — Catalogue of available European languages](#req-set-013)
-14. [REQ-SET-014 — Individual identifier format selection](#req-set-014)
-15. [REQ-SET-015 — Automatic identifier generation for a new individual](#req-set-015)
+1. [REQ-SET-001 — User settings persistence](#req-set-001-user-settings-persistence)
+2. [REQ-SET-002 — Settings loading at startup](#req-set-002-settings-loading-at-startup)
+3. [REQ-SET-003 — Sub-tab navigation in the Settings page](#req-set-003-sub-tab-navigation-in-the-settings-page)
+4. [REQ-SET-004 — Display of the configurable GUI tabs list](#req-set-004-display-of-the-configurable-gui-tabs-list)
+5. [REQ-SET-005 — Hiding an optional tab](#req-set-005-hiding-an-optional-tab)
+6. [REQ-SET-006 — Showing a previously hidden optional tab](#req-set-006-showing-a-previously-hidden-optional-tab)
+7. [REQ-SET-007 — Tab visibility toggle](#req-set-007-tab-visibility-toggle)
+8. [REQ-SET-008 — Immediate application of tab visibility in the DOM](#req-set-008-immediate-application-of-tab-visibility-in-the-dom)
+9. [REQ-SET-009 — Tab visibility persistence in localStorage](#req-set-009-tab-visibility-persistence-in-localstorage)
+10. [REQ-SET-010 — Preferred language definition](#req-set-010-preferred-language-definition)
+11. [REQ-SET-011 — Enabling or disabling a language](#req-set-011-enabling-or-disabling-a-language)
+12. [REQ-SET-012 — Protection of the preferred language against deactivation](#req-set-012-protection-of-the-preferred-language-against-deactivation)
+13. [REQ-SET-013 — Catalogue of available European languages](#req-set-013-catalogue-of-available-european-languages)
+14. [REQ-SET-014 — Individual identifier format selection](#req-set-014-individual-identifier-format-selection)
+15. [REQ-SET-015 — Automatic identifier generation for a new individual](#req-set-015-automatic-identifier-generation-for-a-new-individual)
 
 ---
 
