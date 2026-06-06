@@ -53,7 +53,7 @@
 
 ### REQ-ONT-002 — Auto-selection of the connected ontology
 
-| **If** | the ontologist opens the Ontologies tab without having made a manual selection beforehand, |
+| **If** | the ontologist opens the `Ontologies` tab without having made a manual selection beforehand, |
 |---|---|
 | **Then** | the currently connected ontology is automatically highlighted in the registry, without any further action from the user. |
 
@@ -179,7 +179,7 @@
 
 | **If** | the ontologist attempts to access an editing tab while no ontology is connected, |
 |---|---|
-| **Then** | access is denied and a message guides the ontologist to the Ontologies tab to connect one. |
+| **Then** | access is denied and a message guides the ontologist to the `Ontologies` tab to connect one. |
 
 ---
 
@@ -217,7 +217,7 @@
 
 ### REQ-ONT-017 — Displaying the Ontologies tab
 
-| **If** | the ontologist navigates to the Ontologies tab, |
+| **If** | the ontologist navigates to the `Ontologies` tab, |
 |---|---|
 | **Then** | the page displays a header, the available actions (create, import, load, download W3C ontologies), an initially hidden assisted input panel, and the registry table with columns Name, Directory, Prefix, and Namespace. |
 
@@ -227,7 +227,7 @@
 
 ### REQ-ONT-018 — Loading and displaying the registry
 
-| **If** | the Ontologies tab is displayed, |
+| **If** | the `Ontologies` tab is displayed, |
 |---|---|
 | **Then** | the list of all registered ontologies is loaded and displayed in the table; if loading fails, an error message is displayed in place of the table. |
 
