@@ -53,7 +53,7 @@
 
 ### REQ-ONT-002 — Auto-sélection de l'ontologie connectée
 
-| **Si** | l'ontologiste ouvre l'onglet Ontologies sans avoir effectué de sélection manuelle au préalable, |
+| **Si** | l'ontologiste ouvre l'onglet `Ontologies` sans avoir effectué de sélection manuelle au préalable, |
 |---|---|
 | **Alors** | l'ontologie actuellement connectée est automatiquement mise en évidence dans le registre, sans action supplémentaire de l'utilisateur. |
 
@@ -179,7 +179,7 @@
 
 | **Si** | l'ontologiste tente d'accéder à un onglet d'édition alors qu'aucune ontologie n'est connectée, |
 |---|---|
-| **Alors** | l'accès est refusé et un message guide l'ontologiste vers l'onglet Ontologies pour en connecter une. |
+| **Alors** | l'accès est refusé et un message guide l'ontologiste vers l'onglet `Ontologies` pour en connecter une. |
 
 ---
 
@@ -217,7 +217,7 @@
 
 ### REQ-ONT-017 — Affichage de l'onglet Ontologies
 
-| **Si** | l'ontologiste navigue vers l'onglet Ontologies, |
+| **Si** | l'ontologiste navigue vers l'onglet `Ontologies`, |
 |---|---|
 | **Alors** | la page affiche un en-tête, les actions disponibles (créer, importer, charger, télécharger les ontologies W3C), un panneau de saisie assistée initialement masqué, et le tableau du registre avec les colonnes Nom, Répertoire, Préfixe et Espace de nommage. |
 
@@ -227,7 +227,7 @@
 
 ### REQ-ONT-018 — Chargement et affichage du registre
 
-| **Si** | l'onglet Ontologies est affiché, |
+| **Si** | l'onglet `Ontologies` est affiché, |
 |---|---|
 | **Alors** | la liste de toutes les ontologies enregistrées est chargée et affichée dans le tableau ; si le chargement échoue, un message d'erreur est affiché à la place du tableau. |
 
