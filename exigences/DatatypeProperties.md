@@ -64,7 +64,7 @@
 
 | **Si** | l'`ontologie` contient des `DatatypeProperties` organisées en hiérarchie de spécialisation, |
 |---|---|
-| **Alors** | l'arbre des `propriétés` reflète fidèlement ces relations de spécialisation, avec les `propriétés` les plus générales à la racine et les plus spécifiques en feuilles, chaque niveau trié alphabétiquement. |
+| **Alors** | l'arbre des `DatatypeProperties` reflète fidèlement ces relations de spécialisation, avec les `DatatypeProperties` les plus générales à la racine et les plus spécifiques en feuilles, chaque niveau trié alphabétiquement. |
 
 ---
 
@@ -74,7 +74,7 @@
 
 | **Si** | l'ontologiste sélectionne une `DatatypeProperty` enfouie dans la hiérarchie, |
 |---|---|
-| **Alors** | l'arbre se déplie automatiquement pour révéler la `propriété` sélectionnée, sans que l'utilisateur ait à déplier manuellement chaque niveau intermédiaire. |
+| **Alors** | l'arbre se déplie automatiquement pour révéler la `DatatypeProperty` sélectionnée, sans que l'utilisateur ait à déplier manuellement chaque niveau intermédiaire. |
 
 ---
 
@@ -82,13 +82,13 @@
 
 ### REQ-DP-004 — Création d'une propriété enfant (child)
 
-| **Si** | l'ontologiste souhaite spécialiser une `DatatypeProperty` existante en créant une sous-`propriété`, |
+| **Si** | l'ontologiste souhaite spécialiser une `DatatypeProperty` existante en créant une sous-`DatatypeProperty`, |
 |---|---|
-| **Alors** | la nouvelle `propriété` est automatiquement positionnée sous la `propriété` actuellement sélectionnée dans la hiérarchie, et la `propriété` parente est dépliée pour la rendre visible. |
+| **Alors** | la nouvelle `DatatypeProperty` est automatiquement positionnée sous la `DatatypeProperty` actuellement sélectionnée dans la hiérarchie, et la `DatatypeProperty` parente est dépliée pour la rendre visible. |
 
-| **Si** | aucune `propriété` n'est sélectionnée au moment de la création, |
+| **Si** | aucune `DatatypeProperty` n'est sélectionnée au moment de la création, |
 |---|---|
-| **Alors** | la nouvelle `propriété` est créée à la racine de la hiérarchie, sans relation de spécialisation. |
+| **Alors** | la nouvelle `DatatypeProperty` est créée à la racine de la hiérarchie, sans relation de spécialisation. |
 
 ---
 
@@ -96,9 +96,9 @@
 
 ### REQ-DP-005 — Création d'une propriété sœur (sibling)
 
-| **Si** | l'ontologiste souhaite créer une `DatatypeProperty` au même niveau de spécialisation qu'une `propriété` existante, |
+| **Si** | l'ontologiste souhaite créer une `DatatypeProperty` au même niveau de spécialisation qu'une `DatatypeProperty` existante, |
 |---|---|
-| **Alors** | la nouvelle `propriété` hérite des mêmes super-`propriétés` que la `propriété` de référence, se positionnant ainsi automatiquement au même rang dans la hiérarchie. |
+| **Alors** | la nouvelle `DatatypeProperty` hérite des mêmes super-`DatatypeProperties` que la `DatatypeProperty` de référence, se positionnant ainsi automatiquement au même rang dans la hiérarchie. |
 
 ---
 
@@ -108,7 +108,7 @@
 
 | **Si** | l'ontologiste crée une nouvelle `DatatypeProperty`, |
 |---|---|
-| **Alors** | un nom provisoire lui est automatiquement attribué, garantissant l'absence de conflit d'identifiant avec les `propriétés` déjà présentes dans l'`ontologie`. |
+| **Alors** | un nom provisoire lui est automatiquement attribué, garantissant l'absence de conflit d'identifiant avec les `DatatypeProperties` déjà présentes dans l'`ontologie`. |
 
 ---
 
@@ -118,7 +118,7 @@
 
 | **Si** | l'ontologiste confirme la création d'une `DatatypeProperty`, |
 |---|---|
-| **Alors** | la nouvelle `propriété` est immédiatement accessible dans l'arbre et son formulaire d'édition s'ouvre automatiquement, prête à être complétée. |
+| **Alors** | la nouvelle `DatatypeProperty` est immédiatement accessible dans l'arbre et son formulaire d'édition s'ouvre automatiquement, prête à être complétée. |
 
 ---
 
@@ -126,7 +126,7 @@
 
 ### REQ-DP-008 — Dépôt (drop) d'une propriété sur une nouvelle cible
 
-| **Si** | l'ontologiste déplace une `DatatypeProperty` par glisser-déposer vers une autre `propriété` parente, |
+| **Si** | l'ontologiste déplace une `DatatypeProperty` par glisser-déposer vers une autre `DatatypeProperty` parente, |
 |---|---|
 | **Alors** | la relation de spécialisation est mise à jour pour refléter le nouveau positionnement dans la hiérarchie, et le changement est immédiatement persisté. |
 
@@ -136,7 +136,7 @@
 
 | **Si** | l'ontologiste dépose une `DatatypeProperty` sur la racine ou en dehors de tout nœud, |
 |---|---|
-| **Alors** | la `propriété` devient une `propriété` racine, sans relation de spécialisation. |
+| **Alors** | la `DatatypeProperty` devient une `DatatypeProperty` racine, sans relation de spécialisation. |
 
 ---
 
@@ -146,7 +146,7 @@
 
 | **Si** | l'ontologiste déplace une `DatatypeProperty` par glisser-déposer, |
 |---|---|
-| **Alors** | l'application vérifie en temps réel que la cible potentielle n'est pas un descendant de la `propriété` déplacée, afin d'empêcher toute création de cycle dans la hiérarchie. |
+| **Alors** | l'application vérifie en temps réel que la cible potentielle n'est pas un descendant de la `DatatypeProperty` déplacée, afin d'empêcher toute création de cycle dans la hiérarchie. |
 
 ---
 
@@ -170,7 +170,7 @@
 
 | **Si** | l'ontologiste associe une `classe` comme domaine d'une `DatatypeProperty`, |
 |---|---|
-| **Alors** | la `classe` apparaît dans la liste des domaines de la `propriété` et la modification est automatiquement sauvegardée. |
+| **Alors** | la `classe` apparaît dans la liste des domaines de la `DatatypeProperty` et la modification est automatiquement sauvegardée. |
 
 | **Si** | l'ontologiste retire une `classe` du domaine, |
 |---|---|
@@ -196,11 +196,11 @@
 
 ### REQ-DP-013 — Gestion d'une super-propriété
 
-| **Si** | l'ontologiste déclare une super-`propriété` pour une `DatatypeProperty`, |
+| **Si** | l'ontologiste déclare une super-`DatatypeProperty` pour une `DatatypeProperty`, |
 |---|---|
-| **Alors** | la relation de spécialisation est enregistrée et visible dans la liste des super-`propriétés`, et la modification est automatiquement sauvegardée. |
+| **Alors** | la relation de spécialisation est enregistrée et visible dans la liste des super-`DatatypeProperties`, et la modification est automatiquement sauvegardée. |
 
-| **Si** | l'ontologiste retire une super-`propriété`, |
+| **Si** | l'ontologiste retire une super-`DatatypeProperty`, |
 |---|---|
 | **Alors** | la relation de spécialisation est supprimée et la modification est automatiquement sauvegardée. |
 
@@ -222,7 +222,7 @@
 
 | **Si** | l'ontologiste valide les informations d'une nouvelle `DatatypeProperty`, |
 |---|---|
-| **Alors** | la `propriété` est créée dans l'`ontologie` avec l'ensemble des informations saisies (identifiant, annotations, domaine, range, super-`propriétés`, caractéristique fonctionnelle), et un message de confirmation est affiché. |
+| **Alors** | la `DatatypeProperty` est créée dans l'`ontologie` avec l'ensemble des informations saisies (identifiant, annotations, domaine, range, super-`DatatypeProperties`, caractéristique fonctionnelle), et un message de confirmation est affiché. |
 
 | **Si** | l'ontologiste modifie une `DatatypeProperty` existante et déclenche la sauvegarde, |
 |---|---|
@@ -240,7 +240,7 @@
 
 | **Si** | l'ontologiste confirme la suppression, |
 |---|---|
-| **Alors** | la `propriété` est définitivement retirée de l'`ontologie`, la sélection courante est réinitialisée, et l'arbre est mis à jour en conséquence. |
+| **Alors** | la `DatatypeProperty` est définitivement retirée de l'`ontologie`, la sélection courante est réinitialisée, et l'arbre est mis à jour en conséquence. |
 
 ---
 
@@ -276,7 +276,7 @@
 
 | **Si** | un nœud de l'arbre des `DatatypeProperties` est affiché, |
 |---|---|
-| **Alors** | il est visuellement indenté selon son rang dans la hiérarchie, accompagné d'un indicateur d'expansion s'il possède des sous-`propriétés`, et il est interactif pour la sélection, le menu contextuel et le réorganisation par glisser-déposer. |
+| **Alors** | il est visuellement indenté selon son rang dans la hiérarchie, accompagné d'un indicateur d'expansion s'il possède des sous-`DatatypeProperties`, et il est interactif pour la sélection, le menu contextuel et le réorganisation par glisser-déposer. |
 
 ---
 
@@ -286,7 +286,7 @@
 
 | **Si** | l'onglet `DatatypeProperties` est affiché, |
 |---|---|
-| **Alors** | l'arbre est présenté avec `owl:topDataProperty` (ou son équivalent selon le profil OWL de l'`ontologie`) comme racine universelle, suivi de toutes les `propriétés` de l'`ontologie` organisées en hiérarchie ; si aucune `propriété` n'existe, un message informatif le signale. |
+| **Alors** | l'arbre est présenté avec `owl:topDataProperty` (ou son équivalent selon le profil OWL de l'`ontologie`) comme racine universelle, suivi de toutes les `DatatypeProperties` de l'`ontologie` organisées en hiérarchie ; si aucune `DatatypeProperty` n'existe, un message informatif le signale. |
 
 ---
 
@@ -306,7 +306,7 @@
 
 | **Si** | l'onglet `DatatypeProperties` est re-rendu suite à une modification, |
 |---|---|
-| **Alors** | la `propriété` précédemment sélectionnée reste active et visible dans l'arbre, préservant le contexte de travail de l'ontologiste. |
+| **Alors** | la `DatatypeProperty` précédemment sélectionnée reste active et visible dans l'arbre, préservant le contexte de travail de l'ontologiste. |
 
 ---
 
@@ -326,11 +326,11 @@
 
 | **Si** | aucune `DatatypeProperty` n'est sélectionnée, |
 |---|---|
-| **Alors** | le panneau inférieur gauche affiche un message invitant l'ontologiste à sélectionner une `propriété`. |
+| **Alors** | le panneau inférieur gauche affiche un message invitant l'ontologiste à sélectionner une `DatatypeProperty`. |
 
 | **Si** | une `DatatypeProperty` est sélectionnée, |
 |---|---|
-| **Alors** | le panneau affiche la chaîne complète de spécialisation depuis la `propriété` sélectionnée jusqu'à `owl:topDatatypeProperty`, avec les super-`propriétés` directes munies d'un bouton de suppression, et un sélecteur permettant d'ajouter une nouvelle super-`propriété` parmi celles disponibles. |
+| **Alors** | le panneau affiche la chaîne complète de spécialisation depuis la `DatatypeProperty` sélectionnée jusqu'à `owl:topDatatypeProperty`, avec les super-`DatatypeProperties` directes munies d'un bouton de suppression, et un sélecteur permettant d'ajouter une nouvelle super-`DatatypeProperty` parmi celles disponibles. |
 
 ---
 
@@ -340,7 +340,7 @@
 
 | **Si** | l'ontologiste sélectionne la racine universelle `owl:topDataProperty` dans l'arbre, |
 |---|---|
-| **Alors** | aucune `propriété` concrète n'est sélectionnée, le panneau de détail affiche un écran d'accueil avec la possibilité de créer une nouvelle `propriété`, et les boutons d'action sont mis à jour en conséquence. |
+| **Alors** | aucune `DatatypeProperty` concrète n'est sélectionnée, le panneau de détail affiche un écran d'accueil avec la possibilité de créer une nouvelle `DatatypeProperty`, et les boutons d'action sont mis à jour en conséquence. |
 
 ---
 
@@ -350,7 +350,7 @@
 
 | **Si** | l'ontologiste sélectionne une `DatatypeProperty` dans l'arbre, |
 |---|---|
-| **Alors** | la `propriété` est mise en surbrillance, son formulaire d'édition complet s'affiche dans le panneau de détail, et le panneau "Super `Properties`" ainsi que les boutons d'action sont mis à jour pour refléter le contexte de cette `propriété`. |
+| **Alors** | la `DatatypeProperty` est mise en surbrillance, son formulaire d'édition complet s'affiche dans le panneau de détail, et le panneau "Super `Properties`" ainsi que les boutons d'action sont mis à jour pour refléter le contexte de cette `DatatypeProperty`. |
 
 ---
 
@@ -360,7 +360,7 @@
 
 | **Si** | la racine `owl:topDataProperty` est sélectionnée, |
 |---|---|
-| **Alors** | seule l'action de création d'une `propriété` enfant est disponible ; les actions de création sœur et de suppression sont masquées car inapplicables à la racine. |
+| **Alors** | seule l'action de création d'une `DatatypeProperty` enfant est disponible ; les actions de création sœur et de suppression sont masquées car inapplicables à la racine. |
 
 | **Si** | une `DatatypeProperty` concrète est sélectionnée, |
 |---|---|
@@ -378,7 +378,7 @@
 
 | **Si** | l'ontologiste clique sur l'indicateur d'expansion d'un nœud de l'arbre, |
 |---|---|
-| **Alors** | le nœud bascule entre déplié (sous-`propriétés` visibles) et replié (sous-`propriétés` masquées), et l'indicateur visuel reflète immédiatement l'état courant. |
+| **Alors** | le nœud bascule entre déplié (sous-`DatatypeProperties` visibles) et replié (sous-`DatatypeProperties` masquées), et l'indicateur visuel reflète immédiatement l'état courant. |
 
 ---
 
@@ -388,7 +388,7 @@
 
 | **Si** | l'ontologiste effectue un clic droit sur un nœud de l'arbre, |
 |---|---|
-| **Alors** | un menu contextuel apparaît à la position du curseur, proposant les actions applicables au nœud concerné : création d'une `propriété` enfant toujours disponible, création d'une `propriété` sœur et suppression disponibles uniquement sur une `propriété` concrète (pas sur la racine). |
+| **Alors** | un menu contextuel apparaît à la position du curseur, proposant les actions applicables au nœud concerné : création d'une `DatatypeProperty` enfant toujours disponible, création d'une `DatatypeProperty` sœur et suppression disponibles uniquement sur une `DatatypeProperty` concrète (pas sur la racine). |
 
 ---
 
@@ -408,7 +408,7 @@
 
 | **Si** | l'ontologiste commence à glisser une `DatatypeProperty` dans l'arbre pour la repositionner, |
 |---|---|
-| **Alors** | la `propriété` glissée est visuellement distinguée des autres nœuds, signalant clairement qu'une opération de déplacement est en cours. |
+| **Alors** | la `DatatypeProperty` glissée est visuellement distinguée des autres nœuds, signalant clairement qu'une opération de déplacement est en cours. |
 
 ---
 
@@ -428,13 +428,13 @@
 
 | **Si** | l'ontologiste sélectionne ou crée une `DatatypeProperty`, |
 |---|---|
-| **Alors** | un formulaire complet s'affiche dans le panneau de détail, présentant toutes les caractéristiques éditables de la `propriété` : identifiant, IRI complète, annotations (labels, commentaires, autres), `classes` domaine, type de données range, super-`propriétés`, caractéristique fonctionnelle, et usages dans les règles de l'`ontologie`. |
+| **Alors** | un formulaire complet s'affiche dans le panneau de détail, présentant toutes les caractéristiques éditables de la `DatatypeProperty` : identifiant, IRI complète, annotations (labels, commentaires, autres), `classes` domaine, type de données range, super-`DatatypeProperties`, caractéristique fonctionnelle, et usages dans les règles de l'`ontologie`. |
 
-| **Si** | le formulaire correspond à une nouvelle `propriété` en cours de création, |
+| **Si** | le formulaire correspond à une nouvelle `DatatypeProperty` en cours de création, |
 |---|---|
 | **Alors** | un bouton de validation explicite est affiché pour confirmer la création. |
 
-| **Si** | le formulaire correspond à une `propriété` existante, |
+| **Si** | le formulaire correspond à une `DatatypeProperty` existante, |
 |---|---|
 | **Alors** | toute modification de champ déclenche une sauvegarde automatique. |
 
@@ -446,11 +446,11 @@
 
 | **Si** | l'ontologiste ajoute une annotation de type label ou commentaire à une `DatatypeProperty`, |
 |---|---|
-| **Alors** | une nouvelle ligne de saisie apparaît dans la table des annotations, et la modification est automatiquement sauvegardée si une `propriété` est en cours d'édition. |
+| **Alors** | une nouvelle ligne de saisie apparaît dans la table des annotations, et la modification est automatiquement sauvegardée si une `DatatypeProperty` est en cours d'édition. |
 
 | **Si** | l'ontologiste supprime une ligne d'annotation, |
 |---|---|
-| **Alors** | la ligne est retirée du tableau et la modification est automatiquement sauvegardée si une `propriété` est en cours d'édition. |
+| **Alors** | la ligne est retirée du tableau et la modification est automatiquement sauvegardée si une `DatatypeProperty` est en cours d'édition. |
 
 ---
 
@@ -458,7 +458,7 @@
 
 ### REQ-DP-035 — Ajout d'une annotation "autre propriété"
 
-| **Si** | l'ontologiste sélectionne une annotation de type "autre `propriété`" via le sélecteur dédié, |
+| **Si** | l'ontologiste sélectionne une annotation de type "autre `DatatypeProperty`" via le sélecteur dédié, |
 |---|---|
 | **Alors** | une nouvelle ligne correspondante est ajoutée dans la table des annotations et le sélecteur est automatiquement masqué pour ne pas encombrer l'interface. |
 
