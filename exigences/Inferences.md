@@ -7,22 +7,22 @@
 
 ## Table des matières
 
-1. [REQ-INF-001 — Récupération des inférences via l'API](#req-inf-001)
-2. [REQ-INF-002 — Rafraîchissement automatique du panneau](#req-inf-002)
-3. [REQ-INF-003 — Arrêt du rafraîchissement automatique](#req-inf-003)
-4. [REQ-INF-004 — Affichage de l'état de cohérence de l'ontologie](#req-inf-004)
-5. [REQ-INF-005 — Affichage des violations de cohérence](#req-inf-005)
-6. [REQ-INF-006 — Affichage de la fermeture transitive de la hiérarchie de classes](#req-inf-006)
-7. [REQ-INF-007 — Affichage des restrictions héritées par héritage de classes](#req-inf-007)
-8. [REQ-INF-008 — Affichage des types inférés via domaine/portée des propriétés](#req-inf-008)
-9. [REQ-INF-009 — Affichage des assertions symétriques inférées](#req-inf-009)
-10. [REQ-INF-010 — Affichage des assertions transitives inférées](#req-inf-010)
-11. [REQ-INF-011 — Affichage des assertions inférées par chaînes et inverses](#req-inf-011)
-12. [REQ-INF-012 — Affichage des restrictions inverses inférées sur les classes](#req-inf-012)
-13. [REQ-INF-013 — Affichage des propriétés inverses inférées par owl:inverseOf](#req-inf-013)
-14. [REQ-INF-014 — Bouton de recalcul manuel des inférences](#req-inf-014)
-15. [REQ-INF-015 — Sections rétractables (collapsible) pour les résultats d'inférence](#req-inf-015)
-16. [REQ-INF-016 — Gestion des erreurs lors de la récupération des inférences](#req-inf-016)
+1. [REQ-INF-001 — Récupération des inférences via l'API](#req-inf-001-récupération-des-inférences-via-lapi)
+2. [REQ-INF-002 — Rafraîchissement automatique du panneau](#req-inf-002-rafraîchissement-automatique-du-panneau)
+3. [REQ-INF-003 — Arrêt du rafraîchissement automatique](#req-inf-003-arrêt-du-rafraîchissement-automatique)
+4. [REQ-INF-004 — Affichage de l'état de cohérence de l'ontologie](#req-inf-004-affichage-de-létat-de-cohérence-de-lontologie)
+5. [REQ-INF-005 — Affichage des violations de cohérence](#req-inf-005-affichage-des-violations-de-cohérence)
+6. [REQ-INF-006 — Affichage de la fermeture transitive de la hiérarchie de classes](#req-inf-006-affichage-de-la-fermeture-transitive-de-la-hiérarchie-de-classes)
+7. [REQ-INF-007 — Affichage des restrictions héritées par héritage de classes](#req-inf-007-affichage-des-restrictions-héritées-par-héritage-de-classes)
+8. [REQ-INF-008 — Affichage des types inférés via domaine/portée des propriétés](#req-inf-008-affichage-des-types-inférés-via-domaineportée-des-propriétés)
+9. [REQ-INF-009 — Affichage des assertions symétriques inférées](#req-inf-009-affichage-des-assertions-symétriques-inférées)
+10. [REQ-INF-010 — Affichage des assertions transitives inférées](#req-inf-010-affichage-des-assertions-transitives-inférées)
+11. [REQ-INF-011 — Affichage des assertions inférées par chaînes et inverses](#req-inf-011-affichage-des-assertions-inférées-par-chaînes-de-propriétés-et-inverses)
+12. [REQ-INF-012 — Affichage des restrictions inverses inférées sur les classes](#req-inf-012-affichage-des-restrictions-inverses-inférées-sur-les-classes)
+13. [REQ-INF-013 — Affichage des propriétés inverses inférées par owl:inverseOf](#req-inf-013-affichage-des-propriétés-inverses-inférées-par-owlinverseof)
+14. [REQ-INF-014 — Bouton de recalcul manuel des inférences](#req-inf-014-bouton-de-recalcul-manuel-des-inférences)
+15. [REQ-INF-015 — Sections rétractables (collapsible) pour les résultats d'inférence](#req-inf-015-sections-rétractables-collapsible-pour-les-résultats-dinférence)
+16. [REQ-INF-016 — Gestion des erreurs lors de la récupération des inférences](#req-inf-016-gestion-des-erreurs-lors-de-la-récupération-des-inférences)
 
 ---
 
