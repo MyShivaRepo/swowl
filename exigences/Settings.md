@@ -7,21 +7,21 @@
 
 ## Table des matières
 
-1. [REQ-SET-001 — Persistance des paramètres utilisateur](#req-set-001)
-2. [REQ-SET-002 — Chargement des paramètres au démarrage](#req-set-002)
-3. [REQ-SET-003 — Navigation par sous-onglets dans la page Settings](#req-set-003)
-4. [REQ-SET-004 — Affichage de la liste des onglets GUI configurables](#req-set-004)
-5. [REQ-SET-005 — Masquage d'un onglet optionnel](#req-set-005)
-6. [REQ-SET-006 — Affichage d'un onglet optionnel précédemment masqué](#req-set-006)
-7. [REQ-SET-007 — Basculement de visibilité d'un onglet (toggle)](#req-set-007)
-8. [REQ-SET-008 — Application immédiate de la visibilité des onglets dans le DOM](#req-set-008)
-9. [REQ-SET-009 — Persistance de la visibilité des onglets dans le localStorage](#req-set-009)
-10. [REQ-SET-010 — Définition de la langue préférée](#req-set-010)
-11. [REQ-SET-011 — Activation ou désactivation d'une langue](#req-set-011)
-12. [REQ-SET-012 — Protection de la langue préférée contre la désactivation](#req-set-012)
-13. [REQ-SET-013 — Catalogue des langues européennes disponibles](#req-set-013)
-14. [REQ-SET-014 — Sélection du format d'identifiant des individus](#req-set-014)
-15. [REQ-SET-015 — Génération automatique d'un identifiant pour un nouvel individu](#req-set-015)
+1. [REQ-SET-001 — Persistance des paramètres utilisateur](#req-set-001-persistance-des-paramètres-utilisateur)
+2. [REQ-SET-002 — Chargement des paramètres au démarrage](#req-set-002-chargement-des-paramètres-au-démarrage)
+3. [REQ-SET-003 — Navigation par sous-onglets dans la page Settings](#req-set-003-navigation-par-sous-onglets-dans-la-page-settings)
+4. [REQ-SET-004 — Affichage de la liste des onglets GUI configurables](#req-set-004-affichage-de-la-liste-des-onglets-gui-configurables)
+5. [REQ-SET-005 — Masquage d'un onglet optionnel](#req-set-005-masquage-dun-onglet-optionnel)
+6. [REQ-SET-006 — Affichage d'un onglet optionnel précédemment masqué](#req-set-006-affichage-dun-onglet-optionnel-précédemment-masqué)
+7. [REQ-SET-007 — Basculement de visibilité d'un onglet (toggle)](#req-set-007-basculement-de-visibilité-dun-onglet-toggle)
+8. [REQ-SET-008 — Application immédiate de la visibilité des onglets dans le DOM](#req-set-008-application-immédiate-de-la-visibilité-des-onglets-dans-le-dom)
+9. [REQ-SET-009 — Persistance de la visibilité des onglets dans le localStorage](#req-set-009-persistance-de-la-visibilité-des-onglets-dans-le-localstorage)
+10. [REQ-SET-010 — Définition de la langue préférée](#req-set-010-définition-de-la-langue-préférée)
+11. [REQ-SET-011 — Activation ou désactivation d'une langue](#req-set-011-activation-ou-désactivation-dune-langue)
+12. [REQ-SET-012 — Protection de la langue préférée contre la désactivation](#req-set-012-protection-de-la-langue-préférée-contre-la-désactivation)
+13. [REQ-SET-013 — Catalogue des langues européennes disponibles](#req-set-013-catalogue-des-langues-européennes-disponibles)
+14. [REQ-SET-014 — Sélection du format d'identifiant des individus](#req-set-014-sélection-du-format-didentifiant-des-individus)
+15. [REQ-SET-015 — Génération automatique d'un identifiant pour un nouvel individu](#req-set-015-génération-automatique-dun-identifiant-pour-un-nouvel-individu)
 
 ---
 
