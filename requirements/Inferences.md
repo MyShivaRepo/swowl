@@ -5,20 +5,20 @@
 ## Table of contents
 
 ### Substance
-- [REQ-INF-001 — Fetching inferences via the API](#req-inf-001--fetching-inferences-via-the-api)
+- [REQ-INF-001 — Inference retrieval via the API](#req-inf-001--inference-retrieval-via-the-api)
 - [REQ-INF-002 — Automatic panel refresh](#req-inf-002--automatic-panel-refresh)
 - [REQ-INF-003 — Stopping automatic refresh](#req-inf-003--stopping-automatic-refresh)
-- [REQ-INF-016 — Error handling when fetching inferences](#req-inf-016--error-handling-when-fetching-inferences)
+- [REQ-INF-016 — Error handling during inference retrieval](#req-inf-016--error-handling-during-inference-retrieval)
 
 ### Form
-- [REQ-INF-004 — Displaying the ontology consistency status](#req-inf-004--displaying-the-ontology-consistency-status)
+- [REQ-INF-004 — Displaying ontology consistency status](#req-inf-004--displaying-ontology-consistency-status)
 - [REQ-INF-005 — Displaying consistency violations](#req-inf-005--displaying-consistency-violations)
 - [REQ-INF-006 — Displaying the transitive closure of the class hierarchy](#req-inf-006--displaying-the-transitive-closure-of-the-class-hierarchy)
-- [REQ-INF-007 — Displaying restrictions inherited via class inheritance](#req-inf-007--displaying-restrictions-inherited-via-class-inheritance)
+- [REQ-INF-007 — Displaying restrictions inherited through class inheritance](#req-inf-007--displaying-restrictions-inherited-through-class-inheritance)
 - [REQ-INF-008 — Displaying types inferred via property domain/range](#req-inf-008--displaying-types-inferred-via-property-domainrange)
 - [REQ-INF-009 — Displaying inferred symmetric assertions](#req-inf-009--displaying-inferred-symmetric-assertions)
 - [REQ-INF-010 — Displaying inferred transitive assertions](#req-inf-010--displaying-inferred-transitive-assertions)
-- [REQ-INF-011 — Displaying assertions inferred via property chains and inverses](#req-inf-011--displaying-assertions-inferred-via-property-chains-and-inverses)
+- [REQ-INF-011 — Displaying assertions inferred by property chains and inverses](#req-inf-011--displaying-assertions-inferred-by-property-chains-and-inverses)
 - [REQ-INF-012 — Displaying inferred inverse restrictions on classes](#req-inf-012--displaying-inferred-inverse-restrictions-on-classes)
 - [REQ-INF-013 — Displaying inverse properties inferred by owl:inverseOf](#req-inf-013--displaying-inverse-properties-inferred-by-owlinverseof)
 - [REQ-INF-014 — Manual inference recalculation button](#req-inf-014--manual-inference-recalculation-button)
@@ -26,14 +26,16 @@
 
 ---
 
-## 1. Substance — Business logic and functional rules
+## 1. Substance — Business logic
 
-> Requirements independent of the UI: OWL rules, data constraints, algorithms, persistence.
+> Requirements independent of the UI: OWL rules, data constraints, algorithmic behaviours, validations, persistence.
 
 
-### REQ-INF-001 — Fetching inferences via the API
+### REQ-INF-001 — Inference retrieval via the API
 
-The application performs an HTTP GET request to the `/api/inferences` endpoint to retrieve the full set of inference data computed by the backend. The response is a JSON object containing the fields `violations`, `subclass_closure`, `inherited_restrictions`, `inferred_inverse_restrictions`, `inferred_types`, `symmetric_assertions`, `transitive_assertions`, `chain_assertions` and `inferred_inverse_properties`.
+**If** the application needs to retrieve inference data computed by the backend,
+
+**Then** it performs an HTTP GET call to the `/api/inferences` endpoint and processes the JSON response containing the fields `violations`, `subclass_closure`, `inherited_restrictions`, `inferred_inverse_restrictions`, `inferred_types`, `symmetric_assertions`, `transitive_assertions`, `chain_assertions` and `inferred_inverse_properties`.
 
 ---
 
@@ -41,7 +43,11 @@ The application performs an HTTP GET request to the `/api/inferences` endpoint t
 
 ### REQ-INF-002 — Automatic panel refresh
 
-When the "Inferences" tab is active (`APP.currentSection === 'inferences'`), the panel refreshes automatically at a regular interval. The default interval is 3000 ms. The function calls `setInterval()`, which triggers `InferenceUI.refresh()` at each cycle, and first stops any existing interval via `stopAutoRefresh()` before creating a new one.
+**If** the "Inferences" tab is active (`APP.currentSection === 'inferences'`),
+
+**Then**:
+- the panel refreshes automatically every 3000 ms via `setInterval()` triggering `InferenceUI.refresh()` at each cycle
+- any existing refresh interval is first stopped via `stopAutoRefresh()` before the new cycle is created
 
 ---
 
@@ -49,27 +55,39 @@ When the "Inferences" tab is active (`APP.currentSection === 'inferences'`), the
 
 ### REQ-INF-003 — Stopping automatic refresh
 
-The function stops the automatic refresh interval by calling `clearInterval()` on the `_autoRefresh` reference and resetting it to `null`. This function is systematically called before starting any new refresh cycle.
+**If** the automatic refresh stop function is called,
+
+**Then** the current interval is cancelled via `clearInterval()` on the `_autoRefresh` reference and that reference is reset to `null`, ensuring no residual cycle remains before a new cycle starts.
 
 ---
 
 **Source code:** `inference_ui.js` → `stopAutoRefresh()`
 
-### REQ-INF-016 — Error handling when fetching inferences
+### REQ-INF-016 — Error handling during inference retrieval
 
-If the call to `API.getInferences()` fails, the exception is caught by a `catch` block. The content of the HTML element `#inference-panel` is replaced by a paragraph with the CSS class `error` displaying the error message (`e.message`). No partial data is retained in case of error.
+**If** the call to `API.getInferences()` fails,
+
+**Then**:
+- the exception is caught by a `catch` block
+- the content of the HTML element `#inference-panel` is replaced by a paragraph with CSS class `error` displaying the error message (`e.message`)
+- no partial data is retained
 
 ---
 
-## 2. Form — Presentation and user interface
+## 2. Form — Presentation and UI
 
 > Requirements related to display: layout, visual components, interactions, navigation, styles.
 
 **Source code:** `inference_ui.js` → `refresh()`
 
-### REQ-INF-004 — Displaying the ontology consistency status
+### REQ-INF-004 — Displaying ontology consistency status
 
-The panel header displays a status badge computed from violations whose severity is `'error'`. If errors exist, the badge displays "🔴 N error(s)" with the CSS class `badge-error`. If no errors are present, the badge displays "🟢 Consistent" with the CSS class `badge-ok`. Warnings (`severity === 'warning'`) generate an additional badge "⚠️ N warning(s)" with the class `badge-warn`.
+**If** the ontology is loaded and the inference panel is displayed,
+
+**Then**:
+- if violations of severity `'error'` exist, a badge "🔴 N error(s)" with CSS class `badge-error` is displayed in the header
+- if no errors are present, a badge "🟢 Consistent" with CSS class `badge-ok` is displayed
+- if warnings of severity `'warning'` exist, an additional badge "⚠️ N warning(s)" with class `badge-warn` is displayed
 
 ---
 
@@ -77,7 +95,10 @@ The panel header displays a status badge computed from violations whose severity
 
 ### REQ-INF-005 — Displaying consistency violations
 
-The "Violations" section lists all violations returned by the backend. Each violation is displayed with: an icon based on severity (🔴 for `'error'`, 🟡 for `'warning'`), the identifier of the affected entity (`v.entity`) formatted as `<code>`, and the descriptive message (`v.message`). If no violations are present, the message "No violations detected." is displayed.
+**If** the inference panel is rendered and violations have been returned by the backend,
+
+**Then** the "Violations" section lists each violation with a severity icon (🔴 for `'error'`, 🟡 for `'warning'`), the identifier of the concerned entity (`v.entity`) formatted as `<code>`, and the descriptive message (`v.message`);
+**and** if no violations are present, the message "No violations detected." is displayed instead.
 
 ---
 
@@ -85,15 +106,19 @@ The "Violations" section lists all violations returned by the backend. Each viol
 
 ### REQ-INF-006 — Displaying the transitive closure of the class hierarchy
 
-The "Resolved hierarchy" section displays, as a table, the transitive closure of the ontology's `subClassOf` relations. For each class with at least one ancestor, the table shows the source class and the full set of its ancestors at all levels, each ancestor formatted with the CSS class `tag-class`. Entries without ancestors are filtered before rendering (`ancs.length > 0`).
+**If** the ontology is loaded and contains classes linked by `subClassOf` relations,
+
+**Then** the "Resolved hierarchy" section displays a table of the transitive closure of those relations, showing for each class that has at least one ancestor the source class and all its ancestors at every level (each ancestor formatted with CSS class `tag-class`), entries without ancestors being filtered out before rendering.
 
 ---
 
 **Source code:** `inference_ui.js` → `_renderSubclassClosure()`
 
-### REQ-INF-007 — Displaying restrictions inherited via class inheritance
+### REQ-INF-007 — Displaying restrictions inherited through class inheritance
 
-The "Inherited restrictions" section displays a table of OWL restrictions inherited through class hierarchy propagation. For each entry, the table shows: the inheriting class (`r.class_id`), the parent class from which the restriction is inherited (`r.inherited_from`), and the textual description of the restriction built from the fields `restr.type`, `restr.property`, `restr.filler` and `restr.cardinality`.
+**If** the ontology is loaded and OWL restrictions have been propagated through the class hierarchy,
+
+**Then** the "Inherited restrictions" section displays a table showing for each entry: the inheriting class (`r.class_id`), the parent class from which the restriction is inherited (`r.inherited_from`), and the textual description of the restriction built from the fields `restr.type`, `restr.property`, `restr.filler` and `restr.cardinality`.
 
 ---
 
@@ -101,7 +126,9 @@ The "Inherited restrictions" section displays a table of OWL restrictions inheri
 
 ### REQ-INF-008 — Displaying types inferred via property domain/range
 
-The "Inferred types" section displays a table of OWL types inferred for individuals from the domains and ranges (`domain`/`range`) of properties. For each individual, the table shows: the individual's label resolved via `IndividualEditor._labelForId()` (with the full IRI as a `title` attribute if the label differs), the inferred type (`t.inferred_type`), and the textual justification (`t.reason`).
+**If** the ontology is loaded and types have been inferred for individuals from the domains and ranges (`domain`/`range`) of properties,
+
+**Then** the "Inferred types" section displays a table showing for each individual: its label resolved via `IndividualEditor._labelForId()` (with the full IRI in the `title` attribute if the label differs), the inferred type (`t.inferred_type`), and the textual justification (`t.reason`).
 
 ---
 
@@ -109,7 +136,10 @@ The "Inferred types" section displays a table of OWL types inferred for individu
 
 ### REQ-INF-009 — Displaying inferred symmetric assertions
 
-The "Inferred symmetric assertions" section lists individual assertions inferred by applying the `owl:SymmetricProperty` characteristic. Each table row shows: the source individual (label resolved via `IndividualEditor._labelForId()`), the property (`a.property`), the target individual (label resolved in the same way), and the justification (`a.reason`). The section is not rendered if the list is empty.
+**If** the ontology is loaded and assertions have been inferred by applying the `owl:SymmetricProperty` characteristic
+**and** the resulting list is non-empty,
+
+**Then** the "Inferred symmetric assertions" section displays a table showing for each assertion: the source individual (label resolved via `IndividualEditor._labelForId()`), the property (`a.property`), the target individual (label resolved in the same way), and the justification (`a.reason`).
 
 ---
 
@@ -117,15 +147,21 @@ The "Inferred symmetric assertions" section lists individual assertions inferred
 
 ### REQ-INF-010 — Displaying inferred transitive assertions
 
-The "Inferred transitive assertions" section lists individual assertions inferred by applying the `owl:TransitiveProperty` characteristic. The rendering is identical to REQ-INF-009 (same `_renderAssertions()` function called with a different title and the `transitive_assertions` list). The section is not rendered if the list is empty.
+**If** the ontology is loaded and assertions have been inferred by applying the `owl:TransitiveProperty` characteristic
+**and** the resulting list is non-empty,
+
+**Then** the "Inferred transitive assertions" section displays a table in the same format as REQ-INF-009, with the `transitive_assertions` list as the data source.
 
 ---
 
 **Source code:** `inference_ui.js` → `_renderAssertions()`
 
-### REQ-INF-011 — Displaying assertions inferred via property chains and inverses
+### REQ-INF-011 — Displaying assertions inferred by property chains and inverses
 
-The "Assertions (chains + inverses)" section lists individual assertions inferred by applying property chains (`owl:propertyChainAxiom`) and inverse properties. The rendering is identical to REQ-INF-009 and REQ-INF-010 (same `_renderAssertions()` function called with the `chain_assertions` list). The section is not rendered if the list is empty.
+**If** the ontology is loaded and assertions have been inferred by applying property chains (`owl:propertyChainAxiom`) and inverse properties
+**and** the resulting list is non-empty,
+
+**Then** the "Assertions (chains + inverses)" section displays a table in the same format as REQ-INF-009 and REQ-INF-010, with the `chain_assertions` list as the data source.
 
 ---
 
@@ -133,7 +169,10 @@ The "Assertions (chains + inverses)" section lists individual assertions inferre
 
 ### REQ-INF-012 — Displaying inferred inverse restrictions on classes
 
-The "Inferred inverse restrictions" section displays a table of existential restrictions inferred on classes through property inversion. The description of each restriction is built in the form `∃<property>.<filler>` from the fields `r.property` and `r.filler`. The table also shows the affected class (`i.class_id`) and the justification (`i.reason`). The section is not rendered if the list is empty.
+**If** the ontology is loaded and existential restrictions have been inferred on classes by property inversion
+**and** the resulting list is non-empty,
+
+**Then** the "Inferred inverse restrictions" section displays a table showing for each restriction: the concerned class (`i.class_id`), the restriction description in the form `∃<property>.<filler>` built from the fields `r.property` and `r.filler`, and the justification (`i.reason`).
 
 ---
 
@@ -141,7 +180,11 @@ The "Inferred inverse restrictions" section displays a table of existential rest
 
 ### REQ-INF-013 — Displaying inverse properties inferred by owl:inverseOf
 
-The "Inferred inverse properties" section displays a table of OWL properties inferred by symmetry of the `owl:inverseOf` relation. For each entry, the table shows: the inferred property (`i.property_id`), the property of which it is the inverse (`i.inverse_of`), and the justification (`i.reason`). If no inverse property is inferred, the message "No inverse inferred by owl:inverseOf symmetry." is displayed.
+**If** the ontology is loaded and OWL properties have been inferred by symmetry of the `owl:inverseOf` relation,
+
+**Then**:
+- the "Inferred inverse properties" section displays a table showing for each entry: the inferred property (`i.property_id`), the property of which it is the inverse (`i.inverse_of`), and the justification (`i.reason`)
+- if no inverse property is inferred, the message "No inverse inferred by owl:inverseOf symmetry." is displayed instead
 
 ---
 
@@ -149,7 +192,9 @@ The "Inferred inverse properties" section displays a table of OWL properties inf
 
 ### REQ-INF-014 — Manual inference recalculation button
 
-The panel header contains a "↻" button whose `onclick` event handler directly calls `InferenceUI.refresh()`. This button allows the user to manually trigger a recalculation and reload of inferences from the backend, independently of the automatic refresh cycle.
+**If** the user clicks the "↻" button displayed in the inference panel header,
+
+**Then** `InferenceUI.refresh()` is called immediately, triggering a full recalculation and reload of inferences from the backend, independently of the automatic refresh cycle.
 
 ---
 
@@ -157,10 +202,14 @@ The panel header contains a "↻" button whose `onclick` event handler directly 
 
 ### REQ-INF-015 — Collapsible sections for inference results
 
-All result sections containing at least one element are rendered with the CSS class `collapsible`. An `onclick` handler on the title element calls `this.parentElement.classList.toggle('open')`, allowing the user to collapse or expand each section individually. A visual indicator `▶` (CSS class `caret`) is displayed in the title.
+**If** an inference results section contains at least one element
+**and** the user clicks on its title,
+
+**Then**:
+- the section toggles between collapsed and expanded states via `this.parentElement.classList.toggle('open')`
+- the section is rendered with the CSS class `collapsible`
+- a visual indicator `▶` (CSS class `caret`) is displayed in the title
 
 ---
-
-— claude-sonnet-4-6
 
 **Source code:** `inference_ui.js` → `_renderSubclassClosure()`, `_renderInheritedRestrictions()`, `_renderInferredTypes()`, `_renderAssertions()`, `_renderInverseClassRestrictions()`, `_renderInferredInverseProperties()`
