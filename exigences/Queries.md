@@ -211,7 +211,7 @@
 
 ### REQ-QRY-020 — Gestion des littéraux non-variables avec FILTER(STR(...))
 
-| **Si** | l'utilisateur saisit une valeur littérale (non-variable) dans le champ objet d'un patron portant un prédicat de type annotation ou `propriété de données`, |
+| **Si** | l'utilisateur saisit une valeur littérale (non-variable) dans le champ objet d'un patron portant un prédicat de type annotation ou `DatatypeProperty`, |
 |---|---|
 | **Alors** | la comparaison s'effectue indépendamment du tag de langue RDF, évitant les faux négatifs liés aux littéraux étiquetés. |
 
@@ -249,7 +249,7 @@
 
 | **Si** | l'utilisateur ouvre le sélecteur de prédicat d'un patron triple, |
 |---|---|
-| **Alors** | les prédicats disponibles sont présentés organisés par catégorie (type de `classe`, `propriétés d'objet`, `propriétés de données`, `propriétés d'annotation`), en respectant la hiérarchie de l'`ontologie`, avec une icône distinctive par type de `propriété`. |
+| **Alors** | les prédicats disponibles sont présentés organisés par catégorie (type de `classe`, `ObjectProperty`, `DatatypeProperty`, `AnnotationProperty`), en respectant la hiérarchie de l'`ontologie`, avec une icône distinctive par type de `propriété`. |
 
 ---
 
@@ -261,11 +261,11 @@
 |---|---|
 | **Alors** | le champ objet présente un sélecteur d'arborescence de `classes` de l'`ontologie`. |
 
-| **Si** | le prédicat est une `propriété d'annotation` ou une `propriété de données`, |
+| **Si** | le prédicat est une `AnnotationProperty` ou une `DatatypeProperty`, |
 |---|---|
 | **Alors** | le champ objet présente un champ texte large permettant de saisir une variable ou une valeur littérale. |
 
-| **Si** | le prédicat est une `propriété d'objet` ou une valeur non reconnue, |
+| **Si** | le prédicat est une `ObjectProperty` ou une valeur non reconnue, |
 |---|---|
 | **Alors** | le champ objet présente un champ texte court permettant de saisir une variable ou un IRI. |
 
