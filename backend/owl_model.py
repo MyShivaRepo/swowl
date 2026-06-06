@@ -248,6 +248,13 @@ class SWRLRule(BaseModel):
 
 # ── Ontologie complète ────────────────────────────────────────
 
+class OWLAnnotationProperty(BaseModel):
+    id: str
+    subPropertyOf: List[str] = []
+    comment: str = ""
+    annotations: EntityAnnotations = Field(default_factory=EntityAnnotations)
+
+
 class OWLOntology(BaseModel):
     id: str                    # IRI base ex: "https://example.org/my-ontology"
     name: str = ""             # Nom lisible choisi par l'utilisateur
@@ -256,6 +263,7 @@ class OWLOntology(BaseModel):
     classes: List[OWLClass] = []
     object_properties: List[OWLObjectProperty] = []
     datatype_properties: List[OWLDatatypeProperty] = []
+    annotation_properties: List[OWLAnnotationProperty] = []
     individuals: List[OWLIndividual] = []
     swrl_rules: List[SWRLRule] = []
     display_rules: dict = Field(default_factory=dict)  # {"single": {classId: propId}, "multi": {classId: [{sep, propId}]}}

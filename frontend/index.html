@@ -17,8 +17,23 @@
       <button id="nav-back" class="btn-nav-hist" onclick="APP.navigateBack()"    disabled title="Back">◀</button>
       <button id="nav-fwd"  class="btn-nav-hist" onclick="APP.navigateForward()" disabled title="Forward">▶</button>
     </div>
-    <span class="topbar-subtitle">OWL 2 DL · SWRL · Real-time Inferences</span>
-    <span id="nav-stats"></span>
+    <div class="global-search-wrap" id="global-search-wrap">
+      <svg class="global-search-ico" width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+        <circle cx="5.5" cy="5.5" r="4.5"/><line x1="9.5" y1="9.5" x2="12" y2="12"/>
+      </svg>
+      <input id="global-search-input" type="text" placeholder="Search classes, properties, individuals…"
+             autocomplete="off" spellcheck="false"
+             oninput="GlobalSearch.onInput(this.value)"
+             onkeydown="GlobalSearch.onKey(event)"
+             onfocus="GlobalSearch.onFocus()"
+             onblur="GlobalSearch.onBlur()">
+      <span id="global-search-clear" class="global-search-clear" style="display:none" onclick="GlobalSearch.clear()">✕</span>
+      <div id="global-search-dropdown" class="global-search-dropdown" style="display:none"></div>
+    </div>
+    <div class="topbar-nav-hist" style="margin-left:auto">
+      <button id="undo-btn" class="btn-nav-hist" onclick="UndoRedo.undo()" disabled title="Undo (Ctrl+Z)" style="font-size:26px;width:38px;height:34px;color:var(--text1);line-height:1">⟲</button>
+      <button id="redo-btn" class="btn-nav-hist" onclick="UndoRedo.redo()" disabled title="Redo (Ctrl+Y)" style="font-size:26px;width:38px;height:34px;color:var(--text1);line-height:1">⟳</button>
+    </div>
   </header>
 
   <!-- ── Tab Nav horizontal ── -->
@@ -90,14 +105,14 @@ function _updateNavCounters() {
   document.getElementById('nc-annos').textContent   = ALL_ANNO_PROPS.length;
 }
 
-// Patch APP.refresh pour mettre à jour les compteurs après chaque refresh
+// Patch APP.refresh to update counters after each refresh
 var _origRefresh = APP.refresh.bind(APP);
 APP.refresh = async function() {
   await _origRefresh();
   _updateNavCounters();
 };
 
-// Patch APP.init pour mettre à jour les compteurs après l'initialisation
+// Patch APP.init to update counters after initialisation
 var _origInit = APP.init.bind(APP);
 APP.init = async function() {
   await _origInit();

@@ -10,12 +10,12 @@
 const SWRLEditor = {
 
     _selectedId:   null,
-    _editingId:             null,   // ID original de la règle en cours d'édition
+    _editingId:             null,   // original ID of the rule being edited
     _editingRule:           null,
     _isNew:                 false,
     _currentPickerPath:     null,   // path + field pour le picker classe
-    _currentPropPickerPath: null,   // path + field pour le picker propriété
-    _drag:                  { section: null, fromIdx: null }, // état drag-and-drop
+    _currentPropPickerPath: null,   // path + field for the property picker
+    _drag:                  { section: null, fromIdx: null }, // drag-and-drop state
 
     // ── SVG icons ──────────────────────────────────────────────
     _ico: `<svg width="9" height="9" viewBox="0 0 9 9" fill="none" stroke="currentColor"
@@ -25,15 +25,48 @@ const SWRLEditor = {
            </svg>`,
 
     // ── Layout split ────────────────────────────────────────────
+    _searchQuery: '',
+
+    _filterRules(rules) {
+        const q = (this._searchQuery || '').trim().toLowerCase();
+        if (!q) return rules;
+        return (rules || []).filter(r =>
+            (r.id     || '').toLowerCase().includes(q) ||
+            (r.label  || '').toLowerCase().includes(q) ||
+            (r.comment|| '').toLowerCase().includes(q) ||
+            [...(r.body||[]), ...(r.head||[])].some(a =>
+                (a.class_id    || '').toLowerCase().includes(q) ||
+                (a.property_id || '').toLowerCase().includes(q) ||
+                (a.var         || '').toLowerCase().includes(q) ||
+                (a.subject     || '').toLowerCase().includes(q) ||
+                (a.object      || '').toLowerCase().includes(q) ||
+                (a.value       || '').toLowerCase().includes(q)
+            )
+        );
+    },
+
     renderSplit(rules) {
         return `
         <div class="section-split">
-            <div class="tree-panel" id="swrl-list-panel">
+            <div class="tree-panel" id="swrl-list-panel" style="display:flex;flex-direction:column">
                 <div class="tree-panel-header">
                     <h3>SWRL Rules</h3>
                     <button class="btn-sm" onclick="SWRLEditor.newRule()" title="New SWRL rule">➕</button>
                 </div>
-                <div class="tree-scroll" id="swrl-list">${this.renderList(rules)}</div>
+                <div class="tree-scroll" id="swrl-list" style="flex:1">${this.renderList(rules)}</div>
+                <div style="padding:6px 8px;border-top:1px solid var(--border);flex-shrink:0">
+                    <div style="display:flex;align-items:center;gap:4px;background:var(--bg3);border:1px solid var(--border2);border-radius:4px;padding:3px 8px">
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="var(--text-dim)" stroke-width="1.5" style="flex-shrink:0">
+                            <circle cx="5" cy="5" r="4"/><line x1="8.5" y1="8.5" x2="11" y2="11"/>
+                        </svg>
+                        <input id="swrl-search" type="text" placeholder="Search rules…"
+                               value="${this._searchQuery || ''}"
+                               style="flex:1;background:transparent;border:none;outline:none;font-size:11px;color:var(--text1);font-family:inherit"
+                               oninput="SWRLEditor._searchQuery=this.value;SWRLEditor._applySearch()">
+                        ${this._searchQuery ? `<span style="cursor:pointer;color:var(--text-dim);font-size:13px;line-height:1" title="Clear"
+                               onclick="SWRLEditor._searchQuery='';document.getElementById('swrl-search').value='';SWRLEditor._applySearch()">✕</span>` : ''}
+                    </div>
+                </div>
             </div>
             <div class="split-handle" id="swrl-split-h"></div>
             <div class="detail-panel" id="swrl-detail">
@@ -45,20 +78,76 @@ const SWRLEditor = {
         </div>`;
     },
 
+    /** Retourne true si la règle référence une entité (classe/propriété/individu) qui n'existe plus */
+    _ruleHasBrokenRefs(rule) {
+        const classes = new Set((APP.state.classes              || []).map(c => c.id));
+        const ops     = new Set((APP.state.object_properties    || []).map(p => p.id));
+        const dps     = new Set((APP.state.datatype_properties  || []).map(p => p.id));
+        const inds    = new Set((APP.state.individuals          || []).map(i => i.id));
+        const checkAtom = (atom) => {
+            if (!atom) return false;
+            if (atom.type === 'type_atom'     && atom.class_id    && !classes.has(atom.class_id))    return true;
+            if (atom.type === 'property_atom' && atom.property_id && !ops.has(atom.property_id) && !dps.has(atom.property_id)) return true;
+            if (atom.type === 'equality_atom' && atom.value       && inds.has(atom.value) === false
+                && (APP.state.individuals||[]).length > 0 && atom.value && !atom.value.startsWith('?')
+                && !/^["'\d]/.test(atom.value)
+                && (APP.state.individuals||[]).some(i => i.id) /* only flag if at least one ind exists */
+                && !(APP.state.individuals||[]).some(i => i.id === atom.value)) {
+                // only flag equality atoms that look like individual references (not literals/vars)
+            }
+            if (atom.type === 'naf_block')    return (atom.atoms      || []).some(checkAtom);
+            if (atom.type === 'conditional')  return [...(atom.condition||[]), ...(atom.consequent||[])].some(checkAtom);
+            return false;
+        };
+        return [...(rule.body||[]), ...(rule.head||[])].some(checkAtom);
+    },
+
+    _applySearch() {
+        const list = document.getElementById('swrl-list');
+        if (list) list.innerHTML = this.renderList(APP.state.swrl_rules || []);
+        // Mettre à jour / supprimer le bouton ✕
+        const search = document.getElementById('swrl-search');
+        if (search) {
+            let btn = search.parentElement.querySelector('.swrl-clear-btn');
+            if (this._searchQuery) {
+                if (!btn) {
+                    btn = document.createElement('span');
+                    btn.className = 'swrl-clear-btn';
+                    btn.style.cssText = 'cursor:pointer;color:var(--text-dim);font-size:13px;line-height:1';
+                    btn.title = 'Clear';
+                    btn.textContent = '✕';
+                    btn.onclick = () => { SWRLEditor._searchQuery = ''; search.value = ''; SWRLEditor._applySearch(); };
+                    search.parentElement.appendChild(btn);
+                }
+            } else if (btn) {
+                btn.remove();
+            }
+        }
+    },
+
     renderList(rules) {
-        if (!rules || !rules.length)
-            return '<div class="cls-list-empty" style="padding:12px">No SWRL rule</div>';
+        const filtered = this._filterRules(rules);
+        if (!filtered || !filtered.length)
+            return `<div class="cls-list-empty" style="padding:12px">${this._searchQuery ? 'No matching rule' : 'No SWRL rule'}</div>`;
         const sel = this._selectedId;
-        return rules.map(r => `
+        return filtered.map(r => {
+            const broken   = this._ruleHasBrokenRefs(r);
+            const mainText = r.label || r.id;
+            const subText  = r.label ? r.id : '';
+            return `
             <div class="tree-item${r.id === sel ? ' selected' : ''}" data-id="${r.id}"
+                 style="align-items:center${broken ? ';color:var(--red,#ef4444)' : ''}"
                  onclick="SWRLEditor.selectRule('${r.id}')">
                 <span class="tree-leaf">◦</span>
-                <span class="tree-label">${r.id}</span>
-                ${r.label ? `<span class="restr-prop-summary" style="margin-left:4px;flex:1">${r.label}</span>` : '<span style="flex:1"></span>'}
+                <span style="flex:1;overflow:hidden;min-width:0">
+                    <span class="tree-label" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block${broken ? ';color:var(--red,#ef4444)' : ''}">${mainText}</span>
+                    ${subText ? `<span style="font-size:10px;color:${broken ? 'var(--red,#ef4444)' : 'var(--text-faint)'};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block">${subText}</span>` : ''}
+                </span>
                 <button class="btn-icon btn-icon-danger" style="flex-shrink:0;padding:2px 4px"
                         onclick="event.stopPropagation();SWRLEditor.delete('${r.id}')"
                         title="Delete rule">${ClassEditor._svgDelete}</button>
-            </div>`).join('');
+            </div>`;
+        }).join('');
     },
 
     restoreSelection() {
@@ -68,7 +157,7 @@ const SWRLEditor = {
         }
     },
 
-    // ── Sélection / création ─────────────────────────────────────
+    // ── Selection / creation ─────────────────────────────────────
     selectRule(id) {
         const rule = (APP.state.swrl_rules || []).find(r => r.id === id);
         if (!rule) return;
@@ -113,7 +202,7 @@ const SWRLEditor = {
         detail.innerHTML = this._renderForm(this._editingRule, this._isNew);
         _initHResizers('swrl-detail');
         if (!this._isNew) {
-            // Focus sur le champ ID pour que l'utilisateur puisse le renommer directement
+            // Focus on the ID field so the user can rename it directly
             const idInp = document.getElementById('swrl-id');
             if (idInp) idInp.focus();
         }
@@ -135,21 +224,25 @@ const SWRLEditor = {
         <div class="cls-editor">
             <div class="cls-editor-hdr">
                 <div class="cls-editor-title" style="gap:6px;flex-wrap:wrap">
-                    ID&nbsp;
+                    ID <span class="form-req">*</span>&nbsp;
                     <input type="text" class="cls-id-inp" id="swrl-id"
-                           value="${rule.id}" placeholder="ruleName"
+                           value="${rule.id}" placeholder="RuleID"
                            oninput="this.value=this.value.replace(/\\s+/g,'_')"
                            ${isNew ? '' : 'onchange="SWRLEditor._syncAndSave()"'}
                            title="Rule identifier">
-                    <span class="cls-editor-meta">NAME</span>
+                    <span class="cls-editor-meta">LABEL</span>
                 </div>
-                <div style="margin-top:4px;display:flex;gap:4px">
+                <div style="margin-top:4px">
                     <input type="text" id="swrl-label" value="${rule.label||''}" placeholder="Label"
-                           class="cls-id-inp" style="flex:1;font-size:11px"
+                           class="cls-id-inp" style="width:100%;font-size:11px"
                            onchange="SWRLEditor._syncAndSave()">
-                    <input type="text" id="swrl-comment" value="${rule.comment||''}" placeholder="Comment"
-                           class="cls-id-inp" style="flex:2;font-size:11px"
-                           onchange="SWRLEditor._syncAndSave()">
+                </div>
+                <div style="margin-top:6px">
+                    <span class="cls-editor-meta">COMMENT</span>
+                    <textarea id="swrl-comment" placeholder="Comment"
+                              class="cls-id-inp" rows="3"
+                              style="width:100%;margin-top:4px;resize:vertical;white-space:pre-wrap;word-break:break-word;border:1px solid var(--border2);border-radius:3px;padding:4px 6px;box-sizing:border-box;background:var(--bg3)"
+                              onchange="SWRLEditor._syncAndSave()">${(rule.comment||'').replace(/</g,'&lt;')}</textarea>
                 </div>
             </div>
 
@@ -196,7 +289,7 @@ const SWRLEditor = {
 
     _renderAtom(atom, path) {
         const parts = path.split(',');
-        // Draggable si l'atome est un élément d'une liste nommée (body, head, atoms, condition, consequent)
+        // Draggable if the atom is an element of a named list (body, head, atoms, condition, consequent)
         const _listParents = new Set(['body', 'head', 'atoms', 'condition', 'consequent']);
         const isDraggable = parts.length >= 2 && _listParents.has(parts[parts.length - 2]);
 
@@ -204,14 +297,14 @@ const SWRLEditor = {
         const listPath = parts.slice(0, -1).join(',');   // ex: 'body' ou 'body,2,atoms'
         const idx      = parts[parts.length - 1];
 
-        // Le conteneur reçoit seulement les événements de DROP (pas draggable lui-même)
-        // onDragOver ne fait event.preventDefault() que si listPath correspond → empêche le drop sur un mauvais parent
+        // The container receives only DROP events (not draggable itself)
+        // onDragOver only calls event.preventDefault() if listPath matches → prevents drop on wrong parent
         const dragAttrs = isDraggable ? `
             ondragover="SWRLEditor.onDragOver(event,this,'${listPath}')"
             ondragleave="SWRLEditor.onDragLeave(this)"
             ondrop="event.preventDefault();event.stopPropagation();SWRLEditor.onDrop(event,'${listPath}',${idx})"` : '';
 
-        // La poignée porte draggable="true" — seule elle initie le drag, sans conflit de niveaux
+        // The handle has draggable="true" — it alone initiates the drag, without level conflicts
         const handle = isDraggable ? `
             <span class="swrl-drag-handle" title="Drag to reorder"
                   draggable="true"
@@ -228,6 +321,7 @@ const SWRLEditor = {
                 const safePath = path.replace(/,/g, '__');
                 const pickerId = `swrl-cls-picker-${safePath}`;
                 const tree     = _classTreePickerItems('SWRLEditor.onClassPickerSelect');
+                const clsExists = !clsId || (APP.state.classes||[]).some(c => c.id === clsId);
                 return `<div class="swrl-atom" data-path="${path}" ${dragAttrs}>
                     ${handle}
                     <input class="swrl-var" value="${atom.var||''}" placeholder="?var"
@@ -236,14 +330,16 @@ const SWRLEditor = {
                     <div style="position:relative;flex:1;min-width:0">
                         <div class="tree-item restr-filler-btn" style="margin:0;padding:2px 6px;cursor:pointer"
                              title="${clsId ? 'Left-click: navigate · Right-click: change class' : 'Click to select a class'}"
-                             onclick="${clsId ? '' : `SWRLEditor.toggleClassPicker('${pickerId}','${path}',this)`}"
+                             onclick="${clsId && clsExists ? '' : `SWRLEditor.toggleClassPicker('${pickerId}','${path}',this)`}"
                              oncontextmenu="event.preventDefault();SWRLEditor.toggleClassPicker('${pickerId}','${path}',this)">
                             ${clsId
-                                ? `<span class="cls-dot tree-cls-dot" style="flex-shrink:0;margin-right:4px"></span>
-                                   <span class="restr-filler-lbl" style="cursor:pointer"
-                                         onclick="event.stopPropagation();APP.navigateTo('classes','${clsId}')"
-                                         onmouseover="this.style.textDecoration='underline';this.style.color='var(--accent,#5f8dd3)'"
-                                         onmouseout="this.style.textDecoration='';this.style.color=''">${clsId}</span>`
+                                ? (clsExists
+                                    ? `<span class="cls-dot tree-cls-dot" style="flex-shrink:0;margin-right:4px"></span>
+                                       <span class="restr-filler-lbl" style="cursor:pointer"
+                                             onclick="event.stopPropagation();APP.navigateTo('classes','${clsId}')"
+                                             onmouseover="this.style.textDecoration='underline';this.style.color='var(--accent,#5f8dd3)'"
+                                             onmouseout="this.style.textDecoration='';this.style.color=''">${clsId}</span>`
+                                    : `<span style="color:var(--red,#ef4444);font-weight:600;font-size:11px" title="${clsId} — deleted">⚠ deleted</span>`)
                                 : `<span class="restr-filler-ph"></span>
                                    <span class="restr-filler-lbl" style="color:var(--text-faint)">— class —</span>`
                             }
@@ -260,6 +356,7 @@ const SWRLEditor = {
                 const propId    = atom.property_id || '';
                 const isOP      = (APP.state.object_properties  || []).some(p => p.id === propId);
                 const isDP      = (APP.state.datatype_properties || []).some(p => p.id === propId);
+                const propExists = !propId || isOP || isDP;
                 const propDot   = isOP ? 'op-prop-dot' : isDP ? 'dp-prop-dot' : null;
                 const propPickId = `swrl-prop-picker-${path.replace(/,/g,'__')}`;
                 return `<div class="swrl-atom" data-path="${path}" ${dragAttrs}>
@@ -269,14 +366,16 @@ const SWRLEditor = {
                     <div style="position:relative;flex:0 1 auto;min-width:80px">
                         <div class="tree-item restr-filler-btn" style="margin:0;padding:2px 6px;cursor:pointer;width:max-content;max-width:200px"
                              title="${propId ? 'Left-click: navigate · Right-click: change property' : 'Click to select a property'}"
-                             onclick="${propId ? '' : `SWRLEditor.togglePropPicker('${propPickId}','${path}',this)`}"
+                             onclick="${propId && propExists ? '' : `SWRLEditor.togglePropPicker('${propPickId}','${path}',this)`}"
                              oncontextmenu="event.preventDefault();SWRLEditor.togglePropPicker('${propPickId}','${path}',this)">
                             ${propId
-                                ? `<span class="${propDot||'op-prop-dot'}" style="flex-shrink:0;margin-right:4px"></span>
-                                   <span style="white-space:nowrap;cursor:pointer"
-                                         onclick="event.stopPropagation();APP.navigateTo('${isOP ? 'object-properties' : 'datatype-properties'}','${propId}')"
-                                         onmouseover="this.style.textDecoration='underline';this.style.color='var(--accent,#5f8dd3)'"
-                                         onmouseout="this.style.textDecoration='';this.style.color=''">${propId}</span>`
+                                ? (propExists
+                                    ? `<span class="${propDot||'op-prop-dot'}" style="flex-shrink:0;margin-right:4px"></span>
+                                       <span style="white-space:nowrap;cursor:pointer"
+                                             onclick="event.stopPropagation();APP.navigateTo('${isOP ? 'object-properties' : 'datatype-properties'}','${propId}')"
+                                             onmouseover="this.style.textDecoration='underline';this.style.color='var(--accent,#5f8dd3)'"
+                                             onmouseout="this.style.textDecoration='';this.style.color=''">${propId}</span>`
+                                    : `<span style="color:var(--red,#ef4444);font-weight:600;font-size:11px" title="${propId} — deleted">⚠ deleted</span>`)
                                 : `<span class="restr-filler-ph"></span>
                                    <span style="color:var(--text-faint);white-space:nowrap">— property —</span>`
                             }
@@ -413,9 +512,9 @@ const SWRLEditor = {
     // ── Pickers ──────────────────────────────────────────────────
 
     /** Ouvre/ferme le tree picker de classe pour un atome type_atom.
-     *  Utilise position:fixed pour échapper à tout overflow:hidden parent. */
+     *  Uses position:fixed to escape any overflow:hidden parent. */
 
-    /** Positionne un dropdown en fixed sous (ou au-dessus si pas de place) du bouton déclencheur */
+    /** Positions a dropdown in fixed mode below (or above if no room) the trigger button */
     _positionDropdown(el, btn, width = 200, maxH = 260) {
         if (!btn) return;
         const rect = btn.getBoundingClientRect();
@@ -460,18 +559,18 @@ const SWRLEditor = {
         setTimeout(() => document.addEventListener('click', close), 0);
     },
 
-    /** Appelé quand une classe est sélectionnée dans le tree picker */
+    /** Called when a class is selected in the tree picker */
     onClassPickerSelect(classId) {
         if (!this._currentPickerPath) return;
-        // Mettre à jour l'atome dans _editingRule
+        // Update the atom in _editingRule
         const atom = this._navAtom(this._currentPickerPath);
         if (atom) atom['class_id'] = classId;
         // Fermer tous les pickers
         document.querySelectorAll('[id^="swrl-cls-picker-"]').forEach(p => p.style.display = 'none');
         this._currentPickerPath = null;
-        // Re-rendre le formulaire pour afficher la classe sélectionnée
+        // Re-render the form to show the selected class
         this._renderDetail();
-        // Sauvegarder si la règle existe déjà
+        // Save if the rule already exists
         if (!this._isNew && this._editingRule?.id) this.save(false);
     },
 
@@ -496,7 +595,7 @@ const SWRLEditor = {
         setTimeout(() => document.addEventListener('click', close), 0);
     },
 
-    /** Appelé quand un individu est sélectionné dans le picker */
+    /** Called when an individual is selected in the picker */
     onIndPickerSelect(indId) {
         const atomPath = this._swrlIndPicker?.atomPath || this._currentIndPickerPath;
         if (!atomPath) return;
@@ -507,7 +606,7 @@ const SWRLEditor = {
         if (!this._isNew && this._editingRule?.id) this.save(false);
     },
 
-    /** Ouvre/ferme le tree picker de propriété (position:fixed) */
+    /** Opens/closes the property tree picker (position:fixed) */
     togglePropPicker(pickerId, atomPath, btnEl) {
         this._currentPropPickerPath = atomPath;
         document.querySelectorAll('[id^="swrl-prop-picker-"]').forEach(p => {
@@ -519,7 +618,7 @@ const SWRLEditor = {
         const visible = el.style.display !== 'none';
         if (visible) { el.style.display = 'none'; return; }
 
-        // Construire le contenu du picker avec icônes
+        // Build the picker content with icons
         const ops = APP.state.object_properties  || [];
         const dps = APP.state.datatype_properties || [];
         const alpha = (a, b) => a.id.localeCompare(b.id);
@@ -556,7 +655,7 @@ const SWRLEditor = {
 
     _swrlIndPicker: { atomPath: null, selectedClass: null, selectedInd: null },
 
-    /** Ouvre le picker bi-panneau pour sélectionner un individu */
+    /** Opens the two-panel picker to select an individual */
     openIndPicker(atomPath) {
         this._swrlIndPicker = { atomPath, selectedClass: null, selectedInd: null };
         document.getElementById('swrl-ind-picker-modal')?.remove();
@@ -681,7 +780,7 @@ const SWRLEditor = {
         this._swrlIndPicker = { atomPath: null, selectedClass: null, selectedInd: null };
     },
 
-    /** Appelé quand une propriété est sélectionnée dans le picker */
+    /** Called when a property is selected in the picker */
     onPropPickerSelect(propId) {
         if (!this._currentPropPickerPath) return;
         const atom = this._navAtom(this._currentPropPickerPath);
@@ -707,7 +806,7 @@ const SWRLEditor = {
     },
 
     onDragOver(event, el, listPath) {
-        // N'accepte le drop que si on est dans la même liste que la source
+        // Only accept the drop if in the same list as the source
         if (!this._drag?.listPath || this._drag.listPath !== listPath) return;
         event.preventDefault();
         event.dataTransfer.dropEffect = 'move';
@@ -727,7 +826,7 @@ const SWRLEditor = {
         if (!fromPath || fromIdx === null || fromPath !== listPath) return;
         toIdx = parseInt(toIdx);
         if (fromIdx === toIdx) return;
-        // Naviguer jusqu'à la liste et réordonner
+        // Navigate to the list and reorder
         const arr = this._nav(listPath);
         if (!Array.isArray(arr)) return;
         const [item] = arr.splice(fromIdx, 1);
@@ -745,9 +844,9 @@ const SWRLEditor = {
         document.querySelectorAll('.swrl-dragging').forEach(e => e.classList.remove('swrl-dragging'));
     },
 
-    // ── Manipulation des atomes ──────────────────────────────────
+    // ── Atom manipulation ──────────────────────────────────
 
-    /** Ajoute un atome à la liste désignée par path */
+    /** Adds an atom to the list designated by path */
     addAtom(pathStr, atomType) {
         const arr = this._nav(pathStr);
         if (!Array.isArray(arr)) return;
@@ -756,7 +855,7 @@ const SWRLEditor = {
         if (!this._isNew) this.save(false);
     },
 
-    /** Supprime l'atome à l'index donné */
+    /** Removes the atom at the given index */
     removeAtom(pathStr) {
         const parts = pathStr.split(',');
         const idx   = parseInt(parts.pop());
@@ -766,7 +865,7 @@ const SWRLEditor = {
         if (!this._isNew) this.save(false);
     },
 
-    /** Met à jour un champ d'un atome */
+    /** Updates a field of an atom */
     updateField(pathStr, field, value) {
         const atom = this._navAtom(pathStr);
         if (atom && field) {
@@ -834,7 +933,7 @@ const SWRLEditor = {
         if (!this._isNew && this._editingRule?.id) this.save(false);
     },
 
-    // ── Sauvegarde / Suppression ─────────────────────────────────
+    // ── Save / Delete ─────────────────────────────────
     async save(isNew) {
         this._syncFromDom();
         const rule = this._editingRule;

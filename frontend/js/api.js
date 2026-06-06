@@ -1,10 +1,14 @@
 /**
- * api.js — Client HTTP pour l'API FastAPI
+ * api.js — HTTP client for the FastAPI backend
  */
 const API = {
     base: '/api',
 
     async _fetch(method, path, body = null) {
+        // Snapshot avant toute mutation (POST/PUT/DELETE) sauf snapshot lui-même
+        if (['POST','PUT','DELETE'].includes(method) && !path.includes('/snapshot/')) {
+            if (typeof UndoRedo !== 'undefined') UndoRedo.snapshot();
+        }
         const opts = {
             method,
             headers: { 'Content-Type': 'application/json' },
@@ -19,7 +23,10 @@ const API = {
         return res.json();
     },
 
-    // ── Registre d'ontologies ──────────────────────────────
+    // ── Ontology registry ──────────────────────────────
+    peekOntology:     (path)  => API._fetch('GET', `/ontologies/peek?path=${encodeURIComponent(path)}`),
+    registerJson:     (path, name, uri, prefix) =>
+        API._fetch('POST', `/ontologies/register-json?path=${encodeURIComponent(path)}&name=${encodeURIComponent(name)}&uri=${encodeURIComponent(uri)}&prefix=${encodeURIComponent(prefix)}`),
     listOntologies:     ()           => API._fetch('GET',    '/ontologies'),
     registerOntology:   (data)       => API._fetch('POST',   '/ontologies/register', data),
     updateOntologyEntry:(name, data) => API._fetch('PUT',    `/ontologies/${encodeURIComponent(name)}`, data),
@@ -33,6 +40,10 @@ const API = {
     exportOntology: (fmt) => fetch(`${API.base}/ontologies/export?fmt=${fmt}`)
         .then(r => { if (!r.ok) throw new Error(r.statusText); return r.blob(); }),
 
+    exportOntologyByName: (name, fmt) =>
+        fetch(`${API.base}/ontologies/${encodeURIComponent(name)}/export?fmt=${fmt}`)
+        .then(r => { if (!r.ok) throw new Error(r.statusText); return r.blob(); }),
+
     importOntology: async (file, name, path, uri, prefix) => {
         const fd = new FormData();
         fd.append('file', file);
@@ -42,28 +53,35 @@ const API = {
         return res.json();
     },
 
-    // ── Classes ────────────────────────────────────────────
+    // ── Classes ────────────────────────────────────────
     listClasses:   ()         => API._fetch('GET',    '/classes'),
     createClass:   (cls)      => API._fetch('POST',   '/classes', cls),
     getClass:      (id)       => API._fetch('GET',    `/classes/${id}`),
     updateClass:   (id, cls)  => API._fetch('PUT',    `/classes/${id}`, cls),
     deleteClass:   (id)       => API._fetch('DELETE', `/classes/${id}`),
 
-    // ── ObjectProperties ───────────────────────────────────
+    // ── ObjectProperties ───────────────────────────────
     listOPs:    ()          => API._fetch('GET',    '/object-properties'),
     createOP:   (p)         => API._fetch('POST',   '/object-properties', p),
     getOP:      (id)        => API._fetch('GET',    `/object-properties/${id}`),
     updateOP:   (id, p)     => API._fetch('PUT',    `/object-properties/${id}`, p),
     deleteOP:   (id)        => API._fetch('DELETE', `/object-properties/${id}`),
 
-    // ── DatatypeProperties ─────────────────────────────────
+    // ── DatatypeProperties ─────────────────────────────
     listDPs:    ()          => API._fetch('GET',    '/datatype-properties'),
     createDP:   (p)         => API._fetch('POST',   '/datatype-properties', p),
     getDP:      (id)        => API._fetch('GET',    `/datatype-properties/${id}`),
     updateDP:   (id, p)     => API._fetch('PUT',    `/datatype-properties/${id}`, p),
     deleteDP:   (id)        => API._fetch('DELETE', `/datatype-properties/${id}`),
 
-    // ── Individus ──────────────────────────────────────────
+    // ── AnnotationProperties ──────────────────────────────────
+    listAPs:    ()          => API._fetch('GET',    '/annotation-properties'),
+    createAP:   (p)         => API._fetch('POST',   '/annotation-properties', p),
+    getAP:      (id)        => API._fetch('GET',    `/annotation-properties/${encodeURIComponent(id)}`),
+    updateAP:   (id, p)     => API._fetch('PUT',    `/annotation-properties/${encodeURIComponent(id)}`, p),
+    deleteAP:   (id)        => API._fetch('DELETE', `/annotation-properties/${encodeURIComponent(id)}`),
+
+    // ── Individuals ──────────────────────────────────────────
     listIndividuals:   ()        => API._fetch('GET',    '/individuals'),
     createIndividual:  (ind)     => API._fetch('POST',   '/individuals', ind),
     getIndividual:     (id)      => API._fetch('GET',    `/individuals/${id}`),
@@ -71,21 +89,25 @@ const API = {
     deleteIndividual:  (id)      => API._fetch('DELETE', `/individuals/${id}`),
 
 
-    // ── SWRL ──────────────────────────────────────────────
+    // ── SWRL ──────────────────────────────────────────
     listSWRLRules:    ()      => API._fetch('GET',    '/swrl-rules'),
     createSWRLRule:   (r)     => API._fetch('POST',   '/swrl-rules', r),
     getSWRLRule:      (id)    => API._fetch('GET',    `/swrl-rules/${id}`),
     updateSWRLRule:   (id, r) => API._fetch('PUT',    `/swrl-rules/${id}`, r),
     deleteSWRLRule:   (id)    => API._fetch('DELETE', `/swrl-rules/${id}`),
 
-    // ── Inférences ─────────────────────────────────────────
+    // ── Inferences ─────────────────────────────────────────
     getInferences:      ()   => API._fetch('GET', '/inferences'),
     getViolations:      ()   => API._fetch('GET', '/inferences/violations'),
     getSubclassClosure: ()   => API._fetch('GET', '/inferences/subclass-closure'),
+
+    restoreSnapshot: (snap) => API._fetch('POST', '/snapshot/restore', snap),
 
     importFromPath: (data) => API._fetch('POST', '/ontologies/import-from-path', data),
 
     fsBrowse: (path, ext = '.json') => API._fetch('GET', `/fs/browse?path=${encodeURIComponent(path)}&ext=${encodeURIComponent(ext)}`),
 
-    health: () => API._fetch('GET', '/health'),
+    fetchBuiltins:  () => API._fetch('POST', '/builtins/fetch'),
+    health:         () => API._fetch('GET',  '/health'),
+    revealInFinder: (path) => API._fetch('POST', `/reveal?path=${encodeURIComponent(path)}`),
 };

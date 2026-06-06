@@ -1,5 +1,5 @@
 /**
- * inference_ui.js — Panneau des inférences temps réel
+ * inference_ui.js — Real-time inference panel
  */
 
 const InferenceUI = {
@@ -48,7 +48,7 @@ const InferenceUI = {
                 ${errors.length ? `🔴 ${errors.length} error(s)` : '🟢 Consistent'}
             </span>
             ${warnings.length ? `<span class="inf-badge badge-warn">⚠️ ${warnings.length} warning(s)</span>` : ''}
-            <button class="btn-sm" onclick="InferenceUI.refresh()" title="Recalculer">↻</button>
+            <button class="btn-sm" onclick="InferenceUI.refresh()" title="Recalculate">↻</button>
         </div>
 
         ${this._renderViolations(violations)}
@@ -85,11 +85,11 @@ const InferenceUI = {
         }
         return `<div class="inf-section collapsible">
             <div class="inf-title" onclick="this.parentElement.classList.toggle('open')">
-                🌳 Resolved hierarchy (fermeture transitive subClassOf) <span class="caret">▶</span>
+                🌳 Resolved hierarchy (transitive closure of subClassOf) <span class="caret">▶</span>
             </div>
             <div class="inf-content">
             <table class="inf-table">
-                <thead><tr><th>Classe</th><th>Ancestors (all levels)</th></tr></thead>
+                <thead><tr><th>Class</th><th>Ancestors (all levels)</th></tr></thead>
                 <tbody>
                 ${entries.map(([cls, ancs]) => `
                 <tr>
@@ -112,7 +112,7 @@ const InferenceUI = {
             </div>
             <div class="inf-content">
             <table class="inf-table">
-                <thead><tr><th>Classe</th><th>Inherited from</th><th>Restriction</th></tr></thead>
+                <thead><tr><th>Class</th><th>Inherited from</th><th>Restriction</th></tr></thead>
                 <tbody>
                 ${restrictions.map(r => {
                     const restr = r.restriction || {};
@@ -143,7 +143,7 @@ const InferenceUI = {
             </div>
             <div class="inf-content">
             <table class="inf-table">
-                <thead><tr><th>Individu</th><th>Inferred type</th><th>Reason</th></tr></thead>
+                <thead><tr><th>Individual</th><th>Inferred type</th><th>Reason</th></tr></thead>
                 <tbody>
                 ${types.map(t => {
                     const lbl = IndividualEditor._labelForId(t.individual_id);
@@ -168,7 +168,7 @@ const InferenceUI = {
             </div>
             <div class="inf-content">
             <table class="inf-table">
-                <thead><tr><th>Individu</th><th>Property</th><th>Target</th><th>Reason</th></tr></thead>
+                <thead><tr><th>Individual</th><th>Property</th><th>Target</th><th>Reason</th></tr></thead>
                 <tbody>
                 ${assertions.map(a => {
                     const indLbl    = IndividualEditor._labelForId(a.individual);
@@ -196,7 +196,7 @@ const InferenceUI = {
             </div>
             <div class="inf-content">
             <table class="inf-table">
-                <thead><tr><th>Classe</th><th>Inferred restriction</th><th>Reason</th></tr></thead>
+                <thead><tr><th>Class</th><th>Inferred restriction</th><th>Reason</th></tr></thead>
                 <tbody>
                 ${items.map(i => {
                     const r = i.restriction || {};
@@ -215,11 +215,11 @@ const InferenceUI = {
 
     _renderInferredInverseProperties(items) {
         if (!items.length) {
-            return '<div class="inf-section"><div class="inf-title">↔ Propertys inverses inférées</div><p class="empty">No inverse inferred by owl:inverseOf symmetry.</p></div>';
+            return '<div class="inf-section"><div class="inf-title">↔ Inferred inverse properties</div><p class="empty">No inverse inferred by owl:inverseOf symmetry.</p></div>';
         }
         return `<div class="inf-section collapsible">
             <div class="inf-title" onclick="this.parentElement.classList.toggle('open')">
-                ↔ Propertys inverses inférées (${items.length}) <span class="caret">▶</span>
+                ↔ Inferred inverse properties (${items.length}) <span class="caret">▶</span>
             </div>
             <div class="inf-content">
             <table class="inf-table">

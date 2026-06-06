@@ -1,7 +1,7 @@
 """
 triple_store.py — Triple store in-memory basé sur rdflib
 Persistance via fichiers JSON à chemins arbitraires
-Registre centralisé : DATA_DIR/registry.json
+Registre centralisé : ~/.swowl/registry.json (indépendant du répertoire projet)
 """
 from __future__ import annotations
 import os
@@ -31,10 +31,18 @@ ANNO_PROP_MAP = {
     'owl:incompatibleWith':       OWL.incompatibleWith,
 }
 
-DATA_DIR = Path(os.environ.get("DATA_DIR", "/app/data/ontologies"))
-DATA_DIR.mkdir(parents=True, exist_ok=True)
+# Répertoire de configuration utilisateur (persistant, indépendant du volume projet)
+SWOWL_DIR = Path(os.environ.get("SWOWL_DIR", "/host/Users/bernard/.swowl"))
+SWOWL_DIR.mkdir(parents=True, exist_ok=True)
 
-REGISTRY_FILE = DATA_DIR / "registry.json"
+REGISTRY_FILE = SWOWL_DIR / "registry.json"
+
+# Répertoire par défaut pour les nouvelles ontologies (optionnel)
+DATA_DIR = Path(os.environ.get("DATA_DIR", str(SWOWL_DIR / "ontologies")))
+try:
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+except Exception:
+    pass  # non critique — l'utilisateur peut spécifier n'importe quel chemin
 
 # Préfixe pour traduire les chemins hôte → container
 HOST_PREFIX_CONTAINER = "/host/Users/bernard"
@@ -56,20 +64,26 @@ def container_to_host(path: str) -> str:
 
 
 class RegistryEntry:
-    def __init__(self, name: str, path: str, uri: str, prefix: str, connected: bool = False):
+    def __init__(self, name: str, path: str, uri: str, prefix: str,
+                 connected: bool = False, readonly: bool = False,
+                 imports: list = None):
         self.name = name
         self.path = path        # chemin hôte (affiché à l'utilisateur)
         self.uri = uri
         self.prefix = prefix
         self.connected = connected
+        self.readonly = readonly   # True for built-in W3C ontologies
+        self.imports = imports or []  # list of imported ontology URIs
 
     def to_dict(self) -> dict:
         return {
-            "name": self.name,
-            "path": self.path,
-            "uri": self.uri,
-            "prefix": self.prefix,
+            "name":      self.name,
+            "path":      self.path,
+            "uri":       self.uri,
+            "prefix":    self.prefix,
             "connected": self.connected,
+            "readonly":  self.readonly,
+            "imports":   self.imports,
         }
 
     @staticmethod
@@ -80,6 +94,8 @@ class RegistryEntry:
             uri=d["uri"],
             prefix=d.get("prefix", "onto"),
             connected=d.get("connected", False),
+            readonly=d.get("readonly", False),
+            imports=d.get("imports", []),
         )
 
 
@@ -121,6 +137,12 @@ class TripleStore:
         entry = RegistryEntry(name=name, path=path, uri=uri, prefix=prefix, connected=False)
         self._registry[name] = entry
         self._save_registry()
+        # Create the .json file immediately if it doesn't exist yet
+        container_path = host_to_container(path)
+        p = Path(container_path)
+        if not p.exists():
+            onto = OWLOntology(id=uri, name=name, prefix=prefix)
+            self._save_onto(onto, path)
         return entry
 
     def unregister(self, name: str) -> bool:
@@ -251,49 +273,151 @@ class TripleStore:
 
         onto = OWLOntology(id=onto_id, name=name, prefix=prefix)
 
-        for cls_uri in g.subjects(RDF.type, OWL.Class):
-            if isinstance(cls_uri, URIRef):
-                local = self._local_name(str(cls_uri), base)
+        # ── Helper: collect labels & comments for any URI ───────
+        def _collect_labels(uri_ref):
+            labels, comments = [], []
+            for lbl in g.objects(uri_ref, RDFS.label):
+                labels.append({"lang": lbl.language or "en", "value": str(lbl)})
+            for cmt in g.objects(uri_ref, RDFS.comment):
+                comments.append({"lang": cmt.language or "en", "value": str(cmt)})
+            return labels, comments
+
+        # ── Helper: extract local name with prefix fallback ──────
+        def _lid(uri_str_val):
+            """Return a prefixed local id — e.g. 'rdf:type', 'rdfs:label', or bare 'MyClass'."""
+            # 1. Known external namespaces — check FIRST so rdfs:Resource beats bare 'Resource'
+            for ns_uri, ns_prefix in [
+                (str(XSD),  "xsd"),
+                (str(OWL),  "owl"),
+                (str(RDFS), "rdfs"),
+                (str(RDF),  "rdf"),
+            ]:
+                if uri_str_val.startswith(ns_uri) and ns_uri != base:
+                    return ns_prefix + ":" + uri_str_val[len(ns_uri):]
+            # 2. Belongs to current ontology base → strip base
+            local = self._local_name(uri_str_val, base)
+            return local
+
+        # ── Classes: owl:Class + rdfs:Class ─────────────────────
+        seen_cls = set()
+        for cls_type in (OWL.Class, RDFS.Class):
+            for cls_uri in g.subjects(RDF.type, cls_type):
+                if not isinstance(cls_uri, URIRef) or str(cls_uri) in seen_cls:
+                    continue
+                local = _lid(str(cls_uri))
                 if not local:
                     continue
+                seen_cls.add(str(cls_uri))
+                labels, comments = _collect_labels(cls_uri)
                 owl_cls = OWLClass(id=local)
-                for label in g.objects(cls_uri, RDFS.label):
-                    owl_cls.annotations.labels.append(
-                        {"lang": label.language or "fr", "value": str(label)}
-                    )
+                owl_cls.annotations.labels   = labels
+                owl_cls.annotations.comments = comments
                 for sup in g.objects(cls_uri, RDFS.subClassOf):
                     if isinstance(sup, URIRef):
-                        sup_local = self._local_name(str(sup), base)
+                        sup_local = _lid(str(sup))
                         if sup_local:
                             owl_cls.subClassOf.append(sup_local)
                 onto.classes.append(owl_cls)
 
+        # ── Object Properties: owl:ObjectProperty ───────────────
+        seen_op = set()
         for prop_uri in g.subjects(RDF.type, OWL.ObjectProperty):
-            if isinstance(prop_uri, URIRef):
-                local = self._local_name(str(prop_uri), base)
-                if not local:
-                    continue
-                prop = OWLObjectProperty(id=local)
-                for d in g.objects(prop_uri, RDFS.domain):
-                    if isinstance(d, URIRef):
-                        prop.domain.append(self._local_name(str(d), base))
-                for r in g.objects(prop_uri, RDFS.range):
-                    if isinstance(r, URIRef):
-                        prop.range.append(self._local_name(str(r), base))
-                onto.object_properties.append(prop)
+            if not isinstance(prop_uri, URIRef) or str(prop_uri) in seen_op:
+                continue
+            local = _lid(str(prop_uri))
+            if not local:
+                continue
+            seen_op.add(str(prop_uri))
+            labels, comments = _collect_labels(prop_uri)
+            prop = OWLObjectProperty(id=local)
+            prop.annotations.labels   = labels
+            prop.annotations.comments = comments
+            for d in g.objects(prop_uri, RDFS.domain):
+                if isinstance(d, URIRef):
+                    dl = _lid(str(d))
+                    if dl: prop.domain.append(dl)
+            for r in g.objects(prop_uri, RDFS.range):
+                if isinstance(r, URIRef):
+                    rl = _lid(str(r))
+                    if rl: prop.range.append(rl)
+            for sp in g.objects(prop_uri, RDFS.subPropertyOf):
+                if isinstance(sp, URIRef):
+                    sl = _lid(str(sp))
+                    if sl: prop.subPropertyOf.append(sl)
+            onto.object_properties.append(prop)
 
+        # ── Datatype Properties: owl:DatatypeProperty ────────────
+        seen_dp = set()
         for prop_uri in g.subjects(RDF.type, OWL.DatatypeProperty):
-            if isinstance(prop_uri, URIRef):
-                local = self._local_name(str(prop_uri), base)
-                if not local:
-                    continue
+            if not isinstance(prop_uri, URIRef) or str(prop_uri) in seen_dp:
+                continue
+            local = _lid(str(prop_uri))
+            if not local:
+                continue
+            seen_dp.add(str(prop_uri))
+            labels, comments = _collect_labels(prop_uri)
+            prop = OWLDatatypeProperty(id=local)
+            prop.annotations.labels   = labels
+            prop.annotations.comments = comments
+            for d in g.objects(prop_uri, RDFS.domain):
+                if isinstance(d, URIRef):
+                    dl = _lid(str(d))
+                    if dl: prop.domain.append(dl)
+            for r in g.objects(prop_uri, RDFS.range):
+                rl = _lid(str(r)) if isinstance(r, URIRef) else str(r).replace(base, "").replace(str(XSD), "xsd:")
+                if rl: prop.range.append(rl)
+            for sp in g.objects(prop_uri, RDFS.subPropertyOf):
+                if isinstance(sp, URIRef):
+                    sl = _lid(str(sp))
+                    if sl: prop.subPropertyOf.append(sl)
+            onto.datatype_properties.append(prop)
+
+        # ── rdf:Property → OP or DP depending on range ──────────
+        seen_rp = seen_op | seen_dp
+        for prop_uri in g.subjects(RDF.type, RDF.Property):
+            if not isinstance(prop_uri, URIRef) or str(prop_uri) in seen_rp:
+                continue
+            local = _lid(str(prop_uri))
+            if not local:
+                continue
+            seen_rp.add(str(prop_uri))
+            labels, comments = _collect_labels(prop_uri)
+            # Detect range type: xsd: → DatatypeProperty, else ObjectProperty
+            ranges = list(g.objects(prop_uri, RDFS.range))
+            is_datatype = any(str(r).startswith(str(XSD)) for r in ranges if isinstance(r, URIRef))
+            if is_datatype:
                 prop = OWLDatatypeProperty(id=local)
+                prop.annotations.labels   = labels
+                prop.annotations.comments = comments
                 for d in g.objects(prop_uri, RDFS.domain):
                     if isinstance(d, URIRef):
-                        prop.domain.append(self._local_name(str(d), base))
-                for r in g.objects(prop_uri, RDFS.range):
-                    prop.range.append(str(r).replace(base, "").replace(str(XSD), "xsd:"))
+                        dl = _lid(str(d))
+                        if dl: prop.domain.append(dl)
+                for r in ranges:
+                    rl = str(r).replace(str(XSD), "xsd:") if isinstance(r, URIRef) else ""
+                    if rl: prop.range.append(rl)
+                for sp in g.objects(prop_uri, RDFS.subPropertyOf):
+                    if isinstance(sp, URIRef):
+                        sl = _lid(str(sp))
+                        if sl: prop.subPropertyOf.append(sl)
                 onto.datatype_properties.append(prop)
+            else:
+                prop = OWLObjectProperty(id=local)
+                prop.annotations.labels   = labels
+                prop.annotations.comments = comments
+                for d in g.objects(prop_uri, RDFS.domain):
+                    if isinstance(d, URIRef):
+                        dl = _lid(str(d))
+                        if dl: prop.domain.append(dl)
+                for r in ranges:
+                    if isinstance(r, URIRef):
+                        rl = _lid(str(r))
+                        if rl: prop.range.append(rl)
+                for sp in g.objects(prop_uri, RDFS.subPropertyOf):
+                    if isinstance(sp, URIRef):
+                        sl = _lid(str(sp))
+                        if sl: prop.subPropertyOf.append(sl)
+                onto.object_properties.append(prop)
 
         # Synchroniser les domaines de propriétés → marqueurs PropertyPresence dans les classes
         # (nécessaire pour que le panel "Asserted Properties" soit rempli)

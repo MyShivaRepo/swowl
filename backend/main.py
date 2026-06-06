@@ -14,6 +14,7 @@ from pydantic import BaseModel as PydanticModel
 
 from owl_model import (
     OWLOntology, OWLClass, OWLObjectProperty, OWLDatatypeProperty,
+    OWLAnnotationProperty,
     OWLIndividual, SWRLRule, InferenceResult, PropertyPresence,
     ObjectPropertyAssertion,
 )
@@ -78,6 +79,16 @@ def _rename_swrl_atom(atom, old_id: str, new_id: str, kind: str) -> None:
         _rename_swrl_atom(a, old_id, new_id, kind)
     for a in getattr(atom, 'consequent', []):
         _rename_swrl_atom(a, old_id, new_id, kind)
+
+
+import re as _re
+
+def _validate_ncname(id_str: str, label: str = "ID") -> None:
+    """Raise 422 if id_str is not a valid OWL local name (XML NCName)."""
+    if not id_str or not id_str.strip():
+        raise HTTPException(422, f"{label} is required.")
+    if _re.match(r'^[0-9]', id_str):
+        raise HTTPException(422, f"{label} '{id_str}' cannot start with a digit (OWL NCName rule).")
 
 
 def _cascade_rename_class(onto: OWLOntology, old_id: str, new_id: str) -> None:
@@ -226,6 +237,30 @@ def register_ontology(req: RegisterRequest):
     return entry.to_dict()
 
 
+@app.post("/api/ontologies/register-json", tags=["Ontologie"], status_code=201)
+def register_json(path: str = Query(...), name: str = Query(None),
+                  uri: str = Query(None), prefix: str = Query(None)):
+    """Register an existing .json ontology file into the registry (Load workflow)."""
+    from pathlib import Path as FP
+    import json as _json
+    container_path = host_to_container(path)
+    p = FP(container_path)
+    if not p.exists():
+        raise HTTPException(404, f"File not found: {path}")
+    try:
+        data = _json.loads(p.read_text(encoding="utf-8"))
+    except Exception as e:
+        raise HTTPException(400, f"Cannot read JSON: {e}")
+    resolved_name   = name   or data.get("name") or p.stem
+    resolved_uri    = uri    or data.get("id", "")
+    resolved_prefix = prefix or data.get("prefix", "onto")
+    entries = store.list_registry()
+    if any(e["name"] == resolved_name for e in entries):
+        raise HTTPException(409, f"An ontology named '{resolved_name}' already exists in the registry.")
+    entry = store.register(resolved_name, path, resolved_uri, resolved_prefix)
+    return entry.to_dict()
+
+
 @app.put("/api/ontologies/{name}", tags=["Ontologie"])
 def update_ontology_entry(name: str, req: UpdateEntryRequest):
     """Modifie les métadonnées d'une entrée du registre."""
@@ -277,6 +312,51 @@ def update_display_rules(rules: dict):
     onto.display_rules = rules
     store.save()
     return rules
+
+
+# ── Peek (read prefix/URI without importing) ─────────────────
+
+@app.get("/api/ontologies/peek", tags=["Ontologie"])
+def peek_ontology(path: str = Query(..., description="Host path to .owl / .ttl / .json")):
+    """Read name, prefix and base URI from an ontology file without modifying state."""
+    from pathlib import Path as FP
+    import json as _json
+    container_path = host_to_container(path)
+    p = FP(container_path)
+    if not p.exists():
+        raise HTTPException(404, f"File not found: {path}")
+    name = p.stem  # filename without extension
+    fname = p.name.lower()
+    try:
+        if fname.endswith(".json"):
+            data = _json.loads(p.read_text(encoding="utf-8"))
+            return {
+                "name":   data.get("name") or name,
+                "prefix": data.get("prefix", "onto"),
+                "uri":    data.get("id", ""),
+                "path":   path,
+            }
+        # OWL/XML or Turtle — parse with rdflib
+        import rdflib
+        from rdflib.namespace import OWL, RDF
+        g = rdflib.Graph()
+        fmt = "turtle" if fname.endswith(".ttl") else "xml"
+        g.parse(data=p.read_bytes(), format=fmt)
+        # Base URI: look for owl:Ontology declaration
+        uri = ""
+        for s in g.subjects(RDF.type, OWL.Ontology):
+            uri = str(s)
+            break
+        # Prefix: look for declared namespace bindings (skip common ones)
+        SKIP = {"owl","rdf","rdfs","xsd","xml","skos","dc","dcterms",""}
+        prefix = "onto"
+        for pfx, ns in g.namespaces():
+            if pfx not in SKIP and str(pfx):
+                prefix = str(pfx)
+                break
+        return {"name": name, "prefix": prefix, "uri": uri, "path": path}
+    except Exception as e:
+        raise HTTPException(400, f"Cannot read file: {e}")
 
 
 # ── Import ───────────────────────────────────────────────────
@@ -340,6 +420,51 @@ def import_from_path(req: ImportFromPathRequest):
 
 # ── Export ───────────────────────────────────────────────────
 
+@app.get("/api/ontologies/{name}/export", tags=["Ontologie"])
+def export_ontology_by_name(name: str, fmt: str = Query("owl", enum=["owl", "ttl", "jsonld", "swrl", "sword"])):
+    """Exporte une ontologie enregistrée par son nom, sans modifier l'état connecté."""
+    current = store.get()
+    entry = store._registry.get(name)
+    if not entry:
+        raise HTTPException(404, f"Ontologie '{name}' introuvable dans le registre.")
+    # Utiliser l'ontologie en mémoire si c'est celle connectée, sinon charger depuis le fichier
+    if entry.connected and current:
+        target = current
+    else:
+        target = store._load_from_entry(entry)
+        if not target:
+            raise HTTPException(404, f"Fichier introuvable pour '{name}'.")
+    # Export SWRL JSON
+    if fmt == "swrl":
+        import json as _json
+        rules = [r.model_dump() for r in (target.swrl_rules or [])]
+        data  = _json.dumps(rules, indent=2, ensure_ascii=False).encode("utf-8")
+        fname = f"{name}_rules.swrl.json"
+        return Response(content=data, media_type="application/json",
+                        headers={"Content-Disposition": f'attachment; filename="{fname}"'})
+    # Export SWORD (format textuel)
+    if fmt == "sword":
+        from sword_serializer import export_sword
+        data  = export_sword(target)
+        fname = f"{name}_rules.sword"
+        return Response(content=data, media_type="text/plain; charset=utf-8",
+                        headers={"Content-Disposition": f'attachment; filename="{fname}"'})
+    # Swap temporaire pour utiliser les serialiseurs existants
+    store._ontology = target
+    try:
+        if fmt == "owl":
+            data, media, ext = export_owl_xml(store), "application/rdf+xml", "owl"
+        elif fmt == "ttl":
+            data, media, ext = export_turtle(store), "text/turtle", "ttl"
+        else:
+            data, media, ext = export_jsonld(store), "application/ld+json", "jsonld"
+    finally:
+        store._ontology = current  # restaurer l'état
+    fname = f"{name}.{ext}"
+    return Response(content=data, media_type=media,
+                    headers={"Content-Disposition": f'attachment; filename="{fname}"'})
+
+
 @app.get("/api/ontologies/export", tags=["Ontologie"])
 def export_ontology(fmt: str = Query("owl", enum=["owl", "ttl", "jsonld"])):
     require_onto()
@@ -362,6 +487,29 @@ def export_ontology(fmt: str = Query("owl", enum=["owl", "ttl", "jsonld"])):
 
 
 # ════════════════════════════════════════════════════════════════
+# UNDO / REDO — restore snapshot
+# ════════════════════════════════════════════════════════════════
+
+class OntologySnapshot(PydanticModel):
+    classes:               list = []
+    object_properties:     list = []
+    datatype_properties:   list = []
+    individuals:           list = []
+    swrl_rules:            list = []
+
+@app.post("/api/snapshot/restore", tags=["Undo"])
+def restore_snapshot(snap: OntologySnapshot):
+    onto = require_onto()
+    onto.classes             = [OWLClass(**c)             for c in snap.classes]
+    onto.object_properties   = [OWLObjectProperty(**p)   for p in snap.object_properties]
+    onto.datatype_properties = [OWLDatatypeProperty(**p) for p in snap.datatype_properties]
+    onto.individuals         = [OWLIndividual(**i)        for i in snap.individuals]
+    onto.swrl_rules          = [SWRLRule(**r)             for r in snap.swrl_rules]
+    store.save()
+    return {"ok": True}
+
+
+# ════════════════════════════════════════════════════════════════
 # CLASSES
 # ════════════════════════════════════════════════════════════════
 
@@ -373,9 +521,20 @@ def list_classes():
 @app.post("/api/classes", tags=["Classes"], status_code=201)
 def create_class(cls: OWLClass):
     onto = require_onto()
+    _validate_ncname(cls.id, "Class ID")
     if any(c.id == cls.id for c in onto.classes):
         raise HTTPException(409, f"Classe '{cls.id}' already exists")
     onto.classes.append(cls)
+    # Propager la symétrie disjointWith aux classes déjà existantes
+    for other in onto.classes:
+        if other.id != cls.id and other.id in cls.disjointWith:
+            if cls.id not in other.disjointWith:
+                other.disjointWith.append(cls.id)
+    # Propager la symétrie equivalentClass aux classes déjà existantes
+    for other in onto.classes:
+        if other.id != cls.id and other.id in cls.equivalentClass:
+            if cls.id not in other.equivalentClass:
+                other.equivalentClass.append(cls.id)
     store.save()
     return cls
 
@@ -392,6 +551,7 @@ def get_class(class_id: str):
 @app.put("/api/classes/{class_id}", tags=["Classes"])
 def update_class(class_id: str, cls: OWLClass):
     onto = require_onto()
+    _validate_ncname(cls.id, "Class ID")
     idx = next((i for i, c in enumerate(onto.classes) if c.id == class_id), None)
     if idx is None:
         raise HTTPException(404, f"Classe '{class_id}' not found")
@@ -418,6 +578,30 @@ def update_class(class_id: str, cls: OWLClass):
         p = next((q for q in all_props if q.id == prop_id), None)
         if p and cls.id not in p.domain:
             p.domain.append(cls.id)
+    # ── Sync symétrie equivalentClass ───────────────────────────
+    old_equiv = set(e for e in onto.classes[idx].equivalentClass if isinstance(e, str))
+    new_equiv = set(e for e in cls.equivalentClass if isinstance(e, str))
+    eq_added   = new_equiv - old_equiv
+    eq_removed = old_equiv - new_equiv
+    for other in onto.classes:
+        if other.id == cls.id:
+            continue
+        if other.id in eq_added and cls.id not in other.equivalentClass:
+            other.equivalentClass.append(cls.id)
+        if other.id in eq_removed and cls.id in other.equivalentClass:
+            other.equivalentClass = [e for e in other.equivalentClass if e != cls.id]
+    # ── Sync symétrie disjointWith ───────────────────────────────
+    old_disj = set(onto.classes[idx].disjointWith)
+    new_disj = set(cls.disjointWith)
+    added   = new_disj - old_disj
+    removed = old_disj - new_disj
+    for other in onto.classes:
+        if other.id == cls.id:
+            continue
+        if other.id in added and cls.id not in other.disjointWith:
+            other.disjointWith.append(cls.id)
+        if other.id in removed and cls.id in other.disjointWith:
+            other.disjointWith = [d for d in other.disjointWith if d != cls.id]
     onto.classes[idx] = cls
     store.save()
     return cls
@@ -467,6 +651,7 @@ def list_object_properties():
 @app.post("/api/object-properties", tags=["Propriétés"], status_code=201)
 def create_object_property(prop: OWLObjectProperty):
     onto = require_onto()
+    _validate_ncname(prop.id, "Property ID")
     if any(p.id == prop.id for p in onto.object_properties):
         raise HTTPException(409, f"ObjectProperty '{prop.id}' already exists")
     onto.object_properties.append(prop)
@@ -493,6 +678,7 @@ def get_object_property(prop_id: str):
 @app.put("/api/object-properties/{prop_id}", tags=["Propriétés"])
 def update_object_property(prop_id: str, prop: OWLObjectProperty):
     onto = require_onto()
+    _validate_ncname(prop.id, "Property ID")
     idx = next((i for i, p in enumerate(onto.object_properties) if p.id == prop_id), None)
     if idx is None:
         raise HTTPException(404, f"ObjectProperty '{prop_id}' not found")
@@ -550,6 +736,7 @@ def list_datatype_properties():
 @app.post("/api/datatype-properties", tags=["Propriétés"], status_code=201)
 def create_datatype_property(prop: OWLDatatypeProperty):
     onto = require_onto()
+    _validate_ncname(prop.id, "Property ID")
     if any(p.id == prop.id for p in onto.datatype_properties):
         raise HTTPException(409, f"DatatypeProperty '{prop.id}' already exists")
     onto.datatype_properties.append(prop)
@@ -571,6 +758,7 @@ def get_datatype_property(prop_id: str):
 @app.put("/api/datatype-properties/{prop_id}", tags=["Propriétés"])
 def update_datatype_property(prop_id: str, prop: OWLDatatypeProperty):
     onto = require_onto()
+    _validate_ncname(prop.id, "Property ID")
     idx = next((i for i, p in enumerate(onto.datatype_properties) if p.id == prop_id), None)
     if idx is None:
         raise HTTPException(404, f"DatatypeProperty '{prop_id}' not found")
@@ -596,6 +784,69 @@ def delete_datatype_property(prop_id: str):
     # ── Marqueurs domain → classes ───────────────────────────────
     _sync_domain_markers(onto, prop_id, set(prop.domain or []), set())
     onto.datatype_properties = [p for p in onto.datatype_properties if p.id != prop_id]
+    store.save()
+    return {"deleted": prop_id}
+
+
+# ════════════════════════════════════════════════════════════════
+# ANNOTATION PROPERTIES
+# ════════════════════════════════════════════════════════════════
+
+@app.get("/api/annotation-properties", tags=["Propriétés"])
+def list_annotation_properties():
+    return require_onto().annotation_properties
+
+
+@app.post("/api/annotation-properties", tags=["Propriétés"], status_code=201)
+def create_annotation_property(prop: OWLAnnotationProperty):
+    onto = require_onto()
+    _validate_ncname(prop.id, "Property ID")
+    if any(p.id == prop.id for p in onto.annotation_properties):
+        raise HTTPException(409, f"AnnotationProperty '{prop.id}' already exists")
+    onto.annotation_properties.append(prop)
+    store.save()
+    return prop
+
+
+@app.get("/api/annotation-properties/{prop_id}", tags=["Propriétés"])
+def get_annotation_property(prop_id: str):
+    onto = require_onto()
+    prop = next((p for p in onto.annotation_properties if p.id == prop_id), None)
+    if not prop:
+        raise HTTPException(404, f"AnnotationProperty '{prop_id}' not found")
+    return prop
+
+
+@app.put("/api/annotation-properties/{prop_id}", tags=["Propriétés"])
+def update_annotation_property(prop_id: str, prop: OWLAnnotationProperty):
+    onto = require_onto()
+    _validate_ncname(prop.id, "Property ID")
+    idx = next((i for i, p in enumerate(onto.annotation_properties) if p.id == prop_id), None)
+    if idx is None:
+        raise HTTPException(404, f"AnnotationProperty '{prop_id}' not found")
+    if prop.id != prop_id:
+        if any(p.id == prop.id for i2, p in enumerate(onto.annotation_properties) if i2 != idx):
+            raise HTTPException(409, f"AnnotationProperty '{prop.id}' already exists")
+        # Cascade rename in subPropertyOf references
+        for p in onto.annotation_properties:
+            if prop_id in p.subPropertyOf:
+                p.subPropertyOf = [prop.id if s == prop_id else s for s in p.subPropertyOf]
+    onto.annotation_properties[idx] = prop
+    store.save()
+    return prop
+
+
+@app.delete("/api/annotation-properties/{prop_id}", tags=["Propriétés"])
+def delete_annotation_property(prop_id: str):
+    onto = require_onto()
+    prop = next((p for p in onto.annotation_properties if p.id == prop_id), None)
+    if not prop:
+        raise HTTPException(404, f"AnnotationProperty '{prop_id}' not found")
+    # Remove subPropertyOf references
+    for p in onto.annotation_properties:
+        if prop_id in p.subPropertyOf:
+            p.subPropertyOf = [s for s in p.subPropertyOf if s != prop_id]
+    onto.annotation_properties = [p for p in onto.annotation_properties if p.id != prop_id]
     store.save()
     return {"deleted": prop_id}
 
@@ -649,6 +900,7 @@ def _sync_inverse_assertions(onto: OWLOntology, ind_id: str,
 @app.post("/api/individuals", tags=["Individus"], status_code=201)
 def create_individual(ind: OWLIndividual):
     onto = require_onto()
+    _validate_ncname(ind.id, "Individual ID")
     ind.id = ind.id.strip().replace(' ', '_')   # espace → underscore
     if any(i.id == ind.id for i in onto.individuals):
         raise HTTPException(409, f"Individual '{ind.id}' already exists")
@@ -671,6 +923,7 @@ def get_individual(ind_id: str):
 @app.put("/api/individuals/{ind_id}", tags=["Individus"])
 def update_individual(ind_id: str, ind: OWLIndividual):
     onto = require_onto()
+    _validate_ncname(ind.id, "Individual ID")
     idx = next((i for i, x in enumerate(onto.individuals) if x.id == ind_id), None)
     if idx is None:
         raise HTTPException(404, f"Individual '{ind_id}' not found")
@@ -844,6 +1097,113 @@ def fs_browse(path: str = Query("/Users/bernard"),
             continue
     parent = str(FSPath(path).parent) if str(FSPath(path).parent) != path else None
     return {"current": path, "parent": parent, "dirs": dirs, "files": files}
+
+
+
+@app.post("/api/builtins/fetch", tags=["Système"])
+def fetch_builtins():
+    """Download the 3 core W3C ontologies (RDF, RDFS, OWL) and register them as read-only.
+    Uses rdflib to fetch & parse (handles redirects and content negotiation automatically).
+    Files are cached as Turtle in the data directory."""
+    import rdflib
+    from triple_store import DATA_DIR, container_to_host, store
+
+    BUILTINS = [
+        {
+            "name":   "rdf",
+            "prefix": "rdf",
+            "uri":    "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
+            "url":    "http://www.w3.org/1999/02/22-rdf-syntax-ns",
+            "file":   "rdf.ttl",
+        },
+        {
+            "name":   "rdfs",
+            "prefix": "rdfs",
+            "uri":    "http://www.w3.org/2000/01/rdf-schema#",
+            "url":    "http://www.w3.org/2000/01/rdf-schema",
+            "file":   "rdfs.ttl",
+            # RDFS uses RDF but doesn't formally declare owl:imports in its W3C file
+            "forced_imports": ["http://www.w3.org/1999/02/22-rdf-syntax-ns"],
+        },
+        {
+            "name":   "owl",
+            "prefix": "owl",
+            "uri":    "http://www.w3.org/2002/07/owl#",
+            "url":    "http://www.w3.org/2002/07/owl",
+            "file":   "owl.ttl",
+        },
+    ]
+
+    # Store builtins in ~/.swowl/builtins/ — correctly mapped via container_to_host()
+    from triple_store import SWOWL_DIR
+    builtin_dir = SWOWL_DIR / "builtins"
+    builtin_dir.mkdir(parents=True, exist_ok=True)
+
+    results = []
+    for b in BUILTINS:
+        # Skip if already registered
+        if any(e["name"] == b["name"] for e in store.list_registry()):
+            results.append({"name": b["name"], "status": "already registered"})
+            continue
+
+        # Download via rdflib (handles redirects + content negotiation)
+        ttl_path  = builtin_dir / b["file"]           # cached Turtle
+        json_path = builtin_dir / f"{b['name']}.json" # SWOWL JSON
+        if not ttl_path.exists():
+            try:
+                g = rdflib.Graph()
+                g.parse(b["url"])
+                ttl_path.write_text(g.serialize(format="turtle"), encoding="utf-8")
+            except Exception as e:
+                results.append({"name": b["name"], "status": f"download failed: {e}"})
+                continue
+
+        # host path for the registry (container /host/Users/bernard/... → /Users/bernard/...)
+        # Extract owl:imports declarations from the TTL
+        imported_uris = list(b.get("forced_imports", []))
+        try:
+            g2 = rdflib.Graph()
+            g2.parse(data=ttl_path.read_bytes(), format="turtle")
+            for s, p, o2 in g2.triples((None, rdflib.OWL.imports, None)):
+                uri_str = str(o2)
+                if uri_str not in imported_uris:
+                    imported_uris.append(uri_str)
+        except Exception:
+            pass
+
+        host_json = container_to_host(str(json_path))
+        try:
+            store.import_from_rdf(
+                ttl_path.read_bytes(), "turtle",
+                b["name"], host_json, b["uri"], b["prefix"]
+            )
+            store.disconnect()
+            entry = store._registry.get(b["name"])
+            if entry:
+                entry.readonly = True
+                entry.imports  = imported_uris
+                store._save_registry()
+            results.append({"name": b["name"], "status": "fetched and registered",
+                             "imports": imported_uris})
+        except Exception as e:
+            results.append({"name": b["name"], "status": f"import failed: {e}"})
+
+    return {"results": results}
+
+
+@app.post("/api/reveal", tags=["Système"])
+def reveal_in_finder(path: str = Query(..., description="Host path to reveal in Finder")):
+    """Ask the macOS host agent to open Finder at the given path."""
+    import urllib.request as _req
+    import urllib.parse as _parse
+    host_path = path  # already a host path (not container path)
+    url = f"http://host.docker.internal:8002/reveal?path={_parse.quote(host_path)}"
+    try:
+        req = _req.Request(url, method="POST")
+        with _req.urlopen(req, timeout=3) as r:
+            return {"status": "ok", "revealed": host_path}
+    except Exception as e:
+        raise HTTPException(503, f"Host agent not reachable — start host_agent.py first. ({e})")
 
 
 @app.get("/api/health", tags=["Système"])

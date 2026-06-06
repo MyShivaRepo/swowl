@@ -61,31 +61,109 @@ body {
   font-size: 11px;
   color: var(--text-faint);
 }
+
+/* ── Global search ─────────────────────────────────────────── */
+.global-search-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1;
+  max-width: 420px;
+  background: var(--bg3);
+  border: 1px solid var(--border2);
+  border-radius: 6px;
+  padding: 0 8px;
+  gap: 6px;
+}
+.global-search-wrap:focus-within {
+  border-color: var(--accent);
+}
+.global-search-ico {
+  flex-shrink: 0;
+  color: var(--text-dim);
+}
+.global-search-wrap input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-size: 12px;
+  color: var(--text1);
+  font-family: inherit;
+  padding: 5px 0;
+  min-width: 0;
+}
+.global-search-wrap input::placeholder { color: var(--text-faint); }
+.global-search-clear {
+  cursor: pointer;
+  color: var(--text-dim);
+  font-size: 12px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.global-search-clear:hover { color: var(--text); }
+.global-search-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  background: var(--bg2);
+  border: 1px solid var(--border2);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.5);
+  z-index: 9999;
+  max-height: 380px;
+  overflow-y: auto;
+}
+.gs-group-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  color: var(--text-faint);
+  padding: 8px 12px 4px;
+  text-transform: uppercase;
+}
+.gs-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--text1);
+}
+.gs-item:hover, .gs-item.focused {
+  background: var(--bg3);
+  color: var(--accent);
+}
+.gs-item-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gs-item-sub   { font-size: 10px; color: var(--text-faint); flex-shrink: 0; }
+.gs-empty      { padding: 16px 12px; font-size: 12px; color: var(--text-faint); text-align: center; }
 .topbar-nav-hist {
   display: flex;
   gap: 2px;
 }
 .btn-nav-hist {
-  background: none;
-  border: 1px solid var(--border);
+  background: var(--bg3);
+  border: 1px solid var(--border2);
   border-radius: 4px;
-  color: var(--text-dim);
-  font-size: 12px;
-  width: 26px;
-  height: 22px;
+  color: var(--text1);
+  font-size: 14px;
+  width: 28px;
+  height: 24px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background .12s, color .12s;
+  transition: background .12s, color .12s, border-color .12s;
 }
 .btn-nav-hist:hover:not(:disabled) {
-  background: var(--bg3);
+  background: var(--bg4);
   color: var(--text);
-  border-color: var(--border2);
+  border-color: var(--accent);
 }
 .btn-nav-hist:disabled {
-  opacity: 0.3;
+  opacity: 0.25;
   cursor: default;
 }
 #nav-stats {
@@ -99,7 +177,7 @@ body {
   border: 1px solid var(--border);
 }
 
-/* ── Tab Nav horizontal (style Protégé) ─────────────────────── */
+/* ── Horizontal tab nav (Protégé style) ─────────────────────── */
 .tab-nav {
   grid-column: 1 / -1;
   background: var(--bg2);
@@ -121,7 +199,7 @@ body {
   flex-shrink: 0;
 }
 
-.nav-group-title { display: none; }   /* masqué en mode horizontal */
+.nav-group-title { display: none; }   /* hidden in horizontal mode */
 
 .nav-item {
   display: flex;
@@ -133,7 +211,7 @@ body {
   font-size: 12px;
   white-space: nowrap;
   border-bottom: 2px solid transparent;
-  border-top: 2px solid transparent;   /* équilibre visuel */
+  border-top: 2px solid transparent;   /* visual balance */
   transition: color .12s, border-color .12s;
   flex-shrink: 0;
 }
@@ -165,13 +243,13 @@ body {
   background: var(--bg);
   min-width: 0;
 }
-/* Pas de padding quand le layout splitté est actif */
+/* No padding when the split layout is active */
 #main-content:has(.section-split) {
   padding: 0;
   overflow: hidden;
 }
 
-/* ── Inference sidebar : masquée (contenu dans l'onglet dédié) ── */
+/* ── Inference sidebar: hidden (content in dedicated tab) ── */
 .inference-sidebar { display: none; }
 .inf-sidebar-title {
   font-family: var(--font-mono);
@@ -526,7 +604,7 @@ button, .btn-primary, .btn-secondary, .btn-sm {
 .swrl-cons-text { color: var(--text-dim); }
 
 
-/* ── Layout splitté (style Protégé) ─────────────────────────── */
+/* ── Split layout (Protégé style) ─────────────────────────── */
 .section-split {
   display: flex;
   height: 100%;
@@ -544,7 +622,7 @@ button, .btn-primary, .btn-secondary, .btn-sm {
   flex-shrink: 0;
 }
 
-/* ── Séparateur glissable ──────────────────────────────────── */
+/* ── Draggable separator ──────────────────────────────────── */
 .split-handle {
   width: 5px;
   cursor: col-resize;
@@ -555,7 +633,7 @@ button, .btn-primary, .btn-secondary, .btn-sm {
   z-index: 10;
 }
 .split-handle::after {
-  /* zone de clic élargie sans casser le layout */
+  /* enlarged click area without breaking the layout */
   content: '';
   position: absolute;
   inset: 0 -4px;
@@ -570,7 +648,7 @@ body.resizing * {
   user-select: none !important;
 }
 
-/* ── Séparateur horizontal redimensionnable (entre frames) ── */
+/* ── Resizable horizontal separator (between frames) ── */
 .h-resizer {
   height: 5px;
   margin: 0 5px;
@@ -659,7 +737,7 @@ body.h-resizing * {
   border-right: 1px solid var(--border);
 }
 
-/* Le titre de la colonne ind-list affiche le nom exact de la classe (casse préservée) */
+/* The ind-list column title shows the exact class name (case preserved) */
 .ind-list-panel .tree-panel-header h3 {
   text-transform: none;
   letter-spacing: normal;
@@ -678,7 +756,7 @@ body.h-resizing * {
 }
 
 /* ══════════════════════════════════════════════════════════
-   CLASS EDITOR — layout style Protégé 3.5
+   CLASS EDITOR — Protégé 3.5 style layout
    ══════════════════════════════════════════════════════════ */
 
 .cls-editor {
@@ -688,7 +766,7 @@ body.h-resizing * {
   min-height: 100%;
 }
 
-/* ── En-tête ──────────────────────────────────────────────── */
+/* ── Header ──────────────────────────────────────────────── */
 .cls-editor-hdr {
   padding: 6px 10px 8px;
   border-bottom: 2px solid var(--border2);
@@ -741,7 +819,7 @@ body.h-resizing * {
   word-break: break-all;
 }
 
-/* ── Frame générique ──────────────────────────────────────── */
+/* ── Generic frame ──────────────────────────────────────── */
 .cls-frame {
   border: 1px solid var(--border2);
   margin: 5px 5px 0;
@@ -772,7 +850,7 @@ body.h-resizing * {
 }
 .cls-frame-tag-blue   { }
 .cls-frame-tag-orange { }
-/* Noms de propriétés dans les panels individu : casse préservée */
+/* Property names in individual panels: case preserved */
 .ind-prop-panel .cls-frame-tag {
   text-transform: none;
   letter-spacing: normal;
@@ -869,16 +947,16 @@ body.h-resizing * {
   flex-shrink: 0;
 }
 .cls-dot-disj { background: var(--text-dim); }
-/* dot owl:Thing : même forme, brun légèrement plus clair */
+/* owl:Thing dot: same shape, slightly lighter brown */
 .tree-thing-dot { background: #c9956b; }
-/* version grand format (panneau de détail) */
+/* large format version (detail panel) */
 .thing-icon-lg {
   width: 36px; height: 36px;
   border-radius: 50%;
   background: #c9956b;
   flex-shrink: 0;
 }
-/* placeholder alignement quand aucune classe (même taille que cls-dot) */
+/* alignment placeholder when no class (same size as cls-dot) */
 .restr-filler-ph { width: 11px; height: 11px; display: inline-block; flex-shrink: 0; }
 .cls-list-lbl { flex: 1; cursor: pointer; }
 .cls-list-lbl:hover { color: var(--accent); text-decoration: underline; }
@@ -917,7 +995,7 @@ body.h-resizing * {
 }
 .btn-frame-del:hover { color: #dc3545; }
 
-/* ── RestrictionEditor — arbre style Protégé ──────────────── */
+/* ── RestrictionEditor — Protégé-style tree ──────────────── */
 .restr-panel { display: flex; flex-direction: column; }
 .restr-bar { display: flex; align-items: center; gap: 4px; padding: 2px 4px; flex-wrap: wrap; }
 .restr-tree { flex: 1; }
@@ -948,7 +1026,7 @@ body.h-resizing * {
 }
 .restr-filler-arrow { color: var(--text-dim); font-size: 8px; flex-shrink: 0; }
 .restr-filler-dropdown {
-  /* position:fixed + coordonnées posées par JS dans toggleFillerPicker() */
+  /* position:fixed + coordinates set by JS in toggleFillerPicker() */
   width: max-content; z-index: 9000;
   max-height: 260px; overflow-y: auto;
   background: var(--bg2); border: 1px solid var(--border2); border-radius: 4px;
@@ -956,7 +1034,7 @@ body.h-resizing * {
 }
 .restr-card-inp { font-size: 11px; }
 
-/* ── Chip multiplicité (single / multiple) ───────────────────── */
+/* ── Multiplicity chip (single / multiple) ───────────────────── */
 .restr-range-chip {
   font-size: 10px;
   font-style: italic;
@@ -981,7 +1059,7 @@ body.h-resizing * {
   cursor: pointer; user-select: none;
 }
 .restr-stoggle {
-  /* même style que .tree-toggle, adapté au fond --bg4 du header */
+  /* same style as .tree-toggle, adapted for --bg4 header background */
   font-size: 9px;
   display: inline-flex;
   align-items: center;
@@ -995,13 +1073,13 @@ body.h-resizing * {
 }
 .restr-section-body { }
 
-/* ── Groupes lecture seule (héritage) ────────────────────────── */
+/* ── Read-only groups (inheritance) ────────────────────────── */
 .restr-group-ro { margin: 1px 0; }
 .restr-prop-row-ro {
-  /* surcouche .tree-item pour les lignes héritées (lecture seule) */
+  /* overlay .tree-item for inherited rows (read-only) */
   pointer-events: none;
 }
-/* Le nom de propriété reste cliquable malgré le pointer-events:none du parent */
+/* The property name remains clickable despite pointer-events:none on the parent */
 .restr-prop-row-ro .restr-prop-name {
   pointer-events: auto;
 }
@@ -1103,7 +1181,7 @@ body.h-resizing * {
   align-items: center;
 }
 
-/* ── Boutons icône (barre d'outils arbre) ──────────────────── */
+/* ── Icon buttons (tree toolbar) ──────────────────── */
 .btn-icon {
   display: inline-flex;
   align-items: center;
@@ -1137,7 +1215,7 @@ body.h-resizing * {
 .btn-icon[style*="visibility:hidden"] {
   pointer-events: none;
 }
-/* bouton supprimer : rouge en permanence (actif ou désactivé) */
+/* delete button: always red (enabled or disabled) */
 .btn-icon.btn-icon-danger,
 .btn-icon.btn-icon-danger:disabled {
   color: #ff4455 !important;
@@ -1356,7 +1434,7 @@ small { color: var(--text-faint); font-size: 10px; }
 /* nœud racine owl:topDataProperty : vert plus clair */
 .tree-dp-top-dot { background: #6ee7b7; }
 
-/* ── DatatypeProperty icon (texte, utilisé dans les listes) ─── */
+/* ── DatatypeProperty icon (text, used in lists) ─── */
 .dp-icon { font-size: 10px; }
 
 /* ── Header non-cliquable dans un picker div ────────────────── */
@@ -1380,6 +1458,24 @@ small { color: var(--text-faint); font-size: 10px; }
   background: #d4e042;
   flex-shrink: 0;
   vertical-align: middle;
+}
+/* Annotation property tree dot (same color, used inside tree nodes) */
+.tree-ap-dot { margin-right: 4px; }
+
+/* Navigable entity links (annotation props, classes, etc.) */
+.nav-link {
+  cursor: pointer;
+}
+.nav-link:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+/* Namespace root SVG icon < > */
+.ap-ns-icon {
+  flex-shrink: 0;
+  margin-right: 4px;
+  opacity: 0.6;
+  color: var(--text2);
 }
 
 /* ── XSD Range icon : losange violet ───────────────────────── */
@@ -1445,11 +1541,54 @@ small { color: var(--text-faint); font-size: 10px; }
 /* ── Onglet Ontologies ──────────────────────────────────────── */
 .onto-page {
   padding: 12px 16px;
-  max-width: 960px;
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
+
+/* ── 3-button wizard launcher ── */
+.btn-onto-action {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 12px 16px;
+  min-width: 180px;
+  flex: 1;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color .15s, background .15s;
+}
+.btn-onto-action:hover {
+  background: var(--bg3);
+  border-color: var(--accent);
+}
+.btn-onto-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text1);
+}
+.btn-onto-desc {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.btn-onto-w3c-badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 800;
+  font-family: var(--font-mono);
+  letter-spacing: 0.06em;
+  color: #fff;
+  background: #005a9c;
+  border-radius: 3px;
+  padding: 2px 6px;
+  margin-bottom: 2px;
+}
+/* required field asterisk */
+.form-req { color: var(--accent); font-size: 11px; }
 .onto-collapsible { margin-bottom: 0; }
 
 /* Ligne de formulaire inline (import / new) */
@@ -1484,7 +1623,10 @@ small { color: var(--text-faint); font-size: 10px; }
   font-family: var(--font-mono);
   color: var(--text2);
   word-break: break-all;
-  max-width: 380px;
+}
+.onto-path-cell:hover {
+  color: var(--accent) !important;
+  text-decoration: underline;
 }
 .onto-table-empty {
   text-align: center;
@@ -1492,9 +1634,44 @@ small { color: var(--text-faint); font-size: 10px; }
   padding: 14px;
 }
 
-/* Ligne ontologie courante (surlignée) */
-.onto-current-row td { background: rgba(60,120,220,.06); }
-.onto-current-row code { color: var(--accent); font-weight: 600; }
+/* Selected row (click) — permanent */
+.onto-selected-row > td {
+  background: rgba(95,141,211,.20) !important;
+}
+.onto-selected-row > td:first-child {
+  border-left: 3px solid var(--accent) !important;
+}
+
+/* Connected ontology row */
+.onto-current-row td {
+  background: rgba(95,141,211,.28) !important;
+  border-top: 1px solid rgba(95,141,211,.5) !important;
+  border-bottom: 1px solid rgba(95,141,211,.5) !important;
+}
+.onto-current-row td:first-child {
+  border-left: 4px solid var(--accent) !important;
+}
+.onto-current-row strong { color: var(--accent); }
+.onto-current-row code  { color: var(--accent); font-weight: 600; }
+/* Read-only W3C ontology row */
+.onto-readonly-row td { opacity: 0.75; }
+.onto-readonly-row strong { font-weight: 500; }
+/* Import sub-rows (indented tree) */
+.onto-import-subrow td {
+  padding-top: 2px !important;
+  padding-bottom: 2px !important;
+  border-top: none !important;
+  background: transparent;
+  opacity: 0.7;
+}
+.onto-import-link {
+  cursor: pointer;
+}
+.onto-import-link:hover code,
+.onto-import-link:hover span {
+  color: var(--accent) !important;
+  text-decoration: underline;
+}
 
 /* Badges statut connexion */
 .onto-badge {
@@ -1505,7 +1682,7 @@ small { color: var(--text-faint); font-size: 10px; }
 .onto-badge-connected    { background: rgba(40,180,80,.15);  color: #3a9; }
 .onto-badge-disconnected { background: rgba(120,120,140,.12); color: var(--text-dim); }
 
-/* Bouton warn (déconnecter) */
+/* Warn button (disconnect) */
 .btn-warn {
   background: rgba(220,120,30,.12); color: #c80;
   border: 1px solid rgba(220,120,30,.25);
@@ -1714,7 +1891,7 @@ small { color: var(--text-faint); font-size: 10px; }
   border: 1px solid rgba(16,185,129,.3);
   border-radius: 5px;
   overflow: hidden;
-  margin-left: 8px;    /* décalage à droite */
+  margin-left: 8px;    /* offset to the right */
 }
 .swrl-cond-bar {
   display: flex;

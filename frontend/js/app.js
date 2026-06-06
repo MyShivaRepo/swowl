@@ -1,12 +1,12 @@
 /**
- * app.js — Application principale : état, navigation, rendu des sections
+ * app.js — Main application: state, navigation, section rendering
  */
 
-// ── Paramètres utilisateur (persistés en localStorage) ───────
+// ── User settings (persisted in localStorage) ───────
 
 const Settings = {
 
-    // ── Langues européennes disponibles ──────────────────────────
+    // ── Available European languages ──────────────────────────
     availableLangs: [
         { code: 'bg', name: 'Български',  nameEn: 'Bulgarian' },
         { code: 'cs', name: 'Čeština',    nameEn: 'Czech' },
@@ -35,8 +35,9 @@ const Settings = {
         { code: 'sv', name: 'Svenska',    nameEn: 'Swedish' },
     ],
 
-    activeLangs:   ['fr', 'en'],   // langues actives (sous-ensemble des disponibles)
-    preferredLang: 'fr',           // langue préférée (1 parmi les actives)
+    activeLangs:   ['fr', 'en'],   // active languages (subset of available)
+    preferredLang: 'fr',           // preferred language (1 among active)
+    namingFormat:  'individual_counter', // default ID format for individuals
     _key: 'swowl_settings',
 
     get defaultLang() { return this.preferredLang; },
@@ -48,6 +49,7 @@ const Settings = {
             this.activeLangs   = s.activeLangs   || ['fr'];
             if (!this.activeLangs.includes(this.preferredLang))
                 this.activeLangs.unshift(this.preferredLang);
+            this.namingFormat  = s.namingFormat  || 'individual_counter';
         } catch (_) {}
     },
 
@@ -55,7 +57,36 @@ const Settings = {
         localStorage.setItem(this._key, JSON.stringify({
             preferredLang: this.preferredLang,
             activeLangs:   this.activeLangs,
+            namingFormat:  this.namingFormat,
         }));
+    },
+
+    setNamingFormat(fmt) {
+        this.namingFormat = fmt;
+        this.save();
+        APP.renderSection('settings');
+    },
+
+    /** Generates a default ID for a new individual based on the chosen format */
+    generateIndividualId(classId) {
+        const fmt = this.namingFormat;
+        if (fmt === 'alphanumeric') {
+            const letters = 'abcdefghijklmnopqrstuvwxyz';
+            const chars   = 'abcdefghijklmnopqrstuvwxyz0123456789';
+            const seg = (forceLetterFirst = false) => {
+                const first = forceLetterFirst
+                    ? letters[Math.floor(Math.random() * letters.length)]
+                    : chars[Math.floor(Math.random() * chars.length)];
+                return first + Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+            };
+            return `${seg(true)}-${seg()}-${seg()}-${seg()}`;
+        }
+        const existing = APP.state?.individuals || [];
+        const counter  = existing.length + 1;
+        if (fmt === 'class_counter' && classId) {
+            return `${classId}_${counter}`;
+        }
+        return `Individual_${counter}`;
     },
 
     setPreferred(lang) {
@@ -66,7 +97,7 @@ const Settings = {
     },
 
     toggleActive(lang) {
-        if (lang === this.preferredLang) return;  // ne peut pas désactiver la préférée
+        if (lang === this.preferredLang) return;  // cannot deactivate the preferred language
         if (this.activeLangs.includes(lang))
             this.activeLangs = this.activeLangs.filter(l => l !== lang);
         else
@@ -75,7 +106,7 @@ const Settings = {
         APP.renderSection('settings');
     },
 
-    /** Ouvre/ferme le dropdown des langues actives sur un champ LANG */
+    /** Opens/closes the active languages dropdown on a LANG field */
     showLangDropdown(btn) {
         document.getElementById('lang-dropdown')?.remove();
         const inp = btn.previousElementSibling;
@@ -114,7 +145,7 @@ const Settings = {
 };
 Settings.load();
 
-// ── État global ──────────────────────────────────────────────
+// ── Global state ──────────────────────────────────────────────
 
 const APP = {
     state: {
@@ -122,15 +153,16 @@ const APP = {
         classes: [],
         object_properties: [],
         datatype_properties: [],
+        annotation_properties: [],
         individuals: [],
         swrl_rules: [],
     },
     currentSection: 'ontologies',
-    _importFilePath: null,   // chemin du fichier OWL à importer
+    _importFilePath: null,   // path to the OWL file to import
 
-    // ── Historique de navigation ─────────────────────────────────
-    _navHistory: [],     // états passés (max 50)
-    _navFuture:  [],     // états futurs (bouton ►)
+    // ── Navigation history ─────────────────────────────────
+    _navHistory: [],     // past states (max 50)
+    _navFuture:  [],     // future states (► button)
 
     async init() {
         try {
@@ -147,18 +179,20 @@ const APP = {
         try {
             const onto = await API.getCurrentOntology();
             this.state.ontology = onto;
-            this.state.classes             = onto.classes             || [];
-            this.state.object_properties   = onto.object_properties   || [];
-            this.state.datatype_properties = onto.datatype_properties || [];
-            this.state.individuals         = onto.individuals         || [];
-            this.state.swrl_rules         = onto.swrl_rules         || [];
+            this.state.classes                = onto.classes                || [];
+            this.state.object_properties      = onto.object_properties      || [];
+            this.state.datatype_properties    = onto.datatype_properties    || [];
+            this.state.annotation_properties  = onto.annotation_properties  || [];
+            this.state.individuals            = onto.individuals            || [];
+            this.state.swrl_rules             = onto.swrl_rules             || [];
         } catch (e) {
             this.state.ontology = null;
-            this.state.classes             = [];
-            this.state.object_properties   = [];
-            this.state.datatype_properties = [];
-            this.state.individuals         = [];
-            this.state.swrl_rules         = [];
+            this.state.classes                = [];
+            this.state.object_properties      = [];
+            this.state.datatype_properties    = [];
+            this.state.annotation_properties  = [];
+            this.state.individuals            = [];
+            this.state.swrl_rules             = [];
         }
     },
 
@@ -168,17 +202,7 @@ const APP = {
         InferenceUI.refresh();
     },
 
-    updateStats() {
-        const s = this.state;
-        const el = document.getElementById('nav-stats');
-        if (el && s.ontology) {
-            el.textContent =
-                `${s.classes.length} cl · ${s.object_properties.length} op · ` +
-                `${s.datatype_properties.length} dp · ${s.individuals.length} ind`;
-        } else if (el) {
-            el.textContent = '';
-        }
-    },
+    updateStats() {},
 
     renderNav() {
         document.querySelectorAll('.nav-item').forEach(item => {
@@ -187,9 +211,9 @@ const APP = {
         this.updateStats();
     },
 
-    // ── Gestion de l'historique ──────────────────────────────────
+    // ── History management ──────────────────────────────────────
 
-    /** Retourne l'état courant {section, entityId} */
+    /** Returns the current state {section, entityId} */
     _currentState() {
         switch (this.currentSection) {
             case 'classes':
@@ -205,7 +229,7 @@ const APP = {
         }
     },
 
-    /** Empile l'état courant dans l'historique (max 50) et vide le futur */
+    /** Pushes the current state onto the history stack (max 50) and clears the future */
     _pushHistory() {
         const cur = this._currentState();
         this._navHistory.push(cur);
@@ -214,7 +238,7 @@ const APP = {
         this._updateNavButtons();
     },
 
-    /** Active/désactive les boutons ◀ ► */
+    /** Enables/disables the ◀ ► buttons */
     _updateNavButtons() {
         const back = document.getElementById('nav-back');
         const fwd  = document.getElementById('nav-fwd');
@@ -222,7 +246,7 @@ const APP = {
         if (fwd)  fwd.disabled  = this._navFuture.length  === 0;
     },
 
-    /** Restaure un état {section, entityId} sans pousser d'historique */
+    /** Restores a state {section, entityId} without pushing to history */
     _restoreState(state) {
         if (state.entityId) {
             switch (state.section) {
@@ -250,13 +274,13 @@ const APP = {
         this._updateNavButtons();
     },
 
-    /** Point d'entrée pour tous les changements d'onglet initiés par l'utilisateur */
+    /** Entry point for all tab changes initiated by the user */
     navigate(section) {
         this._pushHistory();
         this.renderSection(section);
     },
 
-    /** Revenir en arrière */
+    /** Go back */
     navigateBack() {
         if (!this._navHistory.length) return;
         this._navFuture.push(this._currentState());
@@ -264,7 +288,7 @@ const APP = {
         this._restoreState(prev);
     },
 
-    /** Aller en avant */
+    /** Go forward */
     navigateForward() {
         if (!this._navFuture.length) return;
         this._navHistory.push(this._currentState());
@@ -272,11 +296,11 @@ const APP = {
         this._restoreState(next);
     },
 
-    /** Navigation croisée : bascule vers l'onglet section et sélectionne l'entité entityId */
+    /** Cross-navigation: switches to section tab and selects entity entityId */
     navigateTo(section, entityId) {
-        // Empiler l'état courant dans l'historique
+        // Push current state onto history
         this._pushHistory();
-        // Pré-positionner la sélection pour que restoreSelection() en bénéficie
+        // Pre-position the selection so that restoreSelection() benefits from it
         switch (section) {
             case 'classes':
                 ClassEditor._selectedId       = entityId;
@@ -306,6 +330,14 @@ const APP = {
         if (section === 'swrl-rules' && entityId) {
             SWRLEditor._selectedId = entityId;
         }
+        if (section === 'annotation-properties' && entityId) {
+            APEditor._selectedId = entityId;
+            APEditor._expanded.add(entityId);
+            const allBuiltins = [...(Object.values(AP_BUILTINS || {}).flat())].map(p => p.id);
+            if (allBuiltins.includes(entityId)) {
+                APEditor._expanded.add(entityId.startsWith('rdfs:') ? 'rdfs:' : 'owl:');
+            }
+        }
         this.renderSection(section);
         if (section === 'individuals') {
             IndividualEditor.selectIndividual(entityId);
@@ -325,7 +357,7 @@ const APP = {
         this.renderNav();
         const main = document.getElementById('main-content');
 
-        // Bloquer les onglets d'édition si aucune ontologie n'est connectée
+        // Block editing tabs if no ontology is connected
         const editSections = ['classes','object-properties','datatype-properties','individuals','swrl-rules','inferences'];
         if (!this.state.ontology && editSections.includes(section)) {
             main.innerHTML = this._noOntoMsg();
@@ -351,12 +383,13 @@ const APP = {
                 main.innerHTML = DPEditor.renderSplit(this.state.datatype_properties);
                 DPEditor.restoreSelection();
                 break;
+            case 'annotation-properties':
+                main.innerHTML = APEditor.renderSplit(this.state.annotation_properties);
+                APEditor.restoreSelection();
+                break;
             case 'individuals':
                 main.innerHTML = IndividualEditor.renderSplit(this.state.individuals);
                 IndividualEditor.restoreSelection();
-                break;
-            case 'annotation-properties':
-                main.innerHTML = this._renderAnnotationProperties();
                 break;
             case 'swrl-rules':
                 main.innerHTML = SWRLEditor.renderSplit(this.state.swrl_rules || []);
@@ -379,165 +412,102 @@ const APP = {
         main.innerHTML = html;
     },
 
-    // ── Onglet Ontologies ────────────────────────────────────
+    // ── Ontologies tab ────────────────────────────────────
+
+    _selectedOntoName:    null,     // registry row currently selected (click)
+    _ontoImportExpanded:  null,     // Set of expanded import path keys (null = not yet init)
+
+    /** Returns the contextual virtual root labels based on the connected ontology's prefix */
+    getOntologyRootLabels() {
+        const prefix = this.state.ontology?.prefix || '';
+        if (prefix === 'rdf' || prefix === 'rdfs') {
+            return { classRoot: 'rdfs:Resource', propRoot: 'rdf:Property' };
+        }
+        return { classRoot: 'owl:Thing', propRoot: 'owl:topObjectProperty' };
+    },
 
     async renderOntologies() {
         const main = document.getElementById('main-content');
         main.innerHTML = this._renderOntologiesShell();
         try {
             const list = await API.listOntologies();
+            // Auto-select the connected ontology if nothing is manually selected
+            if (!this._selectedOntoName) {
+                const conn = list.find(o => o.connected);
+                if (conn) this._selectedOntoName = conn.name;
+            }
             this._refreshOntoTable(list);
         } catch (e) {
             const tbody = document.getElementById('onto-registry-body');
             if (tbody) tbody.innerHTML =
-                `<tr><td colspan="6" class="onto-table-empty">Impossible de charger le registre.</td></tr>`;
+                `<tr><td colspan="6" class="onto-table-empty">Unable to load the registry.</td></tr>`;
         }
     },
 
-    _refreshOntoTable(list) {
-        const tbody = document.getElementById('onto-registry-body');
-        const count = document.getElementById('onto-registry-count');
-        if (count) count.textContent = `${list.length} ontologie${list.length !== 1 ? 's' : ''}`;
-        if (!tbody) return;
-        if (!list.length) {
-            tbody.innerHTML = `<tr><td colspan="6" class="onto-table-empty">No ontologies in the registry — create one using the button above.</td></tr>`;
-            return;
-        }
-        tbody.innerHTML = list.map(o => {
-            const isConn = o.connected;
-            const safeName = o.name.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
-            const statusBadge = isConn
-                ? `<span class="onto-badge onto-badge-connected">● connected</span>`
-                : `<span class="onto-badge onto-badge-disconnected">○ disconnected</span>`;
-            const connectBtn = isConn
-                ? `<button class="btn-sm btn-warn" onclick="APP.doDisconnect()" title="Disconnect">⏏ Disconnect</button>`
-                : `<button class="btn-sm btn-edit" onclick="APP.doConnect('${safeName}')" title="Connect">▶ Connect</button>`;
-            // Afficher uniquement le dossier dans la colonne Path (pas le nom de fichier)
-            const displayPath = o.path.substring(0, o.path.lastIndexOf('/') + 1);
-            return `<tr class="${isConn ? 'onto-current-row' : ''}">
-                <td>${statusBadge}</td>
-                <td><strong>${o.name}</strong></td>
-                <td class="onto-iri-cell" title="${o.path}">${displayPath}</td>
-                <td><code>${o.prefix}</code></td>
-                <td><code>${o.uri}</code></td>
-                <td class="actions" style="white-space:nowrap">
-                    <button class="btn-sm" onclick="APP.doEditOntology('${safeName}')" title="Edit attributes">✏️</button>
-                    ${connectBtn}
-                    ${isConn ? `<button class="btn-sm" onclick="APP.exportOntology('owl')" title="Export OWL">↓ OWL</button>
-                    <button class="btn-sm" onclick="APP.exportOntology('ttl')" title="Export Turtle">↓ TTL</button>` : ''}
-                    <button class="btn-sm btn-del" onclick="APP.doUnregister('${safeName}')" title="Remove from registry">✕</button>
-                </td>
-            </tr>`;
-        }).join('');
+    toggleImportRow(path) {
+        if (!this._ontoImportExpanded) this._ontoImportExpanded = new Set();
+        if (this._ontoImportExpanded.has(path)) this._ontoImportExpanded.delete(path);
+        else this._ontoImportExpanded.add(path);
+        // Re-render only the table body (fast, no API call)
+        API.listOntologies().then(list => this._refreshOntoTable(list)).catch(() => {});
+    },
+
+    selectOntoRow(name) {
+        this._selectedOntoName = name;
+        document.querySelectorAll('#onto-registry-body tr').forEach(tr => {
+            tr.classList.toggle('onto-selected-row', tr.dataset.name === name);
+        });
     },
 
     _renderOntologiesShell() {
         return `
         <div class="onto-page">
-
             <div class="section-header">
-                <h2><svg width="18" height="15" viewBox="0 0 14 12" fill="currentColor" style="vertical-align:middle;margin-right:6px"><circle cx="7" cy="1.5" r="1.5"/><circle cx="1.5" cy="10.5" r="1.5"/><circle cx="12.5" cy="10.5" r="1.5"/><line x1="7" y1="3" x2="2.5" y2="9" stroke="currentColor" stroke-width="1"/><line x1="7" y1="3" x2="11.5" y2="9" stroke="currentColor" stroke-width="1"/><line x1="3" y1="10.5" x2="11" y2="10.5" stroke="currentColor" stroke-width="1"/></svg> Ontologies</h2>
-                <div class="section-actions">
-                    <button class="btn-primary" onclick="APP.toggleOntoPanel('onto-new-panel')">✨ New Ontology</button>
-                </div>
+                <h2>Ontologies</h2>
             </div>
 
-            <!-- ── New Ontology form ── -->
-            <div id="onto-new-panel" class="cls-frame onto-collapsible" style="display:none">
-                <div class="cls-frame-bar"><span class="cls-frame-tag">✨ New Ontology</span></div>
-                <div class="cls-frame-body" style="padding:12px;display:flex;flex-direction:column;gap:10px">
-                    <!-- Row 1 : Name + Path -->
-                    <div style="display:flex;gap:10px;flex-wrap:wrap">
-                        <div class="form-group" style="margin:0;flex:1;min-width:160px">
-                            <label>Name *</label>
-                            <input type="text" id="onto-new-name" placeholder="e.g. MyOntology" style="width:100%">
-                        </div>
-                        <div class="form-group" style="margin:0;flex:2;min-width:260px">
-                            <label>Path * <span style="font-size:10px;color:var(--text-dim)">(directory on your Mac)</span></label>
-                            <input type="text" id="onto-new-path" placeholder="Choose directory…"
-                                   style="width:100%;cursor:pointer"
-                                   onclick="FsBrowser.open('onto-new-path')"
-                                   readonly>
-                        </div>
-                    </div>
-                    <!-- Row 2 : Prefix + URI -->
-                    <div style="display:flex;gap:10px;flex-wrap:wrap">
-                        <div class="form-group" style="margin:0;flex:0 0 auto">
-                            <label>Prefix</label>
-                            <input type="text" id="onto-new-prefix" value="onto" style="width:90px">
-                        </div>
-                        <div class="form-group" style="margin:0;flex:2;min-width:260px">
-                            <label>URI (base IRI) *</label>
-                            <input type="text" id="onto-new-uri" placeholder="https://example.org/my-ontology" style="width:100%">
-                        </div>
-                    </div>
-                    <!-- Row 3 : optional import file -->
-                    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
-                        <div class="form-group" style="margin:0;flex:1;min-width:260px">
-                            <label>Import from file <span style="font-size:10px;color:var(--text-dim)">(optional — .owl / .ttl / .rdf)</span></label>
-                            <input type="text" id="onto-new-fname" placeholder="Choose file…"
-                                   style="width:100%;cursor:pointer"
-                                   onclick="FsBrowser.open('onto-new-fname', ['.owl','.ttl','.rdf','.xml','.json'])"
-                                   readonly>
-                        </div>
-                    </div>
-                    <div style="display:flex;gap:8px">
-                        <button class="btn-primary btn-sm" onclick="APP.doCreateOntology()">📋 Add to registry</button>
-                        <button class="btn-secondary btn-sm" onclick="APP.toggleOntoPanel('onto-new-panel')">Cancel</button>
-                    </div>
-                </div>
+            <!-- ── 3 wizard buttons ── -->
+            <div style="display:flex;gap:10px;padding:0 0 12px;flex-wrap:wrap">
+                <button class="btn-onto-action" onclick="APP._openWizard('new')">
+                    <span style="font-size:18px">✨</span>
+                    <span class="btn-onto-label">New Ontology</span>
+                    <span class="btn-onto-desc">Create a new empty ontology</span>
+                </button>
+                <button class="btn-onto-action" onclick="APP._openWizard('import')">
+                    <span style="font-size:18px">📥</span>
+                    <span class="btn-onto-label">Import Ontology</span>
+                    <span class="btn-onto-desc">From an existing .owl or .ttl file</span>
+                </button>
+                <button class="btn-onto-action" onclick="APP._openWizard('load')">
+                    <span style="font-size:18px">📂</span>
+                    <span class="btn-onto-label">Load Ontology</span>
+                    <span class="btn-onto-desc">From an existing .json file</span>
+                </button>
+                <button class="btn-onto-action" onclick="APP._fetchBuiltins()" id="btn-fetch-builtins">
+                    <span class="btn-onto-w3c-badge">W3C</span>
+                    <span class="btn-onto-label">Fetch W3C Ontologies</span>
+                    <span class="btn-onto-desc">Download RDF, RDFS, OWL from w3.org</span>
+                </button>
             </div>
 
-            <!-- ── Edit Ontology form (hidden by default) ── -->
-            <div id="onto-edit-panel" class="cls-frame onto-collapsible" style="display:none">
-                <div class="cls-frame-bar"><span class="cls-frame-tag">✏️ Edit Ontology</span></div>
-                <div class="cls-frame-body" style="padding:12px;display:flex;flex-direction:column;gap:10px">
-                    <input type="hidden" id="onto-edit-orig-name">
-                    <div style="display:flex;gap:10px;flex-wrap:wrap">
-                        <div class="form-group" style="margin:0;flex:1;min-width:160px">
-                            <label>Name *</label>
-                            <input type="text" id="onto-edit-name" style="width:100%">
-                        </div>
-                        <div class="form-group" style="margin:0;flex:2;min-width:260px">
-                            <label>Path * <span style="font-size:10px;color:var(--text-dim)">(directory)</span></label>
-                            <div style="display:flex;gap:4px">
-                                <input type="text" id="onto-edit-path" style="flex:1;min-width:0">
-                                <button class="btn-sm btn-secondary" onclick="FsBrowser.open('onto-edit-path')" title="Browse">📁</button>
-                            </div>
-                        </div>
-                    </div>
-                    <div style="display:flex;gap:10px;flex-wrap:wrap">
-                        <div class="form-group" style="margin:0;flex:0 0 auto">
-                            <label>Prefix</label>
-                            <input type="text" id="onto-edit-prefix" style="width:90px">
-                        </div>
-                        <div class="form-group" style="margin:0;flex:2;min-width:260px">
-                            <label>URI (base IRI) *</label>
-                            <input type="text" id="onto-edit-uri" style="width:100%">
-                        </div>
-                    </div>
-                    <div style="display:flex;gap:8px">
-                        <button class="btn-primary btn-sm" onclick="APP.doSaveEdit()">💾 Save changes</button>
-                        <button class="btn-secondary btn-sm" onclick="APP.toggleOntoPanel('onto-edit-panel')">Cancel</button>
-                    </div>
-                </div>
-            </div>
+            <!-- ── Wizard panel ── -->
+            <div id="onto-wizard" style="display:none;margin-bottom:12px"></div>
 
             <!-- ── Registry table ── -->
             <div class="cls-frame">
                 <div class="cls-frame-bar">
-                    <span class="cls-frame-tag">Ontology Registry</span>
+                    <span class="cls-frame-tag">Registry</span>
                     <span id="onto-registry-count" style="font-size:11px;color:var(--text-dim);margin-left:8px"></span>
                 </div>
                 <div class="cls-frame-body" style="padding:0;overflow:hidden">
                     <table class="entity-table onto-store-table">
                         <thead><tr>
-                            <th style="width:110px">Status</th>
+                            <th style="width:32px"></th>
                             <th>Name</th>
-                            <th>Path</th>
+                            <th>Directory</th>
                             <th style="width:70px">Prefix</th>
-                            <th>URI</th>
-                            <th style="width:180px"></th>
+                            <th>NAMESPACE</th>
+                            <th style="width:200px"></th>
                         </tr></thead>
                         <tbody id="onto-registry-body">
                             <tr><td colspan="6" class="onto-table-empty">Loading…</td></tr>
@@ -545,110 +515,468 @@ const APP = {
                     </table>
                 </div>
             </div>
-
         </div>`;
     },
 
-    // ── Actions Ontologies ───────────────────────────────────
-
-    toggleOntoPanel(id) {
-        const el = document.getElementById(id);
-        if (!el) return;
-        // Fermer les autres panneaux ouverts
-        ['onto-new-panel','onto-edit-panel'].forEach(pid => {
-            if (pid !== id) {
-                const other = document.getElementById(pid);
-                if (other) other.style.display = 'none';
-            }
-        });
-        const wasHidden = el.style.display === 'none';
-        el.style.display = wasHidden ? '' : 'none';
-        // Reset du formulaire New Ontology à chaque ouverture
-        if (wasHidden && id === 'onto-new-panel') {
-            ['onto-new-name','onto-new-path','onto-new-uri'].forEach(fid => {
-                const f = document.getElementById(fid);
-                if (f) f.value = '';
-            });
-            const d = document.getElementById('onto-new-prefix');
-            if (d) d.value = 'onto';
-            const fn = document.getElementById('onto-new-fname');
-            if (fn) fn.value = '';
-            this._importFilePath = null;
+    _refreshOntoTable(list) {
+        const tbody = document.getElementById('onto-registry-body');
+        const count = document.getElementById('onto-registry-count');
+        if (count) count.textContent = `${list.length} ontolog${list.length !== 1 ? 'ies' : 'y'}`;
+        if (!tbody) return;
+        if (!list.length) {
+            tbody.innerHTML = `<tr><td colspan="6" class="onto-table-empty">No ontologies yet — use a button above to get started.</td></tr>`;
+            return;
         }
+        // Sort: user ontologies first (alphabetical), then W3C builtins last in dependency order
+        const BUILTIN_ORDER = { 'owl': 1, 'rdfs': 2, 'rdf': 3 };
+        list = [...list].sort((a, b) => {
+            const aB = a.readonly ? (BUILTIN_ORDER[a.name] ?? 0) : -1;
+            const bB = b.readonly ? (BUILTIN_ORDER[b.name] ?? 0) : -1;
+            if (a.readonly !== b.readonly) return a.readonly ? 1 : -1;
+            if (a.readonly && b.readonly) return aB - bB;
+            return a.name.localeCompare(b.name);
+        });
+        // Resolve URI → registry entry (handles trailing # or not)
+        const resolveImport = (uri) =>
+            list.find(x => x.uri === uri || x.uri === uri + '#'
+                        || uri === x.uri + '#' || uri === x.uri);
+
+        if (!this._ontoImportExpanded) this._ontoImportExpanded = new Set();
+
+        // Recursively render import sub-rows with collapsible toggle
+        const renderImportRows = (uri, depth, parentPath, visited = new Set()) => {
+            if (visited.has(uri)) return '';
+            visited = new Set([...visited, uri]);
+            const entry      = resolveImport(uri);
+            const name       = entry ? entry.name   : uri;
+            const prefix     = entry ? entry.prefix : '';
+            const subImports = entry ? (entry.imports || []) : [];
+            const hasKids    = subImports.length > 0;
+            const path       = parentPath + '/' + name;
+            const safeP      = path.replace(/'/g, "\\'");
+            const safeN      = name.replace(/'/g, "\\'");
+            const isExpanded = this._ontoImportExpanded.has(path);
+            const indent     = depth * 20 + 12;
+            const toggle     = hasKids
+                ? `<span class="onto-import-toggle" onclick="event.stopPropagation();APP.toggleImportRow('${safeP}')"
+                         style="cursor:pointer;margin-right:4px;display:inline-block;width:12px;text-align:center;opacity:0.6">
+                       ${isExpanded ? '▼' : '▶'}
+                   </span>`
+                : `<span style="display:inline-block;width:16px;margin-right:4px;opacity:0.4">↳</span>`;
+            const row = `
+            <tr class="onto-import-subrow" data-path="${path}">
+                <td></td>
+                <td colspan="4" style="padding-left:${indent}px;font-size:11px;color:var(--text-dim)">
+                    ${toggle}
+                    <span class="${entry ? 'onto-import-link' : ''}"
+                          ${entry ? `onclick="event.stopPropagation();APP._scrollToRegistryRow('${safeN}')" title="Go to ${name}"` : ''}>
+                        <code style="color:var(--text2)">${prefix ? prefix + ':' : ''}</code>
+                        <span style="font-style:italic">${name}</span>
+                    </span>
+                </td>
+                <td></td>
+            </tr>`;
+            const children = hasKids && isExpanded
+                ? subImports.map(u => renderImportRows(u, depth + 1, path, visited)).join('')
+                : '';
+            return row + children;
+        };
+
+        tbody.innerHTML = list.map(o => {
+            const isConn     = o.connected;
+            const isReadonly = o.readonly;
+            const safe       = o.name.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+            const dot        = isConn
+                ? `<span title="Connected" style="color:#4ade80;font-size:14px">●</span>`
+                : `<span title="Disconnected" style="color:var(--text-faint);font-size:14px">○</span>`;
+            const connBtn    = isConn
+                ? `<button class="btn-sm btn-warn" onclick="APP.doDisconnect()" title="Disconnect">⏏ Disconnect</button>`
+                : `<button class="btn-sm btn-edit" onclick="APP.doConnect('${safe}')" title="Connect">▶ Connect</button>`;
+            const dirPath    = o.path.substring(0, o.path.lastIndexOf('/') + 1);
+            const actions    = isReadonly
+                ? `${connBtn}
+                   <span title="Read-only W3C ontology" style="font-size:13px;opacity:0.5;margin-left:2px">🔒</span>`
+                : `<button class="btn-sm" onclick="APP.doEditOntology('${safe}')" title="Edit attributes">✏️</button>
+                   ${connBtn}
+                   <button class="btn-sm" onclick="APP._ontoExportDropdown(this,'${safe}','onto')" title="Export ontology">↓ Ontology</button>
+                   <button class="btn-sm" onclick="APP._ontoExportDropdown(this,'${safe}','rules')" title="Export rules">↓ Rules</button>
+                   <button class="btn-sm btn-del" onclick="APP.doUnregister('${safe}')" title="Remove from registry">✕</button>`;
+            // Every user ontology implicitly imports OWL (unless already declared or readonly)
+            const effectiveImports = o.readonly
+                ? (o.imports || [])
+                : (o.imports || []).length
+                    ? o.imports
+                    : ['http://www.w3.org/2002/07/owl#'];
+            const importRows = effectiveImports.map(u => renderImportRows(u, 1, o.name)).join('');
+            const isSel = o.name === this._selectedOntoName;
+            return `<tr data-name="${o.name}" onclick="APP.selectOntoRow('${safe}')" style="cursor:pointer"
+                class="${isConn ? 'onto-current-row' : ''}${isReadonly ? ' onto-readonly-row' : ''}${isSel ? ' onto-selected-row' : ''}">
+                <td style="text-align:center">${dot}</td>
+                <td><strong>${o.name}</strong>${isReadonly ? ' <span style="font-size:10px;color:var(--text-faint);font-style:italic">W3C</span>' : ''}</td>
+                <td class="onto-iri-cell onto-path-cell"
+                    title="Click to open in Finder"
+                    onclick="API.revealInFinder('${o.path.replace(/'/g,"\\'")}').catch(e=>UI.warn('Start host_agent.py to enable Finder reveal.'))"
+                    style="font-size:11px;color:var(--text-dim);cursor:pointer">${dirPath}</td>
+                <td><code>${o.prefix}</code></td>
+                <td class="onto-iri-cell"><code style="font-size:11px">${o.uri}</code></td>
+                <td style="white-space:nowrap">
+                    <div style="display:flex;gap:4px;align-items:center;justify-content:flex-end">
+                        ${actions}
+                    </div>
+                </td>
+            </tr>${importRows}`;
+        }).join('');
     },
 
+    // ── Wizard ────────────────────────────────────────────────
 
+    _openWizard(type) {
+        const panel = document.getElementById('onto-wizard');
+        if (!panel) return;
+        // Toggle off if same wizard already open
+        if (panel.dataset.type === type && panel.style.display !== 'none') {
+            panel.style.display = 'none';
+            panel.dataset.type  = '';
+            return;
+        }
+        panel.dataset.type  = type;
+        panel.style.display = '';
+        if (type === 'new')    panel.innerHTML = this._wizardNew();
+        if (type === 'import') panel.innerHTML = this._wizardImport();
+        if (type === 'load')   panel.innerHTML = this._wizardLoad();
+        // 'edit' fills the panel itself via doEditOntology()
+    },
 
-    async doCreateOntology() {
-        const name   = document.getElementById('onto-new-name')?.value.trim();
-        const dir    = document.getElementById('onto-new-path')?.value.trim();
-        const uri    = document.getElementById('onto-new-uri')?.value.trim();
-        const prefix = document.getElementById('onto-new-prefix')?.value.trim() || 'onto';
+    _closeWizard() {
+        const panel = document.getElementById('onto-wizard');
+        if (panel) { panel.style.display = 'none'; panel.dataset.type = ''; }
+    },
+
+    _wizardNew() {
+        return `
+        <div class="cls-frame">
+            <div class="cls-frame-bar">
+                <span class="cls-frame-tag">✨ New Ontology</span>
+                <button class="btn-frame-del" onclick="APP._closeWizard()" style="margin-left:auto">✕</button>
+            </div>
+            <div class="cls-frame-body" style="padding:14px;display:flex;flex-direction:column;gap:10px">
+                <div style="display:flex;gap:10px;flex-wrap:wrap">
+                    <div class="form-group" style="margin:0;flex:1;min-width:160px">
+                        <label>Name <span class="form-req">*</span></label>
+                        <div style="display:flex;align-items:center;gap:4px">
+                            <input type="text" id="wiz-new-name" placeholder="MyOntology" style="flex:1;min-width:0">
+                            <span style="font-size:11px;color:var(--text-dim);font-family:var(--font-mono)">.json</span>
+                        </div>
+                    </div>
+                    <div class="form-group" style="margin:0;flex:2;min-width:260px">
+                        <label>Directory <span class="form-req">*</span></label>
+                        <input type="text" id="wiz-new-dir" placeholder="Choose directory…"
+                               style="width:100%;cursor:pointer" readonly
+                               onclick="FsBrowser.open('wiz-new-dir')">
+                    </div>
+                </div>
+                <div style="display:flex;gap:10px;flex-wrap:wrap">
+                    <div class="form-group" style="margin:0;flex:0 0 100px">
+                        <label>Prefix</label>
+                        <input type="text" id="wiz-new-prefix" value="onto" style="width:100%">
+                    </div>
+                    <div class="form-group" style="margin:0;flex:2;min-width:260px">
+                        <label>Namespace (base URI) <span class="form-req">*</span></label>
+                        <input type="text" id="wiz-new-uri" placeholder="https://example.org/my-ontology" style="width:100%">
+                    </div>
+                </div>
+                <div style="display:flex;gap:10px;align-items:center">
+                    <button class="btn-primary btn-sm" onclick="APP._doNew()">Add to Registry</button>
+                    <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer">
+                        <input type="checkbox" id="wiz-new-connect" checked> Connect immediately
+                    </label>
+                    <button class="btn-secondary btn-sm" onclick="APP._closeWizard()">Cancel</button>
+                </div>
+            </div>
+        </div>`;
+    },
+
+    _wizardImport() {
+        return `
+        <div class="cls-frame">
+            <div class="cls-frame-bar">
+                <span class="cls-frame-tag">📥 Import Ontology — .owl / .ttl</span>
+                <button class="btn-frame-del" onclick="APP._closeWizard()" style="margin-left:auto">✕</button>
+            </div>
+            <div class="cls-frame-body" style="padding:14px;display:flex;flex-direction:column;gap:10px">
+                <!-- Step 1: source file -->
+                <div class="form-group" style="margin:0">
+                    <label>Source file <span style="font-size:10px;color:var(--text-dim)">(.owl / .ttl / .rdf)</span> <span class="form-req">*</span></label>
+                    <input type="text" id="wiz-imp-src" placeholder="Choose source file…"
+                           style="width:100%;cursor:pointer" readonly
+                           onclick="FsBrowser.open('wiz-imp-src',['.owl','.ttl','.rdf','.xml'])">
+                </div>
+                <button class="btn-secondary btn-sm" style="align-self:flex-start"
+                        onclick="APP._wizardImportPeek()">🔍 Read Prefix &amp; URI from file</button>
+                <!-- Step 2: auto-filled fields -->
+                <div style="display:flex;gap:10px;flex-wrap:wrap">
+                    <div class="form-group" style="margin:0;flex:0 0 100px">
+                        <label>Prefix</label>
+                        <input type="text" id="wiz-imp-prefix" value="onto" style="width:100%">
+                    </div>
+                    <div class="form-group" style="margin:0;flex:2;min-width:260px">
+                        <label>Namespace (base URI) <span class="form-req">*</span></label>
+                        <input type="text" id="wiz-imp-uri" placeholder="auto-detected…" style="width:100%">
+                    </div>
+                </div>
+                <!-- Step 3: destination -->
+                <div style="display:flex;gap:10px;flex-wrap:wrap">
+                    <div class="form-group" style="margin:0;flex:1;min-width:160px">
+                        <label>Name <span class="form-req">*</span></label>
+                        <div style="display:flex;align-items:center;gap:4px">
+                            <input type="text" id="wiz-imp-name" placeholder="MyOntology" style="flex:1;min-width:0">
+                            <span style="font-size:11px;color:var(--text-dim);font-family:var(--font-mono)">.json</span>
+                        </div>
+                    </div>
+                    <div class="form-group" style="margin:0;flex:2;min-width:260px">
+                        <label>Directory <span class="form-req">*</span></label>
+                        <input type="text" id="wiz-imp-dir" placeholder="Choose directory…"
+                               style="width:100%;cursor:pointer" readonly
+                               onclick="FsBrowser.open('wiz-imp-dir')">
+                    </div>
+                </div>
+                <div style="display:flex;gap:10px;align-items:center">
+                    <button class="btn-primary btn-sm" onclick="APP._doImport()">Import &amp; Register</button>
+                    <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer">
+                        <input type="checkbox" id="wiz-imp-connect" checked> Connect immediately
+                    </label>
+                    <button class="btn-secondary btn-sm" onclick="APP._closeWizard()">Cancel</button>
+                </div>
+            </div>
+        </div>`;
+    },
+
+    _wizardLoad() {
+        return `
+        <div class="cls-frame">
+            <div class="cls-frame-bar">
+                <span class="cls-frame-tag">📂 Load Ontology — .json</span>
+                <button class="btn-frame-del" onclick="APP._closeWizard()" style="margin-left:auto">✕</button>
+            </div>
+            <div class="cls-frame-body" style="padding:14px;display:flex;flex-direction:column;gap:10px">
+                <div class="form-group" style="margin:0">
+                    <label>Source file (.json) <span class="form-req">*</span></label>
+                    <input type="text" id="wiz-load-src" placeholder="Choose .json file…"
+                           style="width:100%;cursor:pointer" readonly
+                           onclick="FsBrowser.open('wiz-load-src',['.json'])">
+                </div>
+                <button class="btn-secondary btn-sm" style="align-self:flex-start"
+                        onclick="APP._wizardLoadPeek()">🔍 Read info from file</button>
+                <div style="display:flex;gap:10px;flex-wrap:wrap">
+                    <div class="form-group" style="margin:0;flex:1;min-width:160px">
+                        <label>Name <span class="form-req">*</span></label>
+                        <input type="text" id="wiz-load-name" placeholder="auto-detected…" style="width:100%">
+                    </div>
+                    <div class="form-group" style="margin:0;flex:0 0 100px">
+                        <label>Prefix</label>
+                        <input type="text" id="wiz-load-prefix" placeholder="auto-detected…" style="width:100%">
+                    </div>
+                    <div class="form-group" style="margin:0;flex:2;min-width:260px">
+                        <label>Namespace (base URI)</label>
+                        <input type="text" id="wiz-load-uri" placeholder="auto-detected…" style="width:100%">
+                    </div>
+                </div>
+                <div style="display:flex;gap:10px;align-items:center">
+                    <button class="btn-primary btn-sm" onclick="APP._doLoad()">Load &amp; Register</button>
+                    <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer">
+                        <input type="checkbox" id="wiz-load-connect" checked> Connect immediately
+                    </label>
+                    <button class="btn-secondary btn-sm" onclick="APP._closeWizard()">Cancel</button>
+                </div>
+            </div>
+        </div>`;
+    },
+
+    // ── Wizard actions ────────────────────────────────────────
+
+    async _doNew() {
+        const name   = document.getElementById('wiz-new-name')?.value.trim();
+        const dir    = document.getElementById('wiz-new-dir')?.value.trim();
+        const prefix = document.getElementById('wiz-new-prefix')?.value.trim() || 'onto';
+        const uri    = document.getElementById('wiz-new-uri')?.value.trim();
+        const conn   = document.getElementById('wiz-new-connect')?.checked;
         if (!name) return UI.error('Name is required.');
-        if (!dir)  return UI.error('Path is required.');
+        if (!dir)  return UI.error('Directory is required.');
         if (!uri)  return UI.error('URI is required.');
-        // Construire le chemin complet : dossier + nom.json
         const path = dir.replace(/\/$/, '') + '/' + name + '.json';
         try {
-            if (this._importFilePath) {
-                // Import depuis chemin filesystem (enregistre sans connecter)
-                await API.importFromPath({ name, owl_path: this._importFilePath, save_path: path, uri, prefix });
-                // Déconnecter après import (import-from-path connecte automatiquement côté backend)
-                await API.disconnectOntology();
-                UI.success(`Ontology "${name}" added to registry.`);
-                this._importFilePath = null;
-            } else {
-                // Create from scratch : enregistrer uniquement
-                await API.registerOntology({ name, path, uri, prefix });
-                UI.success(`Ontology "${name}" added to registry.`);
-            }
+            await API.registerOntology({ name, path, uri, prefix });
+            UI.success(`Ontology "${name}" added to registry.`);
+            if (conn) await API.connectOntology(name);
+            this._closeWizard();
+            await this.refresh();
+            this.renderOntologies();
+        } catch (e) { UI.error(e.message); }
+    },
+
+    async _wizardImportPeek() {
+        const src = document.getElementById('wiz-imp-src')?.value.trim();
+        if (!src) return UI.warn('Please select a source file first.');
+        try {
+            const info = await API.peekOntology(src);
+            const nameInp   = document.getElementById('wiz-imp-name');
+            const prefixInp = document.getElementById('wiz-imp-prefix');
+            const uriInp    = document.getElementById('wiz-imp-uri');
+            if (nameInp   && !nameInp.value)   nameInp.value   = info.name   || '';
+            if (prefixInp) prefixInp.value = info.prefix || 'onto';
+            if (uriInp)    uriInp.value    = info.uri    || '';
+            UI.success('Prefix & URI read from file.');
+        } catch (e) { UI.error(`Cannot read file: ${e.message}`); }
+    },
+
+    async _doImport() {
+        const src    = document.getElementById('wiz-imp-src')?.value.trim();
+        const name   = document.getElementById('wiz-imp-name')?.value.trim();
+        const dir    = document.getElementById('wiz-imp-dir')?.value.trim();
+        const prefix = document.getElementById('wiz-imp-prefix')?.value.trim() || 'onto';
+        const uri    = document.getElementById('wiz-imp-uri')?.value.trim();
+        const conn   = document.getElementById('wiz-imp-connect')?.checked;
+        if (!src)  return UI.error('Source file is required.');
+        if (!name) return UI.error('Name is required.');
+        if (!dir)  return UI.error('Destination directory is required.');
+        if (!uri)  return UI.error('URI is required — use 🔍 to auto-detect or enter manually.');
+        const savePath = dir.replace(/\/$/, '') + '/' + name + '.json';
+        try {
+            await API.importFromPath({ name, owl_path: src, save_path: savePath, uri, prefix });
+            if (!conn) await API.disconnectOntology();
+            UI.success(`Ontology "${name}" imported & registered.`);
+            this._closeWizard();
+            await this.refresh();
+            this.renderOntologies();
+        } catch (e) { UI.error(e.message); }
+    },
+
+    async _wizardLoadPeek() {
+        const src = document.getElementById('wiz-load-src')?.value.trim();
+        if (!src) return UI.warn('Please select a .json file first.');
+        try {
+            const info = await API.peekOntology(src);
+            const set = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ''; };
+            set('wiz-load-name',   info.name);
+            set('wiz-load-prefix', info.prefix);
+            set('wiz-load-uri',    info.uri);
+            UI.success('Info read from file.');
+        } catch (e) { UI.error(`Cannot read file: ${e.message}`); }
+    },
+
+    async _doLoad() {
+        const src    = document.getElementById('wiz-load-src')?.value.trim();
+        const name   = document.getElementById('wiz-load-name')?.value.trim();
+        const prefix = document.getElementById('wiz-load-prefix')?.value.trim() || 'onto';
+        const uri    = document.getElementById('wiz-load-uri')?.value.trim();
+        const conn   = document.getElementById('wiz-load-connect')?.checked;
+        if (!src)  return UI.error('Please select a .json file.');
+        if (!name) return UI.error('Name is required — use 🔍 to auto-detect.');
+        try {
+            await API.registerJson(src, name, uri, prefix);
+            UI.success(`Ontology "${name}" loaded & registered.`);
+            if (conn) await API.connectOntology(name);
+            this._closeWizard();
             await this.refresh();
             this.renderOntologies();
         } catch (e) { UI.error(e.message); }
     },
 
     doEditOntology(name) {
-        // Récupérer l'entrée dans la liste affichée
         API.listOntologies().then(list => {
             const o = list.find(e => e.name === name);
             if (!o) return;
-            document.getElementById('onto-edit-orig-name').value = o.name;
-            document.getElementById('onto-edit-name').value    = o.name;
-            // Afficher le dossier (sans le nom de fichier)
-            const dir = o.path.substring(0, o.path.lastIndexOf('/') + 1);
-            document.getElementById('onto-edit-path').value   = dir;
-            document.getElementById('onto-edit-prefix').value = o.prefix;
-            document.getElementById('onto-edit-uri').value    = o.uri;
-            // Ouvrir le panel (ferme les autres)
-            ['onto-new-panel'].forEach(pid => {
-                const p = document.getElementById(pid);
-                if (p) p.style.display = 'none';
-            });
-            const panel = document.getElementById('onto-edit-panel');
-            if (panel) panel.style.display = '';
-            panel?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            this._openWizard('edit');
+            const panel = document.getElementById('onto-wizard');
+            if (!panel) return;
+            panel.innerHTML = `
+            <div class="cls-frame">
+                <div class="cls-frame-bar">
+                    <span class="cls-frame-tag">✏️ Edit — ${o.name}</span>
+                    <button class="btn-frame-del" onclick="APP._closeWizard()" style="margin-left:auto">✕</button>
+                </div>
+                <div class="cls-frame-body" style="padding:14px;display:flex;flex-direction:column;gap:10px">
+                    <input type="hidden" id="wiz-edit-orig" value="${o.name.replace(/"/g,'&quot;')}">
+                    <div style="display:flex;gap:10px;flex-wrap:wrap">
+                        <div class="form-group" style="margin:0;flex:1;min-width:160px">
+                            <label>Name <span class="form-req">*</span></label>
+                            <input type="text" id="wiz-edit-name" value="${o.name.replace(/"/g,'&quot;')}" style="width:100%">
+                        </div>
+                        <div class="form-group" style="margin:0;flex:2;min-width:260px">
+                            <label>Directory <span class="form-req">*</span></label>
+                            <input type="text" id="wiz-edit-dir"
+                                   value="${o.path.substring(0, o.path.lastIndexOf('/')+1).replace(/"/g,'&quot;')}"
+                                   style="width:100%;cursor:pointer" readonly
+                                   onclick="FsBrowser.open('wiz-edit-dir')">
+                        </div>
+                    </div>
+                    <div style="display:flex;gap:10px;flex-wrap:wrap">
+                        <div class="form-group" style="margin:0;flex:0 0 100px">
+                            <label>Prefix</label>
+                            <input type="text" id="wiz-edit-prefix" value="${o.prefix.replace(/"/g,'&quot;')}" style="width:100%">
+                        </div>
+                        <div class="form-group" style="margin:0;flex:2;min-width:260px">
+                            <label>Namespace (base URI) <span class="form-req">*</span></label>
+                            <input type="text" id="wiz-edit-uri" value="${o.uri.replace(/"/g,'&quot;')}" style="width:100%">
+                        </div>
+                    </div>
+                    <div style="display:flex;gap:8px;align-items:center">
+                        <button class="btn-primary btn-sm" onclick="APP.doSaveEdit()">💾 Save changes</button>
+                        <button class="btn-secondary btn-sm" onclick="APP._closeWizard()">Cancel</button>
+                    </div>
+                </div>
+            </div>`;
         }).catch(e => UI.error(e.message));
     },
 
     async doSaveEdit() {
-        const origName = document.getElementById('onto-edit-orig-name')?.value.trim();
-        const name     = document.getElementById('onto-edit-name')?.value.trim();
-        const dir      = document.getElementById('onto-edit-path')?.value.trim();
-        const prefix   = document.getElementById('onto-edit-prefix')?.value.trim() || 'onto';
-        const uri      = document.getElementById('onto-edit-uri')?.value.trim();
-        if (!name)  return UI.error('Name is required.');
-        if (!dir)   return UI.error('Path is required.');
-        if (!uri)   return UI.error('URI is required.');
-        // Reconstruire le chemin complet (dir + nom original de fichier si même nom, sinon name.json)
-        const filename = name + '.json';
-        const path = dir.replace(/\/$/, '') + '/' + filename;
+        const origName = document.getElementById('wiz-edit-orig')?.value.trim();
+        const name     = document.getElementById('wiz-edit-name')?.value.trim();
+        const dir      = document.getElementById('wiz-edit-dir')?.value.trim();
+        const prefix   = document.getElementById('wiz-edit-prefix')?.value.trim() || 'onto';
+        const uri      = document.getElementById('wiz-edit-uri')?.value.trim();
+        if (!name) return UI.error('Name is required.');
+        if (!dir)  return UI.error('Directory is required.');
+        if (!uri)  return UI.error('URI is required.');
+        const path = dir.replace(/\/$/, '') + '/' + name + '.json';
         try {
             await API.updateOntologyEntry(origName, { name, path, uri, prefix });
             UI.success(`Ontology "${name}" updated.`);
-            document.getElementById('onto-edit-panel').style.display = 'none';
+            this._closeWizard();
             await this.refresh();
             this.renderOntologies();
         } catch (e) { UI.error(e.message); }
+    },
+
+    _scrollToRegistryRow(name) {
+        const rows = document.querySelectorAll('#onto-registry-body tr[data-name]');
+        for (const row of rows) {
+            if (row.dataset.name === name) {
+                row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                // Flash via outline — n'interfère pas avec le background persistant
+                row.style.outline = '2px solid var(--accent)';
+                row.style.outlineOffset = '-2px';
+                setTimeout(() => { row.style.outline = ''; row.style.outlineOffset = ''; }, 1500);
+                return;
+            }
+        }
+    },
+
+    async _fetchBuiltins() {
+        const btn = document.getElementById('btn-fetch-builtins');
+        if (btn) btn.disabled = true;
+        UI.success('Fetching W3C ontologies… this may take a few seconds.');
+        try {
+            const res = await API.fetchBuiltins();
+            const fetched = res.results.filter(r => r.status.includes('fetched')).length;
+            UI.success(`Done — ${fetched} ontology(ies) fetched & registered.`);
+            await this.refresh();
+            this.renderOntologies();
+        } catch (e) {
+            UI.error(`Fetch failed: ${e.message}`);
+        } finally {
+            if (btn) btn.disabled = false;
+        }
     },
 
     async doConnect(name) {
@@ -688,10 +1016,52 @@ const APP = {
             a.download = `ontology.${fmt === 'owl' ? 'owl' : fmt === 'ttl' ? 'ttl' : 'jsonld'}`;
             a.click();
             URL.revokeObjectURL(url);
-        } catch (e) { UI.error(`Erreur d'export : ${e.message}`); }
+        } catch (e) { UI.error(`Export error: ${e.message}`); }
     },
 
-    // ── Helpers sections ─────────────────────────────────────
+    _ontoExportDropdown(btn, name, kind) {
+        document.getElementById('onto-export-dd')?.remove();
+        const rect = btn.getBoundingClientRect();
+        const dd = document.createElement('div');
+        dd.id = 'onto-export-dd';
+        dd.style.cssText = `position:fixed;z-index:9999;background:var(--bg2);border:1px solid var(--border);
+            border-radius:4px;box-shadow:0 4px 12px rgba(0,0,0,.3);min-width:130px;
+            top:${rect.bottom+2}px;left:${rect.left}px;overflow:hidden`;
+        const items = kind === 'onto'
+            ? [{ label: '↓ OWL (.owl)', fmt: 'owl' }, { label: '↓ Turtle (.ttl)', fmt: 'ttl' }]
+            : [{ label: '↓ SWRL (.json)', fmt: 'swrl' }, { label: '↓ SWORD (.sword)', fmt: 'sword' }];
+        items.forEach(({ label, fmt }) => {
+            const item = document.createElement('div');
+            item.textContent = label;
+            item.style.cssText = 'padding:7px 14px;cursor:pointer;font-size:12px';
+            item.onmouseenter = () => item.style.background = 'var(--bg3)';
+            item.onmouseleave = () => item.style.background = '';
+            item.onclick = () => { dd.remove(); APP.exportOntologyByName(name, fmt); };
+            dd.appendChild(item);
+        });
+        document.body.appendChild(dd);
+        const close = (e) => {
+            if (!dd.contains(e.target) && e.target !== btn) {
+                dd.remove(); document.removeEventListener('click', close, true);
+            }
+        };
+        setTimeout(() => document.addEventListener('click', close, true), 0);
+    },
+
+    async exportOntologyByName(name, fmt) {
+        try {
+            const blob = await API.exportOntologyByName(name, fmt);
+            const ext  = fmt === 'owl' ? 'owl' : fmt === 'ttl' ? 'ttl' : fmt === 'swrl' ? 'json' : fmt === 'sword' ? 'sword' : 'jsonld';
+            const url  = URL.createObjectURL(blob);
+            const a    = document.createElement('a');
+            a.href     = url;
+            a.download = `${name}.${ext}`;
+            a.click();
+            URL.revokeObjectURL(url);
+        } catch (e) { UI.error(`Export error: ${e.message}`); }
+    },
+
+    // ── Section helpers ─────────────────────────────────────
 
     _renderAnnotationProperties() {
         const groups = [
@@ -811,9 +1181,9 @@ const UI = {
 
 const FsBrowser = {
     _targetFieldId: null,
-    _currentPath: '/Users/bernard/AppData',
+    _currentPath: '/Users/bernard',
     _pendingFilename: '',   // filename typed in the bottom bar
-    _fileTypes: null,       // extensions acceptées (null = .json uniquement)
+    _fileTypes: null,       // accepted extensions (null = .json only)
 
     open(targetFieldId, fileTypes = null) {
         this._fileTypes = fileTypes;
@@ -829,7 +1199,7 @@ const FsBrowser = {
             this._currentPath = parts.join('/') || '/Users/bernard/AppData';
             this._pendingFilename = current.split('/').pop() || '';
         } else {
-            this._currentPath = '/Users/bernard/AppData';
+            this._currentPath = '/Users/bernard';
             this._pendingFilename = '';
         }
         this._renderModal();
@@ -852,7 +1222,7 @@ const FsBrowser = {
                     <div class="fs-loading">Loading…</div>
                 </div>
                 <div class="fs-browser-footer">
-                    ${this._targetFieldId === 'onto-new-fname'
+                    ${this._fileTypes !== null
                         ? `<span style="font-size:10px;color:var(--text-dim);white-space:nowrap">File:</span>
                            <code style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;color:var(--text2)" id="fs-selected-path">— select a file —</code>
                            <button class="btn-primary btn-sm" id="fs-select-btn" disabled
@@ -912,7 +1282,9 @@ const FsBrowser = {
             data.files.forEach(f => {
                 const safePath = f.path.replace(/'/g, "\\'");
                 const safeName = f.name.replace(/'/g, "\\'");
-                html += `<div class="fs-item fs-item-file" onclick="FsBrowser._selectFile('${safePath}','${safeName}',this)">
+                html += `<div class="fs-item fs-item-file"
+                              onclick="FsBrowser._selectFile('${safePath}','${safeName}',this)"
+                              ondblclick="FsBrowser._selectFile('${safePath}','${safeName}',this);FsBrowser.confirm()">
                     <span class="fs-icon">📄</span><span>${f.name}</span></div>`;
             });
             if (!html) html = '<div class="fs-loading" style="color:var(--text-dim)">Empty folder</div>';
@@ -925,54 +1297,35 @@ const FsBrowser = {
         }
     },
 
-    _selectedFile: null,   // { name, dir } du fichier cliqué
+    _selectedFile: null,   // { name, dir } of the clicked file
 
     _selectFile(path, name, el) {
-        this._selectedFile = { name, dir: this._currentPath };
+        this._selectedFile = { path, name, dir: this._currentPath };
         // Highlight
         document.querySelectorAll('.fs-item').forEach(e => e.classList.remove('fs-item-selected'));
         el.classList.add('fs-item-selected');
-        // Mode fichier : activer le bouton et afficher le nom du fichier
-        if (this._targetFieldId === 'onto-new-fname') {
+        // File mode: enable the button and show the filename
+        if (this._fileTypes !== null) {
             const selPath = document.getElementById('fs-selected-path');
-            if (selPath) selPath.textContent = name;
+            if (selPath) selPath.textContent = path;
             const btn = document.getElementById('fs-select-btn');
             if (btn) btn.disabled = false;
         }
     },
 
     confirm(dirFromBtn) {
-        // dirFromBtn est passé directement depuis le data-dir du bouton — source fiable
-        let dirPath = (dirFromBtn || this._currentPath + '/').replace(/\/$/, '') + '/';
-
+        // dirFromBtn is passed directly from the button's data-dir — reliable source
         const pathField = document.getElementById(this._targetFieldId);
-        const owlExts = ['.owl','.ttl','.rdf','.xml'];
 
-        if (this._selectedFile) {
-            const fname = this._selectedFile.name;
-            const isOwl = owlExts.some(e => fname.toLowerCase().endsWith(e));
-            const fullFilePath = this._currentPath.replace(/\/$/, '') + '/' + fname;
-
-            if (this._targetFieldId === 'onto-new-fname' && isOwl) {
-                // Import from file : chemin complet du fichier OWL
-                if (pathField) pathField.value = fullFilePath;
-                APP._importFilePath = fullFilePath;
-                // Auto-remplir Name et URI si vides
-                const base = fname.replace(/\.\w+$/, '');
-                const nameF = document.getElementById('onto-new-name');
-                if (nameF && !nameF.value.trim()) nameF.value = base;
-                const uriF = document.getElementById('onto-new-uri');
-                if (uriF && !uriF.value.trim()) uriF.value = `https://example.org/${base}`;
-            } else {
-                // Path (dossier) : on injecte le dossier + pré-remplit Name
-                if (pathField) pathField.value = dirPath;
-                const nameField = document.getElementById('onto-new-name');
-                if (nameField && !nameField.value.trim())
-                    nameField.value = fname.replace(/\.\w+$/, '');
-            }
+        if (this._fileTypes !== null) {
+            // ── File picker mode ──────────────────────────────
+            if (!this._selectedFile) return; // nothing selected, stay open
+            const fullPath = this._selectedFile.path;
+            if (pathField) pathField.value = fullPath;
             this._selectedFile = null;
         } else {
-            // Pas de fichier sélectionné : injecter le dossier courant
+            // ── Folder picker mode ────────────────────────────
+            const dirPath = (dirFromBtn || this._currentPath + '/').replace(/\/$/, '') + '/';
             if (pathField) pathField.value = dirPath;
         }
         this.close();
@@ -990,6 +1343,288 @@ window.addEventListener('DOMContentLoaded', () => {
     APP.init();
 
 });
+
+// ── Undo / Redo ───────────────────────────────────────────────
+
+const UndoRedo = {
+    _past:   [],   // snapshots avant mutation
+    _future: [],   // snapshots annulés
+    _MAX:    20,
+
+    /** Capture l'état courant avant une mutation (appelé par api.js) */
+    snapshot() {
+        const s = APP.state;
+        if (!s.ontology) return;
+        const snap = JSON.parse(JSON.stringify({
+            classes:             s.classes             || [],
+            object_properties:   s.object_properties   || [],
+            datatype_properties: s.datatype_properties || [],
+            individuals:         s.individuals         || [],
+            swrl_rules:          s.swrl_rules          || [],
+        }));
+        this._past.push(snap);
+        if (this._past.length > this._MAX) this._past.shift();
+        this._future = [];
+        this._updateButtons();
+    },
+
+    async undo() {
+        if (!this._past.length) return;
+        const snap = this._past.pop();
+        // Sauvegarder l'état actuel dans future
+        const s = APP.state;
+        this._future.push(JSON.parse(JSON.stringify({
+            classes:             s.classes             || [],
+            object_properties:   s.object_properties   || [],
+            datatype_properties: s.datatype_properties || [],
+            individuals:         s.individuals         || [],
+            swrl_rules:          s.swrl_rules          || [],
+        })));
+        try {
+            await API.restoreSnapshot(snap);
+            await APP.refresh();
+            APP.renderSection(APP.currentSection);
+            UI.success('Undo ✓');
+        } catch (e) { UI.error('Undo failed: ' + e.message); }
+        this._updateButtons();
+    },
+
+    async redo() {
+        if (!this._future.length) return;
+        const snap = this._future.pop();
+        const s = APP.state;
+        this._past.push(JSON.parse(JSON.stringify({
+            classes:             s.classes             || [],
+            object_properties:   s.object_properties   || [],
+            datatype_properties: s.datatype_properties || [],
+            individuals:         s.individuals         || [],
+            swrl_rules:          s.swrl_rules          || [],
+        })));
+        try {
+            await API.restoreSnapshot(snap);
+            await APP.refresh();
+            APP.renderSection(APP.currentSection);
+            UI.success('Redo ✓');
+        } catch (e) { UI.error('Redo failed: ' + e.message); }
+        this._updateButtons();
+    },
+
+    _updateButtons() {
+        const u = document.getElementById('undo-btn');
+        const r = document.getElementById('redo-btn');
+        if (u) u.disabled = this._past.length   === 0;
+        if (r) r.disabled = this._future.length === 0;
+    },
+};
+
+// Raccourcis clavier Ctrl+Z / Ctrl+Y
+document.addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key === 'z') {
+        e.preventDefault(); UndoRedo.undo();
+    }
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.shiftKey && e.key === 'z'))) {
+        e.preventDefault(); UndoRedo.redo();
+    }
+});
+
+// ── Global Search ─────────────────────────────────────────────
+
+const GlobalSearch = {
+    _query:     '',
+    _focusIdx:  -1,
+    _blurTimer: null,
+    _items:     [],   // flat list of {section, id, label, sub, dot}
+
+    _dot(type) {
+        if (type === 'swrl-rules') return `<span style="flex-shrink:0;font-size:11px">⚙️</span>`;
+        const map = { classes: 'cls-dot', 'object-properties': 'op-prop-dot',
+                      'datatype-properties': 'dp-prop-dot', 'annotation-properties': 'anno-prop-dot',
+                      individuals: 'xsd-dot' };
+        return `<span class="${map[type] || 'cls-dot'}" style="flex-shrink:0;margin:0"></span>`;
+    },
+
+    /** Retourne le meilleur label d'annotation (langue préférée, sinon premier disponible) */
+    _bestLabel(entity) {
+        const labels = entity?.annotations?.labels || [];
+        if (!labels.length) return '';
+        const pref = Settings.preferredLang;
+        const byLang = labels.find(l => l.lang === pref);
+        return (byLang || labels[0]).value || '';
+    },
+
+    /** Retourne true si la query matche l'ID ou n'importe quel label d'annotation */
+    _matchEntity(entity, lq) {
+        if ((entity.id || '').toLowerCase().includes(lq)) return true;
+        return (entity.annotations?.labels || []).some(l =>
+            (l.value || '').toLowerCase().includes(lq)
+        );
+    },
+
+    _search(q) {
+        const s   = APP.state;
+        const lq  = q.toLowerCase();
+        const results = [];
+        const push = (section, id, label, sub) => results.push({ section, id, label, sub });
+
+        (s.classes || []).forEach(c => {
+            if (!this._matchEntity(c, lq)) return;
+            const lbl = this._bestLabel(c);
+            push('classes', c.id, lbl || c.id, lbl ? c.id : '');
+        });
+
+        (s.object_properties || []).forEach(p => {
+            if (!this._matchEntity(p, lq)) return;
+            const lbl = this._bestLabel(p);
+            push('object-properties', p.id, lbl || p.id, lbl ? p.id : '');
+        });
+
+        (s.datatype_properties || []).forEach(p => {
+            if (!this._matchEntity(p, lq)) return;
+            const lbl = this._bestLabel(p);
+            push('datatype-properties', p.id, lbl || p.id, lbl ? p.id : '');
+        });
+
+        (APP.state.annotation_properties || []).forEach(p => {
+            if ((p.id || '').toLowerCase().includes(lq))
+                push('annotation-properties', p.id, p.id, '');
+        });
+
+        (s.swrl_rules || []).forEach(r => {
+            if (!(r.id || '').toLowerCase().includes(lq) && !(r.label || '').toLowerCase().includes(lq)) return;
+            const mainText = r.label || r.id;
+            push('swrl-rules', r.id, mainText, mainText !== r.id ? r.id : '');
+        });
+
+        (s.individuals || []).forEach(i => {
+            const dispLabel = (typeof IndividualEditor !== 'undefined')
+                ? IndividualEditor._resolveDisplayLabel(i, null) : '';
+            const mainText = dispLabel || i.id;
+            const idMatch  = (i.id || '').toLowerCase().includes(lq);
+            const lblMatch = mainText.toLowerCase().includes(lq);
+            // Chercher aussi sur tous les labels d'annotation
+            const annoMatch = (i.annotations?.labels || []).some(l =>
+                (l.value || '').toLowerCase().includes(lq)
+            );
+            if (!idMatch && !lblMatch && !annoMatch) return;
+            push('individuals', i.id, mainText, mainText !== i.id ? i.id : '');
+        });
+
+        return results;
+    },
+
+    _render(results) {
+        if (!results.length)
+            return `<div class="gs-empty">No results for "<strong>${this._query}</strong>"</div>`;
+
+        const groups = { classes: [], 'object-properties': [], 'datatype-properties': [],
+                         'annotation-properties': [], individuals: [], 'swrl-rules': [] };
+        const labels = { classes: 'Classes', 'object-properties': 'Object Properties',
+                         'datatype-properties': 'Datatype Properties',
+                         'annotation-properties': 'Annotation Properties',
+                         individuals: 'Individuals', 'swrl-rules': 'SWRL Rules' };
+
+        results.forEach(r => { if (groups[r.section]) groups[r.section].push(r); });
+
+        let flatIdx = 0;
+        this._items = results;
+
+        return Object.entries(groups).filter(([, arr]) => arr.length).map(([sec, arr]) => {
+            const rows = arr.map(r => {
+                const idx = flatIdx++;
+                return `<div class="gs-item${idx === this._focusIdx ? ' focused' : ''}" data-idx="${idx}"
+                             onmousedown="GlobalSearch._navigate(${idx})"
+                             onmouseover="GlobalSearch._hover(${idx})">
+                    ${this._dot(sec)}
+                    <span class="gs-item-label">${r.label}</span>
+                    ${r.sub ? `<span class="gs-item-sub">${r.sub}</span>` : ''}
+                </div>`;
+            }).join('');
+            return `<div class="gs-group-label">${labels[sec]}</div>${rows}`;
+        }).join('');
+    },
+
+    onInput(val) {
+        this._query   = val;
+        this._focusIdx = -1;
+        const clear = document.getElementById('global-search-clear');
+        if (clear) clear.style.display = val ? 'inline' : 'none';
+
+        const drop = document.getElementById('global-search-dropdown');
+        if (!drop) return;
+
+        if (!val.trim() || !APP.state.ontology) {
+            drop.style.display = 'none';
+            return;
+        }
+
+        const results = this._search(val.trim());
+        drop.innerHTML = this._render(results);
+        drop.style.display = 'block';
+    },
+
+    _hover(idx) {
+        this._focusIdx = idx;
+        document.querySelectorAll('.gs-item').forEach((el, i) =>
+            el.classList.toggle('focused', i === idx));
+    },
+
+    _navigate(idx) {
+        const item = this._items[idx];
+        if (!item) return;
+        this.clear();
+        APP.navigateTo(item.section, item.id);
+    },
+
+    onKey(e) {
+        const drop = document.getElementById('global-search-dropdown');
+        if (!drop || drop.style.display === 'none') return;
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            this._focusIdx = Math.min(this._focusIdx + 1, this._items.length - 1);
+            this._refreshFocus();
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            this._focusIdx = Math.max(this._focusIdx - 1, 0);
+            this._refreshFocus();
+        } else if (e.key === 'Enter') {
+            if (this._focusIdx >= 0) this._navigate(this._focusIdx);
+            else if (this._items.length === 1) this._navigate(0);
+        } else if (e.key === 'Escape') {
+            this.clear();
+        }
+    },
+
+    _refreshFocus() {
+        document.querySelectorAll('.gs-item').forEach((el, i) =>
+            el.classList.toggle('focused', i === this._focusIdx));
+        const focused = document.querySelector('.gs-item.focused');
+        if (focused) focused.scrollIntoView({ block: 'nearest' });
+    },
+
+    onFocus() {
+        if (this._blurTimer) { clearTimeout(this._blurTimer); this._blurTimer = null; }
+        if (this._query.trim()) this.onInput(this._query);
+    },
+
+    onBlur() {
+        this._blurTimer = setTimeout(() => {
+            const drop = document.getElementById('global-search-dropdown');
+            if (drop) drop.style.display = 'none';
+        }, 150);
+    },
+
+    clear() {
+        this._query    = '';
+        this._focusIdx = -1;
+        this._items    = [];
+        const inp   = document.getElementById('global-search-input');
+        const drop  = document.getElementById('global-search-dropdown');
+        const clear = document.getElementById('global-search-clear');
+        if (inp)   { inp.value = ''; inp.blur(); }
+        if (drop)  drop.style.display  = 'none';
+        if (clear) clear.style.display = 'none';
+    },
+};
 
 // ── Settings UI ───────────────────────────────────────────────
 
@@ -1012,14 +1647,14 @@ APP.renderSettings = function() {
     const sidebar = `
         <div style="width:150px;flex-shrink:0;border-right:1px solid var(--border);padding:8px 0">
             ${tabBtn('languages',     '🌐 Languages')}
-            ${tabBtn('naming-rules',  '🏷 Naming Rules')}
+            ${tabBtn('naming-rules',  '🏷 IDs Rules')}
         </div>`;
 
     const pref    = Settings.preferredLang;
     const active  = Settings.activeLangs;
     const avail   = Settings.availableLangs;
 
-    // ── Étage 1 : Langue préférée ────────────────────────────
+    // ── Stage 1: Preferred language ────────────────────────────
     const prefHtml = active.map(code => {
         const name = avail.find(x => x.code === code)?.name || '';
         const isPref = code === pref;
@@ -1031,7 +1666,7 @@ APP.renderSettings = function() {
                 </button>`;
     }).join('');
 
-    // ── Étage 2 : Langues actives ───────────────────────────
+    // ── Stage 2: Active languages ───────────────────────────
     const activeHtml = active.map(code => {
         const name = avail.find(x => x.code === code)?.name || '';
         const isPref = code === pref;
@@ -1044,7 +1679,7 @@ APP.renderSettings = function() {
                 </div>`;
     }).join('');
 
-    // ── Étage 3 : Langues disponibles ──────────────────────
+    // ── Stage 3: Available languages ──────────────────────
     const availHtml = avail.map(({ code, name }) => {
         const isActive = active.includes(code);
         return `<button class="btn-${isActive ? 'primary' : 'secondary'} btn-sm"
@@ -1053,13 +1688,13 @@ APP.renderSettings = function() {
                         title="${name}${isActive ? ' — active' : ''}">${code}</button>`;
     }).join('');
 
-    // ── Contenu de l'onglet actif ─────────────────────────────
+    // ── Active tab content ─────────────────────────────
     let tabContent = '';
     if (tab === 'languages') {
         tabContent = `
         <div style="display:flex;flex-direction:column;gap:16px;padding:16px;flex:1;overflow-y:auto">
 
-            <!-- Étage 1 : Langue préférée -->
+            <!-- Stage 1: Preferred language -->
             <div class="cls-frame" style="padding:0">
                 <div class="cls-frame-bar"><span class="cls-frame-tag">★ Preferred language</span></div>
                 <div class="cls-frame-body" style="padding:10px 14px">
@@ -1073,7 +1708,7 @@ APP.renderSettings = function() {
                 </div>
             </div>
 
-            <!-- Étage 2 : Langues actives -->
+            <!-- Stage 2: Active languages -->
             <div class="cls-frame" style="padding:0">
                 <div class="cls-frame-bar"><span class="cls-frame-tag">◆ Active languages</span></div>
                 <div class="cls-frame-body" style="padding:10px 14px">
@@ -1087,7 +1722,7 @@ APP.renderSettings = function() {
                 </div>
             </div>
 
-            <!-- Étage 3 : Langues disponibles -->
+            <!-- Stage 3: Available languages -->
             <div class="cls-frame" style="padding:0">
                 <div class="cls-frame-bar"><span class="cls-frame-tag">◇ Available languages</span></div>
                 <div class="cls-frame-body" style="padding:10px 14px">
@@ -1099,9 +1734,33 @@ APP.renderSettings = function() {
             </div>
         </div>`;
     } else if (tab === 'naming-rules') {
+        const fmt = Settings.namingFormat;
+        const fmtOption = (id, label, example, desc) => `
+            <label style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:6px;cursor:pointer;
+                          border:1px solid ${fmt===id?'var(--accent)':'var(--border)'};
+                          background:${fmt===id?'var(--bg3)':'var(--bg2)'};margin-bottom:8px">
+                <input type="radio" name="naming-fmt" value="${id}" ${fmt===id?'checked':''} style="margin-top:3px;accent-color:var(--accent)"
+                       onchange="Settings.setNamingFormat('${id}')">
+                <div style="flex:1">
+                    <div style="font-weight:600;font-size:13px">${label}</div>
+                    <div style="font-size:11px;color:var(--text-dim);margin:2px 0">${desc}</div>
+                    <div style="font-family:var(--font-mono);font-size:11px;color:var(--accent);margin-top:4px">ex : ${example}</div>
+                </div>
+            </label>`;
         tabContent = `
-        <div style="padding:16px;flex:1;display:flex;align-items:center;justify-content:center">
-            <span style="color:var(--text-dim);font-size:13px;font-style:italic">Naming Rules — coming soon</span>
+        <div style="display:flex;flex-direction:column;gap:16px;padding:16px;flex:1;overflow-y:auto">
+            <div class="cls-frame" style="padding:0">
+                <div class="cls-frame-bar"><span class="cls-frame-tag">🏷 Individual ID format</span></div>
+                <div class="cls-frame-body" style="padding:12px 14px">
+                    <p style="margin:0 0 12px;font-size:11px;color:var(--text-dim)">
+                        Format automatically applied when creating a new individual.
+                        The ID can still be edited before confirming.
+                    </p>
+                    ${fmtOption('individual_counter', 'Individual_Counter',  'Individual_123',        'Generic prefix + sequential number based on the number of existing individuals.')}
+                    ${fmtOption('class_counter',      'ClassName_Counter','Part_456',             'Name of the selected class + sequential number. Falls back to Individual_N if no class is selected.')}
+                    ${fmtOption('alphanumeric',       'Alphanumeric string', 'rgu8j-7t32z-oh7g5-mq78t','4 groups of 5 random alphanumeric characters separated by dashes.')}
+                </div>
+            </div>
         </div>`;
     }
 

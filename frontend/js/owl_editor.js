@@ -1,16 +1,34 @@
 /**
- * owl_editor.js — Formulaires OWL : Classes, ObjectProperties, DatatypeProperties, Individus
+ * owl_editor.js — OWL Forms: Classes, ObjectProperties, DatatypeProperties, Individuals
  */
 
-// ── Annotation Properties OWL 2 ─────────────────────────────
-/** Toutes les annotation properties OWL 2 (pour l'onglet AnnotationProperties) */
+// ── OWL 2 Annotation Properties ─────────────────────────────
+/** All OWL 2 annotation properties (for the AnnotationProperties tab) */
 const ALL_ANNO_PROPS = [
     'rdfs:label', 'rdfs:comment', 'rdfs:seeAlso', 'rdfs:isDefinedBy',
     'owl:versionInfo', 'owl:deprecated', 'owl:priorVersion',
     'owl:backwardCompatibleWith', 'owl:incompatibleWith',
 ];
-/** Les 7 propriétés "autres" (hors label/comment qui ont leurs propres boutons) */
+/** The 7 "other" properties (excluding label/comment which have their own buttons) */
 const OTHER_ANNO_PROPS = ALL_ANNO_PROPS.filter(p => p !== 'rdfs:label' && p !== 'rdfs:comment');
+
+// ── OWL ID validation ───────────────────────────────────────
+
+/** Sanitize an ID input: replace spaces with _ and remove leading digits.
+ *  Called oninput on all ID fields. */
+function _sanitizeId(input) {
+    let v = input.value.replace(/\s+/g, '_');
+    // XML NCName: first char must be letter or underscore
+    v = v.replace(/^[0-9]+/, '');
+    input.value = v;
+}
+
+/** Validate an ID before saving. Returns an error message or null if valid. */
+function _validateId(id, label = 'ID') {
+    if (!id || !id.trim()) return `${label} is required.`;
+    if (/^[0-9]/.test(id)) return `${label} cannot start with a digit (OWL NCName rule).`;
+    return null;
+}
 
 // ── Helpers UI ──────────────────────────────────────────────
 
@@ -21,15 +39,15 @@ function classOptions(selectedIds = []) {
     ).join('');
 }
 
-/** Options <option> des classes en ordre hiérarchique (même ordre que l'Asserted Hierarchy) */
+/** <option> elements for classes in hierarchical order (same order as the Asserted Hierarchy) */
 function classHierarchyOptions(selectedId = '') {
     const classes = APP.state.classes || [];
     if (!classes.length) return '';
     const { roots, childrenOf } = ClassEditor.buildTree(classes);
     const lines = [];
     const visit = (id, depth) => {
-        const pad   = '   '.repeat(depth);   // espaces insécables pour l'indentation
-        const arrow = depth > 0 ? '▸ ' : '';       // ▸ + espace insécable
+        const pad   = '   '.repeat(depth);   // non-breaking spaces for indentation
+        const arrow = depth > 0 ? '▸ ' : '';       // ▸ + non-breaking space
         lines.push(`<option value="${id}" ${id === selectedId ? 'selected' : ''}>${pad}${arrow}${id}</option>`);
         (childrenOf[id] || []).forEach(child => visit(child, depth + 1));
     };
@@ -37,14 +55,14 @@ function classHierarchyOptions(selectedId = '') {
     return lines.join('');
 }
 
-/** Items HTML du picker custom de classe (dot marron + ordre hiérarchique) */
-/** Items de l'arbre de classes pour un picker générique (domain, range…).
- *  onSelectExpr : expression JS exécutée au clic, ex: "OPEditor.addDomain(this.dataset.id)" */
+/** HTML items for the custom class picker (brown dot + hierarchical order) */
+/** Class tree items for a generic picker (domain, range…).
+ *  onSelectExpr : JS expression executed on click, e.g. "OPEditor.addDomain(this.dataset.id)" */
 /**
- * Génère les items de l'arbre des classes pour un picker.
- * @param {string}   callExpr    Expression JS appelée avec l'id en argument,
+ * Generates class tree items for a picker.
+ * @param {string}   callExpr    JS expression called with the id as argument,
  *                               ex: "MyEditor.addSomething" → devient MyEditor.addSomething('WhoItem')
- * @param {string[]} [excludeIds] Classes à exclure (déjà sélectionnées, classe courante…)
+ * @param {string[]} [excludeIds] Classes to exclude (already selected, current class…)
  */
 function _classTreePickerItems(callExpr, excludeIds = []) {
     const excluded = new Set(excludeIds);
@@ -63,7 +81,7 @@ function _classTreePickerItems(callExpr, excludeIds = []) {
 
     const visit = (id, depth) => {
         if (excluded.has(id)) {
-            // Afficher les enfants quand même (la classe est exclue mais pas ses filles)
+            // Still show children (class is excluded but not its sub-classes)
             (childrenOf[id] || []).forEach(child => visit(child, depth + 1));
             return;
         }
@@ -82,7 +100,7 @@ function _classTreePickerItems(callExpr, excludeIds = []) {
 
 /** Items de l'arbre ObjectProperties pour un picker (inverse, subPropertyOf…)
  *  @param {string}   onSelectExpr  expression onclick
- *  @param {string[]} [excludeIds]  identifiants à exclure de l'arbre
+ *  @param {string[]} [excludeIds]  identifiers to exclude from the tree
  */
 function _opTreePickerItems(onSelectExpr, excludeIds = []) {
     const excluded = new Set(excludeIds);
@@ -104,7 +122,7 @@ function _opTreePickerItems(onSelectExpr, excludeIds = []) {
     return lines.join('') || '<div class="cls-list-empty" style="padding:4px 8px">—</div>';
 }
 
-/** Items du picker classe — structure identique à l\'Asserted Hierarchy */
+/** Class picker items — same structure as the Asserted Hierarchy */
 function _classHierarchyItems(idx, selectedId) {
     const classes = APP.state.classes || [];
     const { roots, childrenOf } = ClassEditor.buildTree(classes);
@@ -161,18 +179,18 @@ function xsdOptions(selected = 'xsd:string') {
 
 
 // ════════════════════════════════════════════════════════════════
-// CLASSES — vue arbre style Protégé
+// CLASSES — Protégé-style tree view
 // ════════════════════════════════════════════════════════════════
 
 const ClassEditor = {
 
-    _selectedId: null,          // classe sélectionnée dans l'arbre
-    _expanded: new Set(),       // IDs des nœuds développés
-    _editingId: null,           // ID original de la classe en cours d'édition
-    _owlThingSelected: false,   // true quand owl:Thing est sélectionné
-    _dragId: null,              // ID de la classe en cours de glisser-déposer
+    _selectedId: null,          // class selected in the tree
+    _expanded: new Set(),       // IDs of expanded nodes
+    _editingId: null,           // original ID of the class being edited
+    _owlThingSelected: false,   // true when owl:Thing is selected
+    _dragId: null,              // ID of the class being dragged
 
-    // ── Icônes SVG partagées (toolbar + menu contextuel) ─────────
+    // ── Shared SVG icons (toolbar + context menu) ─────────
     _svgChild:  `<svg viewBox="0 0 18 15" width="16" height="13" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <rect x="1" y="1" width="16" height="4.5" rx="1"/>
             <line x1="4" y1="5.5" x2="4" y2="9"/>
@@ -196,30 +214,42 @@ const ClassEditor = {
             <line x1="8.5" y1="6.5" x2="8.5" y2="11.5"/>
         </svg>`,
 
-    // ── Construction de l'arbre ──────────────────────────────────
+    // ── Tree construction ──────────────────────────────────
 
     buildTree(classes) {
         const allIds = new Set(classes.map(c => c.id));
         const childrenOf = {};
         classes.forEach(c => { childrenOf[c.id] = []; });
 
-        const hasParent = new Set();
+        const hasKnownParent   = new Set(); // has an internal parent (in allIds)
+        const hasExternalParent = new Set(); // has a prefixed external parent (!owl:Thing)
+
         classes.forEach(c => {
-            const parents = [...new Set((c.subClassOf || []).filter(s => typeof s === 'string' && allIds.has(s)))];
-            parents.forEach(p => {
+            const allParents   = (c.subClassOf || []).filter(s => typeof s === 'string');
+            const knownParents = [...new Set(allParents.filter(s => allIds.has(s)))];
+            const classRoot = APP.getOntologyRootLabels().classRoot;
+            const externalParents = allParents.filter(s =>
+                !allIds.has(s) && s !== classRoot && s.includes(':')
+            );
+            if (knownParents.length > 0)   hasKnownParent.add(c.id);
+            if (externalParents.length > 0) hasExternalParent.add(c.id);
+            knownParents.forEach(p => {
                 if (!childrenOf[p].includes(c.id)) childrenOf[p].push(c.id);
-                hasParent.add(c.id);
             });
         });
 
-        // Tri alphabétique à chaque niveau
         const alpha = (a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' });
-        const roots = classes.filter(c => !hasParent.has(c.id)).map(c => c.id).sort(alpha);
+
+        // owlRoots   → no known parent AND no external parent → shown under owl:Thing
+        // externalRoots → no known parent BUT has external parent → shown as independent roots
+        const owlRoots      = classes.filter(c => !hasKnownParent.has(c.id) && !hasExternalParent.has(c.id)).map(c => c.id).sort(alpha);
+        const externalRoots = classes.filter(c => !hasKnownParent.has(c.id) &&  hasExternalParent.has(c.id)).map(c => c.id).sort(alpha);
+
         Object.keys(childrenOf).forEach(id => childrenOf[id].sort(alpha));
-        return { roots, childrenOf };
+        return { roots: owlRoots, externalRoots, childrenOf };
     },
 
-    /** Ajoute tous les ancêtres de classId dans _expanded pour déplier l'arbre jusqu'à lui */
+    /** Expands all ancestors of classId in _expanded to unfold the tree down to it */
     _expandAncestors(classId) {
         const classes = APP.state.classes || [];
         const allIds  = new Set(classes.map(c => c.id));
@@ -230,7 +260,7 @@ const ClassEditor = {
             .forEach(par => { this._expanded.add(par); this._expandAncestors(par); });
     },
 
-    // ── Rendu arbre ──────────────────────────────────────────────
+    // ── Tree rendering ──────────────────────────────────────────
 
     _renderNode(id, childrenOf, depth) {
         const cls = (APP.state.classes || []).find(c => c.id === id);
@@ -267,7 +297,8 @@ const ClassEditor = {
     },
 
     renderTree(classes) {
-        const { roots, childrenOf } = this.buildTree(classes);
+        const { roots, externalRoots, childrenOf } = this.buildTree(classes);
+        const { classRoot } = APP.getOntologyRootLabels();
         const owlSel = this._owlThingSelected ? ' selected' : '';
         return `
         <div class="tree-root-item${owlSel}"
@@ -278,15 +309,16 @@ const ClassEditor = {
              ondrop="ClassEditor.onDrop(event,null)">
             <span class="tree-toggle open" style="cursor:default">▶</span>
             <span class="cls-dot tree-cls-dot tree-thing-dot"></span>
-            <span style="font-size:12px">owl:Thing</span>
+            <span style="font-size:12px">${classRoot}</span>
         </div>
-        ${classes.length
+        ${roots.length
             ? roots.map(id => this._renderNode(id, childrenOf, 1)).join('')
-            : '<p class="empty" style="padding:8px 16px;font-size:12px">No classes — create a child class of owl:Thing</p>'
-        }`;
+            : (!externalRoots.length ? `<p class="empty" style="padding:8px 16px;font-size:12px">No classes — create a child class of ${classRoot}</p>` : '')
+        }
+        ${externalRoots.map(id => this._renderNode(id, childrenOf, 1)).join('')}`;
     },
 
-    // ── Layout splitté ───────────────────────────────────────────
+    // ── Split layout ───────────────────────────────────────────
 
     renderSplit(classes) {
         const icoAdd = `<svg width="9" height="9" viewBox="0 0 9 9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><line x1="4.5" y1="0.5" x2="4.5" y2="8.5"/><line x1="0.5" y1="4.5" x2="8.5" y2="4.5"/></svg>`;
@@ -315,7 +347,7 @@ const ClassEditor = {
                     </div>
                 </div>
 
-                <!-- ── Séparateur redimensionnable ── -->
+                <!-- ── Resizable separator ── -->
                 <div class="h-resizer"></div>
 
                 <!-- ── Super Classes ── -->
@@ -346,7 +378,7 @@ const ClassEditor = {
         </div>`;
     },
 
-    // ── Sélection et navigation ──────────────────────────────────
+    // ── Selection and navigation ──────────────────────────────────
 
     restoreSelection() {
         this._initSplitPane();
@@ -382,7 +414,7 @@ const ClassEditor = {
         _initHResizers('tree-panel');
     },
 
-    /** Met à jour le panneau "Super Classes" dans la colonne gauche */
+    /** Updates the "Super Classes" panel in the left column */
     _updateSuperPanel(cls) {
         const panel = document.getElementById('cls-supers-list');
         if (!panel) return;
@@ -458,13 +490,14 @@ const ClassEditor = {
         // Surbrillance
         document.querySelectorAll('.tree-item, .tree-root-item').forEach(el => el.classList.remove('selected'));
         document.querySelector('.tree-root-item')?.classList.add('selected');
-        // Panneau droit
+        // Right panel
         const detail = document.getElementById('class-detail');
+        const { classRoot } = APP.getOntologyRootLabels();
         if (detail) detail.innerHTML = `
             <div class="detail-panel-empty">
                 <span class="cls-dot" style="width:32px;height:32px"></span>
-                <strong style="font-family:var(--font-mono);font-size:13px">owl:Thing</strong>
-                <span style="color:var(--text-dim);font-size:12px">Root of all OWL classes</span>
+                <strong style="font-family:var(--font-mono);font-size:13px">${classRoot}</strong>
+                <span style="color:var(--text-dim);font-size:12px">Root of all classes</span>
                 <span style="color:var(--text2);font-size:12px">Select an existing <strong>Class</strong> or create a new one</span>
                 <button class="btn-primary btn-sm" onclick="ClassEditor.createChild()">＋ Create Class</button>
             </div>`;
@@ -491,7 +524,7 @@ const ClassEditor = {
         const cls = (APP.state.classes || []).find(c => c.id === id);
         detail.innerHTML = cls ? this.renderForm(cls) : this.renderForm(null);
         _initHResizers('class-detail');
-        // Super classes panel : mettre à jour la colonne gauche
+        // Super classes panel: update the left column
         this._updateSuperPanel(cls || null);
         this._updateTreeButtons();
     },
@@ -503,21 +536,21 @@ const ClassEditor = {
         if (!btnSister || !btnChild || !btnDelete) return;
 
         if (this._owlThingSelected) {
-            // owl:Thing sélectionné : seulement "Fille"
+            // owl:Thing selected: only "Child"
             btnSister.disabled = true;
             btnSister.style.visibility = 'hidden';
             btnChild.disabled  = false;
             btnDelete.disabled = true;
             btnDelete.style.visibility = 'hidden';
         } else if (this._selectedId) {
-            // Classe ordinaire sélectionnée : tous les boutons actifs
+            // Regular class selected: all buttons active
             btnSister.disabled = false;
             btnSister.style.visibility = '';
             btnChild.disabled  = false;
             btnDelete.disabled = false;
             btnDelete.style.visibility = '';
         } else {
-            // Rien de sélectionné
+            // Nothing selected
             btnSister.disabled = true;
             btnSister.style.visibility = '';
             btnChild.disabled  = true;
@@ -530,15 +563,15 @@ const ClassEditor = {
         if (!this._selectedId) return;
         const cls = (APP.state.classes || []).find(c => c.id === this._selectedId);
         const parents = cls ? (cls.subClassOf || []).filter(s => typeof s === 'string') : [];
-        // Déployer les parents communs pour que la nouvelle sœur soit visible
+        // Expand common parents so the new sibling is visible
         parents.forEach(p => this._expanded.add(p));
         await this._createAndSelect(parents);
     },
 
     async createChild() {
-        const parent = this._selectedId; // null si owl:Thing sélectionné
+        const parent = this._selectedId; // null if owl:Thing is selected
         const parents = parent ? [parent] : [];
-        // Déployer le parent pour que la classe fille soit visible dans l'arbre
+        // Expand the parent so the child class is visible in the tree
         if (parent) this._expanded.add(parent);
         await this._createAndSelect(parents);
     },
@@ -577,7 +610,7 @@ const ClassEditor = {
         await this.delete(this._selectedId);
     },
 
-    /** Crée un ObjectProperty avec domain = classe sélectionnée, puis navigue vers l'onglet OP */
+    /** Creates an ObjectProperty with domain = selected class, then navigates to the OP tab */
     async createOPForClass() {
         const classId = this._selectedId;
         if (!classId) return UI.error('Select a class first');
@@ -596,7 +629,7 @@ const ClassEditor = {
         } catch (e) { UI.error(e.message); }
     },
 
-    /** Crée un DatatypeProperty avec domain = classe sélectionnée, puis navigue vers l'onglet DTP */
+    /** Creates a DatatypeProperty with domain = selected class, then navigates to the DTP tab */
     async createDTPForClass() {
         const classId = this._selectedId;
         if (!classId) return UI.error('Select a class first');
@@ -614,12 +647,12 @@ const ClassEditor = {
         } catch (e) { UI.error(e.message); }
     },
 
-    // ── Menu contextuel ──────────────────────────────────────────
+    // ── Context menu ──────────────────────────────────────────
 
     showContextMenu(event, id) {
         event.preventDefault();
         event.stopPropagation();
-        // Sélectionner l'élément visé
+        // Select the targeted element
         if (id) this.selectClass(id);
         else    this.selectOwlThing();
         this._closeContextMenu();
@@ -635,18 +668,18 @@ const ClassEditor = {
                 ${this._svgSister} Add Sibling Class</div>
             <div class="ctx-sep"></div>
             <div class="ctx-item ctx-danger" onclick="ClassEditor._closeContextMenu();ClassEditor.deleteSelected()">
-                ${this._svgDelete} Supprimer</div>` : ''}
+                ${this._svgDelete} Delete</div>` : ''}
         `;
         menu.style.left = event.clientX + 'px';
         menu.style.top  = event.clientY + 'px';
         document.body.appendChild(menu);
-        // Ajuster si hors écran
+        // Adjust if off-screen
         requestAnimationFrame(() => {
             const r = menu.getBoundingClientRect();
             if (r.right  > window.innerWidth)  menu.style.left = (event.clientX - r.width)  + 'px';
             if (r.bottom > window.innerHeight)  menu.style.top  = (event.clientY - r.height) + 'px';
         });
-        // Fermer au prochain clic hors du menu
+        // Close on next click outside the menu
         const close = (e) => {
             if (!menu.contains(e.target)) {
                 this._closeContextMenu();
@@ -666,13 +699,13 @@ const ClassEditor = {
         this._dragId = id;
         event.dataTransfer.effectAllowed = 'move';
         event.dataTransfer.setData('text/plain', id);
-        // Légère opacité après le début du drag (setTimeout pour ne pas affecter le ghost)
+        // Slight opacity after drag starts (setTimeout to avoid affecting the ghost)
         setTimeout(() => event.target.classList.add('dragging'), 0);
     },
 
     onDragOver(event, targetId) {
         if (!this._dragId) return;
-        if (this._dragId === targetId) return;               // pas sur soi-même
+        if (this._dragId === targetId) return;               // not on itself
         if (this._isDescendant(targetId, this._dragId)) return; // pas sur un descendant
         event.preventDefault();
         event.dataTransfer.dropEffect = 'move';
@@ -699,7 +732,7 @@ const ClassEditor = {
         const restrictions = (cls.subClassOf || []).filter(s => typeof s === 'object');
         const newParents   = targetId ? [targetId] : [];
         const updated = { ...cls, subClassOf: [...newParents, ...restrictions] };
-        // Déployer le nouveau parent pour voir la classe déplacée
+        // Expand the new parent to see the moved class
         if (targetId) this._expanded.add(targetId);
         this._selectedId = draggedId;
         this._editingId  = draggedId;
@@ -737,7 +770,7 @@ const ClassEditor = {
         el.style.display = isOpen ? 'none' : 'block';
         if (isOpen) this._expanded.delete(id);
         else        this._expanded.add(id);
-        // Mettre à jour l'icône toggle
+        // Update the toggle icon
         const toggle = el.previousElementSibling?.querySelector('.tree-toggle');
         if (toggle) toggle.classList.toggle('open', !isOpen);
     },
@@ -751,7 +784,7 @@ const ClassEditor = {
         if (detail) { detail.innerHTML = this.renderForm(null); _initHResizers('class-detail'); }
     },
 
-    // ── Formulaire style Protégé ─────────────────────────────────
+    // ── Protégé-style form ─────────────────────────────────
 
     renderForm(cls = null, forceNew = false) {
         const isNew = forceNew || !cls;
@@ -767,18 +800,18 @@ const ClassEditor = {
         const labels   = c.annotations?.labels   || [];
         const comments = c.annotations?.comments || [];
 
-        // IRI complète
+        // Full IRI
         const baseIri  = (APP.state.ontology?.id || '').replace(/#$/, '');
         const classIri = (c.id && baseIri) ? `${baseIri}#${c.id}` : '';
 
-        // ── Lignes annotations ──
+        // ── Annotation rows ──
         const annoRows = [
             ...labels.map(l   => _annoRow('label',   l.value,  l.lang  || Settings.defaultLang, 'ClassEditor', ac)),
             ...comments.map(cm => _annoRow('comment', cm.value, cm.lang || Settings.defaultLang, 'ClassEditor', ac)),
             ...(c.annotations?.other || []).map(a => _annoRow('other', a.value, '', 'ClassEditor', ac, a.property)),
         ].join('');
 
-        // ── Liste Superclasses ──
+        // ── Superclass list ──
         const superRows = superClasses.map(s => `
             <div class="cls-list-item" data-id="${s}">
                 <span class="cls-dot"></span>
@@ -790,7 +823,16 @@ const ClassEditor = {
             .filter(c2 => c2.id !== c.id && !superClasses.includes(c2.id))
             .map(c2 => `<option value="${c2.id}">${c2.id}</option>`).join('');
 
-        // ── Liste Disjoints ──
+        // ── Equivalent list ──
+        const equivRows = (c.equivalentClass || []).filter(e => typeof e === 'string').map(e => `
+            <div class="cls-list-item" data-id="${e}">
+                <span class="cls-dot"></span>
+                <span class="cls-list-lbl" style="cursor:pointer"
+                      onclick="APP.navigateTo('classes','${e}')">${e}</span>
+                <button class="btn-frame-del" onclick="ClassEditor.removeEquivalent('${e}')">✕</button>
+            </div>`).join('');
+
+        // ── Disjoint list ──
         const disjRows = (c.disjointWith || []).map(d => `
             <div class="cls-list-item" data-id="${d}">
                 <span class="cls-dot"></span>
@@ -798,19 +840,20 @@ const ClassEditor = {
                       onclick="APP.navigateTo('classes','${d}')">${d}</span>
                 <button class="btn-frame-del" onclick="ClassEditor.removeDisjoint('${d}')">✕</button>
             </div>`).join('');
-        // Icône ➕ SVG pour les toolbars
+        // ➕ SVG icon for toolbars
         const icoAdd = `<svg width="9" height="9" viewBox="0 0 9 9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><line x1="4.5" y1="0.5" x2="4.5" y2="8.5"/><line x1="0.5" y1="4.5" x2="8.5" y2="4.5"/></svg>`;
 
         return `
         <div class="cls-editor">
 
-            <!-- ── En-tête ───────────────────────────────── -->
+            <!-- ── Header ───────────────────────────────── -->
             <div class="cls-editor-hdr">
                 <div class="cls-editor-title">
-                    CLASS EDITOR for&nbsp;
+                    ID&nbsp;
                     <input type="text" id="cls-id" class="cls-id-inp"
                            value="${c.id}" placeholder="NewClass"
-                           ${ac} title="Identifiant IRI local">
+                           oninput="_sanitizeId(this)"
+                           ${ac} title="Local IRI identifier — cannot start with a digit">
                     <span class="cls-editor-meta">(instance of owl:Class)</span>
                 </div>
                 ${classIri ? `<div class="cls-editor-iri">For Class:&nbsp;<code>${classIri}</code></div>` : ''}
@@ -823,8 +866,8 @@ const ClassEditor = {
             <div class="cls-frame">
                 <div class="cls-frame-bar">
                     <span class="cls-frame-tag">Annotation(s)</span>
-                    <button class="btn-ftool" onclick="ClassEditor.addAnnotRow('label')"   title="Ajouter rdfs:label">${icoAdd}&thinsp;label</button>
-                    <button class="btn-ftool" onclick="ClassEditor.addAnnotRow('comment')" title="Ajouter rdfs:comment">${icoAdd}&thinsp;comment</button>
+                    <button class="btn-ftool" onclick="ClassEditor.addAnnotRow('label')"   title="Add rdfs:label">${icoAdd}&thinsp;label</button>
+                    <button class="btn-ftool" onclick="ClassEditor.addAnnotRow('comment')" title="Add rdfs:comment">${icoAdd}&thinsp;comment</button>
                     <button class="btn-ftool" onclick="_togglePicker('cls-anno-picker')" title="Add annotation property">${icoAdd}&thinsp;Annotation Property</button>
                 </div>
                 <div class="cls-frame-body">
@@ -852,16 +895,30 @@ const ClassEditor = {
 
             <div class="h-resizer"></div>
 
-            <!-- ── Frame bas : Disjoints ── -->
-            <div class="cls-frame">
-                <div class="cls-frame-bar">
-                    <span class="cls-frame-tag cls-frame-tag-orange">Disjoints</span>
-                    <button class="btn-ftool" onclick="ClassEditor.showPicker('cls-disj-picker')" title="Add disjoint class">${icoAdd}</button>
+            <!-- ── Frame bas : Disjoints + Equivalent (côte à côte) ── -->
+            <div class="cls-frames-row">
+                <div class="cls-frame">
+                    <div class="cls-frame-bar">
+                        <span class="cls-frame-tag cls-frame-tag-orange">Disjoints</span>
+                        <button class="btn-ftool" onclick="ClassEditor.showPicker('cls-disj-picker')" title="Add disjoint class">${icoAdd}</button>
+                    </div>
+                    <div class="cls-frame-body" id="cls-disjoints-list">
+                        ${disjRows}
+                        <div id="cls-disj-picker" class="cls-tree-picker" style="display:none">
+                            ${_classTreePickerItems('ClassEditor.addDisjoint', [c.id, ...(c.disjointWith || [])])}
+                        </div>
+                    </div>
                 </div>
-                <div class="cls-frame-body" id="cls-disjoints-list">
-                    ${disjRows}
-                    <div id="cls-disj-picker" class="cls-tree-picker" style="display:none">
-                        ${_classTreePickerItems('ClassEditor.addDisjoint', [c.id, ...(c.disjointWith || [])])}
+                <div class="cls-frame">
+                    <div class="cls-frame-bar">
+                        <span class="cls-frame-tag cls-frame-tag-orange">Equivalent</span>
+                        <button class="btn-ftool" onclick="ClassEditor.showPicker('cls-equiv-picker')" title="Add equivalent class">${icoAdd}</button>
+                    </div>
+                    <div class="cls-frame-body" id="cls-equivalents-list">
+                        ${equivRows}
+                        <div id="cls-equiv-picker" class="cls-tree-picker" style="display:none">
+                            ${_classTreePickerItems('ClassEditor.addEquivalent', [c.id, ...(c.equivalentClass || []).filter(e => typeof e === 'string')])}
+                        </div>
                     </div>
                 </div>
             </div>
@@ -871,7 +928,7 @@ const ClassEditor = {
         </div>`;
     },
 
-    // ── Helpers annotations ──────────────────────────────────────
+    // ── Annotation helpers ──────────────────────────────────────
 
     addAnnotRow(type) {
         const ac = this._editingId !== null ? 'onchange="ClassEditor.autoSave()"' : '';
@@ -893,14 +950,23 @@ const ClassEditor = {
         if (this._editingId !== null) this.autoSave();
     },
 
-    // ── Helpers superclasses ─────────────────────────────────────
+    // ── Superclass helpers ─────────────────────────────────────
 
     showPicker(id) {
         const el = document.getElementById(id);
         if (!el) return;
         const visible = el.style.display !== 'none';
         el.style.display = visible ? 'none' : '';
-        if (!visible) el.focus();
+        if (!visible) {
+            el.focus();
+            const close = (e) => {
+                if (!el.contains(e.target) && !e.target.closest('[onclick*="showPicker"]')) {
+                    el.style.display = 'none';
+                    document.removeEventListener('click', close, true);
+                }
+            };
+            setTimeout(() => document.addEventListener('click', close, true), 0);
+        }
     },
 
     addSuperClass(id) {
@@ -932,7 +998,31 @@ const ClassEditor = {
         if (this._editingId !== null) this.autoSave();
     },
 
-    // ── Helpers disjoints ────────────────────────────────────────
+    // ── Equivalent helpers ──────────────────────────────────────
+
+    addEquivalent(id) {
+        if (!id) return;
+        const list   = document.getElementById('cls-equivalents-list');
+        const picker = document.getElementById('cls-equiv-picker');
+        if (!list || list.querySelector(`.cls-list-item[data-id="${id}"]`)) return;
+        const item = document.createElement('div');
+        item.className = 'cls-list-item';
+        item.dataset.id = id;
+        item.innerHTML = `<span class="cls-dot"></span>
+            <span class="cls-list-lbl" style="cursor:pointer"
+                  onclick="APP.navigateTo('classes','${id}')">${id}</span>
+            <button class="btn-frame-del" onclick="ClassEditor.removeEquivalent('${id}')">✕</button>`;
+        list.insertBefore(item, picker);
+        if (picker) picker.style.display = 'none';
+        if (this._editingId !== null) this.autoSave();
+    },
+
+    removeEquivalent(id) {
+        document.querySelector(`#cls-equivalents-list .cls-list-item[data-id="${id}"]`)?.remove();
+        if (this._editingId !== null) this.autoSave();
+    },
+
+    // ── Disjoint helpers ────────────────────────────────────────
 
     addDisjoint(id) {
         if (!id) return;
@@ -946,7 +1036,7 @@ const ClassEditor = {
             <span class="cls-list-lbl">${id}</span>
             <button class="btn-frame-del" onclick="ClassEditor.removeDisjoint('${id}')">✕</button>`;
         list.insertBefore(item, picker);
-        if (picker) picker.style.display = 'none';          // div : pas de .value à réinitialiser
+        if (picker) picker.style.display = 'none';          // div: no .value to reset
         if (this._editingId !== null) this.autoSave();
     },
 
@@ -959,7 +1049,7 @@ const ClassEditor = {
         if (this._editingId !== null) this.save(false);
     },
 
-    /** Sauvegarde silencieuse : persiste l'état DOM courant sans re-rendu ni refresh global */
+    /** Silent save: persists the current DOM state without re-rendering or global refresh */
     async _silentSave() {
         const originalId = this._editingId;
         if (originalId === null) return;
@@ -971,6 +1061,8 @@ const ClassEditor = {
         const { labels, comments, other } = _collectAnnotations('cls-annotations-body');
         const supers = Array.from(document.querySelectorAll('#cls-supers-list .cls-list-item[data-id]'))
                             .map(el => el.dataset.id).filter(Boolean);
+        const equiv  = Array.from(document.querySelectorAll('#cls-equivalents-list .cls-list-item[data-id]'))
+                            .map(el => el.dataset.id).filter(Boolean);
         const disj   = Array.from(document.querySelectorAll('#cls-disjoints-list .cls-list-item[data-id]'))
                             .map(el => el.dataset.id).filter(Boolean);
 
@@ -980,35 +1072,37 @@ const ClassEditor = {
             id,
             annotations: { labels, comments, other },
             subClassOf:  [...supers, ...restrictions],
-            equivalentClass: [],
+            equivalentClass: equiv,
             disjointWith: disj,
         };
         try {
             await API.updateClass(originalId, cls);
-            // Mise à jour en mémoire sans re-rendu
+            // In-memory update without re-render
             const idx = (APP.state.classes || []).findIndex(c => c.id === originalId);
             if (idx >= 0) APP.state.classes[idx] = cls;
         } catch (_) { /* fail silently */ }
     },
 
     openEdit(id) {
-        // Compatibilité ascendante (appelé depuis d'autres endroits)
+        // Backward compatibility (called from other places)
         if (APP.currentSection !== 'classes') APP.renderSection('classes');
         this.selectClass(id);
     },
 
-    // ── Sauvegarde / suppression ─────────────────────────────────
+    // ── Save / delete ─────────────────────────────────
 
     async save(isNew) {
         const originalId = isNew ? null : this._editingId;
         const id = document.getElementById('cls-id').value.trim();
-        if (!id) return UI.error('L\'identifiant est obligatoire');
+        const _idErr = _validateId(id, 'Identifier'); if (_idErr) return UI.error(_idErr);
 
         // Annotations depuis la table
         const { labels, comments, other } = _collectAnnotations('cls-annotations-body');
 
-        // Superclasses et disjoints depuis les listes
+        // Superclasses, équivalences et disjoints depuis les listes
         const supers = Array.from(document.querySelectorAll('#cls-supers-list .cls-list-item[data-id]'))
+                            .map(el => el.dataset.id).filter(Boolean);
+        const equiv  = Array.from(document.querySelectorAll('#cls-equivalents-list .cls-list-item[data-id]'))
                             .map(el => el.dataset.id).filter(Boolean);
         const disj   = Array.from(document.querySelectorAll('#cls-disjoints-list .cls-list-item[data-id]'))
                             .map(el => el.dataset.id).filter(Boolean);
@@ -1018,7 +1112,7 @@ const ClassEditor = {
             id,
             annotations: { labels, comments, other },
             subClassOf:  [...supers, ...restrictions],
-            equivalentClass: [],
+            equivalentClass: equiv,
             disjointWith: disj,
         };
 
@@ -1051,7 +1145,7 @@ const ClassEditor = {
         const collect = (cid) => (childrenOf[cid] || []).forEach(c => { descendants.push(c); collect(c); });
         collect(id);
 
-        // ── Vérification individuals AVANT la confirmation ──────────
+        // ── Check individuals BEFORE confirmation ──────────
         const toDelete   = new Set([id, ...descendants]);
         const blocking   = (APP.state.individuals || []).filter(
             ind => (ind.types || []).some(t => toDelete.has(t))
@@ -1090,18 +1184,18 @@ const ClassEditor = {
 };
 
 
-// ── Éditeur de restrictions ──────────────────────────────────
+// ── Restriction editor ──────────────────────────────────
 
 const RestrictionEditor = {
 
-    _selectedProp: null,   // propriété sélectionnée dans le tree
+    _selectedProp: null,   // property selected in the tree
 
-    // ── Rendu principal ──────────────────────────────────────────
+    // ── Main rendering ──────────────────────────────────────────
     renderPanel(restrictions, cls) {
         const ico = `<svg width="9" height="9" viewBox="0 0 9 9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><line x1="4.5" y1=".5" x2="4.5" y2="8.5"/><line x1=".5" y1="4.5" x2="8.5" y2="4.5"/></svg>`;
         const alpha = (a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' });
 
-        // ── Section "Asserted" ────────────────────────────────
+        // ── "Asserted" section ────────────────────────────────
         const groups  = this._group(restrictions);
         const propIds = Object.keys(groups).sort(alpha);
         const _allProps = [
@@ -1120,7 +1214,7 @@ const RestrictionEditor = {
                 </div>`;
             }).join('');
 
-        // ── Section "Inherited" ───────────────────────────────
+        // ── "Inherited" section ───────────────────────────────
         const inherited  = cls ? this._computeInherited(cls) : [];
         const inhGroups  = this._group(inherited);
         const inhPropIds = Object.keys(inhGroups).sort(alpha);
@@ -1175,7 +1269,7 @@ const RestrictionEditor = {
         </div>`;
     },
 
-    // ── Calcul des propriétés héritées (traversée récursive) ─────
+    // ── Computing inherited properties (recursive traversal) ─────
     _computeInherited(cls) {
         const classes = APP.state.classes || [];
         const visited = new Set([cls.id]);
@@ -1188,10 +1282,10 @@ const RestrictionEditor = {
             if (!c) return;
             (c.subClassOf || []).forEach(expr => {
                 if (typeof expr === 'object') {
-                    // _marker inclus : propriété sans restriction héritée aussi
+                    // _marker included: property without restriction also inherited
                     result.push({ ...expr, _fromClass: clsId });
                 } else if (typeof expr === 'string') {
-                    collect(expr);   // remonter la hiérarchie
+                    collect(expr);   // traverse up the hierarchy
                 }
             });
         };
@@ -1200,7 +1294,7 @@ const RestrictionEditor = {
         return result;
     },
 
-    // ── Groupe propriété en lecture seule (héritage) ─────────────
+    // ── Read-only property group (inheritance) ─────────────
     _renderGroupReadOnly(prop, restrictions) {
         const isOP   = (APP.state.object_properties  || []).some(p => p.id === prop);
         const isDP   = (APP.state.datatype_properties || []).some(p => p.id === prop);
@@ -1209,13 +1303,13 @@ const RestrictionEditor = {
         const navSection = isOP ? 'object-properties' : isDP ? 'datatype-properties' : null;
         const visible = restrictions.filter(r => r.type !== '_marker');
 
-        // Tag de provenance — affiché dans le header, pas dans les lignes enfants
+        // Source tag — shown in the header, not in child rows
         const fromClasses = [...new Set(restrictions.map(r => r._fromClass).filter(Boolean))];
         const fromTag = fromClasses.length
             ? `<span class="restr-prop-summary">(↑ ${fromClasses.join(', ')})</span>`
             : '';
 
-        // Lignes enfants read-only — sans tag ↑ (déjà dans le header)
+        // Read-only child rows — without ↑ tag (already in the header)
         const childRows = visible.map(r => {
             const isCard = (r.type || '').includes('Cardinality');
             let valueHtml = '';
@@ -1283,14 +1377,14 @@ const RestrictionEditor = {
         return d;
     },
 
-    // ── Rendu d'un groupe propriété ──────────────────────────────
+    // ── Rendering a property group ──────────────────────────────
     _renderGroup(prop, restrictions) {
         const isSel  = prop === this._selectedProp;
-        // Filtrer les marqueurs de présence (_marker) — invisibles pour l'utilisateur
+        // Filter presence markers (_marker) — invisible to the user
         const visible = restrictions.filter(r => r.type !== '_marker');
         const summary = visible.map(r => this._desc(r)).join(', ');
 
-        // ── Chip multiplicity (single/multiple) basé sur range + functional ──
+        // ── Multiplicity chip (single/multiple) based on range + functional ──
         const opData = (APP.state.object_properties  || []).find(p => p.id === prop);
         const dpData = (APP.state.datatype_properties || []).find(p => p.id === prop);
         const isOP   = !!opData;
@@ -1330,7 +1424,7 @@ const RestrictionEditor = {
         </div>`;
     },
 
-    // ── Rendu d'un enfant restriction ────────────────────────────
+    // ── Rendering a restriction child ────────────────────────────
     _renderChild(prop, r, li) {
         const gid        = `${prop}__${li}`;
         const types      = ['someValuesFrom','allValuesFrom','hasValue','exactCardinality','minCardinality','maxCardinality'];
@@ -1356,7 +1450,7 @@ const RestrictionEditor = {
                             onmouseover="this.style.textDecoration='underline';this.style.color='var(--accent,#5f8dd3)';this.style.cursor='pointer'"
                             onmouseout="this.style.textDecoration='';this.style.color=''"
                         ` : ''}
-                    >${fv || '— classe —'}</span>
+                    >${fv || '— class —'}</span>
                     <button class="btn-frame-del restr-filler-clear" style="flex-shrink:0"
                         onclick="event.stopPropagation();RestrictionEditor.deleteChild('${gid}')">✕</button>
                     <span style="flex:1"></span>
@@ -1375,7 +1469,7 @@ const RestrictionEditor = {
         </div>`;
     },
 
-    // ── Actions toolbar ──────────────────────────────────────────
+    // ── Toolbar actions ──────────────────────────────────────────
     showPropPicker() {
         const el = document.getElementById('restr-prop-picker');
         if (!el) return;
@@ -1389,7 +1483,7 @@ const RestrictionEditor = {
         const picker = document.getElementById('restr-prop-picker');
         if (picker) {
             picker.style.display = 'none';
-            // Retirer l'item du picker (propriété déjà dans le panel)
+            // Remove the item from the picker (property already in the panel)
             picker.querySelector(`.restr-prop-item[data-id="${propId}"]`)?.remove();
         }
         if (document.querySelector(`.restr-prop-group[data-prop="${propId}"]`)) {
@@ -1401,7 +1495,7 @@ const RestrictionEditor = {
         const div = document.createElement('div');
         div.innerHTML = this._renderGroup(propId, []);
         const newGroup = div.firstElementChild;
-        // Insertion en ordre alphabétique
+        // Insert in alphabetical order
         const existing = Array.from(tree.querySelectorAll('.restr-prop-group'));
         const after = existing.find(el =>
             el.dataset.prop.localeCompare(propId, undefined, { sensitivity: 'base' }) > 0);
@@ -1485,7 +1579,7 @@ const RestrictionEditor = {
     deleteProp(prop) {
         document.querySelector(`.restr-prop-group[data-prop="${prop}"]`)?.remove();
         if (this._selectedProp === prop) this._selectedProp = null;
-        // Remettre la propriété dans le picker avec son icône, en ordre alphabétique
+        // Put the property back in the picker with its icon, in alphabetical order
         const picker = document.getElementById('restr-prop-picker');
         if (picker && !picker.querySelector(`.restr-prop-item[data-id="${prop}"]`)) {
             const isOP  = (APP.state.object_properties || []).some(p => p.id === prop);
@@ -1497,7 +1591,7 @@ const RestrictionEditor = {
             item.innerHTML = `<span class="${dotCls}" style="flex-shrink:0"></span>
                 <span class="tree-label" style="margin-left:4px">${prop}</span>`;
             item.onclick = () => RestrictionEditor.addProperty(prop);
-            // Insertion en ordre alphabétique parmi les items existants
+            // Insert in alphabetical order among existing items
             const items = Array.from(picker.querySelectorAll('.restr-prop-item'));
             const after = items.find(el =>
                 el.dataset.id.localeCompare(prop, undefined, { sensitivity: 'base' }) > 0);
@@ -1520,10 +1614,10 @@ const RestrictionEditor = {
         const filler = document.getElementById(`restr-filler-${gid}`);
         if (card)   card.style.display   = isCard ? 'inline' : 'none';
         if (filler) filler.style.display = isCard ? 'none'   : '';
-        // Afficher/masquer le ◦ devant le champ de cardinalité
+        // Show/hide the ◦ before the cardinality field
         const cardDot = card?.previousElementSibling;
         if (cardDot?.classList.contains('tree-leaf')) cardDot.style.display = isCard ? 'inline' : 'none';
-        // Fermer le dropdown si on bascule vers cardinalité
+        // Close the dropdown when switching to cardinality
         if (isCard) row.querySelector('.restr-filler-dropdown') && (row.querySelector('.restr-filler-dropdown').style.display = 'none');
     },
 
@@ -1557,10 +1651,10 @@ const RestrictionEditor = {
         if (!wrap) return;
         wrap.querySelector('.restr-filler-val').value = id;
         const lbl = wrap.querySelector('.restr-filler-lbl');
-        lbl.textContent = id || '— classe —';
+        lbl.textContent = id || '— class —';
         lbl.style.flex = '0 1 auto';
         const btn = wrap.querySelector('.restr-filler-btn');
-        // Mettre à jour le dot
+        // Update the dot
         const old = btn.querySelector('.cls-dot, .restr-filler-ph');
         if (old) old.remove();
         const dot = document.createElement('span');
@@ -1573,14 +1667,14 @@ const RestrictionEditor = {
         if (ClassEditor._editingId !== null) ClassEditor.autoSave();
     },
 
-    // ── Collecte pour la sauvegarde ──────────────────────────────
+    // ── Collecting for save ──────────────────────────────
     collect() {
         const result = [];
         document.querySelectorAll('#restr-tree .restr-prop-group').forEach(group => {
             const prop = group.dataset.prop;
             const rows = group.querySelectorAll('.restr-child-row');
             if (rows.length === 0) {
-                // Groupe vide → marqueur de présence (persisté en JSON, ignoré en RDF)
+                // Empty group → presence marker (persisted in JSON, ignored in RDF)
                 result.push({ type: '_marker', property: prop });
                 return;
             }
@@ -1607,7 +1701,7 @@ const RestrictionEditor = {
 
 // ════════════════════════════════════════════════════════════════
 // HELPERS PARTAGÉS  (Annotations, Listes, Pickers)
-// Utilisés par OPEditor et DPEditor
+// Used by OPEditor and DPEditor
 // ════════════════════════════════════════════════════════════════
 
 /** HTML d'une ligne d'annotation (pour rendu initial).
@@ -1616,12 +1710,21 @@ const RestrictionEditor = {
 function _annoRow(type, value, lang, editor, ac, prop = null) {
     let propLabel, langCell, dataProp;
     if (type === 'other') {
-        propLabel = `<span class="anno-prop-dot"></span> ${prop}`;
-        langCell  = '';
+        propLabel = `<span class="anno-prop-dot"></span>
+                     <span class="nav-link" onclick="APP.navigateTo('annotation-properties','${prop}')"
+                           title="Go to ${prop}">${prop}</span>`;
+        langCell  = `<div style="display:flex;align-items:center;gap:1px">
+                        <input type="text" class="anno-lang-inp" value="${lang||Settings.defaultLang}" ${ac}
+                               style="width:36px;min-width:0">
+                        <button class="btn-ftool" style="padding:1px 3px;font-size:9px;flex-shrink:0"
+                                onclick="Settings.showLangDropdown(this)" title="Choose language">▼</button>
+                    </div>`;
         dataProp  = ` data-prop="${prop}"`;
     } else {
         const propName = type === 'label' ? 'rdfs:label' : 'rdfs:comment';
-        propLabel = `<span class="anno-prop-dot"></span> ${propName}`;
+        propLabel = `<span class="anno-prop-dot"></span>
+                     <span class="nav-link" onclick="APP.navigateTo('annotation-properties','${propName}')"
+                           title="Go to ${propName}">${propName}</span>`;
         langCell  = `<div style="display:flex;align-items:center;gap:1px">
                         <input type="text" class="anno-lang-inp" value="${lang||Settings.defaultLang}" ${ac}
                                style="width:36px;min-width:0">
@@ -1638,17 +1741,26 @@ function _annoRow(type, value, lang, editor, ac, prop = null) {
     </tr>`;
 }
 
-/** Élément TR annotation (DOM) pour insertion dynamique.
+/** Annotation TR element (DOM) for dynamic insertion.
  *  type = 'label' | 'comment' | 'other'
  *  propId : requis si type === 'other' */
 function _makeAnnotRow(type, editor, ac, propId = null) {
     let propLabel, langHtml;
     if (type === 'other') {
-        propLabel = `<span class="anno-prop-dot"></span> ${propId}`;
-        langHtml  = '';
+        propLabel = `<span class="anno-prop-dot"></span>
+                     <span class="nav-link" onclick="APP.navigateTo('annotation-properties','${propId}')"
+                           title="Go to ${propId}">${propId}</span>`;
+        langHtml  = `<div style="display:flex;align-items:center;gap:1px">
+                        <input type="text" class="anno-lang-inp" value="${Settings.defaultLang}" ${ac}
+                               style="width:36px;min-width:0">
+                        <button class="btn-ftool" style="padding:1px 3px;font-size:9px;flex-shrink:0"
+                                onclick="Settings.showLangDropdown(this)" title="Choose language">▼</button>
+                    </div>`;
     } else {
         const propName = type === 'label' ? 'rdfs:label' : 'rdfs:comment';
-        propLabel = `<span class="anno-prop-dot"></span> ${propName}`;
+        propLabel = `<span class="anno-prop-dot"></span>
+                     <span class="nav-link" onclick="APP.navigateTo('annotation-properties','${propName}')"
+                           title="Go to ${propName}">${propName}</span>`;
         langHtml  = `<div style="display:flex;align-items:center;gap:1px">
                         <input type="text" class="anno-lang-inp" value="${Settings.defaultLang}" ${ac}
                                style="width:36px;min-width:0">
@@ -1711,20 +1823,26 @@ function _ruleUsesProperty(rule, propId) {
     return [...(rule.body || []), ...(rule.head || [])].some(search);
 }
 
-/** Génère la frame "Where Used in SWRL Rules" pour un élément donné.
- *  @param {Function} testFn  (rule) => boolean — retourne true si la règle référence l'élément */
+/** Generates the "Where Used in SWRL Rules" frame for a given element.
+ *  @param {Function} testFn  (rule) => boolean — returns true if the rule references the element */
 function _whereUsedFrame(testFn) {
     const used = (APP.state.swrl_rules || []).filter(testFn);
     if (!used.length) return '';
-    const rows = used.map(r => `
-        <div class="cls-list-item" style="cursor:default">
+    const rows = used.map(r => {
+        const mainText = r.label || r.id;
+        const subText  = r.label ? r.id : '';
+        return `
+        <div class="cls-list-item" style="cursor:default;align-items:center">
             <span style="font-size:11px;flex-shrink:0">⚙️</span>
-            <span class="cls-list-lbl" style="cursor:pointer"
+            <span style="flex:1;overflow:hidden;min-width:0;cursor:pointer"
                   onclick="APP.navigateTo('swrl-rules','${r.id}')"
-                  onmouseover="this.style.textDecoration='underline';this.style.color='var(--accent,#5f8dd3)'"
-                  onmouseout="this.style.textDecoration='';this.style.color=''">${r.id}</span>
-            ${r.label ? `<span class="restr-prop-summary" style="margin-left:4px">${r.label}</span>` : ''}
-        </div>`).join('');
+                  onmouseover="this.querySelector('.swrl-main-lbl').style.textDecoration='underline';this.querySelector('.swrl-main-lbl').style.color='var(--accent,#5f8dd3)'"
+                  onmouseout="this.querySelector('.swrl-main-lbl').style.textDecoration='';this.querySelector('.swrl-main-lbl').style.color=''">
+                <span class="cls-list-lbl swrl-main-lbl" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block">${mainText}</span>
+                ${subText ? `<span style="font-size:10px;color:var(--text-faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block">${subText}</span>` : ''}
+            </span>
+        </div>`;
+    }).join('');
     return `<div class="h-resizer"></div>
         <div class="cls-frame">
             <div class="cls-frame-bar">
@@ -1792,16 +1910,25 @@ function _removeListItem(id, listId, placeholder = '') {
     }
 }
 
-/** Bascule la visibilité d'un picker select */
+/** Toggles the visibility of a select picker */
 function _togglePicker(id) {
     const el = document.getElementById(id);
     if (!el) return;
     const visible = el.style.display !== 'none';
     el.style.display = visible ? 'none' : '';
-    if (!visible) el.focus();
+    if (!visible) {
+        el.focus();
+        const close = (e) => {
+            if (!el.contains(e.target) && !e.target.closest('[onclick*="_togglePicker"],[onclick*="showPicker"]')) {
+                el.style.display = 'none';
+                document.removeEventListener('click', close, true);
+            }
+        };
+        setTimeout(() => document.addEventListener('click', close, true), 0);
+    }
 }
 
-/** Collecte les annotations depuis un tbody (label, comment et autres) */
+/** Collects annotations from a tbody (label, comment, and others) */
 function _collectAnnotations(tbodyId) {
     const labels = [], comments = [], other = [];
     document.querySelectorAll(`#${tbodyId} .anno-row`).forEach(row => {
@@ -1815,18 +1942,57 @@ function _collectAnnotations(tbodyId) {
     return { labels, comments, other };
 }
 
-/** Items HTML du picker d'annotation properties (les 7 "other") */
+/** Items HTML du picker d'annotation properties — arbre complet (built-ins + user-defined) */
 function _annoPickerItems(editorName) {
-    return OTHER_ANNO_PROPS.map(p =>
-        `<div class="tree-item" style="padding:3px 8px"
-              onclick="${editorName}.addOtherAnnotRow('${p}')">
-            <span class="anno-prop-dot" style="margin-right:4px"></span>
-            <span class="tree-label" style="font-size:12px;color:var(--text2);font-family:var(--font-mono)">${p}</span>
-        </div>`
-    ).join('');
+    const userProps = APP.state.annotation_properties || [];
+    const { childrenOf, builtinChildrenOf } = typeof APEditor !== 'undefined'
+        ? APEditor._buildUserTree(userProps)
+        : { childrenOf: {}, builtinChildrenOf: {} };
+
+    const itemHtml = (id, depth, isBuiltin) => `
+        <div class="tree-item" style="padding:3px 8px;padding-left:${8 + depth * 14}px"
+             onclick="${editorName}.addOtherAnnotRow('${id}')">
+            <span class="anno-prop-dot" style="margin-right:4px;flex-shrink:0"></span>
+            <span class="tree-label" style="font-size:12px;color:var(--text2);font-family:var(--font-mono)">${id}</span>
+            ${isBuiltin ? '<span style="font-size:10px;color:var(--text-faint);font-style:italic;margin-left:4px">built-in</span>' : ''}
+        </div>`;
+
+    const renderUserNode = (id, depth) => {
+        const children = childrenOf[id] || [];
+        return itemHtml(id, depth, false)
+             + children.map(cid => renderUserNode(cid, depth + 1)).join('');
+    };
+
+    const renderNs = (ns) => {
+        const builtins = AP_BUILTINS[ns];
+        const nsLabel = `<div style="padding:4px 8px 2px;font-size:10px;font-weight:600;color:var(--text-dim);
+                               font-family:var(--font-mono);letter-spacing:0.05em;user-select:none">${ns}</div>`;
+        const builtinHtml = builtins.map(p => {
+            const kids = (builtinChildrenOf[p.id] || []);
+            return itemHtml(p.id, 1, true)
+                 + kids.map(cid => renderUserNode(cid, 2)).join('');
+        }).join('');
+        // user props under this namespace with no parent
+        const allUserIds  = new Set(userProps.map(q => q.id));
+        const allBuiltins = new Set([...AP_BUILTINS['rdfs:'], ...AP_BUILTINS['owl:']].map(q => q.id));
+        const hasParent   = new Set(Object.values(childrenOf).flat().concat(Object.values(builtinChildrenOf).flat()));
+        const nsRoots = userProps
+            .filter(q => !hasParent.has(q.id) && q.id.startsWith(ns.replace(':', ':')))
+            .map(q => renderUserNode(q.id, 1)).join('');
+        return nsLabel + builtinHtml + nsRoots;
+    };
+
+    // Orphan user props (no namespace match, no parent)
+    const allBuiltinIds = new Set([...AP_BUILTINS['rdfs:'], ...AP_BUILTINS['owl:']].map(q => q.id));
+    const hasParent     = new Set(Object.values(childrenOf).flat().concat(Object.values(builtinChildrenOf).flat()));
+    const orphans = userProps
+        .filter(q => !hasParent.has(q.id) && !q.id.startsWith('rdfs:') && !q.id.startsWith('owl:'))
+        .map(q => renderUserNode(q.id, 0)).join('');
+
+    return renderNs('rdfs:') + renderNs('owl:') + orphans;
 }
 
-/** Collecte les data-id depuis une liste */
+/** Collects data-id values from a list */
 function _collectList(listId) {
     return Array.from(document.querySelectorAll(`#${listId} .cls-list-item[data-id]`))
         .map(el => el.dataset.id).filter(Boolean);
@@ -1834,8 +2000,8 @@ function _collectList(listId) {
 
 
 /**
- * Active les séparateurs horizontaux redimensionnables (.h-resizer)
- * situés dans le conteneur identifié par `containerId`.
+ * Activates the resizable horizontal separators (.h-resizer)
+ * located in the container identified by `containerId`.
  * Le drag redistribue proportionnellement les hauteurs des frames
  * adjacents (prev + next = total constant).
  */
@@ -1919,7 +2085,7 @@ const OPEditor = {
             <line x1="8.5" y1="6.5" x2="8.5" y2="11.5"/>
         </svg>`,
 
-    // ── Construction de l'arbre ──────────────────────────────────
+    // ── Tree construction ──────────────────────────────────
 
     buildTree(props) {
         const allIds = new Set(props.map(p => p.id));
@@ -1983,6 +2149,7 @@ const OPEditor = {
 
     renderTree(props) {
         const { roots, childrenOf } = this.buildTree(props);
+        const { propRoot } = APP.getOntologyRootLabels();
         const topSel = this._topPropSelected ? ' selected' : '';
         return `
         <div class="tree-root-item${topSel}"
@@ -1993,7 +2160,7 @@ const OPEditor = {
              ondrop="OPEditor.onDrop(event,null)">
             <span class="tree-toggle open" style="cursor:default">▶</span>
             <span class="op-prop-dot tree-op-dot tree-op-top-dot"></span>
-            <span style="font-size:12px">owl:topObjectProperty</span>
+            <span style="font-size:12px">${propRoot}</span>
         </div>
         ${props.length
             ? roots.map(id => this._renderNode(id, childrenOf, 1)).join('')
@@ -2001,7 +2168,7 @@ const OPEditor = {
         }`;
     },
 
-    // ── Layout splitté ───────────────────────────────────────────
+    // ── Split layout ───────────────────────────────────────────
 
     renderSplit(props) {
         const ico = `<svg width="9" height="9" viewBox="0 0 9 9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><line x1="4.5" y1=".5" x2="4.5" y2="8.5"/><line x1=".5" y1="4.5" x2="8.5" y2="4.5"/></svg>`;
@@ -2029,7 +2196,7 @@ const OPEditor = {
                     </div>
                 </div>
 
-                <!-- ── Séparateur redimensionnable ── -->
+                <!-- ── Resizable separator ── -->
                 <div class="h-resizer"></div>
 
                 <!-- ── Super Properties ── -->
@@ -2057,7 +2224,7 @@ const OPEditor = {
         </div>`;
     },
 
-    // ── Sélection / navigation ───────────────────────────────────
+    // ── Selection / navigation ───────────────────────────────────
 
     restoreSelection() {
         this._initSplitPane();
@@ -2081,11 +2248,11 @@ const OPEditor = {
             document.addEventListener('mousemove', onMove);
             document.addEventListener('mouseup', onUp);
         });
-        // Redimensionnement vertical arbre ↕ super-propriétés
+        // Vertical resizing tree ↕ super-properties
         _initHResizers('op-tree-panel');
     },
 
-    /** Met à jour le panneau "Super Properties" dans la colonne gauche */
+    /** Updates the "Super Properties" panel in the left column */
     _updateSuperPanel(prop) {
         const panel = document.getElementById('op-sub-list');
         if (!panel) return;
@@ -2150,11 +2317,12 @@ const OPEditor = {
         document.querySelectorAll('#op-tree .tree-item, #op-tree .tree-root-item').forEach(el => el.classList.remove('selected'));
         document.querySelector('#op-tree .tree-root-item')?.classList.add('selected');
         const detail = document.getElementById('op-detail');
+        const { propRoot } = APP.getOntologyRootLabels();
         if (detail) detail.innerHTML = `
             <div class="detail-panel-empty">
                 <span class="op-prop-dot" style="width:40px;height:20px"></span>
-                <strong style="font-family:var(--font-mono);font-size:13px">owl:topObjectProperty</strong>
-                <span style="color:var(--text-dim);font-size:12px">Root of all OWL Object Properties</span>
+                <strong style="font-family:var(--font-mono);font-size:13px">${propRoot}</strong>
+                <span style="color:var(--text-dim);font-size:12px">Root of all Object Properties</span>
                 <span style="color:var(--text2);font-size:12px">Select an existing <strong>Object Property</strong> or create a new one</span>
                 <button class="btn-primary btn-sm" onclick="OPEditor.createChild()">＋ Create Object Property</button>
             </div>`;
@@ -2256,7 +2424,7 @@ const OPEditor = {
         } catch (e) { UI.error(e.message); }
     },
 
-    // ── Menu contextuel ──────────────────────────────────────────
+    // ── Context menu ──────────────────────────────────────────
 
     showContextMenu(event, id) {
         event.preventDefault();
@@ -2365,7 +2533,7 @@ const OPEditor = {
 
     deleteSelected() { if (this._selectedId) this.delete(this._selectedId); },
 
-    // ── Formulaire style Protégé ─────────────────────────────────
+    // ── Protégé-style form ─────────────────────────────────
 
     renderForm(prop = null) {
         const isNew = !prop;
@@ -2409,8 +2577,8 @@ const OPEditor = {
         return `
         <div class="cls-editor">
             <div class="cls-editor-hdr">
-                <div class="cls-editor-title">OBJECT PROPERTY EDITOR for&nbsp;
-                    <input type="text" id="op-id" class="cls-id-inp" value="${p.id}" placeholder="NewProperty" ${ac} title="Identifiant IRI local">
+                <div class="cls-editor-title">ID&nbsp;
+                    <input type="text" id="op-id" class="cls-id-inp" value="${p.id}" placeholder="NewProperty" oninput="_sanitizeId(this)" ${ac} title="Local IRI identifier — cannot start with a digit">
                     <span class="cls-editor-meta">(instance of owl:ObjectProperty)</span>
                 </div>
                 ${propIri ? `<div class="cls-editor-iri">For Property:&nbsp;<code>${propIri}</code></div>` : ''}
@@ -2419,8 +2587,8 @@ const OPEditor = {
             <div class="cls-frame">
                 <div class="cls-frame-bar">
                     <span class="cls-frame-tag">Annotation(s)</span>
-                    <button class="btn-ftool" onclick="OPEditor.addAnnotRow('label')"   title="Ajouter rdfs:label">${ico}&thinsp;label</button>
-                    <button class="btn-ftool" onclick="OPEditor.addAnnotRow('comment')" title="Ajouter rdfs:comment">${ico}&thinsp;comment</button>
+                    <button class="btn-ftool" onclick="OPEditor.addAnnotRow('label')"   title="Add rdfs:label">${ico}&thinsp;label</button>
+                    <button class="btn-ftool" onclick="OPEditor.addAnnotRow('comment')" title="Add rdfs:comment">${ico}&thinsp;comment</button>
                     <button class="btn-ftool" onclick="_togglePicker('op-anno-picker')" title="Add annotation property">${ico}&thinsp;Annotation Property</button>
                 </div>
                 <div class="cls-frame-body">
@@ -2440,7 +2608,7 @@ const OPEditor = {
                 <div class="cls-frame cls-frame-half">
                     <div class="cls-frame-bar">
                         <span class="cls-frame-tag">Domain(s)</span>
-                        <button class="btn-ftool" onclick="OPEditor.showPicker('op-domain-picker')" title="Ajouter domaine">${ico}</button>
+                        <button class="btn-ftool" onclick="OPEditor.showPicker('op-domain-picker')" title="Add domain">${ico}</button>
                     </div>
                     <div class="cls-frame-body" id="op-domain-list">
                         ${domainRows || '<div class="cls-list-empty">owl:Thing</div>'}
@@ -2452,7 +2620,7 @@ const OPEditor = {
                 <div class="cls-frame cls-frame-half">
                     <div class="cls-frame-bar">
                         <span class="cls-frame-tag">Range(s)</span>
-                        <button class="btn-ftool" onclick="OPEditor.showPicker('op-range-picker')" title="Ajouter range">${ico}</button>
+                        <button class="btn-ftool" onclick="OPEditor.showPicker('op-range-picker')" title="Add range">${ico}</button>
                     </div>
                     <div class="cls-frame-body" id="op-range-list">
                         ${rangeRows || '<div class="cls-list-empty">owl:Thing</div>'}
@@ -2501,7 +2669,7 @@ const OPEditor = {
         </div>`;
     },
 
-    // ── Helpers annotations ──────────────────────────────────────
+    // ── Annotation helpers ──────────────────────────────────────
 
     addAnnotRow(type) {
         const ac = this._editingId !== null ? 'onchange="OPEditor.autoSave()"' : '';
@@ -2517,7 +2685,7 @@ const OPEditor = {
     // ── Helpers pickers ──────────────────────────────────────────
 
     showPicker(id) {
-        // Unicité de l'inverse : si un inverse est déjà défini, ne pas ouvrir le picker
+        // Uniqueness of inverse: if an inverse is already defined, do not open the picker
         if (id === 'op-inverse-picker') {
             const val = document.getElementById('op-inverse-value')?.value;
             if (val) return;
@@ -2555,17 +2723,17 @@ const OPEditor = {
             ph.textContent = '— none —';
             body.insertBefore(ph, body.querySelector('input'));
         }
-        // Masquer/afficher le bouton + selon qu'un inverse est défini (unicité)
+        // Hide/show the + button depending on whether an inverse is defined (uniqueness)
         const btn = document.getElementById('op-inverse-btn');
         if (btn) btn.style.display = id ? 'none' : '';
-        // Fermer le picker
+        // Close the picker
         const picker = document.getElementById('op-inverse-picker');
         if (picker) picker.style.display = 'none';
         if (this._editingId !== null) this.autoSave();
     },
     removeInverse() { this.setInverse(''); },
 
-    // ── Inférence inverse ────────────────────────────────────────
+    // ── Inverse inference ────────────────────────────────────────
 
     async _loadInferredInverse(id) {
         try {
@@ -2573,9 +2741,9 @@ const OPEditor = {
             const items = (data.inferred_inverse_properties || []).filter(i => i.property_id === id);
             const el    = document.getElementById('op-inferred-inverse');
             if (el) el.innerHTML = items.map(i =>
-                `<span class="badge-inferred" title="${i.reason}">⊢ inverse de <strong>${i.inverse_of}</strong></span>`
+                `<span class="badge-inferred" title="${i.reason}">⊢ inverse of <strong>${i.inverse_of}</strong></span>`
             ).join('');
-        } catch (e) { /* silencieux */ }
+        } catch (e) { /* silent */ }
     },
 
     // ── Sauvegarde ───────────────────────────────────────────────
@@ -2585,7 +2753,7 @@ const OPEditor = {
     async save(isNew) {
         const originalId = isNew ? null : this._editingId;
         const id = document.getElementById('op-id').value.trim();
-        if (!id) return UI.error('L\'identifiant est obligatoire');
+        const _idErr = _validateId(id, 'Identifier'); if (_idErr) return UI.error(_idErr);
 
         const { labels, comments, other } = _collectAnnotations('op-annotations-body');
         const domain  = _collectList('op-domain-list');
@@ -2663,7 +2831,7 @@ const DPEditor = {
             <line x1="8.5" y1="6.5" x2="8.5" y2="11.5"/>
         </svg>`,
 
-    // ── Construction de l'arbre ──────────────────────────────────
+    // ── Tree construction ──────────────────────────────────
 
     buildTree(props) {
         const allIds = new Set(props.map(p => p.id));
@@ -2726,6 +2894,8 @@ const DPEditor = {
 
     renderTree(props) {
         const { roots, childrenOf } = this.buildTree(props);
+        const { propRoot } = APP.getOntologyRootLabels();
+        const dpRoot = propRoot === 'rdf:Property' ? 'rdf:Property' : 'owl:topDataProperty';
         const topSel = this._topPropSelected ? ' selected' : '';
         return `
         <div class="tree-root-item${topSel}"
@@ -2736,7 +2906,7 @@ const DPEditor = {
              ondrop="DPEditor.onDrop(event,null)">
             <span class="tree-toggle open" style="cursor:default">▶</span>
             <span class="dp-prop-dot tree-dp-dot tree-dp-top-dot"></span>
-            <span style="font-size:12px">owl:topDataProperty</span>
+            <span style="font-size:12px">${dpRoot}</span>
         </div>
         ${props.length
             ? roots.map(id => this._renderNode(id, childrenOf, 1)).join('')
@@ -2744,7 +2914,7 @@ const DPEditor = {
         }`;
     },
 
-    // ── Layout splitté ───────────────────────────────────────────
+    // ── Split layout ───────────────────────────────────────────
 
     renderSplit(props) {
         const ico = `<svg width="9" height="9" viewBox="0 0 9 9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><line x1="4.5" y1=".5" x2="4.5" y2="8.5"/><line x1=".5" y1="4.5" x2="8.5" y2="4.5"/></svg>`;
@@ -2774,7 +2944,7 @@ const DPEditor = {
                     </div>
                 </div>
 
-                <!-- ── Séparateur redimensionnable ── -->
+                <!-- ── Resizable separator ── -->
                 <div class="h-resizer"></div>
 
                 <!-- ── Super Properties ── -->
@@ -2805,7 +2975,7 @@ const DPEditor = {
         </div>`;
     },
 
-    // ── Sélection / navigation ───────────────────────────────────
+    // ── Selection / navigation ───────────────────────────────────
 
     restoreSelection() {
         this._initSplitPane();
@@ -2829,11 +2999,11 @@ const DPEditor = {
             document.addEventListener('mousemove', onMove);
             document.addEventListener('mouseup', onUp);
         });
-        // Redimensionnement vertical arbre ↕ super-propriétés
+        // Vertical resizing tree ↕ super-properties
         _initHResizers('dp-tree-panel');
     },
 
-    /** Met à jour le panneau "Super Properties" dans la colonne gauche */
+    /** Updates the "Super Properties" panel in the left column */
     _updateSuperPanel(prop) {
         const panel = document.getElementById('dp-sub-list');
         if (!panel) return;
@@ -2906,11 +3076,13 @@ const DPEditor = {
         document.querySelectorAll('#dp-tree .tree-item, #dp-tree .tree-root-item').forEach(el => el.classList.remove('selected'));
         document.querySelector('#dp-tree .tree-root-item')?.classList.add('selected');
         const detail = document.getElementById('dp-detail');
+        const { propRoot } = APP.getOntologyRootLabels();
+        const dpRoot = propRoot === 'rdf:Property' ? 'rdf:Property' : 'owl:topDataProperty';
         if (detail) detail.innerHTML = `
             <div class="detail-panel-empty">
                 <span class="dp-prop-dot" style="width:40px;height:20px"></span>
-                <strong style="font-family:var(--font-mono);font-size:13px">owl:topDatatypeProperty</strong>
-                <span style="color:var(--text-dim);font-size:12px">Root of all OWL Datatype Properties</span>
+                <strong style="font-family:var(--font-mono);font-size:13px">${dpRoot}</strong>
+                <span style="color:var(--text-dim);font-size:12px">Root of all Datatype Properties</span>
                 <span style="color:var(--text2);font-size:12px">Select an existing <strong>Datatype Property</strong> or create a new one</span>
                 <button class="btn-primary btn-sm" onclick="DPEditor.createChild()">＋ Create Datatype Property</button>
             </div>`;
@@ -3010,7 +3182,7 @@ const DPEditor = {
         } catch (e) { UI.error(e.message); }
     },
 
-    // ── Menu contextuel ──────────────────────────────────────────
+    // ── Context menu ──────────────────────────────────────────
 
     showContextMenu(event, id) {
         event.preventDefault();
@@ -3119,7 +3291,7 @@ const DPEditor = {
 
     deleteSelected() { if (this._selectedId) this.delete(this._selectedId); },
 
-    // ── Formulaire style Protégé ─────────────────────────────────
+    // ── Protégé-style form ─────────────────────────────────
 
     renderForm(prop = null) {
         const isNew = !prop;
@@ -3157,8 +3329,8 @@ const DPEditor = {
         return `
         <div class="cls-editor">
             <div class="cls-editor-hdr">
-                <div class="cls-editor-title">DATATYPE PROPERTY EDITOR for&nbsp;
-                    <input type="text" id="dp-id" class="cls-id-inp" value="${p.id}" placeholder="NewDatatypeProperty" ${ac} title="Identifiant IRI local">
+                <div class="cls-editor-title">ID&nbsp;
+                    <input type="text" id="dp-id" class="cls-id-inp" value="${p.id}" placeholder="NewDatatypeProperty" oninput="_sanitizeId(this)" ${ac} title="Local IRI identifier — cannot start with a digit">
                     <span class="cls-editor-meta">(instance of owl:DatatypeProperty)</span>
                 </div>
                 ${propIri ? `<div class="cls-editor-iri">For Property:&nbsp;<code>${propIri}</code></div>` : ''}
@@ -3168,8 +3340,8 @@ const DPEditor = {
             <div class="cls-frame">
                 <div class="cls-frame-bar">
                     <span class="cls-frame-tag">Annotation(s)</span>
-                    <button class="btn-ftool" onclick="DPEditor.addAnnotRow('label')"   title="Ajouter rdfs:label">${ico}&thinsp;label</button>
-                    <button class="btn-ftool" onclick="DPEditor.addAnnotRow('comment')" title="Ajouter rdfs:comment">${ico}&thinsp;comment</button>
+                    <button class="btn-ftool" onclick="DPEditor.addAnnotRow('label')"   title="Add rdfs:label">${ico}&thinsp;label</button>
+                    <button class="btn-ftool" onclick="DPEditor.addAnnotRow('comment')" title="Add rdfs:comment">${ico}&thinsp;comment</button>
                     <button class="btn-ftool" onclick="_togglePicker('dp-anno-picker')" title="Add annotation property">${ico}&thinsp;Annotation Property</button>
                 </div>
                 <div class="cls-frame-body">
@@ -3189,7 +3361,7 @@ const DPEditor = {
                 <div class="cls-frame cls-frame-half">
                     <div class="cls-frame-bar">
                         <span class="cls-frame-tag">Domain(s)</span>
-                        <button class="btn-ftool" onclick="DPEditor.showPicker('dp-domain-picker')" title="Ajouter domaine">${ico}</button>
+                        <button class="btn-ftool" onclick="DPEditor.showPicker('dp-domain-picker')" title="Add domain">${ico}</button>
                     </div>
                     <div class="cls-frame-body" id="dp-domain-list">
                         ${domainRows || '<div class="cls-list-empty">owl:Thing</div>'}
@@ -3230,7 +3402,7 @@ const DPEditor = {
         </div>`;
     },
 
-    // ── Helpers annotations ──────────────────────────────────────
+    // ── Annotation helpers ──────────────────────────────────────
 
     addAnnotRow(type) {
         const ac = this._editingId !== null ? 'onchange="DPEditor.autoSave()"' : '';
@@ -3246,7 +3418,7 @@ const DPEditor = {
     // ── Helpers pickers ──────────────────────────────────────────
 
     showPicker(id) {
-        // Unicité du range : si un type est déjà défini, ne pas ouvrir le picker
+        // Range uniqueness: if a type is already defined, do not open the picker
         if (id === 'dp-range-picker') {
             const list = document.getElementById('dp-range-list');
             if (list && list.querySelector('.cls-list-item[data-id]')) return;
@@ -3260,14 +3432,14 @@ const DPEditor = {
     addRange(id) {
         if (!id) return;
         _addListItem(id, 'dp-range-list', 'dp-range-picker', 'DPEditor.removeRange', 'xsd-dot');
-        // Unicité : masquer le bouton + après ajout
+        // Uniqueness: hide the + button after adding
         const btn = document.getElementById('dp-range-btn');
         if (btn) btn.style.display = 'none';
         if (this._editingId !== null) this.autoSave();
     },
     removeRange(id) {
         _removeListItem(id, 'dp-range-list', 'rdfs:Literal');
-        // Réafficher le bouton + après suppression
+        // Show the + button again after removal
         const btn = document.getElementById('dp-range-btn');
         if (btn) btn.style.display = '';
         if (this._editingId !== null) this.autoSave();
@@ -3276,14 +3448,14 @@ const DPEditor = {
     addSubProp(id)    { _addListItem(id, 'dp-sub-list', 'dp-sub-picker', 'DPEditor.removeSubProp', 'dp-prop-dot', '', '', 'datatype-properties'); if (id && this._editingId !== null) this.autoSave(); },
     removeSubProp(id) { _removeListItem(id, 'dp-sub-list'); if (this._editingId !== null) this.autoSave(); },
 
-    // ── Sauvegarde / suppression ─────────────────────────────────
+    // ── Save / delete ─────────────────────────────────
 
     autoSave() { if (this._editingId !== null) this.save(false); },
 
     async save(isNew) {
         const originalId = isNew ? null : this._editingId;
         const id = document.getElementById('dp-id').value.trim();
-        if (!id) return UI.error('L\'identifiant est obligatoire');
+        const _idErr = _validateId(id, 'Identifier'); if (_idErr) return UI.error(_idErr);
 
         const { labels, comments, other } = _collectAnnotations('dp-annotations-body');
         const domain  = _collectList('dp-domain-list');
@@ -3327,15 +3499,15 @@ const DPEditor = {
 
 const IndividualEditor = {
 
-    _editingId:         null,   // ID de l'individu en cours d'édition (null = nouveau)
+    _editingId:         null,   // ID of the individual being edited (null = new)
     _selectedClassId:   null,   // null = owl:Thing (tous) ; string = IRI de classe
-    _selectedIndId:     null,   // dernier individu sélectionné (formulaire col 3)
-    _selectedIndIds:    new Set(), // tous les individus sélectionnés (multi-sélection)
+    _selectedIndId:     null,   // last selected individual (col 3 form)
+    _selectedIndIds:    new Set(), // all selected individuals (multi-selection)
     _anchorIndId:       null,   // point d'ancrage pour Shift+Click
-    _displayProps:      {},     // classId → propId  (règle simple)
-    _displayPropsMulti: {},     // classId → [{sep, propId}, ...]  (règle composite)
+    _displayProps:      {},     // classId → propId  (simple rule)
+    _displayPropsMulti: {},     // classId → [{sep, propId}, ...]  (composite rule)
 
-    // ── Layout 3 colonnes ────────────────────────────────────────
+    // ── 3-column layout ────────────────────────────────────────
 
     renderSplit(individuals) {
         const treeContent = this._renderClassTree(individuals);
@@ -3385,7 +3557,12 @@ const IndividualEditor = {
         const { roots, childrenOf } = ClassEditor.buildTree(classes);
         const lines   = [];
 
-        // owl:Thing → tous les individuals
+        const dropAttrs = (clsId) => clsId === 'owl:Thing' ? '' :
+            `ondragover="IndividualEditor._onClassDragOver(event,this)"
+             ondragleave="IndividualEditor._onClassDragLeave(this)"
+             ondrop="IndividualEditor._onClassDrop(event,this,'${clsId}')"`;
+
+        // owl:Thing → all individuals
         lines.push(`<div class="tree-item${sel === null ? ' selected' : ''}" data-id="owl:Thing"
             style="padding-left:6px" onclick="IndividualEditor.selectClass(null)">
             <span class="tree-leaf">◦</span>
@@ -3394,7 +3571,7 @@ const IndividualEditor = {
             <span class="nav-count" style="margin-left:auto;margin-right:6px">${inds.length}</span>
         </div>`);
 
-        // Collecte récursive de toutes les sous-classes d'un nœud (lui inclus)
+        // Recursive collection of all sub-classes of a node (including itself)
         const allDescendants = (id) => {
             const set   = new Set([id]);
             const queue = [...(childrenOf[id] || [])];
@@ -3411,10 +3588,11 @@ const IndividualEditor = {
         const visit = (id, depth) => {
             const pl   = depth * 16 + 6;
             const desc = allDescendants(id);
-            // Compte transitif : individu dont au moins 1 type est dans la descendance
+            // Transitive count: individual whose at least 1 type is in the descendant set
             const count = inds.filter(x => (x.types || []).some(t => desc.has(t))).length;
             lines.push(`<div class="tree-item${id === sel ? ' selected' : ''}" data-id="${id}"
-                style="padding-left:${pl}px" onclick="IndividualEditor.selectClass('${id}')">
+                style="padding-left:${pl}px" onclick="IndividualEditor.selectClass('${id}')"
+                ${dropAttrs(id)}>
                 <span class="tree-leaf">◦</span>
                 <span class="cls-dot tree-cls-dot"></span>
                 <span class="tree-label">${id}</span>
@@ -3435,7 +3613,7 @@ const IndividualEditor = {
         if (!classId) {
             filtered = inds; // owl:Thing → tous
         } else {
-            // Filtrage transitif : individuals de classId ET de toutes ses sous-classes
+            // Transitive filter: individuals of classId AND all its sub-classes
             const { childrenOf } = ClassEditor.buildTree(APP.state.classes || []);
             const accepted = new Set([classId]);
             const queue = [...(childrenOf[classId] || [])];
@@ -3449,9 +3627,20 @@ const IndividualEditor = {
             filtered = inds.filter(x => (x.types || []).some(t => accepted.has(t)));
         }
 
+        // Ensure display rules are loaded before resolving labels
+        if (!Object.keys(this._displayProps).length && !Object.keys(this._displayPropsMulti).length) {
+            this._loadDisplayRules();
+        }
+
         const selId = this._selectedIndId;
 
         if (!filtered.length) return '<div class="cls-list-empty" style="padding:12px 8px;font-style:italic">No individuals</div>';
+
+        filtered = [...filtered].sort((a, b) => {
+            const la = (this._resolveDisplayLabel(a, this._selectedClassId) || a.id).toLowerCase();
+            const lb = (this._resolveDisplayLabel(b, this._selectedClassId) || b.id).toLowerCase();
+            return la.localeCompare(lb);
+        });
 
         return filtered.map(ind => {
             const dispLabel = this._resolveDisplayLabel(ind, this._selectedClassId);
@@ -3459,7 +3648,10 @@ const IndividualEditor = {
             const subText   = dispLabel ? ind.id : '';
             return `
             <div class="tree-item${this._selectedIndIds.has(ind.id) ? ' selected' : ''}" data-id="${ind.id}"
-                 style="padding:4px 6px 4px 10px;display:flex;align-items:center;gap:4px;cursor:pointer"
+                 style="padding:4px 6px 4px 10px;display:flex;align-items:center;gap:4px;cursor:grab"
+                 draggable="true"
+                 ondragstart="IndividualEditor._onIndDragStart(event,'${ind.id}')"
+                 ondragend="IndividualEditor._onIndDragEnd(event)"
                  onclick="IndividualEditor.selectIndividual('${ind.id}', event.shiftKey)">
                 <span class="xsd-dot" style="flex-shrink:0;margin:0"></span>
                 <span style="flex:1;overflow:hidden;min-width:0">
@@ -3472,24 +3664,80 @@ const IndividualEditor = {
         }).join('');
     },
 
-    // ── Sélections ───────────────────────────────────────────────
+    // ── Drag & drop : déplacer un individual vers une classe ────────
+
+    _onIndDragStart(event, indId) {
+        event.dataTransfer.setData('text/plain', indId);
+        event.dataTransfer.effectAllowed = 'move';
+        event.currentTarget.style.opacity = '0.5';
+    },
+
+    _onIndDragEnd(event) {
+        event.currentTarget.style.opacity = '';
+    },
+
+    _onClassDragOver(event, el) {
+        event.preventDefault();
+        event.dataTransfer.dropEffect = 'move';
+        el.style.background = 'rgba(59,130,246,0.18)';
+        el.style.outline    = '2px solid var(--accent)';
+    },
+
+    _onClassDragLeave(el) {
+        el.style.background = '';
+        el.style.outline    = '';
+    },
+
+    async _onClassDrop(event, el, targetClassId) {
+        event.preventDefault();
+        el.style.background = '';
+        el.style.outline    = '';
+        const indId = event.dataTransfer.getData('text/plain');
+        if (!indId || !targetClassId) return;
+        const ind = (APP.state.individuals || []).find(i => i.id === indId);
+        if (!ind) return;
+        // Remplace le type correspondant à la classe source (ou le premier type), sinon ajoute
+        const srcClass = this._selectedClassId;
+        let newTypes;
+        if (srcClass && (ind.types || []).includes(srcClass)) {
+            // Remplace le type source par la classe cible
+            newTypes = (ind.types || []).map(t => t === srcClass ? targetClassId : t);
+        } else if ((ind.types || []).length === 1) {
+            // Un seul type → on le remplace
+            newTypes = [targetClassId];
+        } else {
+            // Plusieurs types sans filtre clair → on ajoute la nouvelle classe
+            newTypes = [...new Set([...(ind.types || []), targetClassId])];
+        }
+        if (newTypes.join(',') === (ind.types || []).join(',')) return; // pas de changement
+        const updated = { ...ind, types: newTypes };
+        try {
+            await API.updateIndividual(indId, updated);
+            UI.success(`'${indId}' déplacé vers '${targetClassId}'`);
+            await APP.refresh();
+            APP.renderSection('individuals');
+            this.selectIndividual(indId);
+        } catch (e) { UI.error(e.message); }
+    },
+
+    // ── Selections ───────────────────────────────────────────────
 
     selectClass(classId) {
         this._selectedClassId = classId;
         this._selectedIndId   = null;
         this._selectedIndIds.clear();
         this._anchorIndId     = null;
-        // Col 1 — surlignage
+        // Col 1 — highlighting
         document.querySelectorAll('#ind-class-tree .tree-item').forEach(el => {
             const match = classId === null ? el.dataset.id === 'owl:Thing' : el.dataset.id === classId;
             el.classList.toggle('selected', match);
         });
-        // Col 2 — titre + liste
+        // Col 2 — title + list
         const title = document.getElementById('ind-list-title');
         if (title) title.textContent = classId || 'All Individuals';
         const listScroll = document.getElementById('ind-list-scroll');
         if (listScroll) listScroll.innerHTML = this._renderIndList(APP.state.individuals);
-        // Col 3 — vider
+        // Col 3 — clear
         const detail = document.getElementById('ind-detail');
         if (detail) detail.innerHTML = `<div class="detail-panel-empty">
             <span class="cls-dot" style="width:32px;height:32px"></span>
@@ -3508,7 +3756,7 @@ const IndividualEditor = {
 
     selectIndividual(id, isShift = false) {
         if (isShift && this._anchorIndId) {
-            // ── Shift+Click : sélection en plage ─────────────────
+            // ── Shift+Click: range selection ─────────────────
             const items  = [...document.querySelectorAll('#ind-list-scroll .tree-item[data-id]')];
             const ids    = items.map(el => el.dataset.id);
             const from   = ids.indexOf(this._anchorIndId);
@@ -3520,7 +3768,7 @@ const IndividualEditor = {
                 this._selectedIndIds.add(id);
             }
         } else {
-            // ── Clic simple : sélection unique ────────────────────
+            // ── Single click: single selection ────────────────────
             this._selectedIndIds = new Set([id]);
             this._anchorIndId    = id;
         }
@@ -3529,13 +3777,13 @@ const IndividualEditor = {
         this._editingId     = this._selectedIndIds.size === 1 ? id : null;
         this._setDelBtn(this._selectedIndIds.size > 0);
 
-        // Col 2 — surlignage multi
+        // Col 2 — multi-highlight
         document.querySelector('#ind-list-scroll .ind-new-placeholder')?.remove();
         document.querySelectorAll('#ind-list-scroll .tree-item').forEach(el => {
             el.classList.toggle('selected', this._selectedIndIds.has(el.dataset.id));
         });
 
-        // Col 3 — formulaire (1 sélectionné) ou résumé (N sélectionnés)
+        // Col 3 — form (1 selected) or summary (N selected)
         const detail = document.getElementById('ind-detail');
         if (!detail) return;
         if (this._selectedIndIds.size === 1) {
@@ -3559,7 +3807,7 @@ const IndividualEditor = {
         this._anchorIndId    = null;
         this._editingId      = null;
         this._setDelBtn(false);
-        // Col 2 — désélectionner + insérer le placeholder ghost
+        // Col 2 — deselect + insert ghost placeholder
         document.querySelectorAll('#ind-list-scroll .tree-item').forEach(el => el.classList.remove('selected'));
         const scroll = document.getElementById('ind-list-scroll');
         if (scroll) {
@@ -3571,12 +3819,19 @@ const IndividualEditor = {
                 <span style="flex:1;font-style:italic;color:var(--text-dim)">new individual…</span>`;
             scroll.prepend(ghost);
         }
-        // Col 3 — formulaire vide
+        // Col 3 — empty form
         const detail = document.getElementById('ind-detail');
         if (detail) {
             detail.innerHTML = this.renderForm(null, this._selectedClassId);
             _initHResizers('ind-detail');
-            setTimeout(() => document.getElementById('ind-id')?.focus(), 30);
+            setTimeout(() => {
+                const inp = document.getElementById('ind-id');
+                if (inp) {
+                    inp.value = Settings.generateIndividualId(this._selectedClassId);
+                    inp.focus();
+                    inp.select();
+                }
+            }, 30);
         }
     },
 
@@ -3629,14 +3884,14 @@ const IndividualEditor = {
         } catch (e) { UI.error(e.message); }
     },
 
-    /** Persiste les règles d'affichage dans l'ontologie (backend) */
+    /** Persists the display rules in the ontology (backend) */
     _saveDisplayRules() {
         const rules = { single: this._displayProps, multi: this._displayPropsMulti };
         API.updateDisplayRules(rules).catch(() => {});
         if (APP.state.ontology) APP.state.ontology.display_rules = rules;
     },
 
-    /** Charge les règles d'affichage depuis l'état de l'ontologie */
+    /** Loads the display rules from the ontology state */
     _loadDisplayRules() {
         const rules = APP.state.ontology?.display_rules || {};
         this._displayProps      = rules.single || {};
@@ -3646,15 +3901,15 @@ const IndividualEditor = {
     restoreSelection() {
         this._loadDisplayRules();
         this._initSplitPanes();
-        // Col 1 — restaurer surlignage
+        // Col 1 — restore highlighting
         const treeId = this._selectedClassId === null ? 'owl:Thing' : this._selectedClassId;
         document.querySelectorAll('#ind-class-tree .tree-item').forEach(el => {
             el.classList.toggle('selected', el.dataset.id === treeId);
         });
-        // Col 2 — restaurer le titre (casse exacte de la classe)
+        // Col 2 — restore title (exact class casing)
         const titleEl = document.getElementById('ind-list-title');
         if (titleEl) titleEl.textContent = this._selectedClassId || 'All Individuals';
-        // Col 2 — restaurer surlignage individu
+        // Col 2 — restore individual highlighting
         if (this._selectedIndId) {
             document.querySelectorAll('#ind-list-scroll .tree-item').forEach(el => {
                 el.classList.toggle('selected', el.dataset.id === this._selectedIndId);
@@ -3699,8 +3954,8 @@ const IndividualEditor = {
 
     // ── Formulaire individu ─────────────────────────────────────
 
-    /** Profondeur d'une classe dans la hiérarchie (0 = racine sans parents connus).
-     *  BFS itératif, robuste aux cycles. */
+    /** Depth of a class in the hierarchy (0 = root with no known parents).
+     *  Iterative BFS, robust against cycles. */
     _classDepth(clsId, classes) {
         const visited  = new Set();
         let frontier = [clsId];
@@ -3723,12 +3978,12 @@ const IndividualEditor = {
         return depth;
     },
 
-    /** Collecte les propriétés des classes de l'individu, séparées en deux maps :
-     *  - asserted  : définies directement sur les types de l'individu
-     *  - inherited : définies sur les classes ancêtres
+    /** Collects properties of the individual's classes, separated into two maps:
+     *  - asserted  : defined directly on the individual's types
+     *  - inherited : defined on ancestor classes
      *  Chaque map : propId → { kind: 'op'|'dp', fillers: Set<string> }
-     *  Ordonnées par profondeur hiérarchique (classes hautes en premier), puis alpha.
-     *  Une propriété ne peut être que dans l'une ou l'autre. */
+     *  Ordered by hierarchical depth (highest classes first), then alpha.
+     *  A property can only be in one or the other. */
     _getClassProperties(types) {
         const classes   = APP.state.classes || [];
         const depthCache = {};
@@ -3744,9 +3999,9 @@ const IndividualEditor = {
                 map.get(r.property).fillers.add(r.filler);
         };
 
-        // ── Asserted : types directs de l'individu, traités du plus haut au plus bas ──
+        // ── Asserted: direct types of the individual, processed from highest to lowest ──
         const asserted = new Map();
-        // Grouper les propriétés de chaque type direct, puis les ordonner par depth + alpha
+        // Group properties of each direct type, then order by depth + alpha
         const assertedByClass = []; // [{depth, props: [r,...]}]
         const sortedTypes = [...(types || [])].sort((a, b) => depth(a) - depth(b));
         sortedTypes.forEach(typeId => {
@@ -3755,7 +4010,7 @@ const IndividualEditor = {
             const props = (cls.subClassOf || []).filter(r => typeof r === 'object' && r.property);
             if (props.length) assertedByClass.push({ d: depth(typeId), typeId, props });
         });
-        // Tri : profondeur ascendante, puis alpha sur le typeId pour égalité
+        // Sort: ascending depth, then alpha on typeId for tie-breaking
         assertedByClass.sort((a, b) => a.d - b.d || alpha(a.typeId, b.typeId));
         assertedByClass.forEach(({ props }) => {
             // Alpha dans la classe courante
@@ -3763,9 +4018,9 @@ const IndividualEditor = {
                       .forEach(r => addProp(asserted, r));
         });
 
-        // ── Inherited : ancêtres, ordonnés du plus haut au plus bas ──────────────
+        // ── Inherited: ancestors, ordered from highest to lowest ──────────────
         const inh = new Map();
-        // Collecter tous les ancêtres et leurs propriétés
+        // Collect all ancestors and their properties
         const ancMap = new Map(); // clsId → [restrictions]
         const visitedAnc = new Set();
         const collectAnc = (clsId) => {
@@ -3782,7 +4037,7 @@ const IndividualEditor = {
             if (!cls) return;
             (cls.subClassOf || []).filter(s => typeof s === 'string').forEach(collectAnc);
         });
-        // Trier les ancêtres par profondeur ascendante, puis alpha
+        // Sort ancestors by ascending depth, then alpha
         [...ancMap.entries()]
             .sort((a, b) => depth(a[0]) - depth(b[0]) || alpha(a[0], b[0]))
             .forEach(([, props]) => {
@@ -3793,7 +4048,7 @@ const IndividualEditor = {
         return { inherited: inh, asserted };
     },
 
-    /** Rafraîchit la visibilité du bouton + après ajout/suppression d'une valeur */
+    /** Refreshes the visibility of the + button after adding/removing a value */
     _refreshAddBtn(safeId) {
         const body   = document.getElementById(`ind-prop-${safeId}`);
         const panel  = body?.closest('.ind-prop-panel');
@@ -3821,20 +4076,20 @@ const IndividualEditor = {
         );
     },
 
-    /** Génère un panel de propriété dynamique pour un individu.
+    /** Generates a dynamic property panel for an individual.
      *  propInfo = { kind: 'op'|'dp', fillers: Set<string> } */
     _renderPropPanel(propId, propInfo, ind, ac, ico) {
         const { kind, fillers } = propInfo;
         const safeId  = propId.replace(/[^a-zA-Z0-9]/g, '_');
         const dotCls  = kind === 'op' ? 'op-prop-dot' : 'dp-prop-dot';
 
-        // Range effectif : prop.range en priorité, sinon fillers des restrictions
+        // Effective range: prop.range takes priority, otherwise restriction fillers
         const opData   = kind === 'op' ? (APP.state.object_properties  || []).find(p => p.id === propId) : null;
         const dpData   = kind === 'dp' ? (APP.state.datatype_properties || []).find(p => p.id === propId) : null;
         const propRange      = opData?.range || dpData?.range || [];
         const effectiveRange = [...new Set([...propRange, ...(fillers || [])])];
 
-        // Chip range/multiplicité
+        // Range/multiplicity chip
         const mult = kind === 'op'
             ? (opData?.characteristics?.functional ? 'single' : 'multiple')
             : (dpData?.functional ? 'single' : 'multiple');
@@ -3893,7 +4148,7 @@ const IndividualEditor = {
             }).join('') || '<div class="cls-list-empty">—</div>';
         }
 
-        // Masquer le bouton + si single ET déjà une valeur
+        // Hide the + button if single AND already has a value
         const currentCount = kind === 'op'
             ? (ind?.objectAssertions || []).filter(a => a.property === propId).length
             : (ind?.dataAssertions   || []).filter(a => a.property === propId).length;
@@ -3962,14 +4217,14 @@ const IndividualEditor = {
         return `
         <div class="cls-editor">
             <div class="cls-editor-hdr">
-                <div class="cls-editor-title">INDIVIDUAL EDITOR for&nbsp;
+                <div class="cls-editor-title">ID&nbsp;
                     <input type="text" id="ind-id" class="cls-id-inp" value="${i.id}"
                            placeholder="newIndividual"
-                           oninput="this.value=this.value.replace(/\\s+/g,'_')"
+                           oninput="_sanitizeId(this)"
                            ${isNew
                                ? 'onblur="if(this.value.trim()) IndividualEditor.save(true)"'
                                : ac}
-                           title="IRI local identifier — spaces are replaced by _">
+                           title="IRI local identifier — cannot start with a digit">
                     <span class="cls-editor-meta">(owl:NamedIndividual)</span>
                 </div>
                 ${indIri ? `<div class="cls-editor-iri">For Individual:&nbsp;<code>${indIri}</code></div>` : ''}
@@ -4016,7 +4271,7 @@ const IndividualEditor = {
         </div>`;
     },
 
-    // ── Helpers annotations ──────────────────────────────────────
+    // ── Annotation helpers ──────────────────────────────────────
 
     addAnnotRow(type) {
         const ac = this._editingId !== null ? 'onchange="IndividualEditor.autoSave()"' : '';
@@ -4052,7 +4307,7 @@ const IndividualEditor = {
         const safeId = propId.replace(/[^a-zA-Z0-9]/g, '_');
         const body   = document.getElementById(`ind-prop-${safeId}`);
         if (!body) return;
-        // Bloquer si single et déjà une valeur
+        // Block if single and already has a value
         const panel    = body.closest('.ind-prop-panel');
         const isSingle = panel?.dataset?.single === 'true';
         if (isSingle && body.querySelectorAll('.ind-prop-row').length > 0) return;
@@ -4062,7 +4317,7 @@ const IndividualEditor = {
         row.className = 'ind-prop-row';
         row.style.cssText = 'display:flex;align-items:center;gap:4px;padding:2px 4px';
         if (kind === 'op') {
-            // Lire le range effectif stocké sur le panel (prop.range OU fillers de restrictions)
+            // Read the effective range stored on the panel (prop.range OR restriction fillers)
             const panel         = body.closest('.ind-prop-panel');
             const effectiveRange = (panel?.dataset?.effectiveRange || '').split(',').filter(Boolean);
             const rangeInds     = this._indsOfRange(effectiveRange, this._editingId);
@@ -4096,7 +4351,7 @@ const IndividualEditor = {
 
     _picker: { propId: null, effectiveRange: [], selectedClass: null, selectedInd: null },
 
-    /** Ouvre le modal de sélection d'individu pour une OP */
+    /** Opens the individual selection modal for an OP */
     openPicker(propId, effectiveRangeStr) {
         const effectiveRange = (effectiveRangeStr || '').split(',').filter(Boolean);
         this._picker = { propId, effectiveRange, selectedClass: null, selectedInd: null };
@@ -4129,7 +4384,7 @@ const IndividualEditor = {
             return lines.join('') || '<div class="cls-list-empty" style="padding:8px">—</div>';
         };
 
-        // Construire l'ensemble des classes à afficher
+        // Build the set of classes to display
         // Si range vide → montrer TOUTES les classes (pas de contrainte)
         const allClasses = APP.state.classes || [];
         const { roots: allRoots } = ClassEditor.buildTree(allClasses);
@@ -4174,7 +4429,7 @@ const IndividualEditor = {
         </div>`;
         document.body.appendChild(modal);
 
-        // Sélectionner la première classe par défaut si une seule range
+        // Select the first class by default if only one range
         if (effectiveRange.length === 1) this.pickerSelectClass(effectiveRange[0]);
     },
 
@@ -4186,7 +4441,7 @@ const IndividualEditor = {
         document.querySelectorAll('#ind-picker-cls-tree .ind-picker-cls').forEach(el =>
             el.classList.toggle('selected', el.dataset.id === classId));
 
-        // Mettre à jour le titre
+        // Update the title
         const title = document.getElementById('ind-picker-cls-title');
         if (title) title.textContent = classId;
 
@@ -4217,7 +4472,7 @@ const IndividualEditor = {
         const listEl = document.getElementById('ind-picker-ind-list');
         if (listEl) listEl.innerHTML = listHtml;
 
-        // Désactiver OK, activer "New"
+        // Disable OK, enable "New"
         const ok = document.getElementById('ind-picker-ok');
         if (ok) ok.disabled = true;
         const newBtn = document.getElementById('ind-picker-new');
@@ -4239,7 +4494,7 @@ const IndividualEditor = {
         const safeId = propId.replace(/[^a-zA-Z0-9]/g, '_');
         const body   = document.getElementById(`ind-prop-${safeId}`);
         if (body) {
-            // Bloquer si single et déjà une valeur
+            // Block if single and already has a value
             const panel    = body.closest('.ind-prop-panel');
             const isSingle = panel?.dataset?.single === 'true';
             if (isSingle && body.querySelectorAll('.ind-prop-row').length > 0) {
@@ -4273,7 +4528,7 @@ const IndividualEditor = {
         this._picker = { propId: null, effectiveRange: [], selectedClass: null, selectedInd: null };
     },
 
-    /** Affiche un champ inline dans le picker pour nommer puis créer un individu à la volée */
+    /** Shows an inline field in the picker to name then create an individual on the fly */
     pickerCreateNew() {
         const listEl = document.getElementById('ind-picker-ind-list');
         if (!listEl) return;
@@ -4288,7 +4543,7 @@ const IndividualEditor = {
             <span class="xsd-dot" style="margin:0 6px 0 0;flex-shrink:0"></span>
             <input type="text" id="ind-picker-new-id" class="cls-id-inp"
                    placeholder="Individual ID" autocomplete="off"
-                   oninput="this.value=this.value.replace(/\\s+/g,'_')"
+                   oninput="_sanitizeId(this)"
                    style="flex:1;font-size:12px">
             <button class="btn-primary btn-sm" style="font-size:11px;padding:2px 6px"
                     onclick="IndividualEditor._pickerConfirmNew()">✓</button>
@@ -4297,7 +4552,9 @@ const IndividualEditor = {
         listEl.prepend(row);
         const inp = document.getElementById('ind-picker-new-id');
         if (inp) {
+            inp.value = Settings.generateIndividualId(classId);
             inp.focus();
+            inp.select();
             inp.addEventListener('keydown', e => {
                 if (e.key === 'Enter') IndividualEditor._pickerConfirmNew();
                 if (e.key === 'Escape') row.remove();
@@ -4339,8 +4596,8 @@ const IndividualEditor = {
         }
     },
 
-    /** Retourne la règle d'affichage effective pour une classe.
-     *  Remonte la hiérarchie si aucune règle n'est définie sur la classe elle-même. */
+    /** Returns the effective display rule for a class.
+     *  Walks up the hierarchy if no rule is defined on the class itself. */
     _getEffectiveDisplayProp(classId, _visited = new Set()) {
         const key = classId || '__root__';
         if (key in this._displayProps) return this._displayProps[key] || null;
@@ -4349,18 +4606,44 @@ const IndividualEditor = {
         _visited.add(classId);
         const classes = APP.state.classes || [];
         const cls = classes.find(c => c.id === classId);
-        if (!cls) return null;
+        if (!cls) return this._displayProps['__root__'] || null;
         for (const parent of (cls.subClassOf || []).filter(s => typeof s === 'string')) {
             const rule = this._getEffectiveDisplayProp(parent, _visited);
             if (rule) return rule;
         }
-        return null;
+        // Fallback: rule defined at owl:Thing level
+        return this._displayProps['__root__'] || null;
     },
 
-    /** Valeur à afficher pour un individu selon une display property donnée */
+    /** Value to display for an individual based on a given display property.
+     *  Pour rdfs:label@xx : cherche d'abord la langue xx, puis les autres langues
+     *  actives dans l'ordre, puis le premier label disponible. */
     _getDisplayLabel(ind, prop) {
         if (!prop) return null;
-        if (prop === 'rdfs:label')   return (ind.annotations?.labels   || [])[0]?.value || null;
+        // rdfs:label with specific language: rdfs:label@en, rdfs:label@fr …
+        if (prop === 'rdfs:label' || prop.startsWith('rdfs:label@')) {
+            const labels = ind.annotations?.labels || [];
+            if (!labels.length) return null;
+            const requestedLang = prop.includes('@') ? prop.split('@')[1] : null;
+            if (requestedLang) {
+                // 1. requested language
+                const exact = labels.find(l => l.lang === requestedLang);
+                if (exact) return exact.value;
+                // 2. autres langues actives dans l'ordre
+                const activeLangs = (Settings.activeLangs || []).filter(l => l !== requestedLang);
+                for (const lang of activeLangs) {
+                    const found = labels.find(l => l.lang === lang);
+                    if (found) return found.value;
+                }
+                // 3. premier label disponible quelle que soit la langue
+                return labels[0].value;
+            }
+            // rdfs:label without language: preferred language first, otherwise first available
+            const preferred = Settings.preferredLang
+                ? labels.find(l => l.lang === Settings.preferredLang)
+                : null;
+            return (preferred || labels[0]).value;
+        }
         if (prop === 'rdfs:comment') return (ind.annotations?.comments || [])[0]?.value || null;
         const other = (ind.annotations?.other || []).find(a => a.property === prop);
         if (other) return other.value;
@@ -4371,7 +4654,7 @@ const IndividualEditor = {
         return null;
     },
 
-    /** Définit (ou supprime) la règle d'affichage pour la classe courante */
+    /** Sets (or removes) the display rule for the current class */
     setDisplayProp(propId) {
         const key = this._selectedClassId || '__root__';
         if (propId) this._displayProps[key] = propId;
@@ -4388,7 +4671,7 @@ const IndividualEditor = {
 
     // ── Display Properties (composite) ──────────────────────────
 
-    /** Règle composite effective (avec héritage hiérarchique) */
+    /** Effective composite rule (with hierarchical inheritance) */
     _getEffectiveDisplayMulti(classId, _visited = new Set()) {
         const key = classId || '__root__';
         if (key in this._displayPropsMulti) return this._displayPropsMulti[key] || null;
@@ -4397,15 +4680,16 @@ const IndividualEditor = {
         _visited.add(classId);
         const classes = APP.state.classes || [];
         const cls = classes.find(c => c.id === classId);
-        if (!cls) return null;
+        if (!cls) return this._displayPropsMulti['__root__'] || null;
         for (const parent of (cls.subClassOf || []).filter(s => typeof s === 'string')) {
             const rule = this._getEffectiveDisplayMulti(parent, _visited);
             if (rule) return rule;
         }
-        return null;
+        // Fallback: rule defined at owl:Thing level
+        return this._displayPropsMulti['__root__'] || null;
     },
 
-    /** Construit le label composite à partir des lignes {sep, propId} */
+    /** Builds the composite label from the {sep, propId} rows */
     _buildMultiLabel(ind, rows) {
         if (!rows || !rows.length) return null;
         let result = '';
@@ -4421,8 +4705,8 @@ const IndividualEditor = {
         return hasValue ? result || null : null;
     },
 
-    /** Résout le label d'affichage d'un individu selon les règles définies pour sa classe.
-     *  contextClassId : classe de référence pour la recherche (ex: classe sélectionnée, classe du picker) */
+    /** Resolves the display label of an individual based on the rules defined for its class.
+     *  contextClassId : reference class for the search (e.g. selected class, picker class) */
     _resolveDisplayLabel(ind, contextClassId = null) {
         if (!ind) return null;
         const resolveForClass = (clsId) => {
@@ -4433,16 +4717,14 @@ const IndividualEditor = {
             return null;
         };
         let rule = null;
-        // 1. Contexte explicite (classe sélectionnée dans l'arbre ou le picker)
-        if (contextClassId) rule = resolveForClass(contextClassId);
-        // 2. Types propres de l'individu
-        if (!rule) {
-            for (const typeId of (ind.types || [])) {
-                rule = resolveForClass(typeId);
-                if (rule) break;
-            }
+        // 1. Individual's own types — always takes priority
+        for (const typeId of (ind.types || [])) {
+            rule = resolveForClass(typeId);
+            if (rule) break;
         }
-        // 3. Règle racine (__root__)
+        // 2. Context class (selected in tree) — used if no rule found on own types
+        if (!rule && contextClassId) rule = resolveForClass(contextClassId);
+        // 3. Root rule (__root__)
         if (!rule) rule = resolveForClass(null);
         if (!rule) return null;
         return rule.multi
@@ -4450,9 +4732,9 @@ const IndividualEditor = {
             : rule.single ? this._getDisplayLabel(ind, rule.single) : null;
     },
 
-    /** Retourne le label d'affichage pour un ID d'individu (ou l'ID si aucune règle) */
+    /** Returns the display label for an individual ID (or the ID itself if no rule) */
     _labelForId(id, contextClassId = null) {
-        // Auto-charger les règles depuis l'état si elles ne sont pas encore en mémoire
+        // Auto-load display rules from state if not yet in memory
         if (!Object.keys(this._displayProps).length && !Object.keys(this._displayPropsMulti).length) {
             this._loadDisplayRules();
         }
@@ -4461,7 +4743,7 @@ const IndividualEditor = {
         return this._resolveDisplayLabel(ind, contextClassId) || id;
     },
 
-    /** Enregistre la règle composite pour la classe courante */
+    /** Saves the composite rule for the current class */
     setDisplayPropsMulti(rows) {
         const key = this._selectedClassId || '__root__';
         const cleaned = (rows || []).filter(r => r.propId || r.sep);
@@ -4483,7 +4765,7 @@ const IndividualEditor = {
                       || this._getEffectiveDisplayMulti(classId)
                       || [{ sep: '', propId: '' }];
 
-        // Construire la liste des propriétés disponibles (même logique que modal simple)
+        // Build the list of available properties (same logic as the simple modal)
         const propOpts = this._buildPropOptions(classId);
 
         const rowHtml = (r, i) => `
@@ -4552,7 +4834,7 @@ const IndividualEditor = {
         container.appendChild(div);
     },
 
-    /** Confirme et sauvegarde la règle composite */
+    /** Confirms and saves the composite rule */
     _confirmDisplayMulti() {
         const rows = [];
         document.querySelectorAll('#disp-multi-rows .disp-multi-row').forEach(row => {
@@ -4563,7 +4845,7 @@ const IndividualEditor = {
         this.setDisplayPropsMulti(rows);
     },
 
-    /** Construit la liste des options de propriétés pour les modals */
+    /** Builds the property option list for the modals */
     _buildPropOptions(classId) {
         const relevantClasses = new Set();
         if (classId) {
@@ -4593,8 +4875,12 @@ const IndividualEditor = {
             kind: (APP.state.object_properties || []).some(p => p.id === id) ? 'op' : 'dp',
             label: id,
         });
+        const activeLangs = Settings.activeLangs || [];
+        const labelOpts = activeLangs.length
+            ? activeLangs.map(l => ({ id: `rdfs:label@${l}`, kind: 'anno', label: `rdfs:label (${l})` }))
+            : [{ id: 'rdfs:label', kind: 'anno', label: 'rdfs:label' }];
         return [
-            { id: 'rdfs:label',   kind: 'anno', label: 'rdfs:label' },
+            ...labelOpts,
             { id: 'rdfs:comment', kind: 'anno', label: 'rdfs:comment' },
             ...[...inh.keys()].filter(id => id !== 'rdfs:label' && id !== 'rdfs:comment').map(toOpt),
             ...[...ass.keys()].filter(id => id !== 'rdfs:label' && id !== 'rdfs:comment').map(toOpt),
@@ -4602,11 +4888,11 @@ const IndividualEditor = {
         ];
     },
 
-    /** Ouvre le modal de sélection de propriété d'affichage */
+    /** Opens the display property selection modal */
     _openDisplayPropModal() {
         const classId = this._selectedClassId;
 
-        // Collecter la classe et tous ses ancêtres
+        // Collect the class and all its ancestors
         const relevantClasses = new Set();
         if (classId) {
             const classes = APP.state.classes || [];
@@ -4620,11 +4906,11 @@ const IndividualEditor = {
             addAnc(classId);
         }
 
-        // Propriétés via restrictions (même ordre que le formulaire individu)
+        // Properties via restrictions (same order as the individual form)
         const { inherited: inh, asserted: ass } = this._getClassProperties(classId ? [classId] : []);
 
-        // Propriétés supplémentaires via domain (non couvertes par les restrictions)
-        // Uniquement si une classe concrète est sélectionnée (pas owl:Thing)
+        // Additional properties via domain (not covered by restrictions)
+        // Only if a concrete class is selected (not owl:Thing)
         const alreadyCovered = new Set([...inh.keys(), ...ass.keys()]);
         const domainExtras = [];
         if (classId) {
@@ -4642,29 +4928,33 @@ const IndividualEditor = {
             kind: (APP.state.object_properties || []).some(p => p.id === id) ? 'op' : 'dp',
         });
 
-        // Ordre : inherited (même ordre que le formulaire) → asserted → extras domain
+        // Order: inherited (same order as the form) → asserted → domain extras
         const classProps = [
             ...[...inh.keys()].map(toItem),
             ...[...ass.keys()].map(toItem),
             ...domainExtras.map(toItem),
         ].filter(({ id }) => id !== 'rdfs:label' && id !== 'rdfs:comment');
 
+        const activeLangs = Settings.activeLangs || [];
+        const labelItems = activeLangs.length
+            ? activeLangs.map(l => ({ id: `rdfs:label@${l}`, kind: 'anno', label: `rdfs:label (${l})` }))
+            : [{ id: 'rdfs:label', kind: 'anno', label: 'rdfs:label' }];
         const items = [
-            // Annotations : rdfs:label et rdfs:comment seulement
-            { id: 'rdfs:label',   kind: 'anno' },
-            { id: 'rdfs:comment', kind: 'anno' },
-            // Propriétés de la classe (OP + DP via domain)
+            // Annotations : rdfs:label (par langue) et rdfs:comment
+            ...labelItems,
+            { id: 'rdfs:comment', kind: 'anno', label: 'rdfs:comment' },
+            // Class properties (OP + DP via domain)
             ...classProps,
         ];
 
         const dotFor = (kind) => kind === 'op' ? 'op-prop-dot' : kind === 'dp' ? 'dp-prop-dot' : 'anno-prop-dot';
 
-        // Règle effective : propre à cette classe ou héritée
+        // Effective rule: own to this class or inherited
         const ownRule       = this._displayProps[classId || '__root__'] || null;
         const effectiveProp = this._getEffectiveDisplayProp(classId);
         const hasOwn        = !!ownRule;
 
-        const listHtml = items.map(({ id, kind }) => {
+        const listHtml = items.map(({ id, kind, label }) => {
             const isActive   = effectiveProp === id;
             const isOwn      = ownRule === id;
             const isInherited = isActive && !isOwn;
@@ -4672,7 +4962,7 @@ const IndividualEditor = {
             <div class="tree-item${isOwn ? ' selected' : ''}" style="padding:4px 12px;cursor:pointer"
                  onclick="IndividualEditor.setDisplayProp('${id}')">
                 <span class="${dotFor(kind)}" style="flex-shrink:0;margin-right:6px"></span>
-                <span class="tree-label">${id}</span>
+                <span class="tree-label">${label || id}</span>
                 ${isOwn      ? '<span style="margin-left:auto;color:var(--accent)">✓</span>' : ''}
                 ${isInherited ? '<span style="margin-left:auto;font-size:10px;color:var(--text-faint)">(inherited)</span>' : ''}
             </div>`;
@@ -4710,20 +5000,20 @@ const IndividualEditor = {
         const originalId = isNew ? null : this._editingId;
         const idRaw = document.getElementById('ind-id')?.value.trim() || '';
         const id    = idRaw.replace(/\s+/g, '_');   // spaces → underscore
-        // Mettre à jour le champ si la valeur a changé
+        // Update the field if the value has changed
         const idEl = document.getElementById('ind-id');
         if (idEl && id !== idRaw) idEl.value = id;
-        if (!id) return UI.error('Identifier is required');
+        const _idErr = _validateId(id, 'Identifier'); if (_idErr) return UI.error(_idErr);
 
         const { labels, comments, other } = _collectAnnotations('ind-annotations-body');
         const types = _collectList('ind-types-list');
 
-        // Conserver sameAs / differentFrom existants (panels supprimés)
+        // Keep existing sameAs / differentFrom (removed panels)
         const existingInd   = (APP.state.individuals || []).find(x => x.id === (originalId || id));
         const sameAs        = existingInd?.sameAs        || [];
         const differentFrom = existingInd?.differentFrom || [];
 
-        // Collecter depuis les panels dynamiques de propriétés
+        // Collect from dynamic property panels
         const objAssertions = [];
         document.querySelectorAll('.ind-prop-panel[data-kind="op"]').forEach(panel => {
             const prop = panel.dataset.prop;
@@ -4756,13 +5046,13 @@ const IndividualEditor = {
                 await APP.refresh();
                 this._selectedIndId = id;
                 this._editingId     = id;
-                // Col 1 — recalculer les compteurs
+                // Col 1 — recalculate counters
                 const classTree = document.getElementById('ind-class-tree');
                 if (classTree) classTree.innerHTML = this._renderClassTree(APP.state.individuals);
-                // Col 2 — mettre à jour la liste
+                // Col 2 — update the list
                 const listScroll = document.getElementById('ind-list-scroll');
                 if (listScroll) listScroll.innerHTML = this._renderIndList(APP.state.individuals);
-                // Col 3 — afficher le formulaire de l'individu créé
+                // Col 3 — show the created individual form
                 const updated = APP.state.individuals.find(x => x.id === id);
                 const detail  = document.getElementById('ind-detail');
                 if (detail && updated) {
@@ -4775,13 +5065,13 @@ const IndividualEditor = {
                 this._editingId     = id;
                 this._selectedIndId = id;
                 await APP.refresh();
-                // Col 1 — recalculer les compteurs
+                // Col 1 — recalculate counters
                 const classTree = document.getElementById('ind-class-tree');
                 if (classTree) classTree.innerHTML = this._renderClassTree(APP.state.individuals);
-                // Col 2 — mettre à jour la liste
+                // Col 2 — update the list
                 const listScroll = document.getElementById('ind-list-scroll');
                 if (listScroll) listScroll.innerHTML = this._renderIndList(APP.state.individuals);
-                // Col 3 — afficher les données fraîches
+                // Col 3 — show fresh data
                 const updated = APP.state.individuals.find(x => x.id === id);
                 const detail  = document.getElementById('ind-detail');
                 if (detail && updated) {
@@ -4798,7 +5088,7 @@ const IndividualEditor = {
             await API.deleteIndividual(id);
             UI.success(`Individual '${id}' deleted`);
             await APP.refresh();
-            // Vider la sélection si c'était l'individu sélectionné
+            // Clear the selection if it was the selected individual
             if (this._selectedIndId === id) {
                 this._selectedIndId = null;
                 this._editingId     = null;
@@ -4808,12 +5098,662 @@ const IndividualEditor = {
                     <span>Select an existing Individual or create a new one</span>
                 </div>`;
             }
-            // Col 1 — recalculer les compteurs
+            // Col 1 — recalculate counters
             const classTree = document.getElementById('ind-class-tree');
             if (classTree) classTree.innerHTML = this._renderClassTree(APP.state.individuals);
-            // Col 2 — mettre à jour la liste
+            // Col 2 — update the list
             const listScroll = document.getElementById('ind-list-scroll');
             if (listScroll) listScroll.innerHTML = this._renderIndList(APP.state.individuals);
+        } catch (e) { UI.error(e.message); }
+    },
+};
+
+// ════════════════════════════════════════════════════════════════
+// ANNOTATION PROPERTIES EDITOR
+// ════════════════════════════════════════════════════════════════
+
+/**
+ * Built-in annotation properties (read-only, cannot be deleted/renamed).
+ * Displayed under their namespace root node.
+ */
+const AP_BUILTINS = {
+    'rdfs:': [
+        { id: 'rdfs:label',         comment: 'Human-readable name for a resource' },
+        { id: 'rdfs:comment',       comment: 'Description of a resource' },
+        { id: 'rdfs:seeAlso',       comment: 'Related resource with more information' },
+        { id: 'rdfs:isDefinedBy',   comment: 'Resource that defines the subject' },
+    ],
+    'owl:': [
+        { id: 'owl:versionInfo',            comment: 'Version information (string)' },
+        { id: 'owl:deprecated',             comment: 'Marks entity as deprecated (boolean)' },
+        { id: 'owl:priorVersion',           comment: 'Previous version of the ontology' },
+        { id: 'owl:backwardCompatibleWith', comment: 'Prior version backward compatible' },
+        { id: 'owl:incompatibleWith',       comment: 'Prior version incompatible' },
+    ],
+};
+
+const APEditor = {
+
+    _selectedId:   null,   // null | 'rdfs:' | 'owl:' | user-prop id
+    _editingId:    null,   // original id being edited (null = new)
+    _expanded:     new Set(['rdfs:', 'owl:']),
+
+    // ── Shared SVG icons ──────────────────────────────────────
+    _svgChild:  ClassEditor._svgChild,
+    _svgSister: ClassEditor._svgSister,
+    _svgDelete: ClassEditor._svgDelete,
+
+    // ── Helpers ───────────────────────────────────────────────
+
+    _isBuiltin(id) {
+        return AP_BUILTINS['rdfs:'].some(p => p.id === id)
+            || AP_BUILTINS['owl:'].some(p => p.id === id);
+    },
+
+    _isRoot(id) { return id === 'rdfs:' || id === 'owl:'; },
+
+    /** Namespace root of a prop id ('rdfs:label' → 'rdfs:', 'myProp' → null) */
+    _rootOf(id) {
+        if (id.startsWith('rdfs:')) return 'rdfs:';
+        if (id.startsWith('owl:'))  return 'owl:';
+        return null;
+    },
+
+    // ── Tree construction ─────────────────────────────────────
+
+    _allBuiltinIds() {
+        return new Set([
+            ...AP_BUILTINS['rdfs:'].map(p => p.id),
+            ...AP_BUILTINS['owl:'].map(p => p.id),
+        ]);
+    },
+
+    /** Build tree maps for user-defined props.
+     *  builtinChildrenOf: builtinId → [userPropId] for props whose direct parent is a built-in. */
+    _buildUserTree(props) {
+        const allUserIds   = new Set(props.map(p => p.id));
+        const allBuiltins  = this._allBuiltinIds();
+        const childrenOf        = {};   // user → user children
+        const builtinChildrenOf = {};   // builtinId → [userPropId]
+        props.forEach(p => { childrenOf[p.id] = []; });
+        const hasParent = new Set();
+        props.forEach(p => {
+            (p.subPropertyOf || []).forEach(par => {
+                if (allUserIds.has(par)) {
+                    if (!childrenOf[par].includes(p.id)) childrenOf[par].push(p.id);
+                    hasParent.add(p.id);
+                } else if (allBuiltins.has(par)) {
+                    if (!builtinChildrenOf[par]) builtinChildrenOf[par] = [];
+                    if (!builtinChildrenOf[par].includes(p.id)) builtinChildrenOf[par].push(p.id);
+                    hasParent.add(p.id);
+                }
+            });
+        });
+        const alpha = (a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' });
+        const roots = props.filter(p => !hasParent.has(p.id)).map(p => p.id).sort(alpha);
+        Object.keys(childrenOf).forEach(id => childrenOf[id].sort(alpha));
+        Object.keys(builtinChildrenOf).forEach(id => builtinChildrenOf[id].sort(alpha));
+        return { roots, childrenOf, builtinChildrenOf };
+    },
+
+    // ── Rendering ─────────────────────────────────────────────
+
+    _renderBuiltinNode(p, childrenOf, builtinChildrenOf, props) {
+        const isSel      = this._selectedId === p.id;
+        const userKids   = (builtinChildrenOf[p.id] || []);
+        const hasKids    = userKids.length > 0;
+        const isOpen     = this._expanded.has(p.id);
+        return `
+        <div class="tree-root-node">
+            <div class="tree-item${isSel ? ' selected' : ''}" style="padding-left:32px"
+                 onclick="APEditor.selectProp('${p.id}')"
+                 ondragover="APEditor.onDragOver(event,'${p.id}')"
+                 ondragleave="APEditor.onDragLeave(event)"
+                 ondrop="APEditor.onDrop(event,'${p.id}')">
+                ${hasKids
+                    ? `<span class="tree-toggle${isOpen ? ' open' : ''}"
+                             onclick="event.stopPropagation();APEditor.toggleNode('${p.id}')">▶</span>`
+                    : `<span class="tree-leaf">◦</span>`}
+                <span class="anno-prop-dot tree-ap-dot"></span>
+                <span class="tree-label">${p.id}</span>
+                <span style="font-size:10px;color:var(--text-faint);margin-left:6px;font-style:italic">built-in</span>
+            </div>
+            ${hasKids ? `<div style="display:${isOpen ? 'block' : 'none'}">
+                ${userKids.map(cid => this._renderUserNode(cid, childrenOf, 3, props)).join('')}
+            </div>` : ''}
+        </div>`;
+    },
+
+    _renderUserNode(id, childrenOf, depth, props) {
+        const prop = props.find(p => p.id === id);
+        if (!prop) return '';
+        const children = childrenOf[id] || [];
+        const hasChildren = children.length > 0;
+        const isSel = this._selectedId === id;
+        const isOpen = this._expanded.has(id);
+        const sid = id.replace(/'/g, "\\'");
+        return `
+        <div class="tree-root-node">
+            <div class="tree-item${isSel ? ' selected' : ''}" style="padding-left:${depth * 16 + 6}px"
+                 draggable="true"
+                 onclick="APEditor.selectProp('${sid}')"
+                 ondragstart="APEditor.onDragStart(event,'${sid}')"
+                 ondragover="APEditor.onDragOver(event,'${sid}')"
+                 ondragleave="APEditor.onDragLeave(event)"
+                 ondrop="APEditor.onDrop(event,'${sid}')"
+                 ondragend="APEditor.onDragEnd(event)">
+                ${hasChildren
+                    ? `<span class="tree-toggle${isOpen ? ' open' : ''}"
+                             onclick="event.stopPropagation();APEditor.toggleNode('${sid}')">▶</span>`
+                    : `<span class="tree-leaf">◦</span>`}
+                <span class="anno-prop-dot tree-ap-dot"></span>
+                <span class="tree-label">${id}</span>
+            </div>
+            <div style="display:${isOpen ? 'block' : 'none'}">
+                ${children.map(cid => this._renderUserNode(cid, childrenOf, depth + 1, props)).join('')}
+            </div>
+        </div>`;
+    },
+
+    _renderTree(props) {
+        const { roots, childrenOf, builtinChildrenOf } = this._buildUserTree(props);
+        // Only show rdfs:/owl: namespace roots for OWL-based ontologies
+        const showBuiltins = APP.getOntologyRootLabels().classRoot === 'owl:Thing';
+
+        const renderNsRoot = (ns) => {
+            const builtins  = showBuiltins ? AP_BUILTINS[ns] : [];
+            // User props with no parent whose IRI starts with this namespace
+            const userUnder = roots.filter(id => this._rootOf(id) === ns);
+            const isOpen    = this._expanded.has(ns);
+            const isSel     = this._selectedId === ns;
+            const hasChildren = builtins.length + userUnder.length > 0;
+            return `
+            <div class="tree-root-node">
+                <div class="tree-root-item${isSel ? ' selected' : ''}"
+                     onclick="APEditor.selectProp('${ns}')"
+                     ondragover="APEditor.onDragOver(event,'${ns}')"
+                     ondragleave="APEditor.onDragLeave(event)"
+                     ondrop="APEditor.onDrop(event,'${ns}')">
+                    ${hasChildren
+                        ? `<span class="tree-toggle${isOpen ? ' open' : ''}" style="cursor:pointer"
+                                 onclick="event.stopPropagation();APEditor.toggleNode('${ns}')">▶</span>`
+                        : `<span class="tree-toggle open" style="cursor:default">▶</span>`}
+                    <svg class="ap-ns-icon" viewBox="0 0 22 14" width="22" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 2 L2 7 L7 12"/><path d="M15 2 L20 7 L15 12"/></svg>
+                    <span style="font-size:12px;font-family:var(--font-mono);opacity:0.85">${ns}</span>
+                </div>
+                <div style="display:${isOpen ? 'block' : 'none'}">
+                    ${builtins.map(p => this._renderBuiltinNode(p, childrenOf, builtinChildrenOf, props)).join('')}
+                    ${userUnder.map(id => this._renderUserNode(id, childrenOf, 2, props)).join('')}
+                </div>
+            </div>`;
+        };
+
+        // User props with no parent and no namespace match → orphans at root level
+        const orphans = roots.filter(id => !this._rootOf(id));
+
+        return `
+        ${renderNsRoot('rdfs:')}
+        ${renderNsRoot('owl:')}
+        ${orphans.map(id => this._renderUserNode(id, childrenOf, 1, props)).join('')}`;
+    },
+
+    // ── Split layout ──────────────────────────────────────────
+
+    renderSplit(props) {
+        const ico = `<svg width="9" height="9" viewBox="0 0 9 9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><line x1="4.5" y1=".5" x2="4.5" y2="8.5"/><line x1=".5" y1="4.5" x2="8.5" y2="4.5"/></svg>`;
+        return `
+        <div class="section-split">
+            <div class="tree-panel" id="ap-tree-panel">
+                <div class="left-col-top">
+                    <div class="tree-panel-header">
+                        <h3>Annotation Properties</h3>
+                        <div class="tree-actions">
+                            <button id="ap-btn-child" class="btn-icon" disabled
+                                    onclick="APEditor.createChild()"
+                                    title="Add child property (sub-property)">${this._svgChild}<span>Child</span></button>
+                            <button id="ap-btn-sister" class="btn-icon" disabled
+                                    onclick="APEditor.createSibling()"
+                                    title="Add sibling property (same level)">${this._svgSister}<span>Sibling</span></button>
+                            <button id="ap-btn-delete" class="btn-icon btn-icon-danger" disabled
+                                    onclick="APEditor.deleteSelected()" title="Delete">${this._svgDelete}</button>
+                        </div>
+                    </div>
+                    <div class="tree-scroll" id="ap-tree">
+                        ${this._renderTree(props)}
+                    </div>
+                </div>
+
+                <div class="h-resizer"></div>
+
+                <!-- ── Super Properties ── -->
+                <div class="left-col-bottom">
+                    <div class="tree-panel-header">
+                        <h3>Super Properties</h3>
+                    </div>
+                    <div class="left-col-bottom-body" id="ap-super-list">
+                        <div class="cls-list-empty">— select a property —</div>
+                    </div>
+                </div>
+
+            </div>
+            <div class="split-handle" id="ap-split-handle"></div>
+            <div class="detail-panel" id="ap-detail">
+                <div class="detail-panel-empty">
+                    <span class="anno-prop-dot" style="width:40px;height:20px"></span>
+                    <span>Select an <strong>Annotation Property</strong> or create a new one</span>
+                    <button class="btn-primary btn-sm" onclick="APEditor.createChild()">＋ Create Annotation Property</button>
+                </div>
+            </div>
+        </div>`;
+    },
+
+    restoreSelection() {
+        this._initSplitPane();
+        if (this._selectedId) this.selectProp(this._selectedId);
+    },
+
+    _initSplitPane() {
+        const handle = document.getElementById('ap-split-handle');
+        const panel  = document.getElementById('ap-tree-panel');
+        if (!handle || !panel) return;
+        handle.addEventListener('mousedown', e => {
+            e.preventDefault();
+            const startX = e.clientX, startW = panel.offsetWidth;
+            document.body.classList.add('resizing');
+            const onMove = ev => { panel.style.width = Math.min(520, Math.max(160, startW + ev.clientX - startX)) + 'px'; };
+            const onUp   = () => { document.body.classList.remove('resizing'); document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); };
+            document.addEventListener('mousemove', onMove);
+            document.addEventListener('mouseup', onUp);
+        });
+        _initHResizers('ap-tree-panel');
+    },
+
+    toggleNode(id) {
+        if (this._expanded.has(id)) this._expanded.delete(id);
+        else this._expanded.add(id);
+        const tree = document.getElementById('ap-tree');
+        if (tree) tree.innerHTML = this._renderTree(APP.state.annotation_properties || []);
+        this._highlightSelected();
+    },
+
+    // ── Selection ────────────────────────────────────────────
+
+    selectProp(id) {
+        this._selectedId = id;
+        this._highlightSelected();
+        this._updateButtons();
+        const detail = document.getElementById('ap-detail');
+        if (!detail) return;
+        if (this._isRoot(id)) {
+            detail.innerHTML = this._renderRootDetail(id);
+            this._updateSuperPanel(null);
+        } else if (this._isBuiltin(id)) {
+            detail.innerHTML = this._renderBuiltinDetail(id);
+            this._updateSuperPanel(id);
+        } else {
+            const prop = (APP.state.annotation_properties || []).find(p => p.id === id);
+            detail.innerHTML = prop ? this._renderForm(prop) : '';
+            this._updateSuperPanel(id);
+        }
+    },
+
+    _highlightSelected() {
+        document.querySelectorAll('#ap-tree .tree-item, #ap-tree .tree-root-item').forEach(el => {
+            el.classList.toggle('selected', el.closest('[onclick]')?.getAttribute('onclick')?.includes(`'${this._selectedId}'`));
+        });
+        // More reliable: re-render
+        const tree = document.getElementById('ap-tree');
+        if (tree) tree.innerHTML = this._renderTree(APP.state.annotation_properties || []);
+    },
+
+    _updateButtons() {
+        const id        = this._selectedId;
+        const btnChild  = document.getElementById('ap-btn-child');
+        const btnSister = document.getElementById('ap-btn-sister');
+        const btnDelete = document.getElementById('ap-btn-delete');
+        if (!btnChild) return;
+
+        const isRoot    = this._isRoot(id);
+        const isBuiltin = id && this._isBuiltin(id);
+        const isUser    = id && !isRoot && !isBuiltin;
+
+        // Root selected → hide all buttons
+        // Built-in selected → Child only (no Sibling, no Delete)
+        // User-defined → Child + Sibling (no Delete for now, keep for safety)
+        btnChild.style.display  = isRoot ? 'none' : '';
+        btnSister.style.display = (isRoot || isBuiltin) ? 'none' : '';
+        btnDelete.style.display = (isRoot || isBuiltin) ? 'none' : '';
+
+        btnChild.disabled  = !id;     // enabled for built-ins and user props alike
+        btnSister.disabled = !isUser;
+        btnDelete.disabled = !isUser;
+    },
+
+    // ── Detail panels (read-only) ─────────────────────────────
+
+    _renderRootDetail(ns) {
+        const builtins = AP_BUILTINS[ns];
+        return `
+        <div class="cls-editor">
+            <div class="cls-editor-hdr">
+                <div class="cls-editor-title" style="font-family:var(--font-mono)">${ns}</div>
+                <div class="cls-editor-meta" style="font-size:11px;color:var(--text-dim)">Namespace root — not an AnnotationProperty</div>
+            </div>
+            <div class="cls-frame">
+                <div class="cls-frame-bar"><span class="cls-frame-tag">Built-in properties</span></div>
+                <div class="cls-frame-body">
+                    ${builtins.map(p => `
+                    <div class="cls-list-item" style="padding:4px 6px;align-items:flex-start">
+                        <span class="anno-prop-dot" style="margin-top:3px;flex-shrink:0"></span>
+                        <div style="display:flex;flex-direction:column;gap:1px">
+                            <span style="font-size:12px;font-family:var(--font-mono);color:var(--text2)">${p.id}</span>
+                            <span style="font-size:11px;color:var(--text-dim)">${p.comment}</span>
+                        </div>
+                    </div>`).join('')}
+                </div>
+            </div>
+        </div>`;
+    },
+
+    _renderBuiltinDetail(id) {
+        const p = [...AP_BUILTINS['rdfs:'], ...AP_BUILTINS['owl:']].find(x => x.id === id);
+        if (!p) return '';
+        return `
+        <div class="cls-editor">
+            <div class="cls-editor-hdr">
+                <div class="cls-editor-title" style="font-family:var(--font-mono)">${p.id}</div>
+                <div style="margin-top:4px;font-size:11px;color:var(--text-dim)">${p.comment}</div>
+                <div style="margin-top:6px;font-size:11px;color:var(--text-faint);font-style:italic">Built-in OWL 2 annotation property — read-only.</div>
+            </div>
+        </div>`;
+    },
+
+    // ── Form (user-defined props) ────────────────────────────
+
+    _renderForm(prop) {
+        APEditor._editingId = prop?.id || null;
+        const p          = prop || { id: '', comment: '', subPropertyOf: [], annotations: { labels: [], comments: [], other: [] } };
+        const ac         = `onchange="APEditor._autoSave()"`;
+        const baseIri    = (APP.state.ontology?.id || '').replace(/#$/, '');
+        const propIri    = (p.id && baseIri) ? `${baseIri}#${p.id}` : '';
+        const allBuiltins = [...AP_BUILTINS['rdfs:'], ...AP_BUILTINS['owl:']];
+        const userProps   = (APP.state.annotation_properties || []).filter(q => q.id !== p.id);
+        const currentParents = p.subPropertyOf || [];
+        const ico = `<svg width="9" height="9" viewBox="0 0 9 9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><line x1="4.5" y1=".5" x2="4.5" y2="8.5"/><line x1=".5" y1="4.5" x2="8.5" y2="4.5"/></svg>`;
+
+        const annoRows = [
+            ...(p.annotations?.labels   || []).map(l  => _annoRow('label',   l.value, l.lang || Settings.defaultLang, 'APEditor', ac)),
+            ...(p.annotations?.comments || []).map(cm => _annoRow('comment', cm.value, cm.lang || Settings.defaultLang, 'APEditor', ac)),
+            ...(p.annotations?.other    || []).map(a  => _annoRow('other',   a.value, '', 'APEditor', ac, a.property)),
+        ].join('');
+
+        return `
+        <div class="cls-editor">
+            <div class="cls-editor-hdr">
+                <div class="cls-editor-title">ID&nbsp;</div>
+                    <input type="text" id="ap-id" class="cls-id-inp" value="${p.id}"
+                           placeholder="NewAnnotationProperty"
+                           oninput="_sanitizeId(this)"
+                           onchange="APEditor._autoSave()"
+                           title="Local IRI identifier">
+                    <span class="cls-editor-meta">(instance of owl:AnnotationProperty)</span>
+                </div>
+                ${propIri ? `<div class="cls-editor-iri">For Property:&nbsp;<code>${propIri}</code></div>` : ''}
+            </div>
+        </div>`;
+    },
+
+    addAnnotRow(type) {
+        const ac   = `onchange="APEditor._autoSave()"`;
+        const tbody = document.getElementById('ap-annotations-body');
+        if (tbody) tbody.appendChild(_makeAnnotRow(type, 'APEditor', ac));
+    },
+
+    // ── Create ────────────────────────────────────────────────
+
+    _generatePropName() {
+        const existing = new Set((APP.state.annotation_properties || []).map(p => p.id));
+        let name = 'NewAnnotationProperty';
+        let i = 1;
+        while (existing.has(name)) { name = `NewAnnotationProperty${i++}`; }
+        return name;
+    },
+
+    async _createAndSelect(subPropertyOf) {
+        const id = this._generatePropName();
+        const prop = { id, comment: '', subPropertyOf, annotations: { labels: [], comments: [], other: [] } };
+        try {
+            await API.createAP(prop);
+            this._selectedId = id;
+            this._editingId  = id;
+            // Expand parents so the new node is visible
+            subPropertyOf.forEach(par => this._expanded.add(par));
+            await APP.refresh();
+            APP.renderSection('annotation-properties');
+        } catch (e) { UI.error(e.message); }
+    },
+
+    async createChild() {
+        const parent = this._selectedId;
+        const subPropertyOf = (parent && !this._isRoot(parent)) ? [parent] : [];
+        if (parent) this._expanded.add(parent);
+        await this._createAndSelect(subPropertyOf);
+    },
+
+    async createSibling() {
+        const sel = this._selectedId;
+        if (!sel || this._isRoot(sel)) return;
+        const prop = (APP.state.annotation_properties || []).find(p => p.id === sel);
+        const parentIds = prop ? (prop.subPropertyOf || []) : [];
+        parentIds.forEach(p => this._expanded.add(p));
+        await this._createAndSelect([...parentIds]);
+    },
+
+    // ── Save ─────────────────────────────────────────────────
+
+    _collectForm() {
+        const id  = document.getElementById('ap-id')?.value.trim().replace(/\s+/g, '_') || '';
+        // Preserve existing subPropertyOf from state — the form has no checkbox for it
+        const existing = (APP.state.annotation_properties || []).find(p => p.id === (this._editingId || id));
+        const subPropertyOf = existing?.subPropertyOf || [];
+        const { labels, comments, other } = _collectAnnotations('ap-annotations-body');
+        return { id, comment: '', subPropertyOf, annotations: { labels, comments, other } };
+    },
+
+    async _autoSave() {
+        const id = this._selectedId;
+        if (!id || this._isRoot(id) || this._isBuiltin(id)) return;
+        const data = this._collectForm();
+        if (!data.id) return;
+        try {
+            await API.updateAP(id, data);
+            if (data.id !== id) {
+                this._selectedId = data.id;
+                UI.success(`Renamed → '${data.id}'`);
+            }
+            await APP.refresh();
+            APEditor.restoreSelection();
+        } catch (e) { UI.error(e.message); }
+    },
+
+    async save() {
+        const data = this._collectForm();
+        const _apErr = _validateId(data.id, 'ID'); if (_apErr) { UI.warn(_apErr); return; }
+        try {
+            await API.updateAP(this._editingId || data.id, data);
+            this._editingId  = data.id;
+            this._selectedId = data.id;
+            this._expanded.add(data.id);
+            await APP.refresh();
+            APEditor.restoreSelection();
+        } catch (e) { UI.error(e.message); }
+    },
+
+    // ── Super Properties panel ────────────────────────────────
+
+    _updateSuperPanel(selectedId) {
+        const panel = document.getElementById('ap-super-list');
+        if (!panel) return;
+        if (!selectedId) {
+            panel.innerHTML = '<div class="cls-list-empty">— select a property —</div>';
+            return;
+        }
+
+        const allBuiltins = [...AP_BUILTINS['rdfs:'], ...AP_BUILTINS['owl:']];
+        const userProps   = APP.state.annotation_properties || [];
+        const allPropsMap = {};
+        allBuiltins.forEach(p => { allPropsMap[p.id] = { id: p.id, subPropertyOf: [] }; });
+        userProps.forEach(p => { allPropsMap[p.id] = p; });
+
+        const prop    = allPropsMap[selectedId];
+        const parents = prop ? (prop.subPropertyOf || []).filter(s => typeof s === 'string') : [];
+
+        if (!parents.length) {
+            panel.innerHTML = '<div class="cls-list-empty" style="font-style:italic;opacity:0.6">— no super-property —</div>';
+            return;
+        }
+
+        const buildChain = (startId) => {
+            const chain = [];
+            const visited = new Set();
+            let current = startId;
+            while (current && !visited.has(current)) {
+                visited.add(current);
+                chain.push(current);
+                const p = allPropsMap[current];
+                const nextParents = p ? (p.subPropertyOf || []).filter(s => typeof s === 'string') : [];
+                current = nextParents.length > 0 ? nextParents[0] : null;
+            }
+            // Append namespace root at the top of the chain
+            const last = chain[chain.length - 1] || '';
+            const nsRoot = last.startsWith('rdfs:') ? 'rdfs:' : last.startsWith('owl:') ? 'owl:' : null;
+            if (nsRoot) chain.push(nsRoot);
+            return chain;
+        };
+
+        const nsRootItem = (ns) => `
+            <div class="cls-list-item cls-ancestor" style="padding-left:${6 + buildChain(parents[0]).length * 14 - 14}px;opacity:0.55;font-style:italic;cursor:pointer"
+                 onclick="APEditor.selectProp('${ns}')">
+                <svg class="ap-ns-icon" viewBox="0 0 22 14" width="16" height="10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px;flex-shrink:0"><path d="M7 2 L2 7 L7 12"/><path d="M15 2 L20 7 L15 12"/></svg>
+                <span class="cls-list-lbl">${ns}</span>
+            </div>`;
+
+        const html = parents.map(parentId => {
+            const chain = buildChain(parentId);
+            return chain.map((id, i) => {
+                const indent    = 6 + i * 14;
+                const isDirect  = i === 0;
+                const isNsRoot  = id === 'rdfs:' || id === 'owl:';
+                const isBuiltin = allBuiltins.some(b => b.id === id);
+                if (isNsRoot) {
+                    return `<div class="cls-list-item cls-ancestor" style="padding-left:${indent}px;opacity:0.55;font-style:italic;cursor:pointer"
+                                 onclick="APEditor.selectProp('${id}')">
+                        <svg class="ap-ns-icon" viewBox="0 0 22 14" width="16" height="10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px;flex-shrink:0"><path d="M7 2 L2 7 L7 12"/><path d="M15 2 L20 7 L15 12"/></svg>
+                        <span class="cls-list-lbl">${id}</span>
+                    </div>`;
+                }
+                return `<div class="cls-list-item${isDirect ? '' : ' cls-ancestor'}"
+                             style="padding-left:${indent}px${isDirect ? '' : ';opacity:0.75'}">
+                    <span class="anno-prop-dot" style="flex-shrink:0;margin-right:4px"></span>
+                    <span class="cls-list-lbl nav-link"
+                          onclick="APP.navigateTo('annotation-properties','${id}')">${id}</span>
+                    ${isBuiltin ? '<span style="font-size:10px;color:var(--text-faint);font-style:italic;margin-left:4px">built-in</span>' : ''}
+                </div>`;
+            }).join('');
+        }).join('');
+
+        panel.innerHTML = html || '<div class="cls-list-empty" style="font-style:italic;opacity:0.6">— no super-property —</div>';
+    },
+
+    // ── Drag & Drop ───────────────────────────────────────────
+
+    _dragId: null,
+
+    onDragStart(event, id) {
+        this._dragId = id;
+        event.dataTransfer.effectAllowed = 'move';
+        event.dataTransfer.setData('text/plain', id);
+        setTimeout(() => event.target.classList.add('dragging'), 0);
+    },
+
+    onDragOver(event, targetId) {
+        if (!this._dragId) return;
+        if (this._dragId === targetId) return;
+        if (!this._isRoot(targetId) && !this._isBuiltin(targetId) && this._isDescendant(targetId, this._dragId)) return;
+        event.preventDefault();
+        event.dataTransfer.dropEffect = 'move';
+        event.currentTarget.classList.add('drag-over');
+    },
+
+    onDragLeave(event) {
+        event.currentTarget.classList.remove('drag-over');
+    },
+
+    async onDrop(event, targetId) {
+        event.preventDefault();
+        event.currentTarget.classList.remove('drag-over');
+        const draggedId = this._dragId;
+        this._dragId = null;
+        if (!draggedId || draggedId === targetId) return;
+        const props = APP.state.annotation_properties || [];
+        const prop = props.find(p => p.id === draggedId);
+        if (!prop) return;
+
+        let newParents;
+        if (this._isRoot(targetId)) {
+            // Drop on namespace root → no parent (orphan under that namespace)
+            newParents = [];
+        } else {
+            newParents = [targetId];
+        }
+
+        if (targetId && !this._isRoot(targetId)) this._expanded.add(targetId);
+        this._selectedId = draggedId;
+        try {
+            await API.updateAP(draggedId, { ...prop, subPropertyOf: newParents });
+            UI.success(`'${draggedId}' moved`);
+            await APP.refresh();
+            APP.renderSection('annotation-properties');
+        } catch (e) { UI.error(e.message); }
+    },
+
+    onDragEnd(event) {
+        event.target.classList.remove('dragging');
+        document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+        this._dragId = null;
+    },
+
+    _isDescendant(potentialDesc, ancestorId) {
+        if (!potentialDesc || !ancestorId) return false;
+        const { childrenOf } = this._buildUserTree(APP.state.annotation_properties || []);
+        const visit = (id) => {
+            if (id === potentialDesc) return true;
+            return (childrenOf[id] || []).some(child => visit(child));
+        };
+        return visit(ancestorId);
+    },
+
+    // ── Delete ────────────────────────────────────────────────
+
+    async deleteSelected() {
+        const id = this._selectedId;
+        if (!id || this._isRoot(id) || this._isBuiltin(id)) return;
+        if (!await UI.confirm(`Delete annotation property <strong>${id}</strong>?`)) return;
+        try {
+            await API.deleteAP(id);
+            UI.success(`Annotation Property '${id}' deleted`);
+            this._selectedId = null;
+            await APP.refresh();
+            const detail = document.getElementById('ap-detail');
+            if (detail) detail.innerHTML = `
+                <div class="detail-panel-empty">
+                    <span class="anno-prop-dot" style="width:40px;height:20px"></span>
+                    <span>Select an <strong>Annotation Property</strong> or create a new one</span>
+                    <button class="btn-primary btn-sm" onclick="APEditor.createChild()">＋ Create Annotation Property</button>
+                </div>`;
+            const tree = document.getElementById('ap-tree');
+            if (tree) tree.innerHTML = this._renderTree(APP.state.annotation_properties || []);
+            this._updateButtons();
         } catch (e) { UI.error(e.message); }
     },
 };
