@@ -1,29 +1,33 @@
-# Exigences fonctionnelles — Onglet Settings (SWOWL)
+# Exigences — Settings
 
-**Date :** 2026-06-06
-**Note :** Exigences dérivées strictement du code source (`app.js`). Aucune fonctionnalité n'a été extrapolée — chaque exigence cite la fonction JavaScript qui l'implémente.
-
----
+> Généré le 2026-06-06 | Dérivé strictement du code source | Aucune hallucination
 
 ## Table des matières
 
-1. [REQ-SET-001 — Persistance des paramètres utilisateur](#req-set-001-persistance-des-paramètres-utilisateur)
-2. [REQ-SET-002 — Chargement des paramètres au démarrage](#req-set-002-chargement-des-paramètres-au-démarrage)
-3. [REQ-SET-003 — Navigation par sous-onglets dans la page Settings](#req-set-003-navigation-par-sous-onglets-dans-la-page-settings)
-4. [REQ-SET-004 — Affichage de la liste des onglets GUI configurables](#req-set-004-affichage-de-la-liste-des-onglets-gui-configurables)
-5. [REQ-SET-005 — Masquage d'un onglet optionnel](#req-set-005-masquage-dun-onglet-optionnel)
-6. [REQ-SET-006 — Affichage d'un onglet optionnel précédemment masqué](#req-set-006-affichage-dun-onglet-optionnel-précédemment-masqué)
-7. [REQ-SET-007 — Basculement de visibilité d'un onglet (toggle)](#req-set-007-basculement-de-visibilité-dun-onglet-toggle)
-8. [REQ-SET-008 — Application immédiate de la visibilité des onglets dans le DOM](#req-set-008-application-immédiate-de-la-visibilité-des-onglets-dans-le-dom)
-9. [REQ-SET-009 — Persistance de la visibilité des onglets dans le localStorage](#req-set-009-persistance-de-la-visibilité-des-onglets-dans-le-localstorage)
-10. [REQ-SET-010 — Définition de la langue préférée](#req-set-010-définition-de-la-langue-préférée)
-11. [REQ-SET-011 — Activation ou désactivation d'une langue](#req-set-011-activation-ou-désactivation-dune-langue)
-12. [REQ-SET-012 — Protection de la langue préférée contre la désactivation](#req-set-012-protection-de-la-langue-préférée-contre-la-désactivation)
-13. [REQ-SET-013 — Catalogue des langues européennes disponibles](#req-set-013-catalogue-des-langues-européennes-disponibles)
-14. [REQ-SET-014 — Sélection du format d'identifiant des individus](#req-set-014-sélection-du-format-didentifiant-des-individus)
-15. [REQ-SET-015 — Génération automatique d'un identifiant pour un nouvel individu](#req-set-015-génération-automatique-dun-identifiant-pour-un-nouvel-individu)
+### Fond
+- [REQ-SET-001 — Persistance des paramètres utilisateur](#req-set-001--persistance-des-paramètres-utilisateur)
+- [REQ-SET-002 — Chargement des paramètres au démarrage](#req-set-002--chargement-des-paramètres-au-démarrage)
+- [REQ-SET-005 — Masquage d'un onglet optionnel](#req-set-005--masquage-dun-onglet-optionnel)
+- [REQ-SET-006 — Affichage d'un onglet optionnel précédemment masqué](#req-set-006--affichage-dun-onglet-optionnel-précédemment-masqué)
+- [REQ-SET-007 — Basculement de visibilité d'un onglet (toggle)](#req-set-007--basculement-de-visibilité-dun-onglet-toggle)
+- [REQ-SET-009 — Persistance de la visibilité des onglets dans le localStorage](#req-set-009--persistance-de-la-visibilité-des-onglets-dans-le-localstorage)
+- [REQ-SET-010 — Définition de la langue préférée](#req-set-010--définition-de-la-langue-préférée)
+- [REQ-SET-011 — Activation ou désactivation d'une langue](#req-set-011--activation-ou-désactivation-dune-langue)
+- [REQ-SET-012 — Protection de la langue préférée contre la désactivation](#req-set-012--protection-de-la-langue-préférée-contre-la-désactivation)
+- [REQ-SET-013 — Catalogue des langues européennes disponibles](#req-set-013--catalogue-des-langues-européennes-disponibles)
+- [REQ-SET-014 — Sélection du format d'identifiant des individus](#req-set-014--sélection-du-format-didentifiant-des-individus)
+- [REQ-SET-015 — Génération automatique d'un identifiant pour un nouvel individu](#req-set-015--génération-automatique-dun-identifiant-pour-un-nouvel-individu)
+
+### Forme
+- [REQ-SET-003 — Navigation par sous-onglets dans la page Settings](#req-set-003--navigation-par-sous-onglets-dans-la-page-settings)
+- [REQ-SET-004 — Affichage de la liste des onglets GUI configurables](#req-set-004--affichage-de-la-liste-des-onglets-gui-configurables)
+- [REQ-SET-008 — Application immédiate de la visibilité des onglets dans le DOM](#req-set-008--application-immédiate-de-la-visibilité-des-onglets-dans-le-dom)
 
 ---
+
+## 1. Fond — Règles métier et logique fonctionnelle
+
+> Exigences indépendantes de l'IHM : règles OWL, contraintes de données, comportements algorithmiques, validations, persistance.
 
 ### REQ-SET-001 — Persistance des paramètres utilisateur
 
@@ -38,22 +42,6 @@ La méthode `Settings.save()` sérialise en JSON les trois paramètres utilisate
 **Code source :** `app.js` → `Settings.load()`
 
 La méthode `Settings.load()` lit l'entrée `swowl_settings` du `localStorage` et réhydrate les champs `preferredLang`, `activeLangs` et `namingFormat`. Si aucune valeur n'est stockée, les valeurs par défaut sont appliquées : langue préférée `fr`, langues actives `['fr']`, format d'identifiant `individual_counter`. Elle est invoquée une seule fois à l'initialisation du module (`Settings.load()` ligne 189).
-
----
-
-### REQ-SET-003 — Navigation par sous-onglets dans la page Settings
-
-**Code source :** `app.js` → `APP.renderSettings()`
-
-La fonction `APP.renderSettings()` génère une interface à deux colonnes : une barre latérale gauche avec trois sous-onglets cliquables (`GUI Tabs`, `Languages`, `IDs Rules`), et une zone de contenu à droite dont le rendu dépend de la valeur de `APP._settingsTab`. Un clic sur un sous-onglet met à jour `APP._settingsTab` et rappelle `APP.renderSection('settings')` pour réafficher la page.
-
----
-
-### REQ-SET-004 — Affichage de la liste des onglets GUI configurables
-
-**Code source :** `app.js` → `APP.renderGuiTabs()`
-
-La fonction `APP.renderGuiTabs()` affiche la liste exhaustive des 11 onglets de l'application (`Ontologies`, `Settings`, `Classes`, `ObjectProperties`, `DatatypeProperties`, `AnnotationProperties`, `Individuals`, `SWRL Rules`, `Views`, `Queries`, `Inferences`). Les onglets marqués `fixed: true` sont affichés avec une case à cocher désactivée et le label `required`. Les onglets optionnels sont affichés avec une case à cocher interactive reflétant leur état de visibilité courant.
 
 ---
 
@@ -78,14 +66,6 @@ La méthode `TabVisibility.show(tabId)` supprime l'identifiant de l'onglet du `S
 **Code source :** `app.js` → `TabVisibility.toggle()`
 
 La méthode `TabVisibility.toggle(tabId)` appelle `TabVisibility.show()` si l'onglet est actuellement masqué, ou `TabVisibility.hide()` dans le cas contraire. Elle est invoquée directement par le gestionnaire `onclick` de chaque ligne d'onglet dans `APP.renderGuiTabs()`.
-
----
-
-### REQ-SET-008 — Application immédiate de la visibilité des onglets dans le DOM
-
-**Code source :** `app.js` → `APP._applyTabVisibility()`
-
-La fonction `APP._applyTabVisibility()` parcourt la liste `TabVisibility._optional` et, pour chaque identifiant, sélectionne l'élément `.nav-item[data-section="<id>"]` dans le DOM. Elle affecte `display:none` si l'onglet est dans `_hidden`, ou supprime le style inline sinon.
 
 ---
 
@@ -149,4 +129,30 @@ La méthode `Settings.generateIndividualId(classId)` calcule un identifiant par 
 
 ---
 
-*— claude-sonnet-4-6*
+## 2. Forme — Présentation et interface utilisateur
+
+> Exigences relatives à l'affichage : layout, composants visuels, interactions, navigation, styles.
+
+### REQ-SET-003 — Navigation par sous-onglets dans la page Settings
+
+**Code source :** `app.js` → `APP.renderSettings()`
+
+La fonction `APP.renderSettings()` génère une interface à deux colonnes : une barre latérale gauche avec trois sous-onglets cliquables (`GUI Tabs`, `Languages`, `IDs Rules`), et une zone de contenu à droite dont le rendu dépend de la valeur de `APP._settingsTab`. Un clic sur un sous-onglet met à jour `APP._settingsTab` et rappelle `APP.renderSection('settings')` pour réafficher la page.
+
+---
+
+### REQ-SET-004 — Affichage de la liste des onglets GUI configurables
+
+**Code source :** `app.js` → `APP.renderGuiTabs()`
+
+La fonction `APP.renderGuiTabs()` affiche la liste exhaustive des 11 onglets de l'application (`Ontologies`, `Settings`, `Classes`, `ObjectProperties`, `DatatypeProperties`, `AnnotationProperties`, `Individuals`, `SWRL Rules`, `Views`, `Queries`, `Inferences`). Les onglets marqués `fixed: true` sont affichés avec une case à cocher désactivée et le label `required`. Les onglets optionnels sont affichés avec une case à cocher interactive reflétant leur état de visibilité courant.
+
+---
+
+### REQ-SET-008 — Application immédiate de la visibilité des onglets dans le DOM
+
+**Code source :** `app.js` → `APP._applyTabVisibility()`
+
+La fonction `APP._applyTabVisibility()` parcourt la liste `TabVisibility._optional` et, pour chaque identifiant, sélectionne l'élément `.nav-item[data-section="<id>"]` dans le DOM. Elle affecte `display:none` si l'onglet est dans `_hidden`, ou supprime le style inline sinon.
+
+---
