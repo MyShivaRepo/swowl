@@ -43,9 +43,9 @@
 
 ### REQ-QRY-001 — Query persistence per ontology
 
-| **If** | the user works on several distinct ontologies, |
+| **If** | the user works on several distinct `ontologies`, |
 |---|---|
-| **Then** | the queries of each ontology are isolated from one another and persist between sessions, with no risk of mixing or loss upon application reload. |
+| **Then** | the `queries` of each `ontology` are isolated from one another and persist between sessions, with no risk of mixing or loss upon application reload. |
 
 ---
 
@@ -53,9 +53,9 @@
 
 ### REQ-QRY-002 — Creating a new query
 
-| **If** | the user wishes to formulate a new query on the current ontology, |
+| **If** | the user wishes to formulate a new `query` on the current `ontology`, |
 |---|---|
-| **Then** | they can create a blank query with a unique identifier, ready to be configured and executed, without having to manually enter an identifier or fill in optional fields. |
+| **Then** | they can create a blank `query` with a unique identifier, ready to be configured and executed, without having to manually enter an identifier or fill in optional fields. |
 
 ---
 
@@ -63,9 +63,9 @@
 
 ### REQ-QRY-003 — Selecting an existing query
 
-| **If** | the user selects a query from the list of saved queries, |
+| **If** | the user selects a `query` from the list of saved `queries`, |
 |---|---|
-| **Then** | the full detail of that query is displayed in the editing panel, reflecting exactly the persisted state, without altering other queries. |
+| **Then** | the full detail of that `query` is displayed in the editing panel, reflecting exactly the persisted state, without altering other `queries`. |
 
 ---
 
@@ -73,9 +73,9 @@
 
 ### REQ-QRY-004 — Deleting a query
 
-| **If** | the user deletes a query from the list, |
+| **If** | the user deletes a `query` from the list, |
 |---|---|
-| **Then** | the query is permanently removed from the persisted list, and if it was the query currently being edited, the detail panel is cleared. |
+| **Then** | the `query` is permanently removed from the persisted list, and if it was the `query` currently being edited, the detail panel is cleared. |
 
 ---
 
@@ -83,9 +83,9 @@
 
 ### REQ-QRY-005 — Search/filtering in the query list
 
-| **If** | the user types a term in the query list search field, |
+| **If** | the user types a term in the `query` list search field, |
 |---|---|
-| **Then** | only queries whose identifier or label contains that term are displayed; if no query matches, an explicit message indicates this. |
+| **Then** | only `queries` whose identifier or label contains that term are displayed; if no `query` matches, an explicit message indicates this. |
 
 ---
 
@@ -93,7 +93,7 @@
 
 ### REQ-QRY-006 — Editing a query identifier
 
-| **If** | the user modifies the identifier of a query and the input contains spaces, |
+| **If** | the user modifies the identifier of a `query` and the input contains spaces, |
 |---|---|
 | **Then** | spaces are automatically replaced by underscores to ensure identifier validity, and the list is updated accordingly. |
 
@@ -103,7 +103,7 @@
 
 ### REQ-QRY-007 — Editing a query label and comment
 
-| **If** | the user modifies the label or comment of a query and leaves the field, |
+| **If** | the user modifies the label or comment of a `query` and leaves the field, |
 |---|---|
 | **Then** | the changes are automatically saved without any additional action from the user. |
 
@@ -113,9 +113,9 @@
 
 ### REQ-QRY-008 — Adding a triple pattern
 
-| **If** | the user wishes to add a subject-predicate-object condition to the current query, |
+| **If** | the user wishes to add a subject-predicate-object condition to the current `query`, |
 |---|---|
-| **Then** | a new triple pattern is added to the query with default values allowing input to begin immediately. |
+| **Then** | a new triple pattern is added to the `query` with default values allowing input to begin immediately. |
 
 ---
 
@@ -123,9 +123,9 @@
 
 ### REQ-QRY-009 — Adding a FILTER pattern
 
-| **If** | the user wishes to add a filtering condition to the current query, |
+| **If** | the user wishes to add a filtering condition to the current `query`, |
 |---|---|
-| **Then** | a new FILTER pattern is added to the query with a free-text input field to express the condition. |
+| **Then** | a new FILTER pattern is added to the `query` with a free-text input field to express the condition. |
 
 ---
 
@@ -133,9 +133,9 @@
 
 ### REQ-QRY-010 — Adding an OPTIONAL block
 
-| **If** | the user wishes to express optional conditions in the current query, |
+| **If** | the user wishes to express optional conditions in the current `query`, |
 |---|---|
-| **Then** | an empty OPTIONAL block is added to the query, inside which they can then add triple or FILTER patterns independently. |
+| **Then** | an empty OPTIONAL block is added to the `query`, inside which they can then add triple or FILTER patterns independently. |
 
 ---
 
@@ -145,7 +145,7 @@
 
 | **If** | the user adds a triple or FILTER pattern inside an existing OPTIONAL block, |
 |---|---|
-| **Then** | the new pattern is properly attached to the concerned OPTIONAL block and not to the root of the query. |
+| **Then** | the new pattern is properly attached to the concerned OPTIONAL block and not to the root of the `query`. |
 
 ---
 
@@ -153,9 +153,9 @@
 
 ### REQ-QRY-012 — Deleting a pattern (root or nested)
 
-| **If** | the user deletes a pattern located directly in the query (root level), |
+| **If** | the user deletes a pattern located directly in the `query` (root level), |
 |---|---|
-| **Then** | that pattern is removed from the query and the panel is updated. |
+| **Then** | that pattern is removed from the `query` and the panel is updated. |
 
 | **If** | the user deletes a pattern located inside an OPTIONAL block, |
 |---|---|
@@ -181,9 +181,9 @@
 
 ### REQ-QRY-016 — Variable autocompletion
 
-| **If** | the ontology is loaded and the current query contains variables defined in patterns (including those nested in OPTIONAL blocks), |
+| **If** | the `ontology` is loaded and the current `query` contains variables defined in patterns (including those nested in OPTIONAL blocks), |
 |---|---|
-| **Then** | these variables are offered as autocompletion suggestions in the subject, object and sort fields, facilitating query consistency. |
+| **Then** | these variables are offered as autocompletion suggestions in the subject, object and sort fields, facilitating `query` consistency. |
 
 ---
 
@@ -193,7 +193,7 @@
 
 | **If** | the user configures result formatting options (duplicate elimination, sorting, result count limitation), |
 |---|---|
-| **Then** | these options are integrated into the generated SPARQL query and persist with the query. |
+| **Then** | these options are integrated into the generated SPARQL `query` and persist with the `query`. |
 
 ---
 
@@ -201,9 +201,9 @@
 
 ### REQ-QRY-019 — Automatic generation of SPARQL prefixes
 
-| **If** | a SPARQL query is generated for an ontology that has a declared prefix, |
+| **If** | a SPARQL `query` is generated for an `ontology` that has a declared prefix, |
 |---|---|
-| **Then** | the standard prefixes (`rdf:`, `rdfs:`, `owl:`) as well as the prefix specific to the ontology are automatically included in the query, without the user having to enter them manually. |
+| **Then** | the standard prefixes (`rdf:`, `rdfs:`, `owl:`) as well as the prefix specific to the `ontology` are automatically included in the `query`, without the user having to enter them manually. |
 
 ---
 
@@ -211,7 +211,7 @@
 
 ### REQ-QRY-020 — Handling non-variable literals with FILTER(STR(...))
 
-| **If** | the user enters a literal value (non-variable) in the object field of a pattern bearing an annotation property or datatype property predicate, |
+| **If** | the user enters a literal value (non-variable) in the object field of a pattern bearing an `annotation property` or `datatype property` predicate, |
 |---|---|
 | **Then** | the comparison is performed independently of the RDF language tag, avoiding false negatives caused by tagged literals. |
 
@@ -221,9 +221,9 @@
 
 ### REQ-QRY-021 — Executing the query via the API
 
-| **If** | the user launches the execution of the current query, |
+| **If** | the user launches the execution of the current `query`, |
 |---|---|
-| **Then** | the query is sent to the SPARQL endpoint, a progress indicator is displayed during execution, then the number of results obtained is shown on success, or the server error message is displayed on failure. |
+| **Then** | the `query` is sent to the SPARQL endpoint, a progress indicator is displayed during execution, then the number of results obtained is shown on success, or the server error message is displayed on failure. |
 
 ---
 
@@ -231,9 +231,9 @@
 
 ### REQ-QRY-026 — Restoring the current selection
 
-| **If** | the user returns to the queries tab after having navigated elsewhere in the application, |
+| **If** | the user returns to the `queries` tab after having navigated elsewhere in the application, |
 |---|---|
-| **Then** | the last query they were viewing is automatically redisplayed in the detail panel, without them having to search for and select it again. |
+| **Then** | the last `query` they were viewing is automatically redisplayed in the detail panel, without them having to search for and select it again. |
 
 ---
 
@@ -249,7 +249,7 @@
 
 | **If** | the user opens the predicate selector of a triple pattern, |
 |---|---|
-| **Then** | the available predicates are presented organized by category (class type, object properties, datatype properties, annotation properties), respecting the ontology hierarchy, with a distinctive icon per property type. |
+| **Then** | the available predicates are presented organized by category (class type, `object properties`, `datatype properties`, `annotation properties`), respecting the `ontology` hierarchy, with a distinctive icon per `property` type. |
 
 ---
 
@@ -259,13 +259,13 @@
 
 | **If** | the predicate of a triple pattern is `rdf:type`, |
 |---|---|
-| **Then** | the object field presents a class tree selector from the ontology. |
+| **Then** | the object field presents a class tree selector from the `ontology`. |
 
-| **If** | the predicate is an annotation property or a datatype property, |
+| **If** | the predicate is an `annotation property` or a `datatype property`, |
 |---|---|
 | **Then** | the object field presents a wide text field allowing a variable or literal value to be entered. |
 
-| **If** | the predicate is an object property or an unrecognized value, |
+| **If** | the predicate is an `object property` or an unrecognized value, |
 |---|---|
 | **Then** | the object field presents a short text field allowing a variable or IRI to be entered. |
 
@@ -275,9 +275,9 @@
 
 ### REQ-QRY-018 — Generated SPARQL preview
 
-| **If** | the user wishes to view the SPARQL query corresponding to the patterns they have defined, |
+| **If** | the user wishes to `view` the SPARQL `query` corresponding to the patterns they have defined, |
 |---|---|
-| **Then** | they can show or hide a preview panel displaying the generated SPARQL query in real time, without leaving the editing form. |
+| **Then** | they can show or hide a preview panel displaying the generated SPARQL `query` in real time, without leaving the editing form. |
 
 ---
 
@@ -285,7 +285,7 @@
 
 ### REQ-QRY-022 — Displaying results in a table
 
-| **If** | a SPARQL query returns results, |
+| **If** | a SPARQL `query` returns results, |
 |---|---|
 | **Then** | the results are displayed in a readable table with variables as column headers, one row per result, and a clear indication for cells without a value; language tags of literals are visible as superscript. |
 
@@ -295,9 +295,9 @@
 
 ### REQ-QRY-023 — Navigating to an entity from the results
 
-| **If** | a query result corresponds to a known entity in the ontology (class, individual, property), |
+| **If** | a `query` result corresponds to a known entity in the `ontology` (class, `individual`, `property`), |
 |---|---|
-| **Then** | the user can click on that result to navigate directly to the entity's detail view in the corresponding tab of the application. |
+| **Then** | the user can click on that result to navigate directly to the entity's detail `view` in the corresponding tab of the application. |
 
 ---
 
@@ -305,7 +305,7 @@
 
 ### REQ-QRY-024 — External link for unrecognized URIs in results
 
-| **If** | a query result is a URI that does not correspond to any entity in the current ontology, |
+| **If** | a `query` result is a URI that does not correspond to any entity in the current `ontology`, |
 |---|---|
 | **Then** | the user can open that external resource in a new tab by clicking on it. |
 
@@ -315,7 +315,7 @@
 
 ### REQ-QRY-025 — Resizing the list panel
 
-| **If** | the user wishes to adjust the width of the query list panel, |
+| **If** | the user wishes to adjust the width of the `query` list panel, |
 |---|---|
 | **Then** | they can freely resize it by drag-and-drop, within reasonable limits ensuring interface usability. |
 
