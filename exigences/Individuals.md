@@ -56,7 +56,13 @@
 
 ### REQ-IND-002 — Arbre de classes avec compteurs transitifs
 
-La méthode construit l'arbre des classes OWL via `ClassEditor.buildTree()`. Elle affiche en tête le nœud `owl:Thing` avec le nombre total d'individuals. Pour chaque classe, elle calcule un compteur **transitif** : le nombre d'individuals dont au moins un type appartient à l'ensemble des descendants de cette classe (calculé par BFS via `allDescendants()`). L'indentation est proportionnelle à la profondeur (`depth * 16 + 6` px). Chaque nœud est cible d'un drop zone pour le glisser-déposer.
+**Si** l'ontologie est chargée et contient des classes OWL reliées par des relations `subClassOf`,
+
+**Alors** le système construit et affiche un arbre des classes via `ClassEditor.buildTree()` :
+- le nœud racine `owl:Thing` indique le nombre total d'individuals,
+- chaque classe affiche un compteur **transitif** du nombre d'individuals dont au moins un type appartient à l'ensemble de ses descendants (calculé par BFS via `allDescendants()`),
+- l'indentation de chaque nœud est proportionnelle à sa profondeur (`depth * 16 + 6` px),
+- chaque nœud est une zone cible pour le glisser-déposer.
 
 ---
 
@@ -64,7 +70,15 @@ La méthode construit l'arbre des classes OWL via `ClassEditor.buildTree()`. Ell
 
 ### REQ-IND-003 — Liste des individuals filtrée et triée
 
-La méthode filtre les individuals selon la classe sélectionnée (`_selectedClassId`). Si aucune classe n'est sélectionnée, tous les individuals sont affichés. Si une classe est sélectionnée, le filtre est **transitif** : il inclut les individuals dont un type appartient à la classe ou à l'une de ses sous-classes (BFS). La liste est triée alphabétiquement par le label d'affichage résolu (`_resolveDisplayLabel()`), ou par l'identifiant si aucun label n'est défini. Chaque item affiche le label principal et, si distinct, l'identifiant en sous-texte. Chaque item est draggable.
+**Si** l'onglet Individuals est affiché,
+**et** qu'une classe est éventuellement sélectionnée dans l'arbre (`_selectedClassId`),
+
+**Alors** :
+- si aucune classe n'est sélectionnée, tous les individuals sont listés,
+- si une classe est sélectionnée, seuls les individuals dont au moins un type appartient à cette classe ou à l'une de ses sous-classes (filtrage transitif par BFS) sont affichés,
+- la liste est triée alphabétiquement par le label d'affichage résolu (`_resolveDisplayLabel()`), ou par identifiant si aucun label n'est défini,
+- chaque item affiche le label principal et, si distinct, l'identifiant en sous-texte,
+- chaque item est draggable.
 
 ---
 
@@ -72,7 +86,13 @@ La méthode filtre les individuals selon la classe sélectionnée (`_selectedCla
 
 ### REQ-IND-007 — Création d'un nouvel individual
 
-La méthode vide la sélection courante, insère un placeholder fantôme `new individual…` en tête de la liste (colonne 2), et affiche dans la colonne 3 le formulaire vierge via `renderForm(null, selectedClassId)`. Un `setTimeout` de 30 ms appelle `Settings.generateIndividualId()` pour pré-remplir le champ ID, puis donne le focus à ce champ et sélectionne son contenu.
+**Si** l'utilisateur déclenche la création d'un nouvel individual,
+
+**Alors** :
+- la sélection courante est vidée,
+- un placeholder fantôme `new individual…` est inséré en tête de la liste (colonne 2),
+- le formulaire vierge est affiché dans la colonne 3 via `renderForm(null, selectedClassId)`,
+- après 30 ms, `Settings.generateIndividualId()` pré-remplit le champ ID, le focus lui est donné et son contenu est sélectionné.
 
 ---
 
@@ -80,7 +100,12 @@ La méthode vide la sélection courante, insère un placeholder fantôme `new in
 
 ### REQ-IND-009 — Suppression d'un ou plusieurs individuals
 
-La méthode récupère l'ensemble des IDs sélectionnés (`_selectedIndIds`), affiche une confirmation via `UI.confirm()` (message au singulier ou au pluriel), puis appelle `API.deleteIndividual()` en boucle pour chaque ID. En cas de succès, elle réinitialise toute la sélection, rafraîchit l'état via `APP.refresh()`, et regénère les colonnes 1 et 2. La colonne 3 affiche un état vide.
+**Si** l'utilisateur confirme la suppression d'un ou plusieurs individuals sélectionnés (`_selectedIndIds`),
+
+**Alors** :
+- une confirmation `UI.confirm()` est affichée (message adapté au singulier ou au pluriel),
+- `API.deleteIndividual()` est appelé en boucle pour chaque ID,
+- en cas de succès, toute la sélection est réinitialisée, l'état est rafraîchi via `APP.refresh()`, les colonnes 1 et 2 sont regénérées, et la colonne 3 affiche un état vide.
 
 ---
 
@@ -88,7 +113,14 @@ La méthode récupère l'ensemble des IDs sélectionnés (`_selectedIndIds`), af
 
 ### REQ-IND-010 — Déplacement par glisser-déposer vers une classe
 
-Lors du dépôt d'un individual sur un nœud de classe, la méthode applique l'une des trois logiques suivantes : (a) si la classe source est connue et présente dans les types de l'individual, elle **remplace** ce type par la classe cible ; (b) si l'individual n'a qu'un seul type, celui-ci est remplacé ; (c) sinon, la classe cible est **ajoutée** aux types existants (sans doublon). La modification est envoyée via `API.updateIndividual()`, puis la section est re-rendue et l'individual reste sélectionné.
+**Si** l'utilisateur dépose un individual sur un nœud de classe dans l'arbre,
+
+**Alors** le système applique l'une des trois logiques suivantes :
+- (a) si la classe source est connue et présente dans les types de l'individual, elle est **remplacée** par la classe cible,
+- (b) si l'individual n'a qu'un seul type, celui-ci est remplacé par la classe cible,
+- (c) sinon, la classe cible est **ajoutée** aux types existants sans doublon,
+
+puis la modification est envoyée via `API.updateIndividual()`, la section est re-rendue et l'individual reste sélectionné.
 
 ---
 
@@ -96,7 +128,13 @@ Lors du dépôt d'un individual sur un nœud de classe, la méthode applique l'u
 
 ### REQ-IND-015 — Gestion des types (rdf:type)
 
-`addType()` appelle `_addListItem()` pour insérer un type dans la liste `ind-types-list` et déclenche l'autoSave si l'individual est en cours d'édition. `removeType()` appelle `_removeListItem()` pour retirer le type ; si la liste devient vide, le placeholder `owl:NamedIndividual` est réinséré. L'autoSave est déclenché dans les deux cas.
+**Si** l'utilisateur ajoute un type à un individual,
+
+**Alors** `addType()` insère le type dans la liste `ind-types-list` via `_addListItem()` et déclenche l'autoSave si l'individual est en cours d'édition.
+
+**Si** l'utilisateur supprime un type d'un individual,
+
+**Alors** `removeType()` retire le type via `_removeListItem()` ; si la liste devient vide, le placeholder `owl:NamedIndividual` est réinséré ; l'autoSave est déclenché dans les deux cas.
 
 ---
 
@@ -104,7 +142,12 @@ Lors du dépôt d'un individual sur un nœud de classe, la méthode applique l'u
 
 ### REQ-IND-018 — Gestion de la cardinalité fonctionnelle des propriétés
 
-`_renderPropPanel()` détermine la multiplicité (`single`/`multiple`) selon `opData?.characteristics?.functional` ou `dpData?.functional`. Si `single=true` et qu'une valeur existe déjà, le bouton `+` est masqué (`addBtnHidden`). `_refreshAddBtn()` actualise la visibilité du bouton après chaque ajout/suppression. `confirmPicker()` bloque l'insertion si le panneau est `single` et contient déjà une valeur.
+**Si** une propriété est marquée comme fonctionnelle (`opData?.characteristics?.functional` ou `dpData?.functional`) et qu'une valeur existe déjà,
+
+**Alors** :
+- le bouton `+` d'ajout de valeur est masqué (`addBtnHidden`) lors du rendu du panneau,
+- `_refreshAddBtn()` maintient cette visibilité à jour après chaque ajout ou suppression,
+- `confirmPicker()` bloque l'insertion d'une nouvelle valeur si le panneau est en mode `single` et contient déjà une valeur.
 
 ---
 
@@ -112,7 +155,16 @@ Lors du dépôt d'un individual sur un nœud de classe, la méthode applique l'u
 
 ### REQ-IND-020 — Création d'un individual à la volée depuis le sélecteur
 
-`pickerCreateNew()` insère un champ de saisie inline dans la liste du sélecteur (un seul champ à la fois). Il pré-remplit l'ID via `Settings.generateIndividualId()`, gère les touches `Enter` (confirmation) et `Escape` (annulation). `_pickerConfirmNew()` crée l'individual via `API.createIndividual()` avec les types initiaux correspondant à la classe sélectionnée dans le picker, puis rafraîchit la liste et sélectionne le nouvel individual.
+**Si** l'utilisateur demande la création d'un nouvel individual depuis le sélecteur (`pickerCreateNew()`),
+
+**Alors** :
+- un champ de saisie inline est inséré dans la liste du sélecteur (un seul champ à la fois),
+- l'ID est pré-rempli via `Settings.generateIndividualId()`,
+- la touche `Enter` confirme la création, la touche `Escape` annule.
+
+**Si** l'utilisateur confirme la création (`_pickerConfirmNew()`),
+
+**Alors** l'individual est créé via `API.createIndividual()` avec les types initiaux correspondant à la classe sélectionnée dans le picker, la liste est rafraîchie et le nouvel individual est sélectionné.
 
 ---
 
@@ -120,7 +172,10 @@ Lors du dépôt d'un individual sur un nœud de classe, la méthode applique l'u
 
 ### REQ-IND-021 — Sauvegarde automatique (autoSave)
 
-La méthode appelle `save(false)` uniquement si `_editingId !== null`, c'est-à-dire uniquement lorsqu'un individual existant est en cours d'édition. Elle est déclenchée via `onchange` sur tous les champs du formulaire d'un individual existant.
+**Si** un champ du formulaire est modifié via `onchange`
+**et** qu'un individual existant est en cours d'édition (`_editingId !== null`),
+
+**Alors** `save(false)` est appelé automatiquement pour persister les modifications.
 
 ---
 
@@ -128,7 +183,21 @@ La méthode appelle `save(false)` uniquement si `_editingId !== null`, c'est-à-
 
 ### REQ-IND-022 — Sauvegarde explicite : création et mise à jour
 
-La méthode collecte l'ID (avec remplacement des espaces par des underscores), les annotations via `_collectAnnotations()`, les types via `_collectList()`, les `objectAssertions` et `dataAssertions` depuis les panneaux DOM. Si `isNew=true`, elle appelle `API.createIndividual()`, met à jour `_selectedIndId` et `_editingId`, et re-rend les trois colonnes. Si `isNew=false`, elle appelle `API.updateIndividual(originalId, ind)` — si l'ID a changé, un message de renommage est affiché. Dans les deux cas, `APP.refresh()` est appelé pour synchroniser l'état.
+**Si** l'utilisateur déclenche une sauvegarde explicite,
+
+**Alors** le système collecte :
+- l'ID (espaces remplacés par des underscores),
+- les annotations via `_collectAnnotations()`,
+- les types via `_collectList()`,
+- les `objectAssertions` et `dataAssertions` depuis les panneaux DOM.
+
+**Si** `isNew=true`,
+
+**Alors** `API.createIndividual()` est appelé, `_selectedIndId` et `_editingId` sont mis à jour, les trois colonnes sont re-rendues et `APP.refresh()` est appelé.
+
+**Si** `isNew=false`,
+
+**Alors** `API.updateIndividual(originalId, ind)` est appelé ; si l'ID a changé, un message de renommage est affiché ; `APP.refresh()` est appelé dans les deux cas.
 
 ---
 
@@ -136,7 +205,12 @@ La méthode collecte l'ID (avec remplacement des espaces par des underscores), l
 
 ### REQ-IND-023 — Suppression unitaire d'un individual depuis le formulaire
 
-La méthode affiche une confirmation `UI.confirm()`, appelle `API.deleteIndividual()`, puis, si l'individual supprimé était sélectionné (`_selectedIndId === id`), réinitialise `_selectedIndId` et `_editingId` et restaure l'état vide de la colonne 3. Elle regénère ensuite les colonnes 1 et 2.
+**Si** l'utilisateur confirme la suppression d'un individual depuis le formulaire (`UI.confirm()`),
+
+**Alors** :
+- `API.deleteIndividual()` est appelé,
+- si l'individual supprimé était sélectionné (`_selectedIndId === id`), `_selectedIndId` et `_editingId` sont réinitialisés et la colonne 3 affiche l'état vide,
+- les colonnes 1 et 2 sont regénérées.
 
 ---
 
@@ -144,7 +218,9 @@ La méthode affiche une confirmation `UI.confirm()`, appelle `API.deleteIndividu
 
 ### REQ-IND-024 — Préservation de sameAs et differentFrom lors de la sauvegarde
 
-La méthode `save()` récupère les valeurs existantes de `sameAs` et `differentFrom` depuis `APP.state.individuals` (via l'ID original ou le nouvel ID) et les inclut systématiquement dans l'objet envoyé à l'API. Ces deux champs ne sont pas éditables via l'interface du formulaire principal : ils sont seulement conservés.
+**Si** une sauvegarde est déclenchée pour un individual,
+
+**Alors** les valeurs existantes de `sameAs` et `differentFrom` sont récupérées depuis `APP.state.individuals` (via l'ID original ou le nouvel ID) et incluses systématiquement dans l'objet envoyé à l'API, sans possibilité de modification via le formulaire principal.
 
 ---
 
@@ -152,7 +228,9 @@ La méthode `save()` récupère les valeurs existantes de `sameAs` et `different
 
 ### REQ-IND-025 — Collecte des assertions d'objet depuis les panneaux
 
-La méthode interroge tous les éléments DOM `.ind-prop-panel[data-kind="op"]`, lit `panel.dataset.prop` comme identifiant de propriété, et pour chaque `.ind-op-target` (input hidden ou select) dont la valeur est non vide, construit un objet `{ property, target }` qui est ajouté au tableau `objectAssertions`.
+**Si** une sauvegarde est déclenchée,
+
+**Alors** le système interroge tous les éléments DOM `.ind-prop-panel[data-kind="op"]` : pour chaque `.ind-op-target` (input hidden ou select) dont la valeur est non vide, un objet `{ property, target }` est construit à partir de `panel.dataset.prop` et ajouté au tableau `objectAssertions`.
 
 ---
 
@@ -160,7 +238,9 @@ La méthode interroge tous les éléments DOM `.ind-prop-panel[data-kind="op"]`,
 
 ### REQ-IND-026 — Collecte des assertions de données depuis les panneaux
 
-La méthode interroge tous les éléments DOM `.ind-prop-panel[data-kind="dp"]`, lit `panel.dataset.prop`, et pour chaque `.ind-prop-row` contenant une valeur `.ind-dp-value` non vide, construit un objet `{ property, value, datatype }` — le datatype est lu depuis `dataset.dtype` de l'élément `.ind-dp-type`, avec `xsd:string` comme valeur par défaut.
+**Si** une sauvegarde est déclenchée,
+
+**Alors** le système interroge tous les éléments DOM `.ind-prop-panel[data-kind="dp"]` : pour chaque `.ind-prop-row` contenant une valeur `.ind-dp-value` non vide, un objet `{ property, value, datatype }` est construit — le datatype est lu depuis `dataset.dtype` de l'élément `.ind-dp-type`, avec `xsd:string` comme valeur par défaut.
 
 ---
 
@@ -168,7 +248,13 @@ La méthode interroge tous les éléments DOM `.ind-prop-panel[data-kind="dp"]`,
 
 ### REQ-IND-027 — Règle d'affichage simple (propriété unique)
 
-`_openDisplayPropModal()` ouvre un modal listant toutes les propriétés disponibles pour la classe sélectionnée (annotations, propriétés héritées, propriétés directes, propriétés via domaine). Les propriétés déjà actives par héritage sont signalées `(inherited)`. `setDisplayProp()` enregistre (ou supprime si `null`) la règle dans `_displayProps[classId || '__root__']`. `_getEffectiveDisplayProp()` remonte récursivement la hiérarchie de classes pour trouver la règle applicable.
+**Si** l'utilisateur ouvre le modal de règle d'affichage via `_openDisplayPropModal()`,
+
+**Alors** toutes les propriétés disponibles pour la classe sélectionnée sont listées (annotations, propriétés héritées, directes et via domaine), avec un marquage `(inherited)` pour celles déjà actives par héritage.
+
+**Si** l'utilisateur sélectionne ou supprime une propriété via `setDisplayProp()`,
+
+**Alors** la règle est enregistrée (ou supprimée si `null`) dans `_displayProps[classId || '__root__']` ; `_getEffectiveDisplayProp()` remonte récursivement la hiérarchie de classes pour déterminer la règle applicable à un individual donné.
 
 ---
 
@@ -176,7 +262,13 @@ La méthode interroge tous les éléments DOM `.ind-prop-panel[data-kind="dp"]`,
 
 ### REQ-IND-028 — Règle d'affichage composite (multi-propriétés avec séparateur)
 
-`_openDisplayPropsMultiModal()` ouvre un modal avec des lignes `{séparateur, propriété}` éditables. `_addDisplayMultiRow()` ajoute une ligne vide dans le modal. `_confirmDisplayMulti()` lit toutes les lignes et appelle `setDisplayPropsMulti()`. `setDisplayPropsMulti()` sauvegarde la règle composite dans `_displayPropsMulti[classId || '__root__']` (ou la supprime si `null`/vide). `_getEffectiveDisplayMulti()` remonte la hiérarchie de classes de manière analogue à `_getEffectiveDisplayProp()`.
+**Si** l'utilisateur ouvre le modal de règle d'affichage composite via `_openDisplayPropsMultiModal()`,
+
+**Alors** un modal avec des lignes `{séparateur, propriété}` éditables est affiché ; `_addDisplayMultiRow()` permet d'ajouter une ligne vide.
+
+**Si** l'utilisateur confirme via `_confirmDisplayMulti()`,
+
+**Alors** `setDisplayPropsMulti()` sauvegarde la règle composite dans `_displayPropsMulti[classId || '__root__']` (ou la supprime si `null`/vide) ; `_getEffectiveDisplayMulti()` remonte la hiérarchie de classes de manière analogue à `_getEffectiveDisplayProp()`.
 
 ---
 
@@ -184,7 +276,14 @@ La méthode interroge tous les éléments DOM `.ind-prop-panel[data-kind="dp"]`,
 
 ### REQ-IND-029 — Résolution du label d'affichage par héritage de classe
 
-La méthode cherche une règle d'affichage applicable selon la priorité suivante : (1) types propres de l'individual, (2) classe de contexte (classe sélectionnée dans l'arbre ou classe du picker), (3) règle racine (`__root__`). Pour chaque classe candidate, elle vérifie d'abord la règle composite (`_getEffectiveDisplayMulti()`) puis la règle simple (`_getEffectiveDisplayProp()`). Le label est construit via `_buildMultiLabel()` ou `_getDisplayLabel()` selon le type de règle.
+**Si** le système doit afficher le label d'un individual,
+
+**Alors** il cherche une règle d'affichage applicable selon la priorité suivante :
+1. types propres de l'individual,
+2. classe de contexte (classe sélectionnée dans l'arbre ou classe du picker),
+3. règle racine (`__root__`),
+
+en vérifiant pour chaque classe candidate d'abord la règle composite (`_getEffectiveDisplayMulti()`) puis la règle simple (`_getEffectiveDisplayProp()`) ; le label est construit via `_buildMultiLabel()` ou `_getDisplayLabel()` selon le type de règle.
 
 ---
 
@@ -192,7 +291,12 @@ La méthode cherche une règle d'affichage applicable selon la priorité suivant
 
 ### REQ-IND-030 — Résolution du label rdfs:label multilingue
 
-La méthode supporte les formes `rdfs:label` (sans langue) et `rdfs:label@{lang}`. Pour la forme avec langue, elle cherche d'abord la langue exacte demandée, puis les autres langues actives (`Settings.activeLangs`) dans l'ordre, puis le premier label disponible quelle que soit la langue. Pour la forme sans langue, elle utilise `Settings.preferredLang` en priorité, ou le premier label disponible. Elle supporte aussi `rdfs:comment`, les annotations `other` (par propriété), les `dataAssertions` et les `objectAssertions` (retourne la cible).
+**Si** le système résout le label d'affichage d'un individual à partir d'une propriété `rdfs:label`,
+
+**Alors** :
+- pour la forme `rdfs:label@{lang}`, il cherche d'abord la langue exacte demandée, puis les autres langues actives (`Settings.activeLangs`) dans l'ordre, puis le premier label disponible quelle que soit la langue,
+- pour la forme sans langue, il utilise `Settings.preferredLang` en priorité, ou le premier label disponible,
+- les formes `rdfs:comment`, annotations `other` (par propriété), `dataAssertions` et `objectAssertions` (retourne la cible) sont également supportées.
 
 ---
 
@@ -200,7 +304,13 @@ La méthode supporte les formes `rdfs:label` (sans langue) et `rdfs:label@{lang}
 
 ### REQ-IND-031 — Persistance des règles d'affichage dans l'ontologie
 
-`_saveDisplayRules()` construit un objet `{ single: _displayProps, multi: _displayPropsMulti }` et l'envoie via `API.updateDisplayRules()`. Il met aussi à jour `APP.state.ontology.display_rules` en mémoire. `_loadDisplayRules()` lit `APP.state.ontology?.display_rules` et initialise les deux maps internes `_displayProps` et `_displayPropsMulti`.
+**Si** les règles d'affichage sont modifiées,
+
+**Alors** `_saveDisplayRules()` construit un objet `{ single: _displayProps, multi: _displayPropsMulti }`, l'envoie via `API.updateDisplayRules()` et met à jour `APP.state.ontology.display_rules` en mémoire.
+
+**Si** l'ontologie est chargée,
+
+**Alors** `_loadDisplayRules()` lit `APP.state.ontology?.display_rules` et initialise les deux maps internes `_displayProps` et `_displayPropsMulti`.
 
 ---
 
@@ -208,7 +318,10 @@ La méthode supporte les formes `rdfs:label` (sans langue) et `rdfs:label@{lang}
 
 ### REQ-IND-032 — Génération automatique de l'identifiant d'un nouvel individual
 
-Dans `newIndividual()`, après affichage du formulaire vierge, un `setTimeout` de 30 ms appelle `Settings.generateIndividualId(this._selectedClassId)` pour pré-remplir le champ `ind-id`. Dans `pickerCreateNew()`, la même méthode est appelée pour pré-remplir le champ de saisie inline du sélecteur.
+**Si** le formulaire de création d'un nouvel individual est affiché (`newIndividual()`)
+**ou** qu'un champ de saisie inline est inséré dans le sélecteur (`pickerCreateNew()`),
+
+**Alors** après 30 ms, `Settings.generateIndividualId(this._selectedClassId)` est appelé pour pré-remplir le champ ID correspondant.
 
 ---
 
@@ -216,7 +329,9 @@ Dans `newIndividual()`, après affichage du formulaire vierge, un `setTimeout` d
 
 ### REQ-IND-037 — Profondeur hiérarchique des classes pour l'ordonnancement
 
-La méthode calcule la profondeur d'une classe dans la hiérarchie par BFS itératif en remontant les parents (`subClassOf` de type string uniquement). Elle est robuste aux cycles (marquage `visited`). Le résultat est utilisé dans `_getClassProperties()` pour ordonner les propriétés des classes de l'individual du plus haut au plus bas dans la hiérarchie.
+**Si** le système doit ordonner les propriétés d'un individual par profondeur hiérarchique,
+
+**Alors** `_classDepth()` calcule la profondeur de chaque classe par BFS itératif en remontant les parents (`subClassOf` de type string uniquement), avec protection contre les cycles (marquage `visited`) ; le résultat est utilisé dans `_getClassProperties()` pour ordonner les propriétés du plus haut au plus bas dans la hiérarchie.
 
 ---
 
@@ -224,7 +339,13 @@ La méthode calcule la profondeur d'une classe dans la hiérarchie par BFS itér
 
 ### REQ-IND-038 — Collecte séparée des propriétés héritées et directes
 
-La méthode analyse les types de l'individual et retourne deux maps : `asserted` (restrictions définies sur les types directs de l'individual, ordonnées par profondeur croissante puis alphabétiquement) et `inherited` (restrictions définies sur les ancêtres, sans doublon avec `asserted`). Elle détermine si chaque propriété est une `op` ou `dp` en cherchant dans `APP.state.object_properties`. Cette séparation est utilisée dans `renderForm()` pour afficher les panneaux hérités avant les directs.
+**Si** le formulaire d'un individual est rendu,
+
+**Alors** `_getClassProperties()` analyse les types de l'individual et retourne deux maps :
+- `asserted` : restrictions définies sur les types directs, ordonnées par profondeur croissante puis alphabétiquement,
+- `inherited` : restrictions définies sur les ancêtres, sans doublon avec `asserted`,
+
+la nature de chaque propriété (`op` ou `dp`) étant déterminée en cherchant dans `APP.state.object_properties` ; les panneaux hérités sont affichés avant les directs.
 
 ---
 
@@ -232,7 +353,9 @@ La méthode analyse les types de l'individual et retourne deux maps : `asserted`
 
 ### REQ-IND-039 — Filtre des individuals candidats par range d'une OP
 
-La méthode retourne la liste des individuals compatibles avec le range d'une Object Property, en excluant l'individual en cours d'édition. Si `rangeClasses` est vide ou null, tous les individuals (sauf l'exclu) sont retournés. Sinon, le filtre est **transitif** : les descendants des classes du range sont inclus via `ClassEditor.buildTree()`. Seuls les individuals dont au moins un type est dans l'ensemble calculé sont retenus.
+**Si** le système doit proposer les individuals compatibles avec le range d'une Object Property,
+
+**Alors** `_indsOfRange()` retourne la liste des individuals dont au moins un type appartient à l'ensemble calculé (descendants des classes du range inclus via `ClassEditor.buildTree()`), en excluant l'individual en cours d'édition ; si `rangeClasses` est vide ou null, tous les individuals (sauf l'exclu) sont retournés.
 
 ---
 
@@ -244,7 +367,14 @@ La méthode retourne la liste des individuals compatibles avec le range d'une Ob
 
 ### REQ-IND-001 — Rendu en trois colonnes
 
-La méthode génère le HTML complet de l'onglet sous forme d'une mise en page `section-split` à trois colonnes : (1) arbre des classes (`ind-tree-panel`), (2) liste des individuals (`ind-list-panel`), (3) panneau de détail/formulaire (`ind-detail`). Les deux séparateurs redimensionnables (`ind-split-h1`, `ind-split-h2`) sont insérés entre les colonnes. La colonne (3) affiche par défaut un état vide invitant à sélectionner ou créer un individual.
+**Si** l'onglet Individuals est chargé,
+
+**Alors** le système génère une mise en page `section-split` à trois colonnes :
+- colonne 1 : arbre des classes (`ind-tree-panel`),
+- colonne 2 : liste des individuals (`ind-list-panel`),
+- colonne 3 : panneau de détail/formulaire (`ind-detail`), affichant par défaut un état vide invitant à sélectionner ou créer un individual,
+
+avec deux séparateurs redimensionnables (`ind-split-h1`, `ind-split-h2`) insérés entre les colonnes.
 
 ---
 
@@ -252,7 +382,15 @@ La méthode génère le HTML complet de l'onglet sous forme d'une mise en page `
 
 ### REQ-IND-004 — Sélection d'une classe dans l'arbre
 
-Au clic sur une classe, la méthode met à jour `_selectedClassId`, réinitialise toutes les sélections d'individuals, actualise le surlignage dans la colonne 1, met à jour le titre de la colonne 2 et regénère la liste filtrée (`_renderIndList()`). La colonne 3 affiche un état vide avec le message `owl:Thing` et un bouton de création.
+**Si** l'utilisateur clique sur une classe dans l'arbre,
+
+**Alors** :
+- `_selectedClassId` est mis à jour,
+- toutes les sélections d'individuals sont réinitialisées,
+- le surlignage de la colonne 1 est actualisé,
+- le titre de la colonne 2 est mis à jour,
+- la liste filtrée est regénérée via `_renderIndList()`,
+- la colonne 3 affiche un état vide avec le message `owl:Thing` et un bouton de création.
 
 ---
 
@@ -260,7 +398,13 @@ Au clic sur une classe, la méthode met à jour `_selectedClassId`, réinitialis
 
 ### REQ-IND-005 — Sélection simple d'un individual
 
-Au clic simple sur un individual (sans Shift), la méthode initialise `_selectedIndIds` avec l'unique identifiant cliqué, positionne le point d'ancrage (`_anchorIndId`), et affiche le formulaire de l'individual via `renderForm()` dans la colonne 3. Elle active le bouton de suppression (`_setDelBtn()`).
+**Si** l'utilisateur clique sur un individual sans maintenir la touche Shift,
+
+**Alors** :
+- `_selectedIndIds` est initialisé avec le seul identifiant cliqué,
+- le point d'ancrage `_anchorIndId` est positionné,
+- le formulaire de l'individual est affiché via `renderForm()` dans la colonne 3,
+- le bouton de suppression est activé via `_setDelBtn()`.
 
 ---
 
@@ -268,7 +412,10 @@ Au clic simple sur un individual (sans Shift), la méthode initialise `_selected
 
 ### REQ-IND-006 — Sélection multiple par Shift+Clic
 
-Lorsque `isShift === true` et qu'un point d'ancrage existe, la méthode calcule la plage d'indices entre l'ancre et l'item cliqué dans la liste DOM, et sélectionne tous les items intermédiaires. Si la sélection dépasse un individual, la colonne 3 affiche un résumé `N individuals selected` avec un bouton de suppression groupée, et `_editingId` est mis à `null` (pas d'autoSave).
+**Si** l'utilisateur clique sur un individual avec la touche Shift (`isShift === true`)
+**et** qu'un point d'ancrage existe,
+
+**Alors** la plage d'indices entre l'ancre et l'item cliqué dans la liste DOM est calculée et tous les items intermédiaires sont sélectionnés ; si la sélection dépasse un individual, la colonne 3 affiche un résumé `N individuals selected` avec un bouton de suppression groupée et `_editingId` est mis à `null`.
 
 ---
 
@@ -276,7 +423,12 @@ Lorsque `isShift === true` et qu'un point d'ancrage existe, la méthode calcule 
 
 ### REQ-IND-008 — Annulation du formulaire de création
 
-La méthode réinitialise toutes les variables de sélection et d'édition, supprime le placeholder fantôme de la liste, et restaure dans la colonne 3 l'état vide avec le message de démarrage et le bouton de création.
+**Si** l'utilisateur annule le formulaire de création,
+
+**Alors** :
+- toutes les variables de sélection et d'édition sont réinitialisées,
+- le placeholder fantôme est supprimé de la liste,
+- la colonne 3 restaure l'état vide avec le message de démarrage et le bouton de création.
 
 ---
 
@@ -284,7 +436,15 @@ La méthode réinitialise toutes les variables de sélection et d'édition, supp
 
 ### REQ-IND-011 — Formulaire de détail d'un individual
 
-La méthode génère le formulaire complet d'un individual (existant ou nouveau). Elle construit les blocs : (1) champ ID avec sanitisation en temps réel (`_sanitizeId()`), (2) section Annotations, (3) section Types (`rdf:type`), (4) panneaux de propriétés dynamiques via `_getClassProperties()` et `_renderPropPanel()`. Pour un individual existant, un bloc `_whereUsedFrame()` est ajouté en bas. Pour un nouvel individual, le champ ID déclenche `save(true)` au `blur`.
+**Si** un individual est sélectionné ou en cours de création,
+
+**Alors** `renderForm()` génère le formulaire complet avec les blocs suivants :
+- champ ID avec sanitisation en temps réel (`_sanitizeId()`),
+- section Annotations,
+- section Types (`rdf:type`),
+- panneaux de propriétés dynamiques via `_getClassProperties()` et `_renderPropPanel()`,
+- pour un individual existant, un bloc `_whereUsedFrame()` en bas du formulaire,
+- pour un nouvel individual, le champ ID déclenche `save(true)` au `blur`.
 
 ---
 
@@ -292,7 +452,10 @@ La méthode génère le formulaire complet d'un individual (existant ou nouveau)
 
 ### REQ-IND-012 — Identifiant IRI affiché dans l'en-tête du formulaire
 
-Si l'ontologie possède un IRI de base (`APP.state.ontology?.id`) et que l'individual a un identifiant, le formulaire affiche l'IRI complet sous la forme `{baseIri}#{id}` dans un élément `cls-editor-iri`. Cette ligne n'est pas affichée pour les nouveaux individuals (IRI vide).
+**Si** l'ontologie possède un IRI de base (`APP.state.ontology?.id`)
+**et** que l'individual a un identifiant,
+
+**Alors** l'IRI complet sous la forme `{baseIri}#{id}` est affiché dans l'élément `cls-editor-iri` de l'en-tête du formulaire ; cette ligne n'est pas affichée pour les nouveaux individuals (IRI vide).
 
 ---
 
@@ -300,7 +463,15 @@ Si l'ontologie possède un IRI de base (`APP.state.ontology?.id`) et que l'indiv
 
 ### REQ-IND-013 — Annotations : labels et commentaires
 
-`renderForm()` affiche les annotations existantes (`labels`, `comments`, `other`) via `_annoRow()`. `addAnnotRow()` ajoute dynamiquement une nouvelle ligne dans `ind-annotations-body` via `_makeAnnotRow()`, en activant l'`onchange` pour l'autoSave si l'individual est en cours d'édition. `removeAnnotRow()` supprime la ligne DOM et déclenche l'autoSave.
+**Si** le formulaire est affiché, les annotations existantes (`labels`, `comments`, `other`) sont rendues via `_annoRow()`.
+
+**Si** l'utilisateur ajoute une ligne d'annotation via `addAnnotRow()`,
+
+**Alors** une nouvelle ligne est insérée dynamiquement dans `ind-annotations-body` via `_makeAnnotRow()`, avec `onchange` activé pour l'autoSave si l'individual est en cours d'édition.
+
+**Si** l'utilisateur supprime une ligne via `removeAnnotRow()`,
+
+**Alors** la ligne DOM est supprimée et l'autoSave est déclenché.
 
 ---
 
@@ -308,7 +479,9 @@ Si l'ontologie possède un IRI de base (`APP.state.ontology?.id`) et que l'indiv
 
 ### REQ-IND-014 — Annotations de propriétés personnalisées
 
-La méthode ajoute une ligne d'annotation `other` dans le tableau des annotations, en utilisant la propriété passée en paramètre, puis masque le sélecteur `ind-anno-picker`.
+**Si** l'utilisateur sélectionne une propriété dans le sélecteur `ind-anno-picker`,
+
+**Alors** `addOtherAnnotRow()` ajoute une ligne d'annotation `other` dans le tableau des annotations en utilisant la propriété passée en paramètre, puis masque le sélecteur.
 
 ---
 
@@ -316,7 +489,9 @@ La méthode ajoute une ligne d'annotation `other` dans le tableau des annotation
 
 ### REQ-IND-016 — Panneaux de propriétés dynamiques (Object Properties)
 
-`_renderPropPanel()` génère un panneau par propriété de type `op`. Pour chaque `objectAssertion` existante, il rend une ligne avec le label de la cible (via `_labelForId()`), un lien de navigation vers l'individual cible, et un bouton de suppression. `addPropValue()` (pour `kind='op'`) construit un `<select>` peuplé par `_indsOfRange()` filtré sur le range effectif de la propriété.
+**Si** le formulaire d'un individual est rendu et que des Object Properties sont associées à ses types,
+
+**Alors** `_renderPropPanel()` génère un panneau par propriété `op` : chaque `objectAssertion` existante est affichée avec le label de la cible (via `_labelForId()`), un lien de navigation vers l'individual cible et un bouton de suppression ; `addPropValue()` (pour `kind='op'`) construit un `<select>` peuplé par `_indsOfRange()` filtré sur le range effectif de la propriété.
 
 ---
 
@@ -324,7 +499,9 @@ La méthode ajoute une ligne d'annotation `other` dans le tableau des annotation
 
 ### REQ-IND-017 — Panneaux de propriétés dynamiques (Datatype Properties)
 
-`_renderPropPanel()` génère un panneau par propriété de type `dp`. Pour chaque `dataAssertion` existante, il rend un champ texte éditable avec la valeur, le datatype (`xsd:string` par défaut ou le premier range de la propriété), et un bouton de suppression. Si la valeur est une URL (`/^https?:\/\//i`), un lien `🔗` cliquable est affiché. `addPropValue()` (pour `kind='dp'`) crée un champ texte vide avec le datatype par défaut.
+**Si** le formulaire d'un individual est rendu et que des Datatype Properties sont associées à ses types,
+
+**Alors** `_renderPropPanel()` génère un panneau par propriété `dp` : chaque `dataAssertion` existante est affichée avec un champ texte éditable, le datatype (`xsd:string` par défaut ou premier range de la propriété) et un bouton de suppression ; si la valeur est une URL (`/^https?:\/\//i`), un lien `🔗` cliquable est affiché ; `addPropValue()` (pour `kind='dp'`) crée un champ texte vide avec le datatype par défaut.
 
 ---
 
@@ -332,7 +509,25 @@ La méthode ajoute une ligne d'annotation `other` dans le tableau des annotation
 
 ### REQ-IND-019 — Ouverture du sélecteur d'individual pour une Object Property
 
-`openPicker()` ouvre un modal overlay avec deux panneaux : arbre des classes autorisées (filtrées selon le `effectiveRange` de la propriété, ou toutes les classes si aucun range) et liste des individuals. `pickerSelectClass()` met à jour la liste des individuals de la classe sélectionnée (filtrage transitif), exclut l'individual en cours d'édition. `pickerSelectInd()` active le bouton OK. `confirmPicker()` insère l'individual choisi comme nouvelle ligne dans le panneau de la propriété. `closePicker()` supprime l'overlay du DOM.
+**Si** l'utilisateur ouvre le sélecteur pour une Object Property via `openPicker()`,
+
+**Alors** un modal overlay est affiché avec deux panneaux : arbre des classes autorisées (filtrées selon le `effectiveRange` de la propriété, ou toutes les classes si aucun range) et liste des individuals.
+
+**Si** l'utilisateur sélectionne une classe dans le picker via `pickerSelectClass()`,
+
+**Alors** la liste des individuals est mise à jour (filtrage transitif) en excluant l'individual en cours d'édition.
+
+**Si** l'utilisateur sélectionne un individual via `pickerSelectInd()`,
+
+**Alors** le bouton OK est activé.
+
+**Si** l'utilisateur confirme via `confirmPicker()`,
+
+**Alors** l'individual choisi est inséré comme nouvelle ligne dans le panneau de la propriété.
+
+**Si** l'utilisateur ferme le picker via `closePicker()`,
+
+**Alors** l'overlay est supprimé du DOM.
 
 ---
 
@@ -340,7 +535,9 @@ La méthode ajoute une ligne d'annotation `other` dans le tableau des annotation
 
 ### REQ-IND-033 — Navigation vers un individual cible depuis une Object Property
 
-Pour les panneaux de type `op`, chaque valeur affichée comporte un `onclick="APP.navigateTo('individuals','${a.target}')"` sur le label du texte, permettant de naviguer directement vers l'individual cible dans l'onglet Individuals. Le même lien est généré dans `confirmPicker()` après sélection via le sélecteur.
+**Si** un panneau de type `op` affiche des valeurs,
+
+**Alors** chaque valeur comporte un lien `onclick="APP.navigateTo('individuals','${a.target}')"` permettant de naviguer directement vers l'individual cible dans l'onglet Individuals ; ce même lien est généré après sélection via `confirmPicker()`.
 
 ---
 
@@ -348,7 +545,9 @@ Pour les panneaux de type `op`, chaque valeur affichée comporte un `onclick="AP
 
 ### REQ-IND-034 — Lien cliquable pour les valeurs de données de type URL
 
-Pour les panneaux de type `dp`, si la valeur d'une `dataAssertion` correspond à l'expression régulière `/^https?:\/\//i`, un lien `<a>` avec l'icône `🔗` est inséré à droite du champ texte, ouvrant l'URL dans un nouvel onglet (`target="_blank"`).
+**Si** la valeur d'une `dataAssertion` dans un panneau `dp` correspond à l'expression régulière `/^https?:\/\//i`,
+
+**Alors** un lien `<a>` avec l'icône `🔗` est inséré à droite du champ texte, ouvrant l'URL dans un nouvel onglet (`target="_blank"`).
 
 ---
 
@@ -356,7 +555,9 @@ Pour les panneaux de type `dp`, si la valeur d'une `dataAssertion` correspond à
 
 ### REQ-IND-035 — Panneau "Where Used" dans le formulaire
 
-Pour un individual existant (`ind` non null), le formulaire appelle `_whereUsedFrame(r => _ruleUsesIndividual(r, ind.id))` et insère le résultat en bas du formulaire. Ce bloc liste les règles SWRL ou autres entités qui référencent l'individual.
+**Si** le formulaire affiche un individual existant (`ind` non null),
+
+**Alors** `_whereUsedFrame(r => _ruleUsesIndividual(r, ind.id))` est appelé et son résultat est inséré en bas du formulaire, listant les règles SWRL ou autres entités qui référencent l'individual.
 
 ---
 
@@ -364,7 +565,11 @@ Pour un individual existant (`ind` non null), le formulaire appelle `_whereUsedF
 
 ### REQ-IND-036 — Redimensionnement des colonnes par glisser-déposer
 
-`_initSplitPanes()` appelle `_initHandle()` deux fois : pour `ind-split-h1` / `ind-tree-panel` (largeur entre 120 et 520 px) et pour `ind-split-h2` / `ind-list-panel` (largeur entre 100 et 400 px). `_initHandle()` attache les écouteurs `mousedown`/`mousemove`/`mouseup` sur `document` et ajuste la largeur CSS du panneau en temps réel.
+**Si** l'utilisateur fait glisser un séparateur de colonne (`ind-split-h1` ou `ind-split-h2`),
+
+**Alors** `_initHandle()` ajuste en temps réel la largeur CSS du panneau adjacent via les écouteurs `mousedown`/`mousemove`/`mouseup` sur `document`, dans les limites suivantes :
+- `ind-split-h1` / `ind-tree-panel` : entre 120 et 520 px,
+- `ind-split-h2` / `ind-list-panel` : entre 100 et 400 px.
 
 ---
 
