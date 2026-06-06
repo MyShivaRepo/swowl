@@ -33,9 +33,9 @@
 
 ### REQ-INF-001 — Récupération des inférences via l'API
 
-| **Si** | l'ontologiste consulte le panneau des inférences, |
+| **Si** | l'`ontologiste` consulte le panneau des `inférences`, |
 |---|---|
-| **Alors** | l'application récupère auprès du raisonneur l'ensemble des résultats calculés : violations de cohérence, fermeture de la hiérarchie, restrictions héritées, restrictions inverses, types inférés, assertions symétriques, transitives, par chaînes de propriétés et propriétés inverses. |
+| **Alors** | l'application récupère auprès du raisonneur l'ensemble des résultats calculés : violations de cohérence, fermeture de la hiérarchie, `restrictions` héritées, `restrictions` inverses, types inférés, assertions symétriques, transitives, par chaînes de `propriétés` et `propriétés` inverses. |
 
 ---
 
@@ -43,9 +43,9 @@
 
 ### REQ-INF-002 — Rafraîchissement automatique du panneau
 
-| **Si** | l'ontologiste navigue vers l'onglet des inférences, |
+| **Si** | l'`ontologiste` navigue vers l'onglet des `inférences`, |
 |---|---|
-| **Alors** | le panneau se met à jour régulièrement de façon automatique, sans que l'utilisateur ait besoin d'intervenir, afin de refléter en permanence l'état courant du raisonnement sur l'ontologie. |
+| **Alors** | le panneau se met à jour régulièrement de façon automatique, sans que l'utilisateur ait besoin d'intervenir, afin de refléter en permanence l'état courant du raisonnement sur l'`ontologie`. |
 
 ---
 
@@ -53,7 +53,7 @@
 
 ### REQ-INF-003 — Arrêt du rafraîchissement automatique
 
-| **Si** | l'ontologiste quitte l'onglet des inférences ou qu'un nouveau cycle de rafraîchissement doit démarrer, |
+| **Si** | l'`ontologiste` quitte l'onglet des `inférences` ou qu'un nouveau cycle de rafraîchissement doit démarrer, |
 |---|---|
 | **Alors** | toute mise à jour automatique en cours est immédiatement interrompue, sans laisser de cycle résiduel actif en arrière-plan. |
 
@@ -63,9 +63,9 @@
 
 ### REQ-INF-016 — Gestion des erreurs lors de la récupération des inférences
 
-| **Si** | la récupération des inférences auprès du raisonneur échoue, |
+| **Si** | la récupération des `inférences` auprès du raisonneur échoue, |
 |---|---|
-| **Alors** | l'ontologiste est informé de l'échec par un message d'erreur explicite affiché dans le panneau, et aucune donnée partielle ou obsolète n'est conservée à l'écran. |
+| **Alors** | l'`ontologiste` est informé de l'échec par un message d'erreur explicite affiché dans le panneau, et aucune donnée partielle ou obsolète n'est conservée à l'écran. |
 
 ---
 
@@ -81,9 +81,9 @@
 
 ### REQ-INF-004 — Affichage de l'état de cohérence de l'ontologie
 
-| **Si** | l'ontologiste consulte le panneau des inférences, |
+| **Si** | l'`ontologiste` consulte le panneau des `inférences`, |
 |---|---|
-| **Alors** | l'en-tête du panneau indique clairement si l'ontologie est cohérente, en erreur ou porteuse d'avertissements, avec un indicateur visuel distinct pour chaque niveau de sévérité. |
+| **Alors** | l'en-tête du panneau indique clairement si l'`ontologie` est cohérente, en erreur ou porteuse d'avertissements, avec un indicateur visuel distinct pour chaque niveau de sévérité. |
 
 ---
 
@@ -91,7 +91,7 @@
 
 ### REQ-INF-005 — Affichage des violations de cohérence
 
-| **Si** | le raisonneur a détecté des violations dans l'ontologie, |
+| **Si** | le raisonneur a détecté des violations dans l'`ontologie`, |
 |---|---|
 | **Alors** | la section "Violations" les liste toutes, en distinguant visuellement les erreurs des avertissements et en identifiant pour chacune le concept ou l'entité concernée ainsi qu'une description du problème ; si aucune violation n'est détectée, un message le confirme explicitement. |
 
@@ -101,9 +101,9 @@
 
 ### REQ-INF-006 — Affichage de la fermeture transitive de la hiérarchie de classes
 
-| **Si** | l'ontologie contient des classes organisées en hiérarchie, |
+| **Si** | l'`ontologie` contient des `classes` organisées en hiérarchie, |
 |---|---|
-| **Alors** | la section "Resolved hierarchy" présente pour chaque classe l'ensemble de ses ancêtres à tous les niveaux, permettant à l'ontologiste de visualiser d'un coup d'œil l'intégralité de la chaîne de spécialisation, sans avoir à remonter manuellement les relations une à une. |
+| **Alors** | la section "Resolved hierarchy" présente pour chaque `classe` l'ensemble de ses ancêtres à tous les niveaux, permettant à l'`ontologiste` de visualiser d'un coup d'œil l'intégralité de la chaîne de spécialisation, sans avoir à remonter manuellement les relations une à une. |
 
 ---
 
@@ -111,9 +111,9 @@
 
 ### REQ-INF-007 — Affichage des restrictions héritées par héritage de classes
 
-| **Si** | des restrictions OWL ont été définies sur des classes parentes et propagées à leurs sous-classes par la hiérarchie, |
+| **Si** | des `restrictions` OWL ont été définies sur des `classes` parentes et propagées à leurs sous-`classes` par la hiérarchie, |
 |---|---|
-| **Alors** | la section "Inherited restrictions" indique pour chaque sous-classe quelles restrictions elle hérite, de quelle classe parente elles proviennent, et en quoi elles consistent, afin que l'ontologiste comprenne l'impact transitif de la hiérarchie sur les contraintes des individus. |
+| **Alors** | la section "Inherited `restrictions`" indique pour chaque sous-`classe` quelles `restrictions` elle hérite, de quelle `classe` parente elles proviennent, et en quoi elles consistent, afin que l'`ontologiste` comprenne l'impact transitif de la hiérarchie sur les contraintes des `individus`. |
 
 ---
 
@@ -121,9 +121,9 @@
 
 ### REQ-INF-008 — Affichage des types inférés via domaine/portée des propriétés
 
-| **Si** | des individus participent à des assertions de propriétés dont le domaine ou la portée est déclaré, |
+| **Si** | des `individus` participent à des assertions de `propriétés` dont le domaine ou la portée est déclaré, |
 |---|---|
-| **Alors** | la section "Inferred types" liste les types que le raisonneur a attribués à ces individus par application des axiomes de domaine et de portée, en précisant pour chacun la justification qui a conduit à cette inférence. |
+| **Alors** | la section "Inferred types" liste les types que le raisonneur a attribués à ces `individus` par application des `axiomes` de domaine et de portée, en précisant pour chacun la justification qui a conduit à cette `inférence`. |
 
 ---
 
@@ -131,9 +131,9 @@
 
 ### REQ-INF-009 — Affichage des assertions symétriques inférées
 
-| **Si** | l'ontologie déclare des propriétés symétriques et que des assertions existent sur ces propriétés, |
+| **Si** | l'`ontologie` déclare des `propriétés` symétriques et que des assertions existent sur ces `propriétés`, |
 |---|---|
-| **Alors** | la section "Inferred symmetric assertions" présente les assertions réciproques que le raisonneur a déduites, en indiquant les deux individus concernés, la propriété symétrique impliquée et la justification de l'inférence. |
+| **Alors** | la section "Inferred symmetric assertions" présente les assertions réciproques que le raisonneur a déduites, en indiquant les deux `individus` concernés, la `propriété` symétrique impliquée et la justification de l'`inférence`. |
 
 ---
 
@@ -141,7 +141,7 @@
 
 ### REQ-INF-010 — Affichage des assertions transitives inférées
 
-| **Si** | l'ontologie déclare des propriétés transitives et que des chaînes d'assertions directes existent entre individus, |
+| **Si** | l'`ontologie` déclare des `propriétés` transitives et que des chaînes d'assertions directes existent entre `individus`, |
 |---|---|
 | **Alors** | la section "Inferred transitive assertions" présente les relations indirectes que le raisonneur a déduites par transitivité, avec le même niveau de détail que pour les assertions symétriques. |
 
@@ -151,9 +151,9 @@
 
 ### REQ-INF-011 — Affichage des assertions inférées par chaînes de propriétés et inverses
 
-| **Si** | l'ontologie définit des chaînes de propriétés ou des propriétés inverses et que les conditions d'application sont réunies, |
+| **Si** | l'`ontologie` définit des chaînes de `propriétés` ou des `propriétés` inverses et que les conditions d'application sont réunies, |
 |---|---|
-| **Alors** | la section "Assertions (chains + inverses)" présente les assertions que le raisonneur a déduites par composition de propriétés ou par inversion, avec le même niveau de détail que pour les assertions précédentes. |
+| **Alors** | la section "Assertions (chains + inverses)" présente les assertions que le raisonneur a déduites par composition de `propriétés` ou par inversion, avec le même niveau de détail que pour les assertions précédentes. |
 
 ---
 
@@ -161,9 +161,9 @@
 
 ### REQ-INF-012 — Affichage des restrictions inverses inférées sur les classes
 
-| **Si** | des propriétés inverses ont permis au raisonneur de déduire des restrictions existentielles sur des classes qui n'en déclaraient pas explicitement, |
+| **Si** | des `propriétés` inverses ont permis au raisonneur de déduire des `restrictions` existentielles sur des `classes` qui n'en déclaraient pas explicitement, |
 |---|---|
-| **Alors** | la section "Inferred inverse restrictions" liste ces restrictions déduites, en identifiant la classe concernée, la nature de la restriction et la justification qui a permis de l'inférer. |
+| **Alors** | la section "Inferred inverse `restrictions`" liste ces `restrictions` déduites, en identifiant la `classe` concernée, la nature de la `restriction` et la justification qui a permis de l'inférer. |
 
 ---
 
@@ -171,9 +171,9 @@
 
 ### REQ-INF-013 — Affichage des propriétés inverses inférées par owl:inverseOf
 
-| **Si** | l'ontologie déclare des relations `owl:inverseOf` entre propriétés, |
+| **Si** | l'`ontologie` déclare des relations `owl:inverseOf` entre `propriétés`, |
 |---|---|
-| **Alors** | la section "Inferred inverse properties" liste les propriétés que le raisonneur a déduites par symétrie de cette relation, en précisant pour chacune de quelle propriété elle est l'inverse et pourquoi cette inférence est valide ; si aucune propriété inverse n'est inférée, un message le confirme explicitement. |
+| **Alors** | la section "Inferred inverse `properties`" liste les `propriétés` que le raisonneur a déduites par symétrie de cette relation, en précisant pour chacune de quelle `propriété` elle est l'inverse et pourquoi cette `inférence` est valide ; si aucune `propriété` inverse n'est inférée, un message le confirme explicitement. |
 
 ---
 
@@ -181,7 +181,7 @@
 
 ### REQ-INF-014 — Bouton de recalcul manuel des inférences
 
-| **Si** | l'ontologiste souhaite forcer une mise à jour immédiate des résultats d'inférence sans attendre le prochain cycle automatique, |
+| **Si** | l'`ontologiste` souhaite forcer une mise à jour immédiate des résultats d'`inférence` sans attendre le prochain cycle automatique, |
 |---|---|
 | **Alors** | il peut déclencher un recalcul complet à la demande, et le panneau se met à jour instantanément avec les derniers résultats du raisonneur. |
 
@@ -191,7 +191,7 @@
 
 ### REQ-INF-015 — Sections rétractables (collapsible) pour les résultats d'inférence
 
-| **Si** | l'ontologiste veut se concentrer sur une catégorie d'inférences particulière, |
+| **Si** | l'`ontologiste` veut se concentrer sur une catégorie d'`inférences` particulière, |
 |---|---|
 | **Alors** | il peut replier ou déplier chaque section de résultats individuellement en cliquant sur son titre, et un indicateur visuel signale l'état courant (replié ou déplié) de chaque section. |
 
