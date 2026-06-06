@@ -52,9 +52,9 @@
 
 ### REQ-SWR-005 — Recherche/filtrage des règles
 
-| **Si** | l'ontologiste souhaite retrouver une règle SWRL en saisissant un terme dans le champ de recherche, |
+| **Si** | l'`ontologiste` souhaite retrouver une `règle SWRL` en saisissant un terme dans le champ de recherche, |
 |---|---|
-| **Alors** | seules les règles dont l'identifiant, le libellé, le commentaire ou les termes des atomes (classes, propriétés, variables, sujets, objets, valeurs) correspondent au terme saisi — sans distinction de casse — sont présentées. |
+| **Alors** | seules les règles dont l'identifiant, le libellé, le commentaire ou les termes des atomes (`classes`, `propriétés`, variables, sujets, objets, valeurs) correspondent au terme saisi — sans distinction de casse — sont présentées. |
 
 ---
 
@@ -62,7 +62,7 @@
 
 ### REQ-SWR-007 — Sélection d'une règle existante
 
-| **Si** | l'ontologiste sélectionne une règle dans la liste, |
+| **Si** | l'`ontologiste` sélectionne une règle dans la liste, |
 |---|---|
 | **Alors** | le contenu de la règle est chargé dans le formulaire d'édition, prêt à être modifié, sans affecter les données persistées tant qu'aucune sauvegarde n'est déclenchée. |
 
@@ -72,9 +72,9 @@
 
 ### REQ-SWR-008 — Création d'une nouvelle règle
 
-| **Si** | l'ontologiste souhaite créer une nouvelle règle SWRL, |
+| **Si** | l'`ontologiste` souhaite créer une nouvelle `règle SWRL`, |
 |---|---|
-| **Alors** | une règle vide est immédiatement créée avec un identifiant unique, persistée dans l'ontologie, et son formulaire d'édition est ouvert pour permettre la saisie sans délai. |
+| **Alors** | une règle vide est immédiatement créée avec un identifiant unique, persistée dans l'`ontologie`, et son formulaire d'édition est ouvert pour permettre la saisie sans délai. |
 
 ---
 
@@ -82,9 +82,9 @@
 
 ### REQ-SWR-009 — Génération automatique d'un identifiant unique
 
-| **Si** | le système doit attribuer un identifiant à une nouvelle règle SWRL, |
+| **Si** | le système doit attribuer un identifiant à une nouvelle `règle SWRL`, |
 |---|---|
-| **Alors** | l'identifiant généré est garanti unique parmi toutes les règles existantes de l'ontologie. |
+| **Alors** | l'identifiant généré est garanti unique parmi toutes les règles existantes de l'`ontologie`. |
 
 ---
 
@@ -92,7 +92,7 @@
 
 ### REQ-SWR-011 — Synchronisation des métadonnées depuis le DOM
 
-| **Si** | le système collecte les métadonnées saisies par l'ontologiste avant une sauvegarde, |
+| **Si** | le système collecte les métadonnées saisies par l'`ontologiste` avant une sauvegarde, |
 |---|---|
 | **Alors** | l'identifiant, le libellé et le commentaire de la règle sont lus depuis les champs de saisie et mis à jour dans la règle en cours d'édition ; les espaces dans l'identifiant sont automatiquement remplacés par des tirets bas. |
 
@@ -102,7 +102,7 @@
 
 ### REQ-SWR-012 — Sauvegarde automatique lors de la modification des métadonnées
 
-| **Si** | l'ontologiste modifie l'identifiant, le libellé ou le commentaire d'une règle déjà existante et quitte le champ, |
+| **Si** | l'`ontologiste` modifie l'identifiant, le libellé ou le commentaire d'une règle déjà existante et quitte le champ, |
 |---|---|
 | **Alors** | les modifications sont automatiquement persistées sans action supplémentaire de sa part. |
 
@@ -114,7 +114,7 @@
 
 | **Si** | le système doit persister la règle en cours d'édition, |
 |---|---|
-| **Alors** | la règle est créée ou mise à jour dans l'ontologie selon qu'elle est nouvelle ou existante ; en cas d'échec, l'ontologiste est informé par un message d'erreur explicite. |
+| **Alors** | la règle est créée ou mise à jour dans l'`ontologie` selon qu'elle est nouvelle ou existante ; en cas d'échec, l'`ontologiste` est informé par un message d'erreur explicite. |
 
 ---
 
@@ -122,9 +122,9 @@
 
 ### REQ-SWR-014 — Renommage d'une règle existante
 
-| **Si** | l'ontologiste modifie l'identifiant d'une règle existante et sauvegarde, |
+| **Si** | l'`ontologiste` modifie l'identifiant d'une règle existante et sauvegarde, |
 |---|---|
-| **Alors** | la règle est renommée dans l'ontologie et l'ontologiste reçoit une confirmation indiquant le nouveau nom. |
+| **Alors** | la règle est renommée dans l'`ontologie` et l'`ontologiste` reçoit une confirmation indiquant le nouveau nom. |
 
 ---
 
@@ -132,9 +132,9 @@
 
 ### REQ-SWR-015 — Suppression d'une règle
 
-| **Si** | l'ontologiste demande la suppression d'une règle et confirme son intention, |
+| **Si** | l'`ontologiste` demande la suppression d'une règle et confirme son intention, |
 |---|---|
-| **Alors** | la règle est définitivement retirée de l'ontologie, la sélection est réinitialisée et le panneau d'édition est vidé. |
+| **Alors** | la règle est définitivement retirée de l'`ontologie`, la sélection est réinitialisée et le panneau d'édition est vidé. |
 
 ---
 
@@ -142,7 +142,7 @@
 
 ### REQ-SWR-016 — Ajout d'un atome dans une section
 
-| **Si** | l'ontologiste souhaite ajouter un atome dans la prémisse ou la conclusion d'une règle, |
+| **Si** | l'`ontologiste` souhaite ajouter un atome dans la prémisse ou la conclusion d'une règle, |
 |---|---|
 | **Alors** | un atome du type choisi est inséré dans la section concernée, le formulaire est immédiatement mis à jour et la règle est automatiquement sauvegardée si elle existe déjà. |
 
@@ -152,7 +152,7 @@
 
 ### REQ-SWR-017 — Suppression d'un atome
 
-| **Si** | l'ontologiste supprime un atome d'une règle, |
+| **Si** | l'`ontologiste` supprime un atome d'une règle, |
 |---|---|
 | **Alors** | l'atome est retiré de la section concernée, le formulaire est mis à jour et la règle est automatiquement sauvegardée si elle existe déjà. |
 
@@ -162,7 +162,7 @@
 
 ### REQ-SWR-018 — Modification d'un champ d'atome
 
-| **Si** | l'ontologiste modifie la valeur d'un champ d'un atome (variable, sujet, objet, valeur littérale, opérateur, etc.), |
+| **Si** | l'`ontologiste` modifie la valeur d'un champ d'un atome (variable, sujet, objet, valeur littérale, opérateur, etc.), |
 |---|---|
 | **Alors** | la modification est prise en compte dans la règle et automatiquement sauvegardée si la règle existe déjà. |
 
@@ -172,9 +172,9 @@
 
 ### REQ-SWR-025 — Sélection d'une classe dans le picker
 
-| **Si** | l'ontologiste choisit une classe dans le sélecteur de classe d'un atome, |
+| **Si** | l'`ontologiste` choisit une `classe` dans le sélecteur de `classe` d'un atome, |
 |---|---|
-| **Alors** | la classe sélectionnée est associée à l'atome concerné, le sélecteur se ferme, le formulaire est mis à jour et la règle est automatiquement sauvegardée. |
+| **Alors** | la `classe` sélectionnée est associée à l'atome concerné, le sélecteur se ferme, le formulaire est mis à jour et la règle est automatiquement sauvegardée. |
 
 ---
 
@@ -182,9 +182,9 @@
 
 ### REQ-SWR-027 — Sélection d'une propriété dans le picker
 
-| **Si** | l'ontologiste choisit une propriété dans le sélecteur de propriété d'un atome, |
+| **Si** | l'`ontologiste` choisit une `propriété` dans le sélecteur de `propriété` d'un atome, |
 |---|---|
-| **Alors** | la propriété sélectionnée est associée à l'atome concerné, le sélecteur se ferme, le formulaire est mis à jour et la règle est automatiquement sauvegardée. |
+| **Alors** | la `propriété` sélectionnée est associée à l'atome concerné, le sélecteur se ferme, le formulaire est mis à jour et la règle est automatiquement sauvegardée. |
 
 ---
 
@@ -192,9 +192,9 @@
 
 ### REQ-SWR-029 — Filtrage des individus par classe dans le picker
 
-| **Si** | l'ontologiste sélectionne une classe dans le panneau de filtrage du sélecteur d'individus, |
+| **Si** | l'`ontologiste` sélectionne une `classe` dans le panneau de filtrage du sélecteur d'`individus`, |
 |---|---|
-| **Alors** | seuls les individus appartenant à cette classe ou à l'une de ses sous-classes sont présentés ; si la classe racine est choisie, tous les individus sont affichés. |
+| **Alors** | seuls les `individus` appartenant à cette `classe` ou à l'une de ses sous-`classes` sont présentés ; si la `classe` racine est choisie, tous les `individus` sont affichés. |
 
 ---
 
@@ -202,13 +202,13 @@
 
 ### REQ-SWR-030 — Sélection d'un individu dans le picker
 
-| **Si** | l'ontologiste clique sur un individu dans la liste du sélecteur, |
+| **Si** | l'`ontologiste` clique sur un `individu` dans la liste du sélecteur, |
 |---|---|
-| **Alors** | l'individu est mis en surbrillance et le bouton de confirmation est activé. |
+| **Alors** | l'`individu` est mis en surbrillance et le bouton de confirmation est activé. |
 
-| **Si** | l'ontologiste double-clique sur un individu, |
+| **Si** | l'`ontologiste` double-clique sur un `individu`, |
 |---|---|
-| **Alors** | l'individu est sélectionné et la confirmation est déclenchée immédiatement. |
+| **Alors** | l'`individu` est sélectionné et la confirmation est déclenchée immédiatement. |
 
 ---
 
@@ -216,9 +216,9 @@
 
 ### REQ-SWR-031 — Confirmation de la sélection d'un individu
 
-| **Si** | l'ontologiste confirme le choix d'un individu dans le sélecteur, |
+| **Si** | l'`ontologiste` confirme le choix d'un `individu` dans le sélecteur, |
 |---|---|
-| **Alors** | l'individu sélectionné est associé à l'atome d'égalité concerné, le sélecteur se ferme, le formulaire est mis à jour et la règle est automatiquement sauvegardée. |
+| **Alors** | l'`individu` sélectionné est associé à l'atome d'égalité concerné, le sélecteur se ferme, le formulaire est mis à jour et la règle est automatiquement sauvegardée. |
 
 ---
 
@@ -226,7 +226,7 @@
 
 ### REQ-SWR-032 — Fermeture du picker d'individu
 
-| **Si** | le sélecteur d'individu se ferme (confirmation ou annulation), |
+| **Si** | le sélecteur d'`individu` se ferme (confirmation ou annulation), |
 |---|---|
 | **Alors** | la fenêtre modale disparaît et l'état interne du sélecteur est entièrement réinitialisé. |
 
@@ -236,11 +236,11 @@
 
 ### REQ-SWR-034 — Glisser-déposer pour réordonner les atomes
 
-| **Si** | l'ontologiste réordonne les atomes d'une section par glisser-déposer, |
+| **Si** | l'`ontologiste` réordonne les atomes d'une section par glisser-déposer, |
 |---|---|
 | **Alors** | l'ordre des atomes est mis à jour dans la règle, le formulaire reflète le nouvel ordre et la règle est automatiquement sauvegardée. |
 
-| **Si** | l'ontologiste tente de déplacer un atome vers une section différente de celle d'origine, |
+| **Si** | l'`ontologiste` tente de déplacer un atome vers une section différente de celle d'origine, |
 |---|---|
 | **Alors** | le déplacement est refusé et aucune modification n'est apportée. |
 
@@ -266,7 +266,7 @@
 
 ### REQ-SWR-002 — Redimensionnement du panneau liste
 
-| **Si** | l'ontologiste redimensionne le panneau liste en faisant glisser la séparation entre les deux panneaux, |
+| **Si** | l'`ontologiste` redimensionne le panneau liste en faisant glisser la séparation entre les deux panneaux, |
 |---|---|
 | **Alors** | la largeur du panneau liste s'ajuste librement entre une largeur minimale et une largeur maximale, sans débordement sur le panneau d'édition. |
 
@@ -276,7 +276,7 @@
 
 ### REQ-SWR-003 — Affichage de la liste des règles SWRL
 
-| **Si** | la liste des règles SWRL est affichée, filtrée ou complète, |
+| **Si** | la liste des `règles SWRL` est affichée, filtrée ou complète, |
 |---|---|
 | **Alors** | chaque règle est présentée avec son libellé ou son identifiant, son identifiant en sous-texte lorsqu'un libellé distinct existe, et un bouton de suppression ; la règle en cours d'édition est visuellement mise en surbrillance ; si aucune règle n'est disponible, un message vide est affiché. |
 
@@ -286,7 +286,7 @@
 
 ### REQ-SWR-004 — Indicateur visuel de références cassées
 
-| **Si** | une règle référence une classe ou une propriété qui a été supprimée de l'ontologie, |
+| **Si** | une règle référence une `classe` ou une `propriété` qui a été supprimée de l'`ontologie`, |
 |---|---|
 | **Alors** | la règle est signalée visuellement dans la liste, et les atomes concernés affichent un avertissement dans le formulaire d'édition. |
 
@@ -296,11 +296,11 @@
 
 ### REQ-SWR-006 — Mise à jour dynamique du filtrage
 
-| **Si** | l'ontologiste saisit ou modifie un terme dans le champ de recherche, |
+| **Si** | l'`ontologiste` saisit ou modifie un terme dans le champ de recherche, |
 |---|---|
 | **Alors** | la liste des règles est filtrée instantanément et un bouton d'effacement apparaît tant que le champ contient du texte. |
 
-| **Si** | l'ontologiste clique sur le bouton d'effacement, |
+| **Si** | l'`ontologiste` clique sur le bouton d'effacement, |
 |---|---|
 | **Alors** | le champ de recherche est vidé et toutes les règles sont de nouveau affichées. |
 
@@ -312,7 +312,7 @@
 
 | **Si** | une règle est sélectionnée et que le formulaire d'édition est affiché, |
 |---|---|
-| **Alors** | l'ontologiste dispose de champs pour saisir l'identifiant (avec normalisation automatique des espaces), le libellé et le commentaire de la règle, ainsi que de deux sections distinctes pour la prémisse (corps) et la conclusion (tête), chacune permettant l'ajout d'atomes des types pertinents selon la section. |
+| **Alors** | l'`ontologiste` dispose de champs pour saisir l'identifiant (avec normalisation automatique des espaces), le libellé et le commentaire de la règle, ainsi que de deux sections distinctes pour la prémisse (corps) et la conclusion (tête), chacune permettant l'ajout d'atomes des types pertinents selon la section. |
 
 ---
 
@@ -320,9 +320,9 @@
 
 ### REQ-SWR-019 — Rendu d'un atome de type `type_atom`
 
-| **Si** | un atome d'appartenance à une classe est affiché dans le formulaire, |
+| **Si** | un atome d'appartenance à une `classe` est affiché dans le formulaire, |
 |---|---|
-| **Alors** | l'ontologiste voit la variable concernée, le mot-clé sémantique `is a` et la classe associée ; si la classe a été supprimée de l'ontologie, un avertissement est affiché à la place ; si elle existe, son identifiant est cliquable pour naviguer directement vers la vue des classes. |
+| **Alors** | l'`ontologiste` voit la variable concernée, le mot-clé sémantique `is a` et la `classe` associée ; si la `classe` a été supprimée de l'`ontologie`, un avertissement est affiché à la place ; si elle existe, son identifiant est cliquable pour naviguer directement vers la `vue` des `classes`. |
 
 ---
 
@@ -330,9 +330,9 @@
 
 ### REQ-SWR-020 — Rendu d'un atome de type `property_atom`
 
-| **Si** | un atome de propriété est affiché dans le formulaire, |
+| **Si** | un atome de `propriété` est affiché dans le formulaire, |
 |---|---|
-| **Alors** | l'ontologiste voit le sujet, la propriété et l'objet de la relation ; le type de propriété (objet ou donnée) est distingué visuellement ; si la propriété a été supprimée, un avertissement est affiché ; si elle existe, son identifiant est cliquable pour naviguer vers la vue de propriétés correspondante. |
+| **Alors** | l'`ontologiste` voit le sujet, la `propriété` et l'objet de la relation ; le type de `propriété` (objet ou donnée) est distingué visuellement ; si la `propriété` a été supprimée, un avertissement est affiché ; si elle existe, son identifiant est cliquable pour naviguer vers la `vue` de `propriétés` correspondante. |
 
 ---
 
@@ -342,7 +342,7 @@
 
 | **Si** | un atome de comparaison est affiché dans le formulaire, |
 |---|---|
-| **Alors** | l'ontologiste voit la variable, l'opérateur de comparaison et la valeur ; si la valeur correspond à un individu connu de l'ontologie, cet individu est affiché sous forme de pastille navigable ; sinon un champ de saisie libre est proposé ; un bouton distinct permet d'ouvrir le sélecteur d'individus. |
+| **Alors** | l'`ontologiste` voit la variable, l'opérateur de comparaison et la valeur ; si la valeur correspond à un `individu` connu de l'`ontologie`, cet `individu` est affiché sous forme de pastille navigable ; sinon un champ de saisie libre est proposé ; un bouton distinct permet d'ouvrir le sélecteur d'`individus`. |
 
 ---
 
@@ -352,7 +352,7 @@
 
 | **Si** | un bloc de négation (NAF) est affiché dans le formulaire, |
 |---|---|
-| **Alors** | l'ontologiste voit un conteneur clairement étiqueté `NAF`, dans lequel il peut ajouter et visualiser des atomes imbriqués. |
+| **Alors** | l'`ontologiste` voit un conteneur clairement étiqueté `NAF`, dans lequel il peut ajouter et visualiser des atomes imbriqués. |
 
 ---
 
@@ -362,7 +362,7 @@
 
 | **Si** | un atome conditionnel est affiché dans la conclusion d'une règle, |
 |---|---|
-| **Alors** | l'ontologiste voit deux sous-sections `if` et `then` imbriquées, chacune permettant l'ajout d'atomes du type approprié, avec normalisation automatique des formats anciens. |
+| **Alors** | l'`ontologiste` voit deux sous-sections `if` et `then` imbriquées, chacune permettant l'ajout d'atomes du type approprié, avec normalisation automatique des formats anciens. |
 
 ---
 
@@ -370,11 +370,11 @@
 
 ### REQ-SWR-024 — Picker de classe pour les atomes `type_atom`
 
-| **Si** | l'ontologiste ouvre le sélecteur de classe d'un atome, |
+| **Si** | l'`ontologiste` ouvre le sélecteur de `classe` d'un atome, |
 |---|---|
-| **Alors** | un menu déroulant listant les classes de l'ontologie apparaît positionné près du déclencheur, et tout sélecteur de classe déjà ouvert se ferme automatiquement. |
+| **Alors** | un menu déroulant listant les `classes` de l'`ontologie` apparaît positionné près du déclencheur, et tout sélecteur de `classe` déjà ouvert se ferme automatiquement. |
 
-| **Si** | l'ontologiste clique en dehors du menu déroulant, |
+| **Si** | l'`ontologiste` clique en dehors du menu déroulant, |
 |---|---|
 | **Alors** | le menu se ferme automatiquement. |
 
@@ -384,9 +384,9 @@
 
 ### REQ-SWR-026 — Picker de propriété pour les atomes `property_atom`
 
-| **Si** | l'ontologiste ouvre le sélecteur de propriété d'un atome, |
+| **Si** | l'`ontologiste` ouvre le sélecteur de `propriété` d'un atome, |
 |---|---|
-| **Alors** | un menu déroulant présente les propriétés objet et les propriétés de données de l'ontologie, visuellement distinguées, triées alphabétiquement au sein de chaque groupe. |
+| **Alors** | un menu déroulant présente les `propriétés` objet et les `propriétés de données` de l'`ontologie`, visuellement distinguées, triées alphabétiquement au sein de chaque groupe. |
 
 ---
 
@@ -394,9 +394,9 @@
 
 ### REQ-SWR-028 — Picker d'individu bi-panneau (modal)
 
-| **Si** | l'ontologiste ouvre le sélecteur d'individus, |
+| **Si** | l'`ontologiste` ouvre le sélecteur d'`individus`, |
 |---|---|
-| **Alors** | une fenêtre modale s'affiche avec, à gauche, l'arbre hiérarchique des classes de l'ontologie (incluant la classe racine avec le nombre total d'individus) et, à droite, la liste des individus filtrables par classe. |
+| **Alors** | une fenêtre modale s'affiche avec, à gauche, l'arbre hiérarchique des `classes` de l'`ontologie` (incluant la `classe` racine avec le nombre total d'`individus`) et, à droite, la liste des `individus` filtrables par `classe`. |
 
 ---
 
@@ -414,11 +414,11 @@
 
 ### REQ-SWR-035 — Navigation vers une entité référencée depuis un atome
 
-| **Si** | une classe, une propriété ou un individu référencé dans un atome existe dans l'ontologie et que l'ontologiste clique sur son identifiant affiché dans le formulaire, |
+| **Si** | une `classe`, une `propriété` ou un `individu` référencé dans un atome existe dans l'`ontologie` et que l'`ontologiste` clique sur son identifiant affiché dans le formulaire, |
 |---|---|
-| **Alors** | l'application navigue directement vers la vue de gestion correspondante et positionne l'entité cliquée en focus. |
+| **Alors** | l'application navigue directement vers la `vue` de gestion correspondante et positionne l'entité cliquée en focus. |
 
-| **Si** | l'ontologiste survole l'identifiant d'une entité référencée, |
+| **Si** | l'`ontologiste` survole l'identifiant d'une entité référencée, |
 |---|---|
 | **Alors** | un soulignement et une couleur d'accentuation indiquent visuellement que l'élément est navigable. |
 
