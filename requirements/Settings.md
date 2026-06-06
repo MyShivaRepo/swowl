@@ -29,97 +29,108 @@
 
 > Requirements independent of the UI: OWL rules, data constraints, algorithms, persistence.
 
+
 ### REQ-SET-001 — Persistence of user settings
 
-**Source code:** `app.js` → `Settings.save()`
 
 The `Settings.save()` method serializes the three user settings (`preferredLang`, `activeLangs`, `namingFormat`) as JSON and stores them in `localStorage` under the key `swowl_settings`. It is called on every modification of a setting.
 
 ---
 
+**Source code:** `app.js` → `Settings.save()`
+
 ### REQ-SET-002 — Loading settings on startup
 
-**Source code:** `app.js` → `Settings.load()`
 
 The `Settings.load()` method reads the `swowl_settings` entry from `localStorage` and rehydrates the fields `preferredLang`, `activeLangs`, and `namingFormat`. If no value is stored, default values are applied: preferred language `fr`, active languages `['fr']`, identifier format `individual_counter`. It is invoked once at module initialization (`Settings.load()` line 189).
 
 ---
 
+**Source code:** `app.js` → `Settings.load()`
+
 ### REQ-SET-005 — Hiding an optional tab
 
-**Source code:** `app.js` → `TabVisibility.hide()`
 
 The `TabVisibility.hide(tabId)` method first checks that the tab is in the `_optional` list. If so, it adds its identifier to the internal `Set` `_hidden`, saves the state, applies the visibility in the DOM, and redirects the user to the `ontologies` tab if the currently active tab is the one that was just hidden.
 
 ---
 
+**Source code:** `app.js` → `TabVisibility.hide()`
+
 ### REQ-SET-006 — Showing a previously hidden optional tab
 
-**Source code:** `app.js` → `TabVisibility.show()`
 
 The `TabVisibility.show(tabId)` method removes the tab identifier from the `Set` `_hidden`, saves the state in `localStorage`, and calls `APP._applyTabVisibility()` to make the tab visible in the navigation bar.
 
 ---
 
+**Source code:** `app.js` → `TabVisibility.show()`
+
 ### REQ-SET-007 — Toggling tab visibility
 
-**Source code:** `app.js` → `TabVisibility.toggle()`
 
 The `TabVisibility.toggle(tabId)` method calls `TabVisibility.show()` if the tab is currently hidden, or `TabVisibility.hide()` otherwise. It is invoked directly by the `onclick` handler of each tab row in `APP.renderGuiTabs()`.
 
 ---
 
+**Source code:** `app.js` → `TabVisibility.toggle()`
+
 ### REQ-SET-009 — Persisting tab visibility in localStorage
 
-**Source code:** `app.js` → `TabVisibility.save()`
 
 The `TabVisibility.save()` method serializes the contents of the `Set` `_hidden` as a JSON array and stores it in `localStorage` under the key `swowl_hidden_tabs`. It is called by `TabVisibility.hide()` and `TabVisibility.show()`.
 
 ---
 
+**Source code:** `app.js` → `TabVisibility.save()`
+
 ### REQ-SET-010 — Setting the preferred language
 
-**Source code:** `app.js` → `Settings.setPreferred()`
 
 The `Settings.setPreferred(lang)` method sets `preferredLang` to the provided language code value. If this language is not yet in `activeLangs`, it adds it. It then calls `Settings.save()` and `APP.renderSection('settings')` to persist and refresh the interface.
 
 ---
 
+**Source code:** `app.js` → `Settings.setPreferred()`
+
 ### REQ-SET-011 — Enabling or disabling a language
 
-**Source code:** `app.js` → `Settings.toggleActive()`
 
 The `Settings.toggleActive(lang)` method adds the language code to `activeLangs` if it is not already present, or removes it otherwise. It calls `Settings.save()` and `APP.renderSection('settings')` after each modification.
 
 ---
 
+**Source code:** `app.js` → `Settings.toggleActive()`
+
 ### REQ-SET-012 — Protecting the preferred language from being disabled
 
-**Source code:** `app.js` → `Settings.toggleActive()`
 
 In the `Settings.toggleActive(lang)` method, a guard at the start of the function checks whether `lang === this.preferredLang`. If so, the function returns immediately without performing any modification, thereby preventing the preferred language from being removed from the active list.
 
 ---
 
+**Source code:** `app.js` → `Settings.toggleActive()`
+
 ### REQ-SET-013 — Catalogue of available European languages
 
-**Source code:** `app.js` → `Settings.availableLangs` (static property initialized in the `Settings` object)
 
 The `Settings` object declares an `availableLangs` property containing an array of 25 entries. Each entry is an object `{ code, name, nameEn }` corresponding to an official or commonly used language in Europe (Bulgarian, Czech, Danish, German, Greek, English, Spanish, Estonian, Finnish, French, Irish, Croatian, Hungarian, Italian, Lithuanian, Latvian, Maltese, Dutch, Norwegian, Polish, Portuguese, Romanian, Slovak, Slovenian, Swedish).
 
 ---
 
+**Source code:** `app.js` → `Settings.availableLangs` (static property initialized in the `Settings` object)
+
 ### REQ-SET-014 — Selecting the individual identifier format
 
-**Source code:** `app.js` → `Settings.setNamingFormat()`
 
 The `Settings.setNamingFormat(fmt)` method assigns the received value to `this.namingFormat`, calls `Settings.save()` to persist, then `APP.renderSection('settings')` to refresh the interface. It is triggered by the radio buttons in the `IDs Rules` sub-tab, which offers three values: `individual_counter`, `class_counter`, `alphanumeric`.
 
 ---
 
+**Source code:** `app.js` → `Settings.setNamingFormat()`
+
 ### REQ-SET-015 — Automatic generation of an identifier for a new individual
 
-**Source code:** `app.js` → `Settings.generateIndividualId()`
 
 The `Settings.generateIndividualId(classId)` method computes a default identifier for a new individual according to the format stored in `Settings.namingFormat`:
 
@@ -133,28 +144,33 @@ The `Settings.generateIndividualId(classId)` method computes a default identifie
 
 > Requirements related to display: layout, visual components, interactions, navigation, styles.
 
+**Source code:** `app.js` → `Settings.generateIndividualId()`
+
 ### REQ-SET-003 — Sub-tab navigation in the Settings page
 
-**Source code:** `app.js` → `APP.renderSettings()`
 
 The `APP.renderSettings()` function generates a two-column interface: a left sidebar with three clickable sub-tabs (`GUI Tabs`, `Languages`, `IDs Rules`), and a content area on the right whose rendering depends on the value of `APP._settingsTab`. Clicking a sub-tab updates `APP._settingsTab` and calls `APP.renderSection('settings')` to re-render the page.
 
 ---
 
+**Source code:** `app.js` → `APP.renderSettings()`
+
 ### REQ-SET-004 — Displaying the list of configurable GUI tabs
 
-**Source code:** `app.js` → `APP.renderGuiTabs()`
 
 The `APP.renderGuiTabs()` function displays the exhaustive list of the application's 11 tabs (`Ontologies`, `Settings`, `Classes`, `ObjectProperties`, `DatatypeProperties`, `AnnotationProperties`, `Individuals`, `SWRL Rules`, `Views`, `Queries`, `Inferences`). Tabs marked `fixed: true` are displayed with a disabled checkbox and the label `required`. Optional tabs are displayed with an interactive checkbox reflecting their current visibility state.
 
 ---
 
+**Source code:** `app.js` → `APP.renderGuiTabs()`
+
 ### REQ-SET-008 — Immediate application of tab visibility in the DOM
 
-**Source code:** `app.js` → `APP._applyTabVisibility()`
 
 The `APP._applyTabVisibility()` function iterates over the `TabVisibility._optional` list and, for each identifier, selects the `.nav-item[data-section="<id>"]` element in the DOM. It sets `display:none` if the tab is in `_hidden`, or removes the inline style otherwise.
 
 ---
 
 — claude-sonnet-4-6
+
+**Source code:** `app.js` → `APP._applyTabVisibility()`
