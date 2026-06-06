@@ -59,7 +59,7 @@
 
 ### REQ-OP-002 — Automatic ancestor expansion
 
-| **If** | the `ontologist` selects or creates a `property` in the tree, |
+| **If** | the ontologist selects or creates a `property` in the tree, |
 |---|---|
 | **Then** | the complete path from the root to that `property` is automatically expanded, without the user having to manually open each intermediate level. |
 
@@ -69,7 +69,7 @@
 
 ### REQ-OP-003 — Child property creation
 
-| **If** | the `ontologist` wants to specialise an existing `property` by creating a subproperty directly positioned beneath it, |
+| **If** | the ontologist wants to specialise an existing `property` by creating a subproperty directly positioned beneath it, |
 |---|---|
 | **Then** | the new `property` is created as a child of the selected `property`, and the parent `property` is automatically expanded in the tree to make the new entry visible. |
 
@@ -79,7 +79,7 @@
 
 ### REQ-OP-004 — Sibling property creation
 
-| **If** | the `ontologist` wants to create a new `property` at the same hierarchical level as an existing `property`, |
+| **If** | the ontologist wants to create a new `property` at the same hierarchical level as an existing `property`, |
 |---|---|
 | **Then** | the new `property` is positioned under the same parents as the reference `property`, without requiring any additional configuration of hierarchical relationships. |
 
@@ -89,7 +89,7 @@
 
 ### REQ-OP-005 — Automatic unique identifier generation
 
-| **If** | the `ontologist` creates a new `object property`, |
+| **If** | the ontologist creates a new `object property`, |
 |---|---|
 | **Then** | a unique identifier is automatically assigned to it, with no risk of collision with existing `properties` in the `ontology`. |
 
@@ -99,7 +99,7 @@
 
 ### REQ-OP-006 — Property creation persistence via API
 
-| **If** | the `ontologist` confirms the creation of a new `object property`, |
+| **If** | the ontologist confirms the creation of a new `object property`, |
 |---|---|
 | **Then** | the `property` is saved in the `ontology` with its hierarchical relationships, and the tree is updated to immediately reflect this new entry. |
 
@@ -109,7 +109,7 @@
 
 ### REQ-OP-007 — Drag-and-drop move in the tree
 
-| **If** | the `ontologist` moves a `property` in the tree by drag-and-drop to change its hierarchical position, |
+| **If** | the ontologist moves a `property` in the tree by drag-and-drop to change its hierarchical position, |
 |---|---|
 | **Then** | the `property` is attached to its new parent (or placed at the root if dropped onto the root node), and the `ontology` is updated accordingly. |
 
@@ -119,7 +119,7 @@
 
 ### REQ-OP-008 — Cycle protection during drag-and-drop
 
-| **If** | the `ontologist` attempts to move a `property` onto one of its own descendants in the tree, |
+| **If** | the ontologist attempts to move a `property` onto one of its own descendants in the tree, |
 |---|---|
 | **Then** | the operation is blocked and a warning is displayed, as this would create a circular hierarchy incompatible with OWL. |
 
@@ -129,7 +129,7 @@
 
 ### REQ-OP-009 — Property deletion with confirmation
 
-| **If** | the `ontologist` wishes to delete an `object property` from the `ontology`, |
+| **If** | the ontologist wishes to delete an `object property` from the `ontology`, |
 |---|---|
 | **Then** | explicit confirmation is requested before any permanent deletion, to prevent accidental removals. |
 
@@ -139,11 +139,11 @@
 
 ### REQ-OP-010 — Domain class management
 
-| **If** | the `ontologist` adds a class to the domain of an `object property`, |
+| **If** | the ontologist adds a class to the domain of an `object property`, |
 |---|---|
 | **Then** | the class is associated with the `property` as a domain constraint, and the `property` is automatically saved; if no domain is defined, `owl:Thing` is implicitly indicated. |
 
-| **If** | the `ontologist` removes a class from the domain of an `object property`, |
+| **If** | the ontologist removes a class from the domain of an `object property`, |
 |---|---|
 | **Then** | the domain constraint is deleted, the `property` is automatically saved, and `owl:Thing` is displayed again if the domain becomes empty. |
 
@@ -153,11 +153,11 @@
 
 ### REQ-OP-011 — Range class management
 
-| **If** | the `ontologist` adds a class to the range of an `object property`, |
+| **If** | the ontologist adds a class to the range of an `object property`, |
 |---|---|
 | **Then** | the class is associated with the `property` as a range constraint, and the `property` is automatically saved; if no range is defined, `owl:Thing` is implicitly indicated. |
 
-| **If** | the `ontologist` removes a class from the range of an `object property`, |
+| **If** | the ontologist removes a class from the range of an `object property`, |
 |---|---|
 | **Then** | the range constraint is deleted, the `property` is automatically saved, and `owl:Thing` is displayed again if the range becomes empty. |
 
@@ -167,7 +167,7 @@
 
 ### REQ-OP-012 — Inverse property definition
 
-| **If** | the `ontologist` associates an inverse `property` with the `property` being edited, |
+| **If** | the ontologist associates an inverse `property` with the `property` being edited, |
 |---|---|
 | **Then** | the inverse relationship is saved and the `property` is automatically saved. |
 
@@ -187,7 +187,7 @@
 
 ### REQ-OP-014 — Inverse property removal
 
-| **If** | the `ontologist` wishes to remove the inverse relationship from a `property`, |
+| **If** | the ontologist wishes to remove the inverse relationship from a `property`, |
 |---|---|
 | **Then** | the inverse `property` is dissociated and the ability to define a new one is immediately restored. |
 
@@ -199,7 +199,7 @@
 
 | **If** | a `property` is selected and the reasoner detects implicit inverse relationships involving it, |
 |---|---|
-| **Then** | these inferred inversions are displayed distinctly in the form, with the justification for each `inference`, without any action required from the `ontologist`. |
+| **Then** | these inferred inversions are displayed distinctly in the form, with the justification for each `inference`, without any action required from the ontologist. |
 
 **Source code:** `owl_editor.js` → `OPEditor._loadInferredInverse()` — Queries the inference engine and injects into `#op-inferred-inverse` a badge `⊢ inverse of <strong>${i.inverse_of}</strong>` for each result in `inferred_inverse_properties`, with the `title` attribute carrying the reason for the inference; errors are silent.
 
@@ -207,11 +207,11 @@
 
 ### REQ-OP-016 — Super-property management (subPropertyOf)
 
-| **If** | the `ontologist` attaches an `object property` to a super-`property`, |
+| **If** | the ontologist attaches an `object property` to a super-`property`, |
 |---|---|
 | **Then** | the hierarchical relationship is saved and the `property` is automatically saved. |
 
-| **If** | the `ontologist` removes the attachment to a super-`property`, |
+| **If** | the ontologist removes the attachment to a super-`property`, |
 |---|---|
 | **Then** | the hierarchical relationship is deleted and the `property` is automatically saved. |
 
@@ -221,11 +221,11 @@
 
 ### REQ-OP-017 — OWL property characteristics
 
-| **If** | the `ontologist` `views` the form of an `object property`, |
+| **If** | the ontologist `views` the form of an `object property`, |
 |---|---|
 | **Then** | the seven OWL characteristics (`functional`, `inverseFunctional`, `transitive`, `symmetric`, `asymmetric`, `reflexive`, `irreflexive`) are presented with their current state, each independently modifiable. |
 
-| **If** | the `ontologist` saves the `property`, |
+| **If** | the ontologist saves the `property`, |
 |---|---|
 | **Then** | the state of each characteristic is included in the persisted data of the `property`. |
 
@@ -235,7 +235,7 @@
 
 ### REQ-OP-018 — Auto-save in edit mode
 
-| **If** | the `ontologist` modifies a field in the form of an already existing `property`, |
+| **If** | the ontologist modifies a field in the form of an already existing `property`, |
 |---|---|
 | **Then** | the changes are automatically saved, without requiring explicit validation. |
 
@@ -245,7 +245,7 @@
 
 ### REQ-OP-019 — Full save (creation or update)
 
-| **If** | the `ontologist` saves an `object property` (new or existing), |
+| **If** | the ontologist saves an `object property` (new or existing), |
 |---|---|
 | **Then** | all entered information is persisted in the `ontology` — identifier, annotations, domain, range, super-`properties`, inverse `property` and characteristics — and the tree is updated to reflect the changes, including any renaming. |
 
@@ -255,7 +255,7 @@
 
 ### REQ-OP-020 — ObjectProperty creation from the Classes tab
 
-| **If** | the `ontologist` wishes to create an `object property` directly from a class record, using that class as domain, |
+| **If** | the ontologist wishes to create an `object property` directly from a class record, using that class as domain, |
 |---|---|
 | **Then** | a new `object property` is created with the current class as domain, and the application automatically navigates to the `object properties` tab to allow further editing. |
 
@@ -269,7 +269,7 @@
 
 ### REQ-OP-021 — Object property tree display
 
-| **If** | the `ontologist` opens the `object properties` tab, |
+| **If** | the ontologist opens the `object properties` tab, |
 |---|---|
 | **Then** | the tree presents first the root `property` `owl:topObjectProperty`, followed by all `ontology` `properties` organised according to their hierarchical relationships; if the `ontology` contains no `object property`, a message explicitly indicates this. |
 
@@ -289,7 +289,7 @@
 
 ### REQ-OP-023 — Selection of owl:topObjectProperty
 
-| **If** | the `ontologist` clicks on the root node `owl:topObjectProperty`, |
+| **If** | the ontologist clicks on the root node `owl:topObjectProperty`, |
 |---|---|
 | **Then** | the detail panel offers to create a new `object property`, no existing `property` is selected, and the tree actions are updated accordingly. |
 
@@ -299,7 +299,7 @@
 
 ### REQ-OP-024 — Property selection in the tree
 
-| **If** | the `ontologist` selects a `property` in the tree, |
+| **If** | the ontologist selects a `property` in the tree, |
 |---|---|
 | **Then** | the edit form for that `property` is displayed in the detail panel, the super-`property` chain is updated, and inferred inverse `properties` are loaded. |
 
@@ -327,7 +327,7 @@
 
 ### REQ-OP-026 — Tree node expansion/collapse
 
-| **If** | the `ontologist` clicks on the expansion triangle of a tree node, |
+| **If** | the ontologist clicks on the expansion triangle of a tree node, |
 |---|---|
 | **Then** | the child `properties` of that node are shown or hidden, and the visual indicator reflects the current state (expanded or collapsed). |
 
@@ -337,7 +337,7 @@
 
 ### REQ-OP-027 — Context menu on right-click in the tree
 
-| **If** | the `ontologist` right-clicks on a tree node, |
+| **If** | the ontologist right-clicks on a tree node, |
 |---|---|
 | **Then** | a context menu is displayed at the cursor coordinates, offering relevant actions according to the targeted node (create child `property`, create sibling `property`, delete); the menu closes automatically as soon as a click is made outside it. |
 
@@ -347,7 +347,7 @@
 
 ### REQ-OP-028 — Object property edit form
 
-| **If** | the `ontologist` selects an `object property` in the tree, |
+| **If** | the ontologist selects an `object property` in the tree, |
 |---|---|
 | **Then** | a complete form is displayed with the `property` identifier, its computed IRI, its annotations, domain and range constraints, the inverse `property`, OWL characteristics, and the `property`'s usages in the `ontology`. |
 
@@ -361,15 +361,15 @@
 
 ### REQ-OP-029 — Annotation management (labels, comments, others)
 
-| **If** | the `ontologist` adds a `label` or `comment` type annotation to the `property`, |
+| **If** | the ontologist adds a `label` or `comment` type annotation to the `property`, |
 |---|---|
 | **Then** | a new annotation row is added in the Annotations section of the form. |
 
-| **If** | the `ontologist` adds an annotation of another type by selecting an `annotation property`, |
+| **If** | the ontologist adds an annotation of another type by selecting an `annotation property`, |
 |---|---|
 | **Then** | an annotation row of type `other` is created with the specified `property`. |
 
-| **If** | the `ontologist` deletes an annotation row, |
+| **If** | the ontologist deletes an annotation row, |
 |---|---|
 | **Then** | the row is removed from the form and the `property` is automatically saved if it is in edit mode. |
 
@@ -379,7 +379,7 @@
 
 ### REQ-OP-030 — "Super Properties" panel with ancestor chain
 
-| **If** | the `ontologist` selects a `property` in the tree, |
+| **If** | the ontologist selects a `property` in the tree, |
 |---|---|
 | **Then** | the "Super `Properties`" panel displays the complete hierarchical chain going up to `owl:topObjectProperty`: direct super-`properties` are editable (deletable), while transitive ancestors are presented visually as such; clicking on any ancestor navigates to its record. |
 
@@ -389,11 +389,11 @@
 
 ### REQ-OP-031 — Two-panel resizable layout
 
-| **If** | the `ontologist` consults the `object properties` tab, |
+| **If** | the ontologist consults the `object properties` tab, |
 |---|---|
 | **Then** | the interface is divided into a left panel displaying the tree and the super-`property` chain, and a right panel displaying the edit form; each panel is resizable by dragging a separator handle. |
 
-| **If** | the `ontologist` drags the vertical separator handle between the two panels, |
+| **If** | the ontologist drags the vertical separator handle between the two panels, |
 |---|---|
 | **Then** | the width of the left panel is adjusted within acceptable limits, and the internal horizontal resizer is recalculated accordingly. |
 
@@ -405,7 +405,7 @@
 
 | **If** | the `object properties` tab is reloaded following an action (creation, modification, deletion), |
 |---|---|
-| **Then** | the `property` that was selected before the reload is automatically re-selected, preserving the `ontologist`'s working context. |
+| **Then** | the `property` that was selected before the reload is automatically re-selected, preserving the ontologist's working context. |
 
 ---
 
