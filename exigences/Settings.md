@@ -42,7 +42,7 @@
 
 | **Si** | l'utilisateur ouvre l'application, |
 |---|---|
-| **Alors** | ses préférences précédemment enregistrées sont automatiquement restaurées ; si aucune préférence n'a jamais été sauvegardée, l'application s'initialise avec des valeurs par défaut : le français comme langue préférée et unique langue active, et le format de comptage simple pour les identifiants d'individus. |
+| **Alors** | ses préférences précédemment enregistrées sont automatiquement restaurées ; si aucune préférence n'a jamais été sauvegardée, l'application s'initialise avec des valeurs par défaut : le français comme langue préférée et unique langue active, et le format de comptage simple pour les identifiants d'`individus`. |
 
 **Code source :** `app.js` → `Settings.load()` — Lit l'entrée `swowl_settings` du `localStorage` et réhydrate les champs `preferredLang`, `activeLangs` et `namingFormat` ; applique les valeurs par défaut (`preferredLang: 'fr'`, `activeLangs: ['fr']`, `namingFormat: 'individual_counter'`) si aucune valeur n'est stockée.
 
@@ -112,17 +112,17 @@
 
 ### REQ-SET-014 — Sélection du format d'identifiant des individus
 
-| **Si** | l'utilisateur choisit la convention de nommage pour les nouveaux individus, |
+| **Si** | l'utilisateur choisit la convention de nommage pour les nouveaux `individus`, |
 |---|---|
-| **Alors** | l'application adopte immédiatement ce format pour la génération des identifiants des prochains individus créés, et ce choix est mémorisé. |
+| **Alors** | l'application adopte immédiatement ce format pour la génération des identifiants des prochains `individus` créés, et ce choix est mémorisé. |
 
 **Code source :** `app.js` → `Settings.setNamingFormat(format)` — Affecte la valeur choisie (`individual_counter`, `class_counter` ou `alphanumeric`) à `namingFormat`, puis appelle `Settings.save()` et rafraîchit l'interface.
 
 ### REQ-SET-015 — Génération automatique d'un identifiant pour un nouvel individu
 
-| **Si** | l'utilisateur crée un nouvel individu, |
+| **Si** | l'utilisateur crée un nouvel `individu`, |
 |---|---|
-| **Alors** | l'application lui propose automatiquement un identifiant conforme à la convention de nommage choisie : un compteur global si le format est par nombre d'individus, un compteur par classe si le format est par classe, ou une chaîne aléatoire unique si le format alphanumérique est sélectionné. |
+| **Alors** | l'application lui propose automatiquement un identifiant conforme à la convention de nommage choisie : un compteur global si le format est par nombre d'`individus`, un compteur par `classe` si le format est par `classe`, ou une chaîne aléatoire unique si le format alphanumérique est sélectionné. |
 
 **Code source :** `app.js` → `Settings.generateIndividualId(classId)` — Selon la valeur de `namingFormat` : **`individual_counter`** retourne `Individual_N` où `N` est `APP.state.individuals.length + 1` ; **`class_counter`** retourne `<classId>_N` si `classId` est fourni, sinon `Individual_N` ; **`alphanumeric`** génère une chaîne `xxxxx-xxxxx-xxxxx-xxxxx` composée de 4 segments de 5 caractères alphanumériques aléatoires, le premier caractère du premier segment étant obligatoirement une lettre.
 
