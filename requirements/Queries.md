@@ -17,304 +17,308 @@
 - [REQ-QRY-010 — Adding an OPTIONAL block](#req-qry-010--adding-an-optional-block)
 - [REQ-QRY-011 — Adding nested patterns inside an OPTIONAL block](#req-qry-011--adding-nested-patterns-inside-an-optional-block)
 - [REQ-QRY-012 — Deleting a pattern (root or nested)](#req-qry-012--deleting-a-pattern-root-or-nested)
-- [REQ-QRY-015 — Object reset on predicate change](#req-qry-015--object-reset-on-predicate-change)
+- [REQ-QRY-015 — Resetting the object when the predicate changes](#req-qry-015--resetting-the-object-when-the-predicate-changes)
 - [REQ-QRY-016 — Variable autocompletion](#req-qry-016--variable-autocompletion)
 - [REQ-QRY-017 — Query options: DISTINCT, ORDER BY, LIMIT](#req-qry-017--query-options-distinct-order-by-limit)
 - [REQ-QRY-019 — Automatic generation of SPARQL prefixes](#req-qry-019--automatic-generation-of-sparql-prefixes)
 - [REQ-QRY-020 — Handling non-variable literals with FILTER(STR(...))](#req-qry-020--handling-non-variable-literals-with-filterstr)
-- [REQ-QRY-021 — Query execution via the API](#req-qry-021--query-execution-via-the-api)
+- [REQ-QRY-021 — Executing the query via the API](#req-qry-021--executing-the-query-via-the-api)
 - [REQ-QRY-026 — Restoring the current selection](#req-qry-026--restoring-the-current-selection)
 
 ### Form
 - [REQ-QRY-013 — Predicate selection via hierarchical dropdown](#req-qry-013--predicate-selection-via-hierarchical-dropdown)
-- [REQ-QRY-014 — Adaptive object field based on predicate](#req-qry-014--adaptive-object-field-based-on-predicate)
+- [REQ-QRY-014 — Adaptive object field based on the predicate](#req-qry-014--adaptive-object-field-based-on-the-predicate)
 - [REQ-QRY-018 — Generated SPARQL preview](#req-qry-018--generated-sparql-preview)
 - [REQ-QRY-022 — Displaying results in a table](#req-qry-022--displaying-results-in-a-table)
-- [REQ-QRY-023 — Navigating to an entity from results](#req-qry-023--navigating-to-an-entity-from-results)
+- [REQ-QRY-023 — Navigating to an entity from the results](#req-qry-023--navigating-to-an-entity-from-the-results)
 - [REQ-QRY-024 — External link for unrecognized URIs in results](#req-qry-024--external-link-for-unrecognized-uris-in-results)
-- [REQ-QRY-025 — List panel resizing](#req-qry-025--list-panel-resizing)
+- [REQ-QRY-025 — Resizing the list panel](#req-qry-025--resizing-the-list-panel)
 
 ---
 
-## 1. Substance — Business logic
+## 1. Substance — Business logic and functional rules
 
 > Requirements independent of the UI: OWL rules, data constraints, algorithmic behaviors, validations, persistence.
 
 
 ### REQ-QRY-001 — Query persistence per ontology
 
-| **If** | the application needs to read or write queries for a given ontology, |
+| **If** | the user works on several distinct ontologies, |
 |---|---|
-| **Then** | the system uses the browser's `localStorage` with a dynamically built key of the form `swowl_sparql_<ontologyId>`, ensuring query isolation per ontology; `_loadAll()` parses the stored JSON (returns `[]` on deserialization error) and `_saveAll()` serializes and rewrites the full array. |
+| **Then** | the queries of each ontology are isolated from one another and persist between sessions, with no risk of mixing or loss upon application reload. |
 
 ---
 
-**Source code:** `sparql_editor.js` → `_storeKey()`, `_loadAll()`, `_saveAll()`
+**Source code:** `sparql_editor.js` → `_storeKey()`, `_loadAll()`, `_saveAll()` — Uses the browser's `localStorage` with a dynamically constructed key of the form `swowl_sparql_<ontologyId>` to isolate queries per ontology; `_loadAll()` parses the stored JSON (returns `[]` on deserialization error) and `_saveAll()` serializes and rewrites the full array.
 
 ### REQ-QRY-002 — Creating a new query
 
-| **If** | the user triggers the creation of a new query, |
+| **If** | the user wishes to formulate a new query on the current ontology, |
 |---|---|
-| **Then** | the system:<br>- generates a unique identifier of the form `QueryN` (incrementing N until no duplicate exists),<br>- creates an empty query object via `_emptyQuery()` with the fields `id`, `label`, `comment`, `distinct: false`, `patterns: []`, `order_by: ''`, `order_dir: 'ASC'`, `limit: 100`,<br>- adds it to `localStorage`,<br>- then immediately selects and displays this new query. |
+| **Then** | they can create a blank query with a unique identifier, ready to be configured and executed, without having to manually enter an identifier or fill in optional fields. |
 
 ---
 
-**Source code:** `sparql_editor.js` → `newQuery()`, `_emptyQuery()`
+**Source code:** `sparql_editor.js` → `newQuery()`, `_emptyQuery()` — Generates a unique identifier of the form `QueryN` (incrementing N until no duplicate exists), creates an empty query object via `_emptyQuery()` with fields `id`, `label`, `comment`, `distinct: false`, `patterns: []`, `order_by: ''`, `order_dir: 'ASC'`, `limit: 100`, adds it to `localStorage`, then immediately selects and displays this new query.
 
 ### REQ-QRY-003 — Selecting an existing query
 
-| **If** | the user selects an existing query by its identifier, |
+| **If** | the user selects a query from the list of saved queries, |
 |---|---|
-| **Then** | the system loads the corresponding query from `localStorage`, performs a deep copy (via `JSON.parse/JSON.stringify`) into `_editingQuery`, updates `_selectedId`, refreshes the list (highlighting the selected item) and renders the detail panel. |
+| **Then** | the full detail of that query is displayed in the editing panel, reflecting exactly the persisted state, without altering other queries. |
 
 ---
 
-**Source code:** `sparql_editor.js` → `selectQuery()`
+**Source code:** `sparql_editor.js` → `selectQuery()` — Loads the query from `localStorage`, performs a deep copy (via `JSON.parse/JSON.stringify`) into `_editingQuery`, updates `_selectedId`, refreshes the list (highlighting the selected item) and renders the detail panel.
 
 ### REQ-QRY-004 — Deleting a query
 
-| **If** | the user deletes a query identified by its `id`, |
+| **If** | the user deletes a query from the list, |
 |---|---|
-| **Then** | the system filters the persisted query array to exclude the targeted query, saves the resulting array, and, if the deleted query was the currently selected query, resets the current state (`_selectedId` and `_editingQuery` to `null`) and replaces the detail panel with an empty message. |
+| **Then** | the query is permanently removed from the persisted list, and if it was the query currently being edited, the detail panel is cleared. |
 
 ---
 
-**Source code:** `sparql_editor.js` → `deleteQuery()`
+**Source code:** `sparql_editor.js` → `deleteQuery()` — Filters the persisted query array to exclude the targeted query, saves the resulting array, and, if the deleted query was selected, resets `_selectedId` and `_editingQuery` to `null` and replaces the detail panel with an empty message.
 
 ### REQ-QRY-005 — Search/filtering in the query list
 
-| **If** | the user types a term in the search field, |
+| **If** | the user types a term in the query list search field, |
 |---|---|
-| **Then** | the system stores the term in `_searchQuery` and rebuilds the HTML content of the list, keeping only the queries whose concatenation `id + label` contains the term (case-insensitive); if no result matches, the message `'No matching query'` is displayed in place of the list. |
+| **Then** | only queries whose identifier or label contains that term are displayed; if no query matches, an explicit message indicates this. |
 
 ---
 
-**Source code:** `sparql_editor.js` → `_onSearch()`, `renderList()`
+**Source code:** `sparql_editor.js` → `_onSearch()`, `renderList()` — Stores the term in `_searchQuery` and rebuilds the HTML content of the list keeping only queries whose concatenation `id + label` contains the term (case-insensitive); if no result matches, displays the message `'No matching query'`.
 
 ### REQ-QRY-006 — Editing a query identifier
 
-| **If** | the user modifies the value of the `sq-id` field of a selected query **and** the input contains spaces, |
+| **If** | the user modifies the identifier of a query and the input contains spaces, |
 |---|---|
-| **Then** | the system normalizes the value by replacing spaces with underscores, locates the corresponding entry in `localStorage` by the old identifier, replaces the `id` in the persisted entry, in `_editingQuery` and in `_selectedId`, saves, then refreshes the list. |
+| **Then** | spaces are automatically replaced by underscores to ensure identifier validity, and the list is updated accordingly. |
 
 ---
 
-**Source code:** `sparql_editor.js` → `_onIdChange()`
+**Source code:** `sparql_editor.js` → `_onIdChange()` — Normalizes the value by replacing spaces with underscores, locates the corresponding entry in `localStorage` by the old identifier, replaces the `id` in the persisted entry, in `_editingQuery` and in `_selectedId`, saves, then refreshes the list.
 
 ### REQ-QRY-007 — Editing a query label and comment
 
-| **If** | the user modifies the `sq-label` field (text input) or `sq-comment` field (textarea) and leaves the field, |
+| **If** | the user modifies the label or comment of a query and leaves the field, |
 |---|---|
-| **Then** | the system reads the current values of all form fields (`sq-id`, `sq-label`, `sq-comment`, `sq-distinct`, `sq-orderby`, `sq-orderdir`, `sq-limit`), copies them into `_editingQuery` via `_sync()`, then persists the state via `_saveEditing()`. |
+| **Then** | the changes are automatically saved without any additional action from the user. |
 
 ---
 
-**Source code:** `sparql_editor.js` → `_syncAndSave()`, `_sync()`
+**Source code:** `sparql_editor.js` → `_syncAndSave()`, `_sync()` — Reads the current values of all form fields (`sq-id`, `sq-label`, `sq-comment`, `sq-distinct`, `sq-orderby`, `sq-orderdir`, `sq-limit`), copies them into `_editingQuery` via `_sync()`, then persists the state via `_saveEditing()`.
 
 ### REQ-QRY-008 — Adding a triple pattern
 
-| **If** | the user triggers the addition of a pattern of type `triple`, |
+| **If** | the user wishes to add a subject-predicate-object condition to the current query, |
 |---|---|
-| **Then** | the system first synchronizes the form, then pushes into `_editingQuery.patterns` an object `{ type: 'triple', subject: '?x', predicate: 'rdf:type', object: '' }` created by `_newPat()`, saves the state and re-renders the detail panel. |
+| **Then** | a new triple pattern is added to the query with default values allowing input to begin immediately. |
 
 ---
 
-**Source code:** `sparql_editor.js` → `addPattern()`, `_newPat()`
+**Source code:** `sparql_editor.js` → `addPattern()`, `_newPat()` — First synchronizes the form, then pushes into `_editingQuery.patterns` an object `{ type: 'triple', subject: '?x', predicate: 'rdf:type', object: '' }`, saves the state and re-renders the detail panel.
 
 ### REQ-QRY-009 — Adding a FILTER pattern
 
-| **If** | the user triggers the addition of a pattern of type `filter`, |
+| **If** | the user wishes to add a filtering condition to the current query, |
 |---|---|
-| **Then** | the system adds an object `{ type: 'filter', expr: '' }` to `_editingQuery.patterns` and renders it via `_renderPattern()` as `FILTER ( <expression> )` with a free-text input field for the expression. |
+| **Then** | a new FILTER pattern is added to the query with a free-text input field to express the condition. |
 
 ---
 
-**Source code:** `sparql_editor.js` → `addPattern()`, `_newPat()`
+**Source code:** `sparql_editor.js` → `addPattern()`, `_newPat()` — Adds an object `{ type: 'filter', expr: '' }` to `_editingQuery.patterns` and renders it via `_renderPattern()` in the form `FILTER ( <expression> )`.
 
 ### REQ-QRY-010 — Adding an OPTIONAL block
 
-| **If** | the user triggers the addition of a block of type `optional`, |
+| **If** | the user wishes to express optional conditions in the current query, |
 |---|---|
-| **Then** | the system adds an object `{ type: 'optional', patterns: [] }` to `_editingQuery.patterns` and `_renderPattern()` displays this block with its own `OPTIONAL` header and `+ Triple` / `+ Filter` buttons to add internal patterns. |
+| **Then** | an empty OPTIONAL block is added to the query, inside which they can then add triple or FILTER patterns independently. |
 
 ---
 
-**Source code:** `sparql_editor.js` → `addPattern()`, `_newPat()`
+**Source code:** `sparql_editor.js` → `addPattern()`, `_newPat()` — Adds an object `{ type: 'optional', patterns: [] }` to `_editingQuery.patterns` and `_renderPattern()` displays this block with its `OPTIONAL` header and `+ Triple` / `+ Filter` buttons to add inner patterns.
 
 ### REQ-QRY-011 — Adding nested patterns inside an OPTIONAL block
 
-| **If** | the user adds a pattern (triple or filter) inside an existing OPTIONAL block at index `outerIdx`, |
+| **If** | the user adds a triple or FILTER pattern inside an existing OPTIONAL block, |
 |---|---|
-| **Then** | the system verifies that the pattern at that index is of type `optional`, adds the new pattern to it via `_newPat()`, and addresses this nested pattern by an array `[outerIdx, innerIdx]` in `_getPat()`. |
+| **Then** | the new pattern is properly attached to the concerned OPTIONAL block and not to the root of the query. |
 
 ---
 
-**Source code:** `sparql_editor.js` → `_addInner()`
+**Source code:** `sparql_editor.js` → `_addInner()` — Verifies that the pattern at index `outerIdx` is of type `optional`, adds the new pattern to it via `_newPat()`, and addresses this nested pattern by an array `[outerIdx, innerIdx]` in `_getPat()`.
 
 ### REQ-QRY-012 — Deleting a pattern (root or nested)
 
-| **If** | the user deletes a pattern identified by a simple index (integer), |
+| **If** | the user deletes a pattern located directly in the query (root level), |
 |---|---|
-| **Then** | the system performs a splice on `q.patterns` to remove the root pattern, saves and re-renders the panel. |
+| **Then** | that pattern is removed from the query and the panel is updated. |
 
-| **If** | the user deletes a pattern identified by an array `[oi, ii]`, |
+| **If** | the user deletes a pattern located inside an OPTIONAL block, |
 |---|---|
-| **Then** | the system performs a splice on `q.patterns[oi].patterns` to remove the nested pattern from the corresponding OPTIONAL block, saves and re-renders the panel. |
+| **Then** | only that nested pattern is removed from the OPTIONAL block that contains it, without affecting other patterns. |
 
 ---
 
-**Source code:** `sparql_editor.js` → `deletePattern()`
+**Source code:** `sparql_editor.js` → `deletePattern()` — For a simple index (integer): performs a splice on `q.patterns` to remove the root pattern. For an array index `[oi, ii]`: performs a splice on `q.patterns[oi].patterns` to remove the pattern nested in the corresponding OPTIONAL block. In both cases, saves and re-renders the panel.
 
-### REQ-QRY-015 — Object reset on predicate change
+### REQ-QRY-015 — Resetting the object when the predicate changes
 
-| **If** | the user changes the predicate of a triple pattern and the new predicate is `rdf:type` while the old one was not, |
+| **If** | the user changes the predicate of a triple pattern to set it to `rdf:type`, |
 |---|---|
-| **Then** | the system clears the `object` field (`''`) and re-renders the panel to switch the object field type. |
+| **Then** | the object field is cleared in order to invite the user to select a class rather than a variable. |
 
-| **If** | the user changes the predicate of a triple pattern and moves away from `rdf:type` to another predicate, |
+| **If** | the user changes the predicate of a triple pattern from `rdf:type` to another predicate, |
 |---|---|
-| **Then** | the system resets the `object` field to `'?y'` and re-renders the panel to switch the object field type. |
+| **Then** | the object field is reset to a default variable in order to provide a starting point consistent with the new predicate. |
 
 ---
 
-**Source code:** `sparql_editor.js` → `_onPredicateChange()`
+**Source code:** `sparql_editor.js` → `_onPredicateChange()` — If the new predicate is `rdf:type` and the old one was not: clears the `object` field (`''`) and re-renders the panel. If the user moves away from `rdf:type` to another predicate: resets the `object` field to `'?y'` and re-renders the panel.
 
 ### REQ-QRY-016 — Variable autocompletion
 
-| **If** | the ontology is loaded and contains query patterns (including inside nested OPTIONAL blocks), |
+| **If** | the ontology is loaded and the current query contains variables defined in patterns (including those nested in OPTIONAL blocks), |
 |---|---|
-| **Then** | the system recursively traverses all patterns, collects into a `Set` all `subject` and `object` values starting with `?`, and exposes these variables via a `<datalist id="sq-vars-list">` element referenced by the `subject`, `object` and `order_by` fields. |
+| **Then** | these variables are offered as autocompletion suggestions in the subject, object and sort fields, facilitating query consistency. |
 
 ---
 
-**Source code:** `sparql_editor.js` → `_collectVars()`, `_renderForm()`
+**Source code:** `sparql_editor.js` → `_collectVars()`, `_renderForm()` — Recursively traverses all patterns, collects into a `Set` all `subject` and `object` values starting with `?`, and exposes these variables via a `<datalist id="sq-vars-list">` element referenced by the `subject`, `object` and `order_by` fields.
 
 ### REQ-QRY-017 — Query options: DISTINCT, ORDER BY, LIMIT
 
-| **If** | the user configures the query options (checkbox `sq-distinct`, field `sq-orderby` with direction `sq-orderdir`, numeric field `sq-limit`), |
+| **If** | the user configures result formatting options (duplicate elimination, sorting, result count limitation), |
 |---|---|
-| **Then** | the system persists these values in the model and `_buildSparql()` integrates them respectively as `SELECT DISTINCT`, `ORDER BY DIR(?var)` and `LIMIT N` in the generated SPARQL query (the `sq-limit` value is an integer with a default of 100 and a maximum of 100000). |
+| **Then** | these options are integrated into the generated SPARQL query and persist with the query. |
 
 ---
 
-**Source code:** `sparql_editor.js` → `_sync()`, `_buildSparql()`
+**Source code:** `sparql_editor.js` → `_sync()`, `_buildSparql()` — Persists the values `distinct`, `order_by`, `order_dir` and `limit` in the model; `_buildSparql()` integrates them respectively as `SELECT DISTINCT`, `ORDER BY DIR(?var)` and `LIMIT N` (the `sq-limit` value is an integer with a default of 100 and a maximum of 100000).
 
 ### REQ-QRY-019 — Automatic generation of SPARQL prefixes
 
-| **If** | a SPARQL query is generated, |
+| **If** | a SPARQL query is generated for an ontology that has a declared prefix, |
 |---|---|
-| **Then** | the system systematically injects the prefixes `rdf:`, `rdfs:` and `owl:`; if the current ontology (`APP.state.ontology`) has a `prefix` and an `id` (base IRI), a fourth prefix `PREFIX <prefix>: <IRI#>` is added (the `#` separator is omitted if the IRI already ends with `#` or `/`). |
+| **Then** | the standard prefixes (`rdf:`, `rdfs:`, `owl:`) as well as the prefix specific to the ontology are automatically included in the query, without the user having to enter them manually. |
 
 ---
 
-**Source code:** `sparql_editor.js` → `_buildSparql()`
+**Source code:** `sparql_editor.js` → `_buildSparql()` — Systematically injects the prefixes `rdf:`, `rdfs:` and `owl:`; if the current ontology (`APP.state.ontology`) has a `prefix` and an `id` (base IRI), adds a fourth prefix `PREFIX <prefix>: <IRI#>` (the `#` separator is omitted if the IRI already ends with `#` or `/`).
 
 ### REQ-QRY-020 — Handling non-variable literals with FILTER(STR(...))
 
-| **If** | a triple pattern carries a literal-type predicate (`rdfs:label`, `rdfs:comment`, or a Datatype Property) **and** the object value is neither a variable (`?`), nor already quoted, |
+| **If** | the user enters a literal value (non-variable) in the object field of a pattern bearing an annotation property or datatype property predicate, |
 |---|---|
-| **Then** | the system generates an intermediate variable `?_lvN` in the triple clause and automatically adds a `FILTER ( STR(?_lvN) = "value" )` clause to compare the value independently of the RDF language tag. |
+| **Then** | the comparison is performed independently of the RDF language tag, avoiding false negatives caused by tagged literals. |
 
 ---
 
-**Source code:** `sparql_editor.js` → `_buildSparql()` (internal function `patToLines`)
+**Source code:** `sparql_editor.js` → `_buildSparql()` (internal function `patToLines`) — For a literal-type predicate (`rdfs:label`, `rdfs:comment`, or a Datatype Property) whose object value is neither a variable (`?`) nor already enclosed in quotes: generates an intermediate variable `?_lvN` in the triple clause and automatically adds a `FILTER ( STR(?_lvN) = "value" )` clause.
 
-### REQ-QRY-021 — Query execution via the API
+### REQ-QRY-021 — Executing the query via the API
 
-| **If** | the user triggers the execution of the current query, |
+| **If** | the user launches the execution of the current query, |
 |---|---|
-| **Then** | the system:<br>- synchronizes the form and generates the SPARQL query,<br>- displays a status `Running…` and automatically exposes the SPARQL preview,<br>- sends the query as POST to `/api/sparql` with content-type `application/x-www-form-urlencoded` (parameter `query`),<br>- displays the number of results (`bindings.length`) in `sq-status` on success,<br>- or propagates the server error text in case of a non-OK response. |
+| **Then** | the query is sent to the SPARQL endpoint, a progress indicator is displayed during execution, then the number of results obtained is shown on success, or the server error message is displayed on failure. |
 
 ---
 
-**Source code:** `sparql_editor.js` → `runQuery()`
+**Source code:** `sparql_editor.js` → `runQuery()` — Synchronizes the form and generates the SPARQL query, displays a status of `Running…` and automatically exposes the SPARQL preview, sends the query via POST to `/api/sparql` with content-type `application/x-www-form-urlencoded` (parameter `query`), displays `bindings.length` in `sq-status` after success, or propagates the server error text in case of a non-OK response.
 
 ### REQ-QRY-026 — Restoring the current selection
 
-| **If** | the user returns to the queries tab, |
+| **If** | the user returns to the queries tab after having navigated elsewhere in the application, |
 |---|---|
-| **Then** | the system reinitializes the resize handle via `_initSplitHandle()` and, if `_selectedId` is defined, calls `selectQuery(_selectedId)` again to redisplay the detail panel of the last selected query. |
+| **Then** | the last query they were viewing is automatically redisplayed in the detail panel, without them having to search for and select it again. |
 
 ---
 
-## 2. Form — Presentation and UI
+**Source code:** `sparql_editor.js` → `restoreSelection()` — Reinitializes the resize handle via `_initSplitHandle()` and, if `_selectedId` is defined, calls `selectQuery(_selectedId)` again to redisplay the detail panel of the last selected query.
 
-> Requirements related to display: layout, visual components, interactions, navigation, styles.
+---
 
-**Source code:** `sparql_editor.js` → `restoreSelection()`
+## 2. Form — Presentation and user interface
+
+> Requirements relating to display: layout, visual components, interactions, navigation, styles.
 
 ### REQ-QRY-013 — Predicate selection via hierarchical dropdown
 
 | **If** | the user opens the predicate selector of a triple pattern, |
 |---|---|
-| **Then** | the system presents a custom dropdown organized into four groups (`rdf:type` / Classes, Object Properties, Datatype Properties, Annotation Properties including `rdfs:label` and `rdfs:comment`), each group sorted according to the `subPropertyOf` hierarchy in alphabetical DFS with depth management, and each entry displaying a color-coded icon by property type. |
+| **Then** | the available predicates are presented organized by category (class type, object properties, datatype properties, annotation properties), respecting the ontology hierarchy, with a distinctive icon per property type. |
 
 ---
 
-**Source code:** `sparql_editor.js` → `_predGroups()`, `_propTreeItems()`, `_ddBuild()`
+**Source code:** `sparql_editor.js` → `_predGroups()`, `_propTreeItems()`, `_ddBuild()` — Presents a custom dropdown organized into four groups (`rdf:type` / Classes, Object Properties, Datatype Properties, Annotation Properties including `rdfs:label` and `rdfs:comment`), each group sorted according to the `subPropertyOf` hierarchy in alphabetical DFS with depth management, each entry displaying a color-coded icon by property type.
 
-### REQ-QRY-014 — Adaptive object field based on predicate
+### REQ-QRY-014 — Adaptive object field based on the predicate
 
 | **If** | the predicate of a triple pattern is `rdf:type`, |
 |---|---|
-| **Then** | the system displays a class tree dropdown (`_buildClsDd()`). |
+| **Then** | the object field presents a class tree selector from the ontology. |
 
-| **If** | the predicate is `rdfs:label`, `rdfs:comment` or a Datatype Property, |
+| **If** | the predicate is an annotation property or a datatype property, |
 |---|---|
-| **Then** | the system displays a full-width text field with the placeholder `?var or literal value`. |
+| **Then** | the object field presents a wide text field allowing a variable or literal value to be entered. |
 
-| **If** | the predicate is an Object Property, an annotation property or an unknown value, |
+| **If** | the predicate is an object property or an unrecognized value, |
 |---|---|
-| **Then** | the system displays a 95px text field with the placeholder `?var or IRI`. |
+| **Then** | the object field presents a short text field allowing a variable or IRI to be entered. |
 
 ---
 
-**Source code:** `sparql_editor.js` → `_objectField()`
+**Source code:** `sparql_editor.js` → `_objectField()` — For `rdf:type`: displays a class tree dropdown via `_buildClsDd()`. For `rdfs:label`, `rdfs:comment` or a Datatype Property: displays a full-width text field with the placeholder `?var or literal value`. For Object Properties, annotation properties or unknown values: displays a 95px text field with the placeholder `?var or IRI`.
 
 ### REQ-QRY-018 — Generated SPARQL preview
 
-| **If** | the user toggles the visibility of the SPARQL preview panel, |
+| **If** | the user wishes to view the SPARQL query corresponding to the patterns they have defined, |
 |---|---|
-| **Then** | the system updates the button label (`▼ Show` / `▲ Hide`), stores the state in `_showSparql`, and shows or hides the `<pre>` content of the generated query; on refresh via `_refreshSparqlPreview()`, the system calls `_sync()` then `_buildSparql()` and injects the text into `sq-sparql-preview` without re-rendering the entire form. |
+| **Then** | they can show or hide a preview panel displaying the generated SPARQL query in real time, without leaving the editing form. |
 
 ---
 
-**Source code:** `sparql_editor.js` → `_toggleSparql()`, `_refreshSparqlPreview()`
+**Source code:** `sparql_editor.js` → `_toggleSparql()`, `_refreshSparqlPreview()` — Updates the button label (`▼ Show` / `▲ Hide`), stores the state in `_showSparql`, and shows or hides the `<pre>` content of the generated query; upon refresh via `_refreshSparqlPreview()`, calls `_sync()` then `_buildSparql()` and injects the text into `sq-sparql-preview` without re-rendering the entire form.
 
 ### REQ-QRY-022 — Displaying results in a table
 
 | **If** | a SPARQL query returns results, |
 |---|---|
-| **Then** | the system generates an HTML table with:<br>- variable names as column headers,<br>- one row per binding with hover highlighting and alternating background on even/odd rows,<br>- a dash (`—`) in cells with no value,<br>- the language tag displayed as superscript (e.g. `@fr`) for literal values carrying an `xml:lang` attribute. |
+| **Then** | the results are displayed in a readable table with variables as column headers, one row per result, and a clear indication for cells without a value; language tags of literals are visible as superscript. |
 
 ---
 
-**Source code:** `sparql_editor.js` → `_renderResults()`
+**Source code:** `sparql_editor.js` → `_renderResults()` — Generates an HTML table with variable names as column headers, one row per binding with hover highlighting and alternating background on even/odd rows, a dash (`—`) in cells without a value, and the language tag displayed as superscript (e.g. `@fr`) for literal values carrying an `xml:lang` attribute.
 
-### REQ-QRY-023 — Navigating to an entity from results
+### REQ-QRY-023 — Navigating to an entity from the results
 
-| **If** | a result cell contains a URI recognized in `APP.state` (among classes, individuals, object properties, datatype properties or annotation properties), |
+| **If** | a query result corresponds to a known entity in the ontology (class, individual, property), |
 |---|---|
-| **Then** | the system renders the cell as a clickable link with the entity's color-coded icon and display name; on click, `navigateToEntity(uri)` calls `APP.navigate(section)` then, after 150 ms, the selection function specific to the relevant editor (`ClassEditor.selectClass`, `IndividualEditor.selectIndividual`, `OPEditor.selectProp`, `DPEditor.selectProp`, `APEditor.selectProp`). |
+| **Then** | the user can click on that result to navigate directly to the entity's detail view in the corresponding tab of the application. |
 
 ---
 
-**Source code:** `sparql_editor.js` → `_resolveEntity()`, `navigateToEntity()`, `_renderResults()`
+**Source code:** `sparql_editor.js` → `_resolveEntity()`, `navigateToEntity()`, `_renderResults()` — Renders the cell as a clickable link with the entity's color-coded icon and display name if the URI is recognized in `APP.state` (among classes, individuals, object properties, datatype properties or annotation properties); on click, `navigateToEntity(uri)` calls `APP.navigate(section)` then, after 150 ms, the selection function specific to the relevant editor (`ClassEditor.selectClass`, `IndividualEditor.selectIndividual`, `OPEditor.selectProp`, `DPEditor.selectProp`, `APEditor.selectProp`).
 
 ### REQ-QRY-024 — External link for unrecognized URIs in results
 
-| **If** | a result cell is of type `uri` **and** `_resolveEntity()` returns no match in the application, |
+| **If** | a query result is a URI that does not correspond to any entity in the current ontology, |
 |---|---|
-| **Then** | the system generates an `<a href="..." target="_blank">` tag displaying the local part of the URI, allowing the external resource to be opened in a new tab. |
+| **Then** | the user can open that external resource in a new tab by clicking on it. |
 
 ---
 
-**Source code:** `sparql_editor.js` → `_renderResults()`
+**Source code:** `sparql_editor.js` → `_renderResults()` — For any cell of type `uri` for which `_resolveEntity()` returns no match in the application: generates an `<a href="..." target="_blank">` tag displaying the local part of the URI.
 
-### REQ-QRY-025 — List panel resizing
+### REQ-QRY-025 — Resizing the list panel
 
-| **If** | the user drags the `sparql-split-h` handle to resize the list panel, |
+| **If** | the user wishes to adjust the width of the query list panel, |
 |---|---|
-| **Then** | the system constrains the width of the `sparql-list-panel` panel between 120 px and 400 px, adds the CSS class `resizing` to the `body` for the entire duration of the drag, and removes this class at the end of the drag; the `mousedown`/`mousemove`/`mouseup` listeners are attached only once (flag `_bound`). |
+| **Then** | they can freely resize it by drag-and-drop, within reasonable limits ensuring interface usability. |
 
-**Source code:** `sparql_editor.js` → `_initSplitHandle()`
+---
+
+**Source code:** `sparql_editor.js` → `_initSplitHandle()` — Constrains the width of the `sparql-list-panel` panel between 120 px and 400 px, adds the CSS class `resizing` to the `body` for the entire duration of the drag and removes it at the end; the `mousedown`/`mousemove`/`mouseup` listeners are attached only once (flag `_bound`).
