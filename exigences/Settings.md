@@ -1,7 +1,3 @@
-Le fichier ne contient pas de paires à fusionner (ajout/suppression, création/suppression, add/delete, add/remove). Toutes les exigences ont des titres uniques sans suffixes d'opération dupliqués. Le fichier est déjà bien structuré.
-
-Je retourne le fichier tel quel, avec uniquement la correction des IDs manquants (REQ-SET-003 et REQ-SET-004 et REQ-SET-008 sont dans la section Forme, les IDs 003/004/008 sont déjà dans la numérotation globale — pas de renumérotation nécessaire car aucune fusion n'a eu lieu).
-
 # Exigences — Settings
 
 > Généré le 2026-06-06 | Dérivé strictement du code source | Aucune hallucination
@@ -36,104 +32,113 @@ Je retourne le fichier tel quel, avec uniquement la correction des IDs manquants
 
 ### REQ-SET-001 — Persistance des paramètres utilisateur
 
+**Si** un paramètre utilisateur (`preferredLang`, `activeLangs` ou `namingFormat`) est modifié,
 
-La méthode `Settings.save()` sérialise en JSON les trois paramètres utilisateur (`preferredLang`, `activeLangs`, `namingFormat`) et les stocke dans le `localStorage` sous la clé `swowl_settings`. Elle est appelée à chaque modification d'un paramètre.
-
----
+**Alors** le système sérialise en JSON les trois paramètres et les stocke dans le `localStorage` sous la clé `swowl_settings`.
 
 **Code source :** `app.js` → `Settings.save()`
 
 ### REQ-SET-002 — Chargement des paramètres au démarrage
 
+**Si** le module est initialisé,
 
-La méthode `Settings.load()` lit l'entrée `swowl_settings` du `localStorage` et réhydrate les champs `preferredLang`, `activeLangs` et `namingFormat`. Si aucune valeur n'est stockée, les valeurs par défaut sont appliquées : langue préférée `fr`, langues actives `['fr']`, format d'identifiant `individual_counter`. Elle est invoquée une seule fois à l'initialisation du module (`Settings.load()` ligne 189).
-
----
+**Alors** :
+- le système lit l'entrée `swowl_settings` du `localStorage` et réhydrate les champs `preferredLang`, `activeLangs` et `namingFormat` ;
+- si aucune valeur n'est stockée, les valeurs par défaut sont appliquées : langue préférée `fr`, langues actives `['fr']`, format d'identifiant `individual_counter`.
 
 **Code source :** `app.js` → `Settings.load()`
 
 ### REQ-SET-003 — Masquage et affichage d'un onglet optionnel
 
+**Si** la méthode `TabVisibility.hide(tabId)` est appelée
+**et** que l'identifiant fourni est présent dans la liste `_optional`,
 
-La méthode `TabVisibility.hide(tabId)` vérifie d'abord que l'onglet est bien dans la liste `_optional`. Si c'est le cas, elle ajoute son identifiant au `Set` interne `_hidden`, sauvegarde l'état, applique la visibilité dans le DOM, et redirige l'utilisateur vers l'onglet `ontologies` si l'onglet actuellement actif est celui qui vient d'être masqué. La méthode `TabVisibility.show(tabId)` supprime l'identifiant de l'onglet du `Set` `_hidden`, sauvegarde l'état dans le `localStorage`, et rappelle `APP._applyTabVisibility()` pour rendre l'onglet visible dans la barre de navigation.
+**Alors** :
+- l'identifiant est ajouté au `Set` interne `_hidden` ;
+- l'état est sauvegardé et la visibilité est appliquée dans le DOM ;
+- si l'onglet actuellement actif est celui qui vient d'être masqué, l'utilisateur est redirigé vers l'onglet `ontologies`.
 
----
+**Si** la méthode `TabVisibility.show(tabId)` est appelée,
+
+**Alors** :
+- l'identifiant de l'onglet est supprimé du `Set` `_hidden` ;
+- l'état est sauvegardé dans le `localStorage` ;
+- `APP._applyTabVisibility()` est appelée pour rendre l'onglet visible dans la barre de navigation.
 
 **Code source :** `app.js` → `TabVisibility.hide()` | `TabVisibility.show()`
 
 ### REQ-SET-004 — Basculement de visibilité d'un onglet (toggle)
 
+**Si** l'utilisateur interagit avec la case à cocher d'un onglet optionnel dans la liste `GUI Tabs`,
 
-La méthode `TabVisibility.toggle(tabId)` appelle `TabVisibility.show()` si l'onglet est actuellement masqué, ou `TabVisibility.hide()` dans le cas contraire. Elle est invoquée directement par le gestionnaire `onclick` de chaque ligne d'onglet dans `APP.renderGuiTabs()`.
-
----
+**Alors** :
+- si l'onglet est actuellement masqué, `TabVisibility.show()` est appelée ;
+- sinon, `TabVisibility.hide()` est appelée.
 
 **Code source :** `app.js` → `TabVisibility.toggle()`
 
 ### REQ-SET-005 — Persistance de la visibilité des onglets dans le localStorage
 
+**Si** un onglet optionnel est masqué ou affiché (via `TabVisibility.hide()` ou `TabVisibility.show()`),
 
-La méthode `TabVisibility.save()` sérialise le contenu du `Set` `_hidden` en tableau JSON et le stocke dans le `localStorage` sous la clé `swowl_hidden_tabs`. Elle est appelée par `TabVisibility.hide()` et `TabVisibility.show()`.
-
----
+**Alors** le système sérialise le contenu du `Set` `_hidden` en tableau JSON et le stocke dans le `localStorage` sous la clé `swowl_hidden_tabs`.
 
 **Code source :** `app.js` → `TabVisibility.save()`
 
 ### REQ-SET-006 — Définition de la langue préférée
 
+**Si** l'utilisateur sélectionne une langue comme langue préférée,
 
-La méthode `Settings.setPreferred(lang)` définit `preferredLang` à la valeur du code de langue fourni. Si cette langue n'est pas encore dans `activeLangs`, elle l'y ajoute. Elle appelle ensuite `Settings.save()` et `APP.renderSection('settings')` pour persister et rafraîchir l'interface.
-
----
+**Alors** :
+- `preferredLang` est défini à la valeur du code de langue fourni ;
+- si cette langue n'est pas encore dans `activeLangs`, elle y est ajoutée ;
+- les paramètres sont persistés et l'interface est rafraîchie.
 
 **Code source :** `app.js` → `Settings.setPreferred()`
 
 ### REQ-SET-007 — Activation ou désactivation d'une langue
 
+**Si** l'utilisateur active ou désactive une langue dans la liste des langues disponibles,
 
-La méthode `Settings.toggleActive(lang)` ajoute le code de langue à `activeLangs` s'il n'y est pas déjà, ou le retire sinon. Elle appelle `Settings.save()` et `APP.renderSection('settings')` après chaque modification.
-
----
+**Alors** :
+- si le code de langue n'est pas dans `activeLangs`, il y est ajouté ;
+- sinon, il en est retiré ;
+- les paramètres sont persistés et l'interface est rafraîchie.
 
 **Code source :** `app.js` → `Settings.toggleActive()`
 
 ### REQ-SET-008 — Protection de la langue préférée contre la désactivation
 
+**Si** l'utilisateur tente de désactiver la langue actuellement définie comme langue préférée (`lang === preferredLang`),
 
-Dans la méthode `Settings.toggleActive(lang)`, un garde en début de fonction vérifie si `lang === this.preferredLang`. Si c'est le cas, la fonction retourne immédiatement sans effectuer aucune modification, empêchant ainsi la suppression de la langue préférée de la liste active.
-
----
+**Alors** le système ignore l'action et n'effectue aucune modification de `activeLangs`.
 
 **Code source :** `app.js` → `Settings.toggleActive()`
 
 ### REQ-SET-009 — Catalogue des langues européennes disponibles
 
+**Si** l'application est chargée,
 
-L'objet `Settings` déclare une propriété `availableLangs` contenant un tableau de 25 entrées. Chaque entrée est un objet `{ code, name, nameEn }` correspondant à une langue officielle ou courante en Europe (bulgare, tchèque, danois, allemand, grec, anglais, espagnol, estonien, finnois, français, irlandais, croate, hongrois, italien, lituanien, letton, maltais, néerlandais, norvégien, polonais, portugais, roumain, slovaque, slovène, suédois).
-
----
+**Alors** le système expose une liste statique de 25 langues européennes (`availableLangs`), chaque entrée étant un objet `{ code, name, nameEn }` couvrant : bulgare, tchèque, danois, allemand, grec, anglais, espagnol, estonien, finnois, français, irlandais, croate, hongrois, italien, lituanien, letton, maltais, néerlandais, norvégien, polonais, portugais, roumain, slovaque, slovène et suédois.
 
 **Code source :** `app.js` → `Settings.availableLangs` (propriété statique initialisée dans l'objet `Settings`)
 
 ### REQ-SET-010 — Sélection du format d'identifiant des individus
 
+**Si** l'utilisateur sélectionne un bouton radio dans le sous-onglet `IDs Rules` (`individual_counter`, `class_counter` ou `alphanumeric`),
 
-La méthode `Settings.setNamingFormat(fmt)` affecte la valeur reçue à `this.namingFormat`, appelle `Settings.save()` pour persister, puis `APP.renderSection('settings')` pour rafraîchir l'interface. Elle est déclenchée par les boutons radio du sous-onglet `IDs Rules`, qui propose trois valeurs : `individual_counter`, `class_counter`, `alphanumeric`.
-
----
+**Alors** le système affecte la valeur choisie à `namingFormat`, persiste les paramètres et rafraîchit l'interface.
 
 **Code source :** `app.js` → `Settings.setNamingFormat()`
 
 ### REQ-SET-011 — Génération automatique d'un identifiant pour un nouvel individu
 
+**Si** un nouvel individu est créé et qu'un identifiant par défaut doit être calculé,
 
-La méthode `Settings.generateIndividualId(classId)` calcule un identifiant par défaut pour un nouvel individu selon le format stocké dans `Settings.namingFormat` :
-
-- **`individual_counter`** : retourne `Individual_N` où `N` est le nombre d'individus existants dans `APP.state.individuals` plus 1.
-- **`class_counter`** : retourne `<classId>_N` si un `classId` est fourni, sinon se rabat sur `Individual_N`.
+**Alors** le système génère cet identifiant selon le format actuel de `namingFormat` :
+- **`individual_counter`** : retourne `Individual_N` où `N` est le nombre d'individus existants dans `APP.state.individuals` plus 1 ;
+- **`class_counter`** : retourne `<classId>_N` si un `classId` est fourni, sinon se rabat sur `Individual_N` ;
 - **`alphanumeric`** : génère une chaîne de la forme `xxxxx-xxxxx-xxxxx-xxxxx` composée de 4 segments de 5 caractères alphanumériques aléatoires, le premier caractère du premier segment étant obligatoirement une lettre.
-
----
 
 **Code source :** `app.js` → `Settings.generateIndividualId()`
 
@@ -145,27 +150,29 @@ La méthode `Settings.generateIndividualId(classId)` calcule un identifiant par 
 
 ### REQ-SET-012 — Navigation par sous-onglets dans la page Settings
 
+**Si** l'utilisateur accède à la page `Settings`
+**et** clique sur l'un des sous-onglets (`GUI Tabs`, `Languages`, `IDs Rules`),
 
-La fonction `APP.renderSettings()` génère une interface à deux colonnes : une barre latérale gauche avec trois sous-onglets cliquables (`GUI Tabs`, `Languages`, `IDs Rules`), et une zone de contenu à droite dont le rendu dépend de la valeur de `APP._settingsTab`. Un clic sur un sous-onglet met à jour `APP._settingsTab` et rappelle `APP.renderSection('settings')` pour réafficher la page.
-
----
+**Alors** :
+- `APP._settingsTab` est mis à jour avec la valeur du sous-onglet sélectionné ;
+- la zone de contenu à droite est réaffichée en conséquence.
 
 **Code source :** `app.js` → `APP.renderSettings()`
 
 ### REQ-SET-013 — Affichage de la liste des onglets GUI configurables
 
+**Si** l'utilisateur ouvre le sous-onglet `GUI Tabs` de la page `Settings`,
 
-La fonction `APP.renderGuiTabs()` affiche la liste exhaustive des 11 onglets de l'application (`Ontologies`, `Settings`, `Classes`, `ObjectProperties`, `DatatypeProperties`, `AnnotationProperties`, `Individuals`, `SWRL Rules`, `Views`, `Queries`, `Inferences`). Les onglets marqués `fixed: true` sont affichés avec une case à cocher désactivée et le label `required`. Les onglets optionnels sont affichés avec une case à cocher interactive reflétant leur état de visibilité courant.
-
----
+**Alors** le système affiche la liste exhaustive des 11 onglets de l'application (`Ontologies`, `Settings`, `Classes`, `ObjectProperties`, `DatatypeProperties`, `AnnotationProperties`, `Individuals`, `SWRL Rules`, `Views`, `Queries`, `Inferences`) avec :
+- une case à cocher désactivée et le label `required` pour les onglets marqués `fixed: true` ;
+- une case à cocher interactive reflétant l'état de visibilité courant pour les onglets optionnels.
 
 **Code source :** `app.js` → `APP.renderGuiTabs()`
 
 ### REQ-SET-014 — Application immédiate de la visibilité des onglets dans le DOM
 
+**Si** l'état de visibilité d'un onglet optionnel est modifié,
 
-La fonction `APP._applyTabVisibility()` parcourt la liste `TabVisibility._optional` et, pour chaque identifiant, sélectionne l'élément `.nav-item[data-section="<id>"]` dans le DOM. Elle affecte `display:none` si l'onglet est dans `_hidden`, ou supprime le style inline sinon.
-
----
+**Alors** le système parcourt `TabVisibility._optional` et, pour chaque identifiant, sélectionne l'élément `.nav-item[data-section="<id>"]` dans le DOM et lui affecte `display:none` s'il est dans `_hidden`, ou supprime le style inline sinon.
 
 **Code source :** `app.js` → `APP._applyTabVisibility()`
