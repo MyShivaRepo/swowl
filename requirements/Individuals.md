@@ -320,7 +320,7 @@
 
 ### REQ-IND-001 — Three-column layout
 
-| **If** | the ontologist opens the Individuals tab, |
+| **If** | the ontologist opens the `Individuals` tab, |
 |---|---|
 | **Then** | the interface presents three side-by-side work areas: the class hierarchy, the individual list, and the detail form; by default, the form invites the user to select or create an individual. |
 
