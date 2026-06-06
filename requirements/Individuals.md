@@ -66,7 +66,7 @@
 
 ### REQ-IND-003 — Filtered and sorted individual list
 
-| **If** | the `ontologist` browses the `individual` list, possibly after selecting a class in the tree, |
+| **If** | the ontologist browses the `individual` list, possibly after selecting a class in the tree, |
 |---|---|
 | **Then** | only `individuals` belonging to that class or one of its subclasses are displayed, sorted alphabetically by their display name; with no class selected, all `individuals` are listed; each `individual` can be moved by drag-and-drop. |
 
@@ -76,7 +76,7 @@
 
 ### REQ-IND-007 — Creation of a new individual
 
-| **If** | the `ontologist` wishes to create a new `individual`, |
+| **If** | the ontologist wishes to create a new `individual`, |
 |---|---|
 | **Then** | a blank form opens immediately, pre-filled with an automatically generated identifier, ready for input without any prior manipulation. |
 
@@ -86,7 +86,7 @@
 
 ### REQ-IND-009 — Deletion of one or more individuals
 
-| **If** | the `ontologist` confirms the deletion of one or more selected `individuals`, |
+| **If** | the ontologist confirms the deletion of one or more selected `individuals`, |
 |---|---|
 | **Then** | the `individuals` are removed from the `ontology`, the list is updated and the form displays an empty state. |
 
@@ -96,7 +96,7 @@
 
 ### REQ-IND-010 — Drag-and-drop move to a class
 
-| **If** | the `ontologist` drops an `individual` onto a class in the tree, |
+| **If** | the ontologist drops an `individual` onto a class in the tree, |
 |---|---|
 | **Then** | the `individual`'s type is updated to reflect its new membership: if the `individual` already had a known type, that type is replaced by the target class; otherwise, the target class is added to its existing types, without duplication. |
 
@@ -106,11 +106,11 @@
 
 ### REQ-IND-015 — Type management (rdf:type)
 
-| **If** | the `ontologist` adds a type to an `individual`, |
+| **If** | the ontologist adds a type to an `individual`, |
 |---|---|
 | **Then** | the new type appears in the `individual`'s type list and saving is triggered automatically if the `individual` is already registered. |
 
-| **If** | the `ontologist` removes a type from an `individual`, |
+| **If** | the ontologist removes a type from an `individual`, |
 |---|---|
 | **Then** | the type is removed from the list; if the list becomes empty, `owl:NamedIndividual` is automatically maintained as the minimal type, and saving is triggered. |
 
@@ -122,7 +122,7 @@
 
 | **If** | a `property` is functional and a value has already been assigned to an `individual`, |
 |---|---|
-| **Then** | the `ontologist` cannot add a second value for that `property`: the add control is hidden and any insertion attempt is blocked. |
+| **Then** | the ontologist cannot add a second value for that `property`: the add control is hidden and any insertion attempt is blocked. |
 
 ---
 
@@ -130,11 +130,11 @@
 
 ### REQ-IND-020 — On-the-fly individual creation from the picker
 
-| **If** | the `ontologist` wishes to create a new `individual` directly from a `property`'s picker, |
+| **If** | the ontologist wishes to create a new `individual` directly from a `property`'s picker, |
 |---|---|
 | **Then** | an input field appears in the picker list with a pre-generated identifier; they can confirm creation with Enter or cancel with Escape. |
 
-| **If** | the `ontologist` confirms creation from the picker, |
+| **If** | the ontologist confirms creation from the picker, |
 |---|---|
 | **Then** | the new `individual` is created with the types corresponding to the selected class, the list is refreshed and the new `individual` is immediately available for selection. |
 
@@ -144,7 +144,7 @@
 
 ### REQ-IND-021 — Auto-save (autoSave)
 
-| **If** | the `ontologist` modifies a field in the form of an already-registered `individual`, |
+| **If** | the ontologist modifies a field in the form of an already-registered `individual`, |
 |---|---|
 | **Then** | the changes are saved automatically without any explicit action on their part. |
 
@@ -154,7 +154,7 @@
 
 ### REQ-IND-022 — Explicit save: creation and update
 
-| **If** | the `ontologist` triggers an explicit save of an `individual`, |
+| **If** | the ontologist triggers an explicit save of an `individual`, |
 |---|---|
 | **Then** | all entered information is collected (identifier, annotations, types, object and data `property` assertions) and persisted in the `ontology`. |
 
@@ -172,7 +172,7 @@
 
 ### REQ-IND-023 — Single individual deletion from the form
 
-| **If** | the `ontologist` deletes an `individual` from its detail form, |
+| **If** | the ontologist deletes an `individual` from its detail form, |
 |---|---|
 | **Then** | the `individual` is removed from the `ontology`, the list is updated and the form displays an empty state if the deleted `individual` was the one currently being viewed. |
 
@@ -212,11 +212,11 @@
 
 ### REQ-IND-027 — Simple display rule (single property)
 
-| **If** | the `ontologist` wishes to define how `individuals` of a class are named in the interface, |
+| **If** | the ontologist wishes to define how `individuals` of a class are named in the interface, |
 |---|---|
 | **Then** | they can choose a `property` whose value will be used as the display label, clearly seeing which `properties` are available and which are already inherited from a parent class. |
 
-| **If** | the `ontologist` selects or removes a display `property`, |
+| **If** | the ontologist selects or removes a display `property`, |
 |---|---|
 | **Then** | the rule is saved for the relevant class and automatically propagated to subclasses that have no rule of their own. |
 
@@ -226,11 +226,11 @@
 
 ### REQ-IND-028 — Composite display rule (multi-property with separator)
 
-| **If** | the `ontologist` wishes to compose the display label of `individuals` from multiple `properties`, |
+| **If** | the ontologist wishes to compose the display label of `individuals` from multiple `properties`, |
 |---|---|
 | **Then** | they can define a composite rule associating multiple `properties` with custom separators, and add as many rows as needed. |
 
-| **If** | the `ontologist` confirms the composite rule, |
+| **If** | the ontologist confirms the composite rule, |
 |---|---|
 | **Then** | the rule is saved for the relevant class and propagated to subclasses without their own rule, in the same way as the simple rule. |
 
@@ -252,7 +252,7 @@
 
 | **If** | the application resolves the display label of an `individual` from the `rdfs:label` `property`, |
 |---|---|
-| **Then** | it respects the `ontologist`'s language preferences: the requested language takes priority, then the other active languages in order of preference, then any available label as a last resort. |
+| **Then** | it respects the ontologist's language preferences: the requested language takes priority, then the other active languages in order of preference, then any available label as a last resort. |
 
 ---
 
@@ -274,9 +274,9 @@
 
 ### REQ-IND-032 — Automatic identifier generation for a new individual
 
-| **If** | the `ontologist` initiates the creation of a new `individual`, whether from the main form or from a `property`'s picker, |
+| **If** | the ontologist initiates the creation of a new `individual`, whether from the main form or from a `property`'s picker, |
 |---|---|
-| **Then** | a unique identifier consistent with the `ontology`'s conventions is automatically proposed, without the `ontologist` having to enter it manually. |
+| **Then** | a unique identifier consistent with the `ontology`'s conventions is automatically proposed, without the ontologist having to enter it manually. |
 
 ---
 
@@ -294,7 +294,7 @@
 
 ### REQ-IND-038 — Separate collection of inherited and direct properties
 
-| **If** | the `ontologist` `views` the form of an `individual`, |
+| **If** | the ontologist `views` the form of an `individual`, |
 |---|---|
 | **Then** | `properties` inherited from parent `classes` are visually distinguished from `properties` defined directly on the `individual`'s types, without duplication. |
 
@@ -304,7 +304,7 @@
 
 ### REQ-IND-039 — Filtering of candidate individuals by an OP's range
 
-| **If** | the `ontologist` needs to select a value for an `Object Property`, |
+| **If** | the ontologist needs to select a value for an `Object Property`, |
 |---|---|
 | **Then** | only `individuals` compatible with the range of that `property` are proposed, excluding the `individual` currently being edited; if no range constraint is defined, all `individuals` are proposed. |
 
@@ -320,7 +320,7 @@
 
 ### REQ-IND-001 — Three-column layout
 
-| **If** | the `ontologist` opens the `Individuals` tab, |
+| **If** | the ontologist opens the `Individuals` tab, |
 |---|---|
 | **Then** | the interface presents three side-by-side work areas: the class hierarchy, the `individual` list, and the detail form; by default, the form invites the user to select or create an `individual`. |
 
@@ -330,7 +330,7 @@
 
 ### REQ-IND-004 — Class selection in the tree
 
-| **If** | the `ontologist` selects a class in the tree, |
+| **If** | the ontologist selects a class in the tree, |
 |---|---|
 | **Then** | the `individual` list is filtered to display only those belonging to that class or its subclasses, and the form displays an empty state inviting the user to select or create an `individual` in that context. |
 
@@ -340,7 +340,7 @@
 
 ### REQ-IND-005 — Simple individual selection
 
-| **If** | the `ontologist` clicks on an `individual` in the list, |
+| **If** | the ontologist clicks on an `individual` in the list, |
 |---|---|
 | **Then** | the detail form for that `individual` is displayed and the delete button becomes active. |
 
@@ -350,7 +350,7 @@
 
 ### REQ-IND-006 — Multiple selection via Shift+Click
 
-| **If** | the `ontologist` clicks on an `individual` while holding the Shift key and an anchor point exists, |
+| **If** | the ontologist clicks on an `individual` while holding the Shift key and an anchor point exists, |
 |---|---|
 | **Then** | all `individuals` between the anchor and the clicked item are selected; if the selection contains more than one `individual`, the form displays a summary indicating the number of selected `individuals` with a bulk delete option. |
 
@@ -360,7 +360,7 @@
 
 ### REQ-IND-008 — Cancel creation form
 
-| **If** | the `ontologist` cancels the creation of a new `individual`, |
+| **If** | the ontologist cancels the creation of a new `individual`, |
 |---|---|
 | **Then** | the form closes, the list reverts to its previous state and the interface returns to its resting state. |
 
@@ -382,7 +382,7 @@
 
 | **If** | the `ontology` has a base IRI and the `individual` has an identifier, |
 |---|---|
-| **Then** | the `individual`'s full IRI is displayed in the form header to allow the `ontologist` to identify it unambiguously; this information is not displayed for new `individuals` not yet registered. |
+| **Then** | the `individual`'s full IRI is displayed in the form header to allow the ontologist to identify it unambiguously; this information is not displayed for new `individuals` not yet registered. |
 
 ---
 
@@ -390,11 +390,11 @@
 
 ### REQ-IND-013 — Annotations: labels and comments
 
-| **If** | the form is displayed, existing annotations are presented as editable rows. **If** the `ontologist` adds an annotation, |
+| **If** | the form is displayed, existing annotations are presented as editable rows. **If** the ontologist adds an annotation, |
 |---|---|
 | **Then** | a new row is dynamically inserted into the annotations table, with auto-save if the `individual` is already registered. |
 
-| **If** | the `ontologist` deletes an annotation, |
+| **If** | the ontologist deletes an annotation, |
 |---|---|
 | **Then** | the row is removed and saving is triggered automatically. |
 
@@ -404,7 +404,7 @@
 
 ### REQ-IND-014 — Custom property annotations
 
-| **If** | the `ontologist` selects a custom `annotation property` in the dedicated picker, |
+| **If** | the ontologist selects a custom `annotation property` in the dedicated picker, |
 |---|---|
 | **Then** | an annotation row for that `property` is added to the form and the picker closes. |
 
@@ -414,7 +414,7 @@
 
 ### REQ-IND-016 — Dynamic property panels (Object Properties)
 
-| **If** | the `ontologist` `views` the form of an `individual` that has `Object Properties`, |
+| **If** | the ontologist `views` the form of an `individual` that has `Object Properties`, |
 |---|---|
 | **Then** | each `Object Property` is presented in a dedicated panel displaying the already-assigned target `individuals`, with the ability to navigate to each of them, add new relationships or remove existing ones. |
 
@@ -424,7 +424,7 @@
 
 ### REQ-IND-017 — Dynamic property panels (Datatype Properties)
 
-| **If** | the `ontologist` `views` the form of an `individual` that has `Datatype Properties`, |
+| **If** | the ontologist `views` the form of an `individual` that has `Datatype Properties`, |
 |---|---|
 | **Then** | each `Datatype Property` is presented in a dedicated panel displaying the already-entered values with their datatype, with the ability to add new values or remove existing ones; URL-type values are presented as clickable links. |
 
@@ -434,23 +434,23 @@
 
 ### REQ-IND-019 — Opening the individual picker for an Object Property
 
-| **If** | the `ontologist` wishes to assign an `individual` to an `Object Property`, |
+| **If** | the ontologist wishes to assign an `individual` to an `Object Property`, |
 |---|---|
 | **Then** | a picker opens with the class tree and the list of `individuals` compatible with the `property`'s range. |
 
-| **If** | the `ontologist` selects a class in the picker, |
+| **If** | the ontologist selects a class in the picker, |
 |---|---|
 | **Then** | the `individual` list is filtered for that class and its subclasses, excluding the `individual` currently being edited. |
 
-| **If** | the `ontologist` selects an `individual` in the picker, |
+| **If** | the ontologist selects an `individual` in the picker, |
 |---|---|
 | **Then** | the confirm button becomes active. |
 
-| **If** | the `ontologist` confirms their choice, |
+| **If** | the ontologist confirms their choice, |
 |---|---|
 | **Then** | the selected `individual` is added as a value of the `property` in the form. |
 
-| **If** | the `ontologist` closes the picker without confirming, |
+| **If** | the ontologist closes the picker without confirming, |
 |---|---|
 | **Then** | the picker disappears without any modification. |
 
@@ -480,7 +480,7 @@
 
 ### REQ-IND-035 — "Where Used" panel in the form
 
-| **If** | the `ontologist` `views` the form of an existing `individual`, |
+| **If** | the ontologist `views` the form of an existing `individual`, |
 |---|---|
 | **Then** | a section at the bottom of the form lists the other entities in the `ontology` that reference that `individual`. |
 
@@ -490,7 +490,7 @@
 
 ### REQ-IND-036 — Column resizing by drag-and-drop
 
-| **If** | the `ontologist` drags a separator between two columns, |
+| **If** | the ontologist drags a separator between two columns, |
 |---|---|
 | **Then** | the width of the adjacent columns adjusts in real time, within limits that guarantee the readability of each area. |
 
