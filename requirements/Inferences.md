@@ -7,22 +7,22 @@
 
 ## Table of Contents
 
-1. [REQ-INF-001 — Fetching inferences via the API](#req-inf-001)
-2. [REQ-INF-002 — Automatic panel refresh](#req-inf-002)
-3. [REQ-INF-003 — Stopping automatic refresh](#req-inf-003)
-4. [REQ-INF-004 — Displaying ontology consistency status](#req-inf-004)
-5. [REQ-INF-005 — Displaying consistency violations](#req-inf-005)
-6. [REQ-INF-006 — Displaying the transitive closure of the class hierarchy](#req-inf-006)
-7. [REQ-INF-007 — Displaying restrictions inherited through class inheritance](#req-inf-007)
-8. [REQ-INF-008 — Displaying types inferred via property domain/range](#req-inf-008)
-9. [REQ-INF-009 — Displaying inferred symmetric assertions](#req-inf-009)
-10. [REQ-INF-010 — Displaying inferred transitive assertions](#req-inf-010)
-11. [REQ-INF-011 — Displaying assertions inferred by property chains and inverses](#req-inf-011)
-12. [REQ-INF-012 — Displaying inferred inverse restrictions on classes](#req-inf-012)
-13. [REQ-INF-013 — Displaying inverse properties inferred by owl:inverseOf](#req-inf-013)
-14. [REQ-INF-014 — Manual inference recalculation button](#req-inf-014)
-15. [REQ-INF-015 — Collapsible sections for inference results](#req-inf-015)
-16. [REQ-INF-016 — Error handling when fetching inferences](#req-inf-016)
+1. [REQ-INF-001 — Fetching inferences via the API](#req-inf-001-fetching-inferences-via-the-api)
+2. [REQ-INF-002 — Automatic panel refresh](#req-inf-002-automatic-panel-refresh)
+3. [REQ-INF-003 — Stopping automatic refresh](#req-inf-003-stopping-automatic-refresh)
+4. [REQ-INF-004 — Displaying ontology consistency status](#req-inf-004-displaying-ontology-consistency-status)
+5. [REQ-INF-005 — Displaying consistency violations](#req-inf-005-displaying-consistency-violations)
+6. [REQ-INF-006 — Displaying the transitive closure of the class hierarchy](#req-inf-006-displaying-the-transitive-closure-of-the-class-hierarchy)
+7. [REQ-INF-007 — Displaying restrictions inherited through class inheritance](#req-inf-007-displaying-restrictions-inherited-through-class-inheritance)
+8. [REQ-INF-008 — Displaying types inferred via property domain/range](#req-inf-008-displaying-types-inferred-via-property-domainrange)
+9. [REQ-INF-009 — Displaying inferred symmetric assertions](#req-inf-009-displaying-inferred-symmetric-assertions)
+10. [REQ-INF-010 — Displaying inferred transitive assertions](#req-inf-010-displaying-inferred-transitive-assertions)
+11. [REQ-INF-011 — Displaying assertions inferred by property chains and inverses](#req-inf-011-displaying-assertions-inferred-by-property-chains-and-inverses)
+12. [REQ-INF-012 — Displaying inferred inverse restrictions on classes](#req-inf-012-displaying-inferred-inverse-restrictions-on-classes)
+13. [REQ-INF-013 — Displaying inverse properties inferred by owl:inverseOf](#req-inf-013-displaying-inverse-properties-inferred-by-owlinverseof)
+14. [REQ-INF-014 — Manual inference recalculation button](#req-inf-014-manual-inference-recalculation-button)
+15. [REQ-INF-015 — Collapsible sections for inference results](#req-inf-015-collapsible-sections-for-inference-results)
+16. [REQ-INF-016 — Error handling when fetching inferences](#req-inf-016-error-handling-when-fetching-inferences)
 
 ---
 
