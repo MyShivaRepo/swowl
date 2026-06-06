@@ -1,73 +1,61 @@
-# Requirements — DatatypeProperties Tab (SWOWL)
+# Requirements — DatatypeProperties
 
-**Date:** 2026-06-06
-**Note:** Requirements derived strictly from the source code (`owl_editor.js`). Each requirement cites the exact JavaScript function that implements it.
+> Generated on 2026-06-06 | Strictly derived from source code | No hallucination
+
+## Table of contents
+
+### Substance
+- [REQ-DP-001 — Initialisation of the available XSD types list](#req-dp-001--initialisation-of-the-available-xsd-types-list)
+- [REQ-DP-004 — Building the hierarchical property tree](#req-dp-004--building-the-hierarchical-property-tree)
+- [REQ-DP-005 — Automatic expansion of a selected property's ancestors](#req-dp-005--automatic-expansion-of-a-selected-propertys-ancestors)
+- [REQ-DP-016 — Creating a child property](#req-dp-016--creating-a-child-property)
+- [REQ-DP-017 — Creating a sibling property](#req-dp-017--creating-a-sibling-property)
+- [REQ-DP-018 — Generating a unique name for a new property](#req-dp-018--generating-a-unique-name-for-a-new-property)
+- [REQ-DP-019 — Effective creation and navigation to the new property](#req-dp-019--effective-creation-and-navigation-to-the-new-property)
+- [REQ-DP-024 — Dropping a property onto a new target](#req-dp-024--dropping-a-property-onto-a-new-target)
+- [REQ-DP-025 — Checking an ancestor/descendant link for drag & drop](#req-dp-025--checking-an-ancestordescendant-link-for-drag--drop)
+- [REQ-DP-030 — Uniqueness check on range before opening the picker](#req-dp-030--uniqueness-check-on-range-before-opening-the-picker)
+- [REQ-DP-031 — Adding / removing a domain](#req-dp-031--adding--removing-a-domain)
+- [REQ-DP-032 — Adding an XSD type as range (with uniqueness)](#req-dp-032--adding-an-xsd-type-as-range-with-uniqueness)
+- [REQ-DP-033 — Removing the XSD type from the range](#req-dp-033--removing-the-xsd-type-from-the-range)
+- [REQ-DP-034 — Adding / removing a super-property](#req-dp-034--adding--removing-a-super-property)
+- [REQ-DP-035 — Automatic save on field change](#req-dp-035--automatic-save-on-field-change)
+- [REQ-DP-036 — Saving (creating or updating) a DatatypeProperty](#req-dp-036--saving-creating-or-updating-a-datatypeproperty)
+- [REQ-DP-037 — Deleting a DatatypeProperty with confirmation](#req-dp-037--deleting-a-datatypeproperty-with-confirmation)
+
+### Form
+- [REQ-DP-002 — Generating HTML options for DatatypeProperties](#req-dp-002--generating-html-options-for-datatypeproperties)
+- [REQ-DP-003 — Generating HTML options for XSD types](#req-dp-003--generating-html-options-for-xsd-types)
+- [REQ-DP-006 — Rendering a tree node with drag & drop handling](#req-dp-006--rendering-a-tree-node-with-drag--drop-handling)
+- [REQ-DP-007 — Rendering the full tree with owl:topDataProperty root](#req-dp-007--rendering-the-full-tree-with-owltopdataproperty-root)
+- [REQ-DP-008 — Rendering the two-panel split layout](#req-dp-008--rendering-the-two-panel-split-layout)
+- [REQ-DP-009 — Restoring the selection after re-rendering](#req-dp-009--restoring-the-selection-after-re-rendering)
+- [REQ-DP-010 — Horizontal resizing of the left panel](#req-dp-010--horizontal-resizing-of-the-left-panel)
+- [REQ-DP-011 — Updating the "Super Properties" panel](#req-dp-011--updating-the-super-properties-panel)
+- [REQ-DP-012 — Selecting the owl:topDataProperty root](#req-dp-012--selecting-the-owltopdataproperty-root)
+- [REQ-DP-013 — Selecting a DatatypeProperty in the tree](#req-dp-013--selecting-a-datatypeproperty-in-the-tree)
+- [REQ-DP-014 — Managing toolbar button states](#req-dp-014--managing-toolbar-button-states)
+- [REQ-DP-015 — Expanding / collapsing a tree node](#req-dp-015--expanding--collapsing-a-tree-node)
+- [REQ-DP-020 — Displaying the context menu (right-click)](#req-dp-020--displaying-the-context-menu-right-click)
+- [REQ-DP-021 — Closing the context menu](#req-dp-021--closing-the-context-menu)
+- [REQ-DP-022 — Starting the drag of a property](#req-dp-022--starting-the-drag-of-a-property)
+- [REQ-DP-023 — Hovering over a target during drag](#req-dp-023--hovering-over-a-target-during-drag)
+- [REQ-DP-026 — Rendering the DatatypeProperty edit form](#req-dp-026--rendering-the-datatypeproperty-edit-form)
+- [REQ-DP-027 — Adding an annotation row (label / comment)](#req-dp-027--adding-an-annotation-row-label--comment)
+- [REQ-DP-028 — Adding an "other property" annotation](#req-dp-028--adding-an-other-property-annotation)
+- [REQ-DP-029 — Removing an annotation row](#req-dp-029--removing-an-annotation-row)
 
 ---
 
-## Table of Contents
+## 1. Substance — Business logic and functional rules
 
-1. [REQ-DP-001 — Initialization of the available XSD types list](#req-dp-001-initialization-of-the-available-xsd-types-list)
-2. [REQ-DP-002 — HTML option generation for DatatypeProperties](#req-dp-002-html-option-generation-for-datatypeproperties)
-3. [REQ-DP-003 — HTML option generation for XSD types](#req-dp-003-html-option-generation-for-xsd-types)
-4. [REQ-DP-004 — Building the hierarchical property tree](#req-dp-004-building-the-hierarchical-property-tree)
-5. [REQ-DP-005 — Automatic expansion of a selected property's ancestors](#req-dp-005-automatic-expansion-of-a-selected-propertys-ancestors)
-6. [REQ-DP-006 — Rendering a tree node with drag & drop handling](#req-dp-006-rendering-a-tree-node-with-drag-drop-handling)
-7. [REQ-DP-007 — Rendering the full tree with owl:topDataProperty root](#req-dp-007-rendering-the-full-tree-with-owltopdataproperty-root)
-8. [REQ-DP-008 — Rendering the two-panel (split) layout](#req-dp-008-rendering-the-two-panel-split-layout)
-9. [REQ-DP-009 — Restoring the selection after re-rendering](#req-dp-009-restoring-the-selection-after-re-rendering)
-10. [REQ-DP-010 — Horizontal resizing of the left panel](#req-dp-010-horizontal-resizing-of-the-left-panel)
-11. [REQ-DP-011 — Updating the "Super Properties" panel](#req-dp-011-updating-the-super-properties-panel)
-12. [REQ-DP-012 — Selecting the owl:topDataProperty root](#req-dp-012-selecting-the-owltopdataproperty-root)
-13. [REQ-DP-013 — Selecting a DatatypeProperty in the tree](#req-dp-013-selecting-a-datatypeproperty-in-the-tree)
-14. [REQ-DP-014 — Managing the toolbar button states](#req-dp-014-managing-the-toolbar-button-states)
-15. [REQ-DP-015 — Expanding / collapsing a tree node](#req-dp-015-expanding-collapsing-a-tree-node)
-16. [REQ-DP-016 — Creating a child property](#req-dp-016-creating-a-child-property)
-17. [REQ-DP-017 — Creating a sibling property](#req-dp-017-creating-a-sibling-property)
-18. [REQ-DP-018 — Generating a unique name for a new property](#req-dp-018-generating-a-unique-name-for-a-new-property)
-19. [REQ-DP-019 — Effective creation and navigation to the new property](#req-dp-019-effective-creation-and-navigation-to-the-new-property)
-20. [REQ-DP-020 — Displaying the context menu (right-click)](#req-dp-020-displaying-the-context-menu-right-click)
-21. [REQ-DP-021 — Closing the context menu](#req-dp-021-closing-the-context-menu)
-22. [REQ-DP-022 — Starting the drag of a property](#req-dp-022-starting-the-drag-of-a-property)
-23. [REQ-DP-023 — Hovering over a target during drag](#req-dp-023-hovering-over-a-target-during-drag)
-24. [REQ-DP-024 — Dropping a property onto a new target](#req-dp-024-dropping-a-property-onto-a-new-target)
-25. [REQ-DP-025 — Checking an ancestor/descendant link for drag & drop](#req-dp-025-checking-an-ancestordescendant-link-for-drag-drop)
-26. [REQ-DP-026 — Rendering the DatatypeProperty edit form](#req-dp-026-rendering-the-datatypeproperty-edit-form)
-27. [REQ-DP-027 — Adding an annotation row (label / comment)](#req-dp-027-adding-an-annotation-row-label-comment)
-28. [REQ-DP-028 — Adding an "other property" annotation](#req-dp-028-adding-an-other-property-annotation)
-29. [REQ-DP-029 — Removing an annotation row](#req-dp-029-removing-an-annotation-row)
-30. [REQ-DP-030 — Checking range uniqueness before opening the picker](#req-dp-030-checking-range-uniqueness-before-opening-the-picker)
-31. [REQ-DP-031 — Adding / removing a domain](#req-dp-031-adding-removing-a-domain)
-32. [REQ-DP-032 — Adding an XSD type as range (with uniqueness enforcement)](#req-dp-032-adding-an-xsd-type-as-range-with-uniqueness-enforcement)
-33. [REQ-DP-033 — Removing the XSD type from the range](#req-dp-033-removing-the-xsd-type-from-the-range)
-34. [REQ-DP-034 — Adding / removing a super-property](#req-dp-034-adding-removing-a-super-property)
-35. [REQ-DP-035 — Auto-save on field change](#req-dp-035-auto-save-on-field-change)
-36. [REQ-DP-036 — Saving (creating or updating) a DatatypeProperty](#req-dp-036-saving-creating-or-updating-a-datatypeproperty)
-37. [REQ-DP-037 — Deleting a DatatypeProperty with confirmation](#req-dp-037-deleting-a-datatypeproperty-with-confirmation)
+> Requirements independent of the UI: OWL rules, data constraints, algorithms, persistence.
 
----
-
-### REQ-DP-001 — Initialization of the available XSD types list
+### REQ-DP-001 — Initialisation of the available XSD types list
 
 **Source code:** `owl_editor.js` → `XSD_TYPES` (constant, lines 167–171)
 
-The code defines a constant array `XSD_TYPES` containing exactly 12 XSD types usable as range: `xsd:string`, `xsd:integer`, `xsd:decimal`, `xsd:float`, `xsd:double`, `xsd:boolean`, `xsd:date`, `xsd:dateTime`, `xsd:duration`, `xsd:anyURI`, `xsd:nonNegativeInteger`, `xsd:positiveInteger`. This list is the sole reference for data types allowed in the application.
-
----
-
-### REQ-DP-002 — HTML option generation for DatatypeProperties
-
-**Source code:** `owl_editor.js` → `dpOptions()`
-
-The function `dpOptions(selectedId)` iterates over `APP.state.datatype_properties` and produces a string of `<option>` elements for each property, with the value matching `selectedId` selected. This result is used in drop-down lists in other tabs that reference a DatatypeProperty.
-
----
-
-### REQ-DP-003 — HTML option generation for XSD types
-
-**Source code:** `owl_editor.js` → `xsdOptions()`
-
-The function `xsdOptions(selected)` iterates over `XSD_TYPES` and produces HTML `<option>` elements. The default value of the `selected` parameter is `'xsd:string'`. This function feeds the XSD selectors in the Individuals tab.
+The code defines a constant array `XSD_TYPES` containing exactly 12 XSD types usable as range: `xsd:string`, `xsd:integer`, `xsd:decimal`, `xsd:float`, `xsd:double`, `xsd:boolean`, `xsd:date`, `xsd:dateTime`, `xsd:duration`, `xsd:anyURI`, `xsd:nonNegativeInteger`, `xsd:positiveInteger`. This list is the sole reference for the data types allowed in the application.
 
 ---
 
@@ -75,7 +63,7 @@ The function `xsdOptions(selected)` iterates over `XSD_TYPES` and produces HTML 
 
 **Source code:** `owl_editor.js` → `DPEditor.buildTree()`
 
-The method `buildTree(props)` computes the parent/child structure from the `subPropertyOf` field of each property. It returns an object `{ roots, childrenOf }` where `roots` is the alphabetically sorted list of properties with no parent, and `childrenOf` is a map from each property to its alphabetically sorted children. Cycles are avoided: only references to existing IDs are taken into account.
+The method `buildTree(props)` computes the parent/child structure from the `subPropertyOf` field of each property. It returns an object `{ roots, childrenOf }` where `roots` is the alphabetically sorted list of properties without a parent, and `childrenOf` is a map of each property to its alphabetically sorted children. Cycles are avoided: only references to existing IDs are taken into account.
 
 ---
 
@@ -84,86 +72,6 @@ The method `buildTree(props)` computes the parent/child structure from the `subP
 **Source code:** `owl_editor.js` → `DPEditor._expandAncestors()`
 
 The method `_expandAncestors(propId)` recursively traverses the parents of a property (via `subPropertyOf`) and adds each of them to `this._expanded` (Set), so that the path from the root to the property is fully expanded in the display.
-
----
-
-### REQ-DP-006 — Rendering a tree node with drag & drop handling
-
-**Source code:** `owl_editor.js` → `DPEditor._renderNode()`
-
-The method `_renderNode(id, childrenOf, depth)` generates the HTML for a tree node. It applies indentation proportional to depth (`depth * 16 + 6` px), displays a toggle triangle if the node has children, and wires the handlers `onclick`, `oncontextmenu`, `ondragstart`, `ondragover`, `ondragleave`, `ondrop`, `ondragend` to the corresponding methods of `DPEditor`.
-
----
-
-### REQ-DP-007 — Rendering the full tree with owl:topDataProperty root
-
-**Source code:** `owl_editor.js` → `DPEditor.renderTree()`
-
-The method `renderTree(props)` calls `buildTree()` then `_renderNode()` for each root. It displays at the top an element representing the root (`owl:topDataProperty` or `rdf:Property` depending on `APP.getOntologyRootLabels()`). If the property list is empty, it displays the message `"No DatatypeProperty"`.
-
----
-
-### REQ-DP-008 — Rendering the two-panel (split) layout
-
-**Source code:** `owl_editor.js` → `DPEditor.renderSplit()`
-
-The method `renderSplit(props)` generates the complete HTML structure of the tab: a left panel containing the tree and the "Super Properties" sub-panel, a horizontal resizable separator (`split-handle`), and a right panel (`detail-panel`) empty with a create button. The "Child", "Sibling", and "Delete" buttons are rendered disabled by default.
-
----
-
-### REQ-DP-009 — Restoring the selection after re-rendering
-
-**Source code:** `owl_editor.js` → `DPEditor.restoreSelection()`
-
-The method `restoreSelection()` first calls `_initSplitPane()` to re-attach the resize listeners, then re-selects either the root (`selectTopProp()`) or the property stored in `_selectedId` (`selectProp()`), thereby preserving the interface state after a full re-render of the section.
-
----
-
-### REQ-DP-010 — Horizontal resizing of the left panel
-
-**Source code:** `owl_editor.js` → `DPEditor._initSplitPane()`
-
-The method `_initSplitPane()` attaches a `mousedown` listener on the `dp-split-handle` element to allow the user to resize the left panel by drag-and-drop. The width is constrained between 160 and 520 px. It also calls `_initHResizers('dp-tree-panel')` for vertical resizing between the tree and the "Super Properties" sub-panel.
-
----
-
-### REQ-DP-011 — Updating the "Super Properties" panel
-
-**Source code:** `owl_editor.js` → `DPEditor._updateSuperPanel()`
-
-The method `_updateSuperPanel(prop)` updates the content of the lower left panel (`dp-sub-list`). If no property is passed, it displays the message "— select a property —". If a property is passed, it computes the full ancestor chain via the internal function `buildChain()`, displays each ancestor with increasing indentation, and ends the chain with `owl:topDatatypeProperty`. Direct ancestors include a delete button (✕). An HTML selector offers properties not yet used as super-properties.
-
----
-
-### REQ-DP-012 — Selecting the owl:topDataProperty root
-
-**Source code:** `owl_editor.js` → `DPEditor.selectTopProp()`
-
-The method `selectTopProp()` sets `_selectedId` to `null` and `_topPropSelected` to `true`. It updates the highlighting in the tree, replaces the detail panel content with a welcome screen displaying the root and a create button, then calls `_updateSuperPanel(null)` and `_updateTreeButtons()`.
-
----
-
-### REQ-DP-013 — Selecting a DatatypeProperty in the tree
-
-**Source code:** `owl_editor.js` → `DPEditor.selectProp()`
-
-The method `selectProp(id)` stores `id` in `_selectedId`, updates the visual highlighting in the tree, retrieves the property object from `APP.state.datatype_properties`, injects the detail form via `renderForm()`, initializes the vertical resizers of the right panel, updates the "Super Properties" panel and the toolbar buttons.
-
----
-
-### REQ-DP-014 — Managing the toolbar button states
-
-**Source code:** `owl_editor.js` → `DPEditor._updateTreeButtons()`
-
-The method `_updateTreeButtons()` enables or disables the buttons `dp-btn-child`, `dp-btn-sister`, and `dp-btn-delete` according to the current state: if the root is selected, only "Child" is enabled and "Sibling" / "Delete" are hidden; if a property is selected, all three buttons are active; otherwise all are disabled.
-
----
-
-### REQ-DP-015 — Expanding / collapsing a tree node
-
-**Source code:** `owl_editor.js` → `DPEditor.toggleNode()`
-
-The method `toggleNode(id)` toggles the visibility of the child container `dp-tcn-${id}`. It updates the `_expanded` Set (adding or removing `id`) and rotates the expand/collapse arrow of the `.tree-toggle` element.
 
 ---
 
@@ -187,7 +95,7 @@ The method `createSibling()` only executes if `_selectedId` is defined. It retri
 
 **Source code:** `owl_editor.js` → `DPEditor._generatePropName()`
 
-The method `_generatePropName()` builds a name starting from `'NewDatatypeProperty'` and incrementing a counter (`NewDatatypeProperty1`, `NewDatatypeProperty2`, …) until a name is found that is absent from the list of existing IDs in `APP.state.datatype_properties`.
+The method `_generatePropName()` builds a name starting from `'NewDatatypeProperty'` and incrementing a counter (`NewDatatypeProperty1`, `NewDatatypeProperty2`, …) until it finds a name absent from the list of existing IDs in `APP.state.datatype_properties`.
 
 ---
 
@@ -199,43 +107,11 @@ The method `_createAndSelect(subPropertyOf)` constructs a property object with d
 
 ---
 
-### REQ-DP-020 — Displaying the context menu (right-click)
-
-**Source code:** `owl_editor.js` → `DPEditor.showContextMenu()`
-
-The method `showContextMenu(event, id)` removes any existing menu, selects the property or the root depending on the value of `id`, creates a `div.ctx-menu` element and inserts it into the `body` at the cursor position. The menu always contains the item "Add Child Property"; if `id` is defined (actual property), it also adds "Add Sibling Property" and "Delete". The menu closes automatically on an outside click via a `click` listener on `document`.
-
----
-
-### REQ-DP-021 — Closing the context menu
-
-**Source code:** `owl_editor.js` → `DPEditor._closeContextMenu()`
-
-The method `_closeContextMenu()` removes from the DOM the element carrying the ID `dp-ctx-menu`, if it exists.
-
----
-
-### REQ-DP-022 — Starting the drag of a property
-
-**Source code:** `owl_editor.js` → `DPEditor.onDragStart()`
-
-The method `onDragStart(event, id)` stores the ID of the dragged property in `_dragId`, sets `effectAllowed` to `'move'`, stores the ID in `dataTransfer`, and adds the CSS class `'dragging'` to the source element after a 0 ms delay (via `setTimeout`).
-
----
-
-### REQ-DP-023 — Hovering over a target during drag
-
-**Source code:** `owl_editor.js` → `DPEditor.onDragOver()`
-
-The method `onDragOver(event, targetId)` allows the drop (`event.preventDefault()`) only if: a drag is in progress (`_dragId` defined), the target differs from the source, and the target is not a descendant of the source (checked via `_isDescendant()`). It applies the class `'drag-over'` to the hovered element.
-
----
-
 ### REQ-DP-024 — Dropping a property onto a new target
 
 **Source code:** `owl_editor.js` → `DPEditor.onDrop()`
 
-The method `onDrop(event, targetId)` moves a property within the hierarchy by modifying its `subPropertyOf` field: if `targetId` is defined, the new parent list equals `[targetId]`; otherwise it is empty (root property). It calls `API.updateDP()` to persist the change, displays a success message via `UI.success()`, then refreshes the display. If the target is a descendant of the source, the operation is cancelled with a warning `UI.warn('Cannot drop on a descendant — would create a cycle')`.
+The method `onDrop(event, targetId)` moves a property in the hierarchy by modifying its `subPropertyOf` field: if `targetId` is defined, the new parent list equals `[targetId]`; otherwise it is empty (root property). It calls `API.updateDP()` to persist the change, displays a success message via `UI.success()`, then refreshes the display. If the target is a descendant of the source, the operation is cancelled with a warning `UI.warn('Cannot drop on a descendant — would create a cycle')`.
 
 ---
 
@@ -247,49 +123,11 @@ The method `_isDescendant(potentialDesc, ancestorId)` performs a recursive depth
 
 ---
 
-### REQ-DP-026 — Rendering the DatatypeProperty edit form
-
-**Source code:** `owl_editor.js` → `DPEditor.renderForm()`
-
-The method `renderForm(prop)` generates the complete HTML of the right panel. In creation mode (`prop === null`), a "✅ Create" button is displayed. In edit mode, all field changes trigger `autoSave()` via `onchange`. The form contains the following sections, all generated by this method:
-- **Header**: ID input field (with `_sanitizeId()`), mention `(instance of owl:DatatypeProperty)`, full IRI computed from `APP.state.ontology.id`.
-- **Annotations**: table with columns Property / Value / Lang, populated via `_annoRow()` for `labels`, `comments`, and `other`.
-- **Domain(s)**: list of domain classes via `_listRows()`, selector among available classes (`APP.state.classes`), default value displayed `owl:Thing`.
-- **Range**: list of XSD types via `_listRows()`, selector among unused types drawn from `XSD_TYPES`, default value displayed `rdfs:Literal`.
-- **Characteristics**: single checkbox "Functional" bound to `p.functional`.
-- **Where Used**: section generated by `_whereUsedFrame()` listing the rules that use this property.
-
----
-
-### REQ-DP-027 — Adding an annotation row (label / comment)
-
-**Source code:** `owl_editor.js` → `DPEditor.addAnnotRow()`
-
-The method `addAnnotRow(type)` calls `_makeAnnotRow(type, 'DPEditor', ac)` and inserts the returned row into the `tbody` identified as `dp-annotations-body`. The `ac` attribute enables `autoSave()` if a property is currently being edited (`_editingId !== null`).
-
----
-
-### REQ-DP-028 — Adding an "other property" annotation
-
-**Source code:** `owl_editor.js` → `DPEditor.addOtherAnnotRow()`
-
-The method `addOtherAnnotRow(prop)` calls `_makeAnnotRow('other', 'DPEditor', ac, prop)`, inserts the row into `dp-annotations-body`, then hides the annotation selector `dp-anno-picker` by forcing its `style.display` to `'none'`.
-
----
-
-### REQ-DP-029 — Removing an annotation row
-
-**Source code:** `owl_editor.js` → `DPEditor.removeAnnotRow()`
-
-The method `removeAnnotRow(btn)` removes from the DOM the parent `<tr>` row of the button passed as parameter (`btn.closest('tr')?.remove()`), then triggers `autoSave()` if a property is currently being edited.
-
----
-
-### REQ-DP-030 — Checking range uniqueness before opening the picker
+### REQ-DP-030 — Uniqueness check on range before opening the picker
 
 **Source code:** `owl_editor.js` → `DPEditor.showPicker()`
 
-The method `showPicker(id)` prevents the range selector (`dp-range-picker`) from opening if the list `dp-range-list` already contains a `.cls-list-item[data-id]` element, thereby ensuring that only one XSD value can be defined as range. For other selectors, it delegates to `_togglePicker(id)`.
+The method `showPicker(id)` prevents the range picker (`dp-range-picker`) from opening if the `dp-range-list` already contains an element `.cls-list-item[data-id]`, thereby ensuring that only one XSD value can be defined as range. For other pickers, it delegates to `_togglePicker(id)`.
 
 ---
 
@@ -302,11 +140,11 @@ The method `showPicker(id)` prevents the range selector (`dp-range-picker`) from
 
 ---
 
-### REQ-DP-032 — Adding an XSD type as range (with uniqueness enforcement)
+### REQ-DP-032 — Adding an XSD type as range (with uniqueness)
 
 **Source code:** `owl_editor.js` → `DPEditor.addRange()`
 
-The method `addRange(id)` calls `_addListItem()` to insert the XSD type into `dp-range-list` with the `xsd-dot` style, then hides the `dp-range-btn` button to prevent adding a second type. It then triggers `autoSave()` if a property is currently being edited.
+The method `addRange(id)` calls `_addListItem()` to insert the XSD type into `dp-range-list` with the `xsd-dot` style, then hides the `dp-range-btn` button to prevent adding a second type. It then triggers `autoSave()` if a property is being edited.
 
 ---
 
@@ -314,7 +152,7 @@ The method `addRange(id)` calls `_addListItem()` to insert the XSD type into `dp
 
 **Source code:** `owl_editor.js` → `DPEditor.removeRange()`
 
-The method `removeRange(id)` calls `_removeListItem()` to remove the type from `dp-range-list` (the displayed default value reverts to `rdfs:Literal`), then re-displays the `dp-range-btn` button to allow the selection of a new type. It then triggers `autoSave()`.
+The method `removeRange(id)` calls `_removeListItem()` to remove the type from `dp-range-list` (the displayed default value reverts to `rdfs:Literal`), then shows the `dp-range-btn` button again to allow selecting a new type. It then triggers `autoSave()`.
 
 ---
 
@@ -322,16 +160,16 @@ The method `removeRange(id)` calls `_removeListItem()` to remove the type from `
 
 **Source code:** `owl_editor.js` → `DPEditor.addSubProp()` and `DPEditor.removeSubProp()`
 
-`addSubProp(id)` inserts the chosen property into `dp-sub-list` via `_addListItem()`, with navigation to the `'datatype-properties'` section and the `dp-prop-dot` style, then triggers `autoSave()`.
+`addSubProp(id)` inserts the chosen property into `dp-sub-list` via `_addListItem()`, with navigation to the `'datatype-properties'` section and `dp-prop-dot` style, then triggers `autoSave()`.
 `removeSubProp(id)` removes the entry from `dp-sub-list` via `_removeListItem()`, then triggers `autoSave()`.
 
 ---
 
-### REQ-DP-035 — Auto-save on field change
+### REQ-DP-035 — Automatic save on field change
 
 **Source code:** `owl_editor.js` → `DPEditor.autoSave()`
 
-The method `autoSave()` calls `save(false)` only if `_editingId !== null`, i.e. if an existing property is currently being edited. It is wired to the `onchange` event of all form fields when an existing property is selected.
+The method `autoSave()` calls `save(false)` only if `_editingId !== null`, i.e. if an existing property is being edited. It is bound to the `onchange` event of all form fields when an existing property is selected.
 
 ---
 
@@ -359,4 +197,174 @@ The method `delete(id)` displays a confirmation dialog via `UI.confirm()`. If th
 
 ---
 
-*— Claude Sonnet 4.6*
+## 2. Form — Presentation and user interface
+
+> Requirements related to display: layout, visual components, interactions, navigation, styles.
+
+### REQ-DP-002 — Generating HTML options for DatatypeProperties
+
+**Source code:** `owl_editor.js` → `dpOptions()`
+
+The function `dpOptions(selectedId)` iterates over `APP.state.datatype_properties` and produces a string of `<option>` elements for each property, with the value corresponding to `selectedId` selected. This result is used in the dropdown lists of other tabs that reference a DatatypeProperty.
+
+---
+
+### REQ-DP-003 — Generating HTML options for XSD types
+
+**Source code:** `owl_editor.js` → `xsdOptions()`
+
+The function `xsdOptions(selected)` iterates over `XSD_TYPES` and produces HTML `<option>` elements. The default value of the `selected` parameter is `'xsd:string'`. This function feeds the XSD selectors in the Individuals tab.
+
+---
+
+### REQ-DP-006 — Rendering a tree node with drag & drop handling
+
+**Source code:** `owl_editor.js` → `DPEditor._renderNode()`
+
+The method `_renderNode(id, childrenOf, depth)` generates the HTML for a tree node. It applies indentation proportional to the depth (`depth * 16 + 6` px), displays a toggle triangle if the node has children, and binds the `onclick`, `oncontextmenu`, `ondragstart`, `ondragover`, `ondragleave`, `ondrop`, `ondragend` handlers to the corresponding methods of `DPEditor`.
+
+---
+
+### REQ-DP-007 — Rendering the full tree with owl:topDataProperty root
+
+**Source code:** `owl_editor.js` → `DPEditor.renderTree()`
+
+The method `renderTree(props)` calls `buildTree()` then `_renderNode()` for each root. It displays at the top an element representing the root (`owl:topDataProperty` or `rdf:Property` depending on `APP.getOntologyRootLabels()`). If the property list is empty, it displays the message `"No DatatypeProperty"`.
+
+---
+
+### REQ-DP-008 — Rendering the two-panel split layout
+
+**Source code:** `owl_editor.js` → `DPEditor.renderSplit()`
+
+The method `renderSplit(props)` generates the complete HTML structure of the tab: left panel containing the tree and the "Super Properties" sub-panel, horizontal resizable separator (`split-handle`), and right panel (`detail-panel`) empty with a creation button. The "Child", "Sibling" and "Delete" buttons are rendered disabled by default.
+
+---
+
+### REQ-DP-009 — Restoring the selection after re-rendering
+
+**Source code:** `owl_editor.js` → `DPEditor.restoreSelection()`
+
+The method `restoreSelection()` first calls `_initSplitPane()` to re-attach the resize listeners, then re-selects either the root (`selectTopProp()`) or the property stored in `_selectedId` (`selectProp()`), thereby preserving the interface state after a full re-render of the section.
+
+---
+
+### REQ-DP-010 — Horizontal resizing of the left panel
+
+**Source code:** `owl_editor.js` → `DPEditor._initSplitPane()`
+
+The method `_initSplitPane()` attaches a `mousedown` listener on the `dp-split-handle` element to allow the user to resize the left panel by dragging. The width is constrained between 160 and 520 px. It also calls `_initHResizers('dp-tree-panel')` for vertical resizing between the tree and the "Super Properties" sub-panel.
+
+---
+
+### REQ-DP-011 — Updating the "Super Properties" panel
+
+**Source code:** `owl_editor.js` → `DPEditor._updateSuperPanel()`
+
+The method `_updateSuperPanel(prop)` updates the content of the lower left panel (`dp-sub-list`). If no property is passed, it displays a message "— select a property —". If a property is passed, it computes the full ancestor chain via the internal function `buildChain()`, displays each ancestor with increasing indentation, and ends the chain with `owl:topDatatypeProperty`. Direct ancestors include a delete button (✕). An HTML selector lists the properties not yet used as super-properties.
+
+---
+
+### REQ-DP-012 — Selecting the owl:topDataProperty root
+
+**Source code:** `owl_editor.js` → `DPEditor.selectTopProp()`
+
+The method `selectTopProp()` sets `_selectedId` to `null` and `_topPropSelected` to `true`. It updates the highlighting in the tree, replaces the detail panel content with a welcome screen displaying the root and a creation button, then calls `_updateSuperPanel(null)` and `_updateTreeButtons()`.
+
+---
+
+### REQ-DP-013 — Selecting a DatatypeProperty in the tree
+
+**Source code:** `owl_editor.js` → `DPEditor.selectProp()`
+
+The method `selectProp(id)` stores `id` in `_selectedId`, updates the visual highlighting in the tree, retrieves the property object from `APP.state.datatype_properties`, injects the detail form via `renderForm()`, initialises the vertical resizers of the right panel, updates the "Super Properties" panel and the toolbar buttons.
+
+---
+
+### REQ-DP-014 — Managing toolbar button states
+
+**Source code:** `owl_editor.js` → `DPEditor._updateTreeButtons()`
+
+The method `_updateTreeButtons()` enables or disables the `dp-btn-child`, `dp-btn-sister` and `dp-btn-delete` buttons according to the current state: if the root is selected, only "Child" is enabled and "Sibling" / "Delete" are hidden; if a property is selected, all three buttons are active; otherwise all are disabled.
+
+---
+
+### REQ-DP-015 — Expanding / collapsing a tree node
+
+**Source code:** `owl_editor.js` → `DPEditor.toggleNode()`
+
+The method `toggleNode(id)` toggles the visibility of the child container `dp-tcn-${id}`. It updates the `_expanded` Set (adding or removing `id`) and rotates the expand/collapse arrow of the `.tree-toggle` element.
+
+---
+
+### REQ-DP-020 — Displaying the context menu (right-click)
+
+**Source code:** `owl_editor.js` → `DPEditor.showContextMenu()`
+
+The method `showContextMenu(event, id)` removes any existing menu, selects the property or the root depending on the value of `id`, creates a `div.ctx-menu` element and inserts it into the `body` at the cursor position. The menu always contains the item "Add Child Property"; if `id` is defined (real property), it also adds "Add Sibling Property" and "Delete". The menu closes automatically on an outside click via a `click` listener on `document`.
+
+---
+
+### REQ-DP-021 — Closing the context menu
+
+**Source code:** `owl_editor.js` → `DPEditor._closeContextMenu()`
+
+The method `_closeContextMenu()` removes from the DOM the element bearing the ID `dp-ctx-menu`, if it exists.
+
+---
+
+### REQ-DP-022 — Starting the drag of a property
+
+**Source code:** `owl_editor.js` → `DPEditor.onDragStart()`
+
+The method `onDragStart(event, id)` stores the ID of the dragged property in `_dragId`, sets `effectAllowed` to `'move'`, stores the ID in `dataTransfer`, and adds the CSS class `'dragging'` to the source element after a 0 ms delay (via `setTimeout`).
+
+---
+
+### REQ-DP-023 — Hovering over a target during drag
+
+**Source code:** `owl_editor.js` → `DPEditor.onDragOver()`
+
+The method `onDragOver(event, targetId)` allows the drop (`event.preventDefault()`) only if: a drag is in progress (`_dragId` defined), the target differs from the source, and the target is not a descendant of the source (checked via `_isDescendant()`). It applies the class `'drag-over'` to the hovered element.
+
+---
+
+### REQ-DP-026 — Rendering the DatatypeProperty edit form
+
+**Source code:** `owl_editor.js` → `DPEditor.renderForm()`
+
+The method `renderForm(prop)` generates the complete HTML of the right panel. In creation mode (`prop === null`), a "✅ Create" button is displayed. In edit mode, all field changes trigger `autoSave()` via `onchange`. The form contains the following sections, all generated by this method:
+- **Header**: ID input field (with `_sanitizeId()`), mention `(instance of owl:DatatypeProperty)`, full IRI computed from `APP.state.ontology.id`.
+- **Annotations**: table with columns Property / Value / Lang, populated via `_annoRow()` for `labels`, `comments` and `other`.
+- **Domain(s)**: list of domain classes via `_listRows()`, selector among available classes (`APP.state.classes`), default value displayed `owl:Thing`.
+- **Range**: list of XSD types via `_listRows()`, selector among unused types drawn from `XSD_TYPES`, default value displayed `rdfs:Literal`.
+- **Characteristics**: single checkbox "Functional" bound to `p.functional`.
+- **Where Used**: section generated by `_whereUsedFrame()` listing the rules that use this property.
+
+---
+
+### REQ-DP-027 — Adding an annotation row (label / comment)
+
+**Source code:** `owl_editor.js` → `DPEditor.addAnnotRow()`
+
+The method `addAnnotRow(type)` calls `_makeAnnotRow(type, 'DPEditor', ac)` and inserts the returned row into the `tbody` identified as `dp-annotations-body`. The `ac` attribute enables `autoSave()` if a property is being edited (`_editingId !== null`).
+
+---
+
+### REQ-DP-028 — Adding an "other property" annotation
+
+**Source code:** `owl_editor.js` → `DPEditor.addOtherAnnotRow()`
+
+The method `addOtherAnnotRow(prop)` calls `_makeAnnotRow('other', 'DPEditor', ac, prop)`, inserts the row into `dp-annotations-body`, then hides the annotation picker `dp-anno-picker` by forcing its `style.display` to `'none'`.
+
+---
+
+### REQ-DP-029 — Removing an annotation row
+
+**Source code:** `owl_editor.js` → `DPEditor.removeAnnotRow()`
+
+The method `removeAnnotRow(btn)` removes from the DOM the parent `<tr>` row of the button passed as parameter (`btn.closest('tr')?.remove()`), then triggers `autoSave()` if a property is being edited.
+
+---
+
+— claude-sonnet-4-6
