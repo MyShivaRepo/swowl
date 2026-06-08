@@ -2414,18 +2414,26 @@ APP._initKnowledgeBase = function() {
         .attr('fill', d => APP._kbClassColor(d.classId))
         .text(d => d.classId);
 
-    // Click → navigate to individual
+    // ── Tooltip DataProperties ────────────────────────────────
+    let kbTooltip = document.getElementById('kb-dp-tooltip');
+    if (!kbTooltip) {
+        kbTooltip = document.createElement('div');
+        kbTooltip.id = 'kb-dp-tooltip';
+        kbTooltip.style.cssText = `
+            position:fixed;pointer-events:none;display:none;z-index:9999;
+            background:var(--bg2,#1e293b);border:1px solid var(--border,#334155);
+            border-radius:6px;padding:8px 10px;font-size:11px;color:var(--text1,#e2e8f0);
+            font-family:var(--font-mono,monospace);max-width:260px;
+            box-shadow:0 4px 12px rgba(0,0,0,.4);line-height:1.6;`;
+        document.body.appendChild(kbTooltip);
+    }
+
+    // Click → navigate to individual (fix: use navigateTo for proper selection)
     nodeEls.on('click', (ev, d) => {
-        APP.navigate('individuals');
-        setTimeout(() => {
-            if (typeof IndividualEditor !== 'undefined') {
-                IndividualEditor._selectedId = d.id;
-                IndividualEditor.restoreSelection();
-            }
-        }, 120);
+        APP.navigateTo('individuals', d.id);
     });
 
-    // Hover highlight
+    // Hover highlight + DataProperties tooltip
     nodeEls.on('mouseover', function(ev, d) {
         // Highlight connected links
         const connectedIds = new Set();
@@ -2445,10 +2453,24 @@ APP._initKnowledgeBase = function() {
             const tid = typeof l.target === 'object' ? l.target.id : l.target;
             return (sid === d.id || tid === d.id) ? 1 : 0.05;
         });
+        // Tooltip : DataProperties
+        const dps = (d.ind.dataAssertions || []);
+        if (dps.length) {
+            const rows = dps.map(a =>
+                `<div><span style="color:var(--accent,#38bdf8)">${a.property}</span>`
+              + ` <span style="color:var(--text-dim,#64748b)">:</span> ${a.value}</div>`
+            ).join('');
+            kbTooltip.innerHTML = `<div style="font-weight:600;margin-bottom:4px;color:var(--text2,#94a3b8)">${d.label}</div>${rows}`;
+            kbTooltip.style.display = 'block';
+        }
+    }).on('mousemove', function(ev) {
+        kbTooltip.style.left = (ev.clientX + 14) + 'px';
+        kbTooltip.style.top  = (ev.clientY - 10) + 'px';
     }).on('mouseout', function() {
         nodeEls.select('circle').attr('opacity', 1);
         linkEls.attr('opacity', 1);
         edgeLabelEls.attr('opacity', 1);
+        kbTooltip.style.display = 'none';
     });
 
     // Drag
