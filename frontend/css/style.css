@@ -957,6 +957,14 @@ body.h-resizing * {
   flex-shrink: 0;
 }
 .cls-dot-disj { background: var(--text-dim); }
+/* rdfs:label search result dot — rectangle jaune */
+.lbl-dot {
+  display: inline-block;
+  width: 14px; height: 9px;
+  border-radius: 2px;
+  background: #FACC15;
+  flex-shrink: 0;
+}
 /* owl:Thing dot: same shape, slightly lighter brown */
 .tree-thing-dot { background: #c9956b; }
 /* large format version (detail panel) */
@@ -2054,6 +2062,44 @@ small { color: var(--text-faint); font-size: 10px; }
   color: var(--accent);
   text-decoration: underline;
   text-underline-offset: 2px;
+}
+
+/* ── Atom chips (WHERE clause items — left=nav, right=edit) ─────── */
+.sq-atom-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--bg2);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text1);
+  cursor: context-menu;
+  user-select: none;
+  min-width: 40px;
+  min-height: 22px;
+  white-space: nowrap;
+}
+.sq-atom-chip.sq-atom-nav {
+  cursor: pointer;
+}
+.sq-atom-chip.sq-atom-nav:hover .sq-atom-lbl {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.sq-atom-var {
+  color: var(--purple, #a78bfa);
+  font-weight: 600;
+}
+.sq-atom-lbl {
+  color: var(--text1);
+}
+.sq-atom-placeholder {
+  color: var(--text-faint);
+  font-style: italic;
 }
 
 /* ── Tab hide button (✕ on optional nav items) ─────────────────── */

@@ -386,19 +386,21 @@ const SparqlEditor = {
         }
 
         // ── TRIPLE ──
-        const subjectField = `
-            <input type="text" class="cls-id-inp sparql-subject"
-                   value="${this._esc(p.subject || '')}"
-                   placeholder="?var"
-                   style="width:95px;font-family:var(--font-mono);font-size:11px;flex-shrink:0"
-                   list="sq-vars-list"
-                   oninput="SparqlEditor._onPatField(${JSON.stringify(idx)},'subject',this.value)">`;
+        const _idxKey    = Array.isArray(idx) ? idx.join('-') : idx;
+        const _predDdId  = 'sqdd-p-'    + _idxKey;
+        const _predChip  = 'sqchip-p-'  + _idxKey;
+        const _predEd    = 'sqed-p-'    + _idxKey;
+        const _subjChip  = 'sqchip-s-'  + _idxKey;
+        const _subjEd    = 'sqed-s-'    + _idxKey;
 
-        const _predDdId = 'sqdd-p-' + (Array.isArray(idx) ? idx.join('-') : idx);
-        const predField = this._ddBuild(
+        const subjectField = this._atomFieldText(
+            p.subject || '', _subjChip, _subjEd, idx, 'subject', '?var', '95px');
+
+        const predDropdown = this._ddBuild(
             _predDdId, p.predicate, this._predGroups(),
-            'pred', JSON.stringify(idx), 'max-width:220px'
-        );
+            'pred', JSON.stringify(idx), 'max-width:220px');
+        const predField = this._atomFieldDd(
+            p.predicate, _predChip, _predEd, _predDdId, predDropdown);
 
         const objField = this._objectField(p, idx);
 
@@ -415,37 +417,31 @@ const SparqlEditor = {
 
 
     _objectField(p, idx) {
-        const change = `oninput="SparqlEditor._onPatField(${JSON.stringify(idx)},'object',this.value)"`;
-        const onchange = `onchange="SparqlEditor._onPatField(${JSON.stringify(idx)},'object',this.value)"`;
+        const _idxKey  = Array.isArray(idx) ? idx.join('-') : idx;
+        const _objChip = 'sqchip-o-' + _idxKey;
+        const _objEd   = 'sqed-o-'   + _idxKey;
 
-        // rdf:type → class tree dropdown (même style que ClassEditor / SWRL Rules)
+        // rdf:type → class tree dropdown
         if (p.predicate === 'rdf:type') {
             const classes  = APP.state?.classes || [];
-            const _clsDdId = 'sqdd-o-' + (Array.isArray(idx) ? idx.join('-') : idx);
-            return this._buildClsDd(_clsDdId, p.object, classes, JSON.stringify(idx));
+            const _clsDdId = 'sqdd-o-' + _idxKey;
+            const clsDd    = this._buildClsDd(_clsDdId, p.object, classes, JSON.stringify(idx));
+            return this._atomFieldDd(p.object, _objChip, _objEd, _clsDdId, clsDd);
         }
 
         // rdfs:label / rdfs:comment / DP → littéral ou variable, pleine largeur
-        const dps = new Set((APP.state?.datatype_properties || []).map(p => p.id));
+        const dps = new Set((APP.state?.datatype_properties || []).map(dp => dp.id));
         const isLiteralPred = p.predicate === 'rdfs:label'
                            || p.predicate === 'rdfs:comment'
                            || dps.has(p.predicate);
         if (isLiteralPred) {
-            return `
-            <input type="text" class="cls-id-inp sparql-object"
-                   value="${this._esc(p.object || '')}"
-                   placeholder='?var ou valeur littérale'
-                   style="flex:1;font-family:var(--font-mono);font-size:11px"
-                   list="sq-vars-list" ${change}>`;
+            return this._atomFieldText(
+                p.object || '', _objChip, _objEd, idx, 'object', '?var ou valeur littérale', '1', true);
         }
 
-        // OP / annotation / inconnu → variable or individual
-        return `
-        <input type="text" class="cls-id-inp sparql-object"
-               value="${this._esc(p.object || '')}"
-               placeholder="?var ou IRI"
-               style="width:95px;font-family:var(--font-mono);font-size:11px;flex-shrink:0"
-               list="sq-vars-list" ${change}>`;
+        // OP / annotation / inconnu → variable ou individual
+        return this._atomFieldText(
+            p.object || '', _objChip, _objEd, idx, 'object', '?var ou IRI', '95px');
     },
 
     // ── Pattern operations ─────────────────────────────────────────────
@@ -942,6 +938,142 @@ const SparqlEditor = {
             ...(dps.length ? [{ label: 'Datatype Properties', items: this._propTreeItems(dps, 'dp-prop-dot') }] : []),
             { label: 'Annotation Properties', items: allAPs },
         ];
+    },
+
+    // ── Atom chip helpers (left-click = navigate, right-click = edit) ─────
+
+    _openAtomEditor: null,
+    _atomOutsideHandler: null,
+
+    // Chip displaying the current value of a field
+    _atomChipHtml(value) {
+        if (!value) return `<span class="sq-atom-placeholder">—</span>`;
+        const isVar = value.startsWith('?');
+        if (isVar) return `<span class="sq-atom-var">${this._esc(value)}</span>`;
+        const entity = this._resolveEntity(value);
+        if (entity) {
+            const lbl = entity.displayName || entity.entityId;
+            return `<span class="${entity.dot}" style="flex-shrink:0"></span>`
+                 + `<span class="sq-atom-lbl">${this._esc(lbl)}</span>`;
+        }
+        return `<span class="sq-atom-lbl">${this._esc(value)}</span>`;
+    },
+
+    // Chip + hidden text input
+    _atomFieldText(value, chipId, edId, idx, field, placeholder, width, flex) {
+        const entity  = value && !value.startsWith('?') ? this._resolveEntity(value) : null;
+        const navAttr = entity
+            ? `onclick="SparqlEditor.navigateToEntity('${this._esc(value)}')" `
+            : `onclick="" `;
+        const navCls  = entity ? ' sq-atom-nav' : '';
+        const wStyle  = flex ? `flex:1` : `width:${width}`;
+        return `<span class="sq-atom-chip${navCls}" id="${chipId}"
+                      ${navAttr}
+                      oncontextmenu="SparqlEditor._atomEdit('${chipId}','${edId}',null,event)"
+                      title="Clic droit pour modifier">${this._atomChipHtml(value)}</span
+               ><input id="${edId}" type="text" class="cls-id-inp"
+                       style="display:none;${wStyle};font-family:var(--font-mono);font-size:11px;flex-shrink:0"
+                       value="${this._esc(value)}"
+                       placeholder="${this._esc(placeholder)}"
+                       list="sq-vars-list"
+                       oninput="SparqlEditor._onPatField(${JSON.stringify(idx)},'${field}',this.value)"
+                       onblur="SparqlEditor._atomEditClose('${chipId}','${edId}')"
+                       onkeydown="if(event.key==='Escape'||event.key==='Enter'){event.preventDefault();SparqlEditor._atomEditClose('${chipId}','${edId}')}">`;
+    },
+
+    // Chip + hidden dropdown (predicate or class)
+    _atomFieldDd(value, chipId, edId, ddId, ddHtml) {
+        const entity  = value && !value.startsWith('?') && value !== 'rdf:type'
+                        && value !== 'rdfs:label' && value !== 'rdfs:comment'
+                        ? this._resolveEntity(value) : null;
+        const navAttr = entity
+            ? `onclick="SparqlEditor.navigateToEntity('${this._esc(value)}')" `
+            : `onclick="" `;
+        const navCls  = entity ? ' sq-atom-nav' : '';
+        return `<span class="sq-atom-chip${navCls}" id="${chipId}"
+                      ${navAttr}
+                      oncontextmenu="SparqlEditor._atomEdit('${chipId}','${edId}','${ddId}',event)"
+                      title="Clic droit pour modifier">${this._atomChipHtml(value)}</span
+               ><span id="${edId}" style="display:none">${ddHtml}</span>`;
+    },
+
+    // Open atom editor on right-click
+    _atomEdit(chipId, edId, ddId, event) {
+        event.preventDefault();
+        event.stopPropagation();
+        // Close previous editor if any
+        if (this._openAtomEditor) {
+            const o = this._openAtomEditor;
+            const c = document.getElementById(o.chipId);
+            const e = document.getElementById(o.edId);
+            if (c) c.style.display = '';
+            if (e) e.style.display = 'none';
+        }
+        if (this._atomOutsideHandler) {
+            document.removeEventListener('mousedown', this._atomOutsideHandler);
+            this._atomOutsideHandler = null;
+        }
+        const chip   = document.getElementById(chipId);
+        const editor = document.getElementById(edId);
+        if (!chip || !editor) return;
+        chip.style.display   = 'none';
+        editor.style.display = '';
+        this._openAtomEditor = { chipId, edId, ddId };
+        if (ddId) {
+            // Open dropdown
+            setTimeout(() => {
+                const dd = document.getElementById(ddId);
+                if (dd && !dd.classList.contains('sq-dd-open')) {
+                    dd.classList.add('sq-dd-open');
+                    dd.focus();
+                }
+            }, 20);
+        } else {
+            // Focus input
+            const inp = editor.querySelector('input');
+            if (inp) { inp.select(); inp.focus(); }
+        }
+        // Close on outside click
+        const self = this;
+        setTimeout(() => {
+            self._atomOutsideHandler = function(e) {
+                const edEl = document.getElementById(edId);
+                if (edEl && !edEl.contains(e.target) && e.target.id !== chipId) {
+                    self._atomEditClose(chipId, edId);
+                }
+            };
+            document.addEventListener('mousedown', self._atomOutsideHandler);
+        }, 80);
+    },
+
+    // Close atom editor and show chip
+    _atomEditClose(chipId, edId) {
+        const chip   = document.getElementById(chipId);
+        const editor = document.getElementById(edId);
+        if (chip)   chip.style.display   = '';
+        if (editor) editor.style.display = 'none';
+        // Update chip content with new input value
+        if (chip && editor) {
+            const inp = editor.querySelector('input');
+            if (inp) {
+                // Re-render chip content in-place
+                chip.innerHTML = this._atomChipHtml(inp.value);
+                const entity = inp.value && !inp.value.startsWith('?')
+                    ? this._resolveEntity(inp.value) : null;
+                if (entity) {
+                    chip.classList.add('sq-atom-nav');
+                    chip.setAttribute('onclick', `SparqlEditor.navigateToEntity('${this._esc(inp.value)}')`);
+                } else {
+                    chip.classList.remove('sq-atom-nav');
+                    chip.setAttribute('onclick', '');
+                }
+            }
+        }
+        if (this._openAtomEditor?.chipId === chipId) this._openAtomEditor = null;
+        if (this._atomOutsideHandler) {
+            document.removeEventListener('mousedown', this._atomOutsideHandler);
+            this._atomOutsideHandler = null;
+        }
     },
 
     navigateToEntity(uri) {

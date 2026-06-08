@@ -212,13 +212,13 @@ class RegisterRequest(PydanticModel):
     name: str
     path: str
     uri: str
-    prefix: str = "onto"
+    prefix: str = ""
 
 class UpdateEntryRequest(PydanticModel):
     name: str
     path: str
     uri: str
-    prefix: str = "onto"
+    prefix: str = ""
 
 
 @app.get("/api/ontologies", tags=["Ontologie"])
@@ -253,7 +253,7 @@ def register_json(path: str = Query(...), name: str = Query(None),
         raise HTTPException(400, f"Cannot read JSON: {e}")
     resolved_name   = name   or data.get("name") or p.stem
     resolved_uri    = uri    or data.get("id", "")
-    resolved_prefix = prefix or data.get("prefix", "onto")
+    resolved_prefix = prefix if prefix is not None else data.get("prefix", "")
     entries = store.list_registry()
     if any(e["name"] == resolved_name for e in entries):
         raise HTTPException(409, f"An ontology named '{resolved_name}' already exists in the registry.")
@@ -347,13 +347,40 @@ def peek_ontology(path: str = Query(..., description="Host path to .owl / .ttl /
         for s in g.subjects(RDF.type, OWL.Ontology):
             uri = str(s)
             break
-        # Prefix: look for declared namespace bindings (skip common ones)
-        SKIP = {"owl","rdf","rdfs","xsd","xml","skos","dc","dcterms",""}
+        # Prefix: prefer the namespace binding whose URI matches the ontology base IRI,
+        # then fall back to the filename stem, then first non-common binding.
+        SKIP = {"owl","rdf","rdfs","xsd","xml","skos","dc","dcterms","schema","sh",""}
         prefix = "onto"
-        for pfx, ns in g.namespaces():
-            if pfx not in SKIP and str(pfx):
-                prefix = str(pfx)
-                break
+        base_norm = uri.rstrip("#/") if uri else ""
+
+        # 1st pass — find namespace whose URI matches the ontology base IRI
+        if base_norm:
+            for pfx, ns in g.namespaces():
+                if pfx not in SKIP and str(pfx) and str(ns).rstrip("#/") == base_norm:
+                    prefix = str(pfx)
+                    break
+            else:
+                # 2nd pass — derive from filename (stem must be a valid identifier)
+                stem = FP(container_path).stem
+                if stem and stem.replace("-","_").replace(".","_").isidentifier():
+                    prefix = stem[:12].lower().replace("-","_")
+                else:
+                    # Last resort — first non-common binding
+                    for pfx, ns in g.namespaces():
+                        if pfx not in SKIP and str(pfx):
+                            prefix = str(pfx)
+                            break
+        else:
+            # No base IRI found — derive from filename or first binding
+            stem = FP(container_path).stem
+            if stem and stem.replace("-","_").replace(".","_").isidentifier():
+                prefix = stem[:12].lower().replace("-","_")
+            else:
+                for pfx, ns in g.namespaces():
+                    if pfx not in SKIP and str(pfx):
+                        prefix = str(pfx)
+                        break
+
         return {"name": name, "prefix": prefix, "uri": uri, "path": path}
     except Exception as e:
         raise HTTPException(400, f"Cannot read file: {e}")
@@ -367,7 +394,7 @@ async def import_ontology(
     name: str = Query(..., description="Nom de l'ontologie"),
     path: str = Query(..., description="Chemin de sauvegarde (hôte)"),
     uri: str  = Query(..., description="IRI de base de l'ontologie"),
-    prefix: str = Query("onto"),
+    prefix: str = Query(""),
 ):
     content = await file.read()
     fname = file.filename or ""
@@ -393,7 +420,7 @@ class ImportFromPathRequest(PydanticModel):
     owl_path: str   # chemin hôte du fichier OWL/RDF
     save_path: str  # chemin hôte de sauvegarde .json
     uri: str
-    prefix: str = "onto"
+    prefix: str = ""
 
 @app.post("/api/ontologies/import-from-path", tags=["Ontologie"])
 def import_from_path(req: ImportFromPathRequest):

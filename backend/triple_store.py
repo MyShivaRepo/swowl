@@ -344,6 +344,21 @@ class TripleStore:
                 if isinstance(sp, URIRef):
                     sl = _lid(str(sp))
                     if sl: prop.subPropertyOf.append(sl)
+            for inv in g.objects(prop_uri, OWL.inverseOf):
+                if isinstance(inv, URIRef):
+                    il = _lid(str(inv))
+                    if il:
+                        prop.inverseOf = il
+                        break
+            # Caractéristiques OWL
+            prop_types = set(g.objects(prop_uri, RDF.type))
+            prop.characteristics.functional        = OWL.FunctionalProperty        in prop_types
+            prop.characteristics.inverseFunctional = OWL.InverseFunctionalProperty in prop_types
+            prop.characteristics.transitive        = OWL.TransitiveProperty        in prop_types
+            prop.characteristics.symmetric         = OWL.SymmetricProperty         in prop_types
+            prop.characteristics.asymmetric        = OWL.AsymmetricProperty        in prop_types
+            prop.characteristics.reflexive         = OWL.ReflexiveProperty         in prop_types
+            prop.characteristics.irreflexive       = OWL.IrreflexiveProperty       in prop_types
             onto.object_properties.append(prop)
 
         # ── Datatype Properties: owl:DatatypeProperty ────────────
@@ -417,7 +432,29 @@ class TripleStore:
                     if isinstance(sp, URIRef):
                         sl = _lid(str(sp))
                         if sl: prop.subPropertyOf.append(sl)
+                for inv in g.objects(prop_uri, OWL.inverseOf):
+                    if isinstance(inv, URIRef):
+                        il = _lid(str(inv))
+                        if il:
+                            prop.inverseOf = il
+                            break
+                prop_types = set(g.objects(prop_uri, RDF.type))
+                prop.characteristics.functional        = OWL.FunctionalProperty        in prop_types
+                prop.characteristics.inverseFunctional = OWL.InverseFunctionalProperty in prop_types
+                prop.characteristics.transitive        = OWL.TransitiveProperty        in prop_types
+                prop.characteristics.symmetric         = OWL.SymmetricProperty         in prop_types
+                prop.characteristics.asymmetric        = OWL.AsymmetricProperty        in prop_types
+                prop.characteristics.reflexive         = OWL.ReflexiveProperty         in prop_types
+                prop.characteristics.irreflexive       = OWL.IrreflexiveProperty       in prop_types
                 onto.object_properties.append(prop)
+
+        # Passe de symétrie inverseOf : si A.inverseOf = B alors B.inverseOf = A
+        op_by_id = {p.id: p for p in onto.object_properties}
+        for p in list(onto.object_properties):
+            if p.inverseOf:
+                inv_prop = op_by_id.get(p.inverseOf)
+                if inv_prop and not inv_prop.inverseOf:
+                    inv_prop.inverseOf = p.id
 
         # Synchroniser les domaines de propriétés → marqueurs PropertyPresence dans les classes
         # (nécessaire pour que le panel "Asserted Properties" soit rempli)

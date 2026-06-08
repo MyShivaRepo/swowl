@@ -851,7 +851,7 @@ const APP = {
     async _doNew() {
         const name   = document.getElementById('wiz-new-name')?.value.trim();
         const dir    = document.getElementById('wiz-new-dir')?.value.trim();
-        const prefix = document.getElementById('wiz-new-prefix')?.value.trim() || 'onto';
+        const prefix = document.getElementById('wiz-new-prefix')?.value.trim() ?? '';
         const uri    = document.getElementById('wiz-new-uri')?.value.trim();
         const conn   = document.getElementById('wiz-new-connect')?.checked;
         if (!name) return UI.error('Name is required.');
@@ -887,7 +887,7 @@ const APP = {
         const src    = document.getElementById('wiz-imp-src')?.value.trim();
         const name   = document.getElementById('wiz-imp-name')?.value.trim();
         const dir    = document.getElementById('wiz-imp-dir')?.value.trim();
-        const prefix = document.getElementById('wiz-imp-prefix')?.value.trim() || 'onto';
+        const prefix = document.getElementById('wiz-imp-prefix')?.value.trim() ?? '';
         const uri    = document.getElementById('wiz-imp-uri')?.value.trim();
         const conn   = document.getElementById('wiz-imp-connect')?.checked;
         if (!src)  return UI.error('Source file is required.');
@@ -921,7 +921,7 @@ const APP = {
     async _doLoad() {
         const src    = document.getElementById('wiz-load-src')?.value.trim();
         const name   = document.getElementById('wiz-load-name')?.value.trim();
-        const prefix = document.getElementById('wiz-load-prefix')?.value.trim() || 'onto';
+        const prefix = document.getElementById('wiz-load-prefix')?.value.trim() ?? '';
         const uri    = document.getElementById('wiz-load-uri')?.value.trim();
         const conn   = document.getElementById('wiz-load-connect')?.checked;
         if (!src)  return UI.error('Please select a .json file.');
@@ -987,7 +987,7 @@ const APP = {
         const origName = document.getElementById('wiz-edit-orig')?.value.trim();
         const name     = document.getElementById('wiz-edit-name')?.value.trim();
         const dir      = document.getElementById('wiz-edit-dir')?.value.trim();
-        const prefix   = document.getElementById('wiz-edit-prefix')?.value.trim() || 'onto';
+        const prefix   = document.getElementById('wiz-edit-prefix')?.value.trim() ?? '';
         const uri      = document.getElementById('wiz-edit-uri')?.value.trim();
         if (!name) return UI.error('Name is required.');
         if (!dir)  return UI.error('Directory is required.');
@@ -1490,77 +1490,72 @@ const GlobalSearch = {
     _items:     [],   // flat list of {section, id, label, sub, dot}
 
     _dot(type) {
-        if (type === 'swrl-rules') return `<span style="flex-shrink:0;font-size:11px">⚙️</span>`;
+        if (type === 'swrl-rules')  return `<span style="flex-shrink:0;font-size:11px">⚙️</span>`;
+        if (type === 'sparql-vizq') return `<span style="flex-shrink:0;font-size:11px">🎯</span>`;
         const map = { classes: 'cls-dot', 'object-properties': 'op-prop-dot',
                       'datatype-properties': 'dp-prop-dot', 'annotation-properties': 'anno-prop-dot',
                       individuals: 'xsd-dot' };
         return `<span class="${map[type] || 'cls-dot'}" style="flex-shrink:0;margin:0"></span>`;
     },
 
-    /** Retourne le meilleur label d'annotation (langue préférée, sinon premier disponible) */
-    _bestLabel(entity) {
-        const labels = entity?.annotations?.labels || [];
-        if (!labels.length) return '';
-        const pref = Settings.preferredLang;
-        const byLang = labels.find(l => l.lang === pref);
-        return (byLang || labels[0]).value || '';
-    },
-
-    /** Retourne true si la query matche l'ID ou n'importe quel label d'annotation */
-    _matchEntity(entity, lq) {
-        if ((entity.id || '').toLowerCase().includes(lq)) return true;
-        return (entity.annotations?.labels || []).some(l =>
-            (l.value || '').toLowerCase().includes(lq)
-        );
-    },
-
     _search(q) {
-        const s   = APP.state;
-        const lq  = q.toLowerCase();
+        const s  = APP.state;
+        const lq = q.toLowerCase();
         const results = [];
-        const push = (section, id, label, sub) => results.push({ section, id, label, sub });
 
-        (s.classes || []).forEach(c => {
-            if (!this._matchEntity(c, lq)) return;
-            const lbl = this._bestLabel(c);
-            push('classes', c.id, lbl || c.id, lbl ? c.id : '');
-        });
+        // ── helpers ─────────────────────────────────────────────────────────
+        const _idMatch    = (e) => (e.id || '').toLowerCase().includes(lq);
+        const _lblMatches = (e) => (e.annotations?.labels || []).filter(l =>
+            (l.value || '').toLowerCase().includes(lq));
 
-        (s.object_properties || []).forEach(p => {
-            if (!this._matchEntity(p, lq)) return;
-            const lbl = this._bestLabel(p);
-            push('object-properties', p.id, lbl || p.id, lbl ? p.id : '');
-        });
+        // ── A. USER LABELS ───────────────────────────────────────────────────
 
-        (s.datatype_properties || []).forEach(p => {
-            if (!this._matchEntity(p, lq)) return;
-            const lbl = this._bestLabel(p);
-            push('datatype-properties', p.id, lbl || p.id, lbl ? p.id : '');
-        });
-
-        (APP.state.annotation_properties || []).forEach(p => {
-            if ((p.id || '').toLowerCase().includes(lq))
-                push('annotation-properties', p.id, p.id, '');
-        });
-
-        (s.swrl_rules || []).forEach(r => {
-            if (!(r.id || '').toLowerCase().includes(lq) && !(r.label || '').toLowerCase().includes(lq)) return;
-            const mainText = r.label || r.id;
-            push('swrl-rules', r.id, mainText, mainText !== r.id ? r.id : '');
-        });
-
-        (s.individuals || []).forEach(i => {
-            const dispLabel = (typeof IndividualEditor !== 'undefined')
-                ? IndividualEditor._resolveDisplayLabel(i, null) : '';
-            const mainText = dispLabel || i.id;
-            const idMatch  = (i.id || '').toLowerCase().includes(lq);
-            const lblMatch = mainText.toLowerCase().includes(lq);
-            // Chercher aussi sur tous les labels d'annotation
-            const annoMatch = (i.annotations?.labels || []).some(l =>
-                (l.value || '').toLowerCase().includes(lq)
+        // A1. rdfs:label — toutes entités avec annotations.labels
+        [
+            ...(s.classes               || []).map(e => ({ e, kind: 'classes' })),
+            ...(s.object_properties     || []).map(e => ({ e, kind: 'object-properties' })),
+            ...(s.datatype_properties   || []).map(e => ({ e, kind: 'datatype-properties' })),
+            ...(s.annotation_properties || []).map(e => ({ e, kind: 'annotation-properties' })),
+            ...(s.individuals           || []).map(e => ({ e, kind: 'individuals' })),
+        ].forEach(({ e, kind }) => {
+            _lblMatches(e).forEach(l =>
+                results.push({ section: 'rdfs-labels', id: e.id, label: l.value, kind })
             );
-            if (!idMatch && !lblMatch && !annoMatch) return;
-            push('individuals', i.id, mainText, mainText !== i.id ? i.id : '');
+        });
+
+        // A2. SWRL labels (label ≠ id)
+        (s.swrl_rules || []).forEach(r => {
+            const lbl = r.label || '';
+            if (lbl && lbl !== r.id && lbl.toLowerCase().includes(lq))
+                results.push({ section: 'swrl-labels', id: r.id, label: lbl });
+        });
+
+        // A3. SPARQL VizQ labels (label ≠ id)
+        const sparqlQueries = (typeof SparqlEditor !== 'undefined') ? SparqlEditor._loadAll() : [];
+        sparqlQueries.forEach(sq => {
+            const lbl = sq.label || '';
+            if (lbl && lbl !== sq.id && lbl.toLowerCase().includes(lq))
+                results.push({ section: 'sparql-labels', id: sq.id, label: lbl });
+        });
+
+        // A4. Individual display names (displayName ≠ id)
+        (s.individuals || []).forEach(i => {
+            const dn = (typeof IndividualEditor !== 'undefined')
+                ? IndividualEditor._resolveDisplayLabel(i, null) : '';
+            if (dn && dn !== i.id && dn.toLowerCase().includes(lq))
+                results.push({ section: 'individual-names', id: i.id, label: dn });
+        });
+
+        // ── B. SYSTEM IDs ────────────────────────────────────────────────────
+        (s.classes               || []).forEach(c => { if (_idMatch(c)) results.push({ section: 'classes',               id: c.id, label: c.id }); });
+        (s.object_properties     || []).forEach(p => { if (_idMatch(p)) results.push({ section: 'object-properties',     id: p.id, label: p.id }); });
+        (s.datatype_properties   || []).forEach(p => { if (_idMatch(p)) results.push({ section: 'datatype-properties',   id: p.id, label: p.id }); });
+        (s.annotation_properties || []).forEach(p => { if (_idMatch(p)) results.push({ section: 'annotation-properties', id: p.id, label: p.id }); });
+        (s.individuals           || []).forEach(i => { if (_idMatch(i)) results.push({ section: 'individuals',           id: i.id, label: i.id }); });
+        (s.swrl_rules            || []).forEach(r => { if (_idMatch(r)) results.push({ section: 'swrl-rules',            id: r.id, label: r.id }); });
+        sparqlQueries.forEach(sq => {
+            if ((sq.id || '').toLowerCase().includes(lq))
+                results.push({ section: 'sparql-vizq', id: sq.id, label: sq.id });
         });
 
         return results;
@@ -1570,30 +1565,65 @@ const GlobalSearch = {
         if (!results.length)
             return `<div class="gs-empty">No results for "<strong>${this._query}</strong>"</div>`;
 
-        const groups = { classes: [], 'object-properties': [], 'datatype-properties': [],
-                         'annotation-properties': [], individuals: [], 'swrl-rules': [] };
-        const labels = { classes: 'Classes', 'object-properties': 'Object Properties',
-                         'datatype-properties': 'Datatype Properties',
-                         'annotation-properties': 'Annotation Properties',
-                         individuals: 'Individuals', 'swrl-rules': 'SWRL Rules' };
+        // Ordre des sections : A avant B
+        const groups = {
+            'rdfs-labels': [], 'individual-names': [], 'swrl-labels': [], 'sparql-labels': [],
+            'classes': [], 'object-properties': [], 'datatype-properties': [],
+            'annotation-properties': [], 'individuals': [], 'swrl-rules': [], 'sparql-vizq': [],
+        };
+        const sectionLabels = {
+            'rdfs-labels':          'rdfs:label',
+            'swrl-labels':          'SWRL Labels',
+            'sparql-labels':        'SPARQL Labels',
+            'individual-names':     'Individual Display Name',
+            'classes':              'Classes',
+            'object-properties':    'Object Properties',
+            'datatype-properties':  'Datatype Properties',
+            'annotation-properties':'Annotation Properties',
+            'individuals':          'Individuals',
+            'swrl-rules':           'SWRL Rules',
+            'sparql-vizq':          'SPARQL VizQ',
+        };
 
-        results.forEach(r => { if (groups[r.section]) groups[r.section].push(r); });
+        results.forEach(r => { if (r.section in groups) groups[r.section].push(r); });
 
-        let flatIdx = 0;
-        this._items = results;
+        this._items = [];  // reconstruit dans l'ordre d'affichage → data-idx cohérent
+
+        const _row = (r, inner) => {
+            const idx = this._items.length;
+            this._items.push(r);
+            const f = idx === this._focusIdx ? ' focused' : '';
+            return `<div class="gs-item${f}" data-idx="${idx}"
+                         onmousedown="GlobalSearch._navigate(${idx})"
+                         onmouseover="GlobalSearch._hover(${idx})">${inner}</div>`;
+        };
 
         return Object.entries(groups).filter(([, arr]) => arr.length).map(([sec, arr]) => {
             const rows = arr.map(r => {
-                const idx = flatIdx++;
-                return `<div class="gs-item${idx === this._focusIdx ? ' focused' : ''}" data-idx="${idx}"
-                             onmousedown="GlobalSearch._navigate(${idx})"
-                             onmouseover="GlobalSearch._hover(${idx})">
-                    ${this._dot(sec)}
-                    <span class="gs-item-label">${r.label}</span>
-                    ${r.sub ? `<span class="gs-item-sub">${r.sub}</span>` : ''}
-                </div>`;
+                switch (sec) {
+                    case 'rdfs-labels':
+                        return _row(r, `<span class="lbl-dot"></span>
+                            <span class="gs-item-label">${r.label}</span>
+                            ${this._dot(r.kind)}
+                            <span class="gs-item-sub">${r.id}</span>`);
+                    case 'swrl-labels':
+                        return _row(r, `<span style="flex-shrink:0;font-size:11px">⚙️</span>
+                            <span class="gs-item-label">${r.label}</span>
+                            <span class="gs-item-sub">${r.id}</span>`);
+                    case 'sparql-labels':
+                        return _row(r, `<span style="flex-shrink:0;font-size:11px">🎯</span>
+                            <span class="gs-item-label">${r.label}</span>
+                            <span class="gs-item-sub">${r.id}</span>`);
+                    case 'individual-names':
+                        return _row(r, `<span class="xsd-dot" style="flex-shrink:0;margin:0"></span>
+                            <span class="gs-item-label">${r.label}</span>
+                            <span class="gs-item-sub">${r.id}</span>`);
+                    default:
+                        return _row(r, `${this._dot(sec)}
+                            <span class="gs-item-label">${r.label}</span>`);
+                }
             }).join('');
-            return `<div class="gs-group-label">${labels[sec]}</div>${rows}`;
+            return `<div class="gs-group-label">${sectionLabels[sec]}</div>${rows}`;
         }).join('');
     },
 
@@ -1626,7 +1656,26 @@ const GlobalSearch = {
         const item = this._items[idx];
         if (!item) return;
         this.clear();
-        APP.navigateTo(item.section, item.id);
+        // Mapping Part A → section de navigation réelle
+        const navMap = {
+            'rdfs-labels':      item.kind,
+            'swrl-labels':      'swrl-rules',
+            'sparql-labels':    'sparql-vizq',
+            'individual-names': 'individuals',
+        };
+        const navSection = navMap[item.section] || item.section;
+        // SPARQL VizQ : sélectionner la requête et switcher sur l'onglet vizq
+        if (navSection === 'sparql-vizq') {
+            APP._queriesTab = 'vizq';
+            if (typeof SparqlEditor !== 'undefined') {
+                const all = SparqlEditor._loadAll();
+                const found = all.find(q => q.id === item.id);
+                if (found) SparqlEditor.selectQuery(item.id);
+            }
+            APP.renderSection('queries');
+            return;
+        }
+        APP.navigateTo(navSection, item.id);
     },
 
     onKey(e) {
@@ -2502,8 +2551,8 @@ APP.renderGuiTabs = function() {
     return `
     <div style="display:flex;flex-direction:column;gap:6px;padding:16px;flex:1;overflow-y:auto">
         <p style="margin:0 0 10px;font-size:11px;color:var(--text-dim)">
-            Choisissez les onglets visibles dans la barre de navigation.
-            Les onglets requis ne peuvent pas être masqués.
+            Choose the tabs visible in the navigation bar.
+            Required tabs cannot be hidden.
         </p>
         ${rows}
     </div>`;

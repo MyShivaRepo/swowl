@@ -4172,6 +4172,105 @@ const IndividualEditor = {
         </div>`;
     },
 
+    // ── subPropertyOf inference (client-side) ────────────────────────
+
+    /** Returns all ancestor property IDs transitively via subPropertyOf. */
+    _getSuperProperties(propId, allProps) {
+        const result  = [];
+        const visited = new Set([propId]);
+        const walk = (id) => {
+            const p = allProps.find(x => x.id === id);
+            if (!p) return;
+            (p.subPropertyOf || []).filter(s => typeof s === 'string').forEach(parentId => {
+                if (!visited.has(parentId)) {
+                    visited.add(parentId);
+                    result.push(parentId);
+                    walk(parentId);   // transitive
+                }
+            });
+        };
+        walk(propId);
+        return result;
+    },
+
+    /** Computes inferred OP + DP assertions for an individual based on subPropertyOf chains. */
+    _inferredAssertions(ind) {
+        const ops = APP.state.object_properties  || [];
+        const dps = APP.state.datatype_properties || [];
+
+        // Keys of explicit assertions — used to avoid showing duplicates
+        const explicitOp = new Set((ind.objectAssertions || []).map(a => `${a.property}||${a.target}`));
+        const explicitDp = new Set((ind.dataAssertions   || []).map(a => `${a.property}||${a.value}`));
+
+        // inferredFrom may have multiple sources → group by propId
+        const opMap = new Map(); // parentPropId → [{target, inferredFrom}]
+        const dpMap = new Map(); // parentPropId → [{value, datatype, inferredFrom}]
+
+        (ind.objectAssertions || []).forEach(a => {
+            this._getSuperProperties(a.property, ops).forEach(parentId => {
+                const key = `${parentId}||${a.target}`;
+                if (!explicitOp.has(key)) {
+                    explicitOp.add(key);
+                    if (!opMap.has(parentId)) opMap.set(parentId, []);
+                    opMap.get(parentId).push({ target: a.target, inferredFrom: a.property });
+                }
+            });
+        });
+
+        (ind.dataAssertions || []).forEach(a => {
+            this._getSuperProperties(a.property, dps).forEach(parentId => {
+                const key = `${parentId}||${a.value}`;
+                if (!explicitDp.has(key)) {
+                    explicitDp.add(key);
+                    if (!dpMap.has(parentId)) dpMap.set(parentId, []);
+                    dpMap.get(parentId).push({ value: a.value, datatype: a.datatype, inferredFrom: a.property });
+                }
+            });
+        });
+
+        return { opMap, dpMap };
+    },
+
+    /** Renders a read-only inferred property panel (🧠 italic, non-editable). */
+    _renderInferredPanel(propId, assertions, kind) {
+        const dotCls = kind === 'op' ? 'op-prop-dot' : 'dp-prop-dot';
+        const navSection = kind === 'op' ? 'object-properties' : 'datatype-properties';
+
+        const rows = assertions.map(a => {
+            const value = kind === 'op' ? a.target : a.value;
+            const lbl   = kind === 'op' ? (this._labelForId(a.target, null) || a.target) : a.value;
+            const dtype = kind === 'dp' ? `<span style="font-size:10px;color:var(--text-dim);margin-left:4px">${a.datatype || ''}</span>` : '';
+            const navClick = kind === 'op'
+                ? `onclick="APP.navigateTo('individuals','${value}')"
+                   onmouseover="this.style.textDecoration='underline';this.style.color='var(--accent,#5f8dd3)'"
+                   onmouseout="this.style.textDecoration='';this.style.color=''"
+                   style="font-size:12px;font-family:var(--font-mono);flex:1;cursor:pointer;font-style:italic"`
+                : `style="font-size:11px;font-family:var(--font-mono);flex:1;font-style:italic;color:var(--text-dim)"`;
+            return `
+            <div style="display:flex;align-items:center;gap:4px;padding:2px 4px">
+                <span class="xsd-dot" style="flex-shrink:0;margin:0;opacity:0.6"></span>
+                <span ${navClick}>${(lbl+'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</span>
+                ${dtype}
+                <span style="font-size:10px;color:var(--text-faint);font-style:italic;flex-shrink:0"
+                      title="Inféré via subPropertyOf">⊢ via ${a.inferredFrom}</span>
+            </div>`;
+        }).join('');
+
+        return `
+        <div class="cls-frame ind-prop-panel" style="opacity:0.85">
+            <div class="cls-frame-bar" style="font-style:italic">
+                <span class="${dotCls}" style="opacity:0.7"></span>
+                <span class="cls-frame-tag" style="margin-left:4px;cursor:pointer;font-style:italic;color:var(--text-dim)"
+                      onclick="APP.navigateTo('${navSection}','${propId}')"
+                      onmouseover="this.style.textDecoration='underline'"
+                      onmouseout="this.style.textDecoration=''"
+                      title="Navigate to ${propId}">${propId}</span>
+                <span style="margin-left:6px;font-size:10px;color:var(--text-faint)">🧠 inféré</span>
+            </div>
+            <div class="cls-frame-body">${rows}</div>
+        </div>`;
+    },
+
     renderForm(ind = null, defaultClassId = null) {
         const isNew = !ind;
         IndividualEditor._editingId = isNew ? null : ind.id;
@@ -4211,8 +4310,25 @@ const IndividualEditor = {
             .join('<div class="h-resizer"></div>');
         const inhHtml  = makePanels(inhProps);
         const assHtml  = makePanels(assProps);
-        const propPanelsHtml = [inhHtml, assHtml].filter(Boolean).join('<div class="h-resizer"></div>');
-        const hasProps = inhProps.size + assProps.size > 0;
+
+        // Inferred panels (subPropertyOf transitive)
+        const { opMap, dpMap } = !isNew ? this._inferredAssertions(i) : { opMap: new Map(), dpMap: new Map() };
+        const infPanels = [
+            ...[...opMap.entries()].map(([propId, assertions]) => this._renderInferredPanel(propId, assertions, 'op')),
+            ...[...dpMap.entries()].map(([propId, assertions]) => this._renderInferredPanel(propId, assertions, 'dp')),
+        ];
+        const infSeparator = infPanels.length ? `
+            <div style="display:flex;align-items:center;gap:8px;padding:6px 4px 2px;user-select:none">
+                <span style="flex:1;height:1px;background:var(--border)"></span>
+                <span style="font-size:10px;color:var(--text-faint);font-style:italic;white-space:nowrap">
+                    🧠 Inferred Properties (subPropertyOf)
+                </span>
+                <span style="flex:1;height:1px;background:var(--border)"></span>
+            </div>` : '';
+        const infHtml = infPanels.join('<div class="h-resizer"></div>');
+
+        const propPanelsHtml = [inhHtml, assHtml, infSeparator + infHtml].filter(Boolean).join('<div class="h-resizer"></div>');
+        const hasProps = inhProps.size + assProps.size > 0 || opMap.size > 0 || dpMap.size > 0;
 
         return `
         <div class="cls-editor">
