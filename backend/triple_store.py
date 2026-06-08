@@ -317,6 +317,11 @@ class TripleStore:
                         sup_local = _lid(str(sup))
                         if sup_local:
                             owl_cls.subClassOf.append(sup_local)
+                for dj in g.objects(cls_uri, OWL.disjointWith):
+                    if isinstance(dj, URIRef):
+                        dj_local = _lid(str(dj))
+                        if dj_local:
+                            owl_cls.disjointWith.append(dj_local)
                 onto.classes.append(owl_cls)
 
         # ── Object Properties: owl:ObjectProperty ───────────────

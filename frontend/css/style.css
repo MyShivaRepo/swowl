@@ -1093,6 +1093,11 @@ body.h-resizing * {
 
 /* ── Read-only groups (inheritance) ────────────────────────── */
 .restr-group-ro { margin: 1px 0; }
+.inh-class-sep {
+  margin: 4px 8px;
+  border-top: 1px solid var(--border, rgba(255,255,255,.08));
+  opacity: .5;
+}
 .restr-prop-row-ro {
   /* overlay .tree-item for inherited rows (read-only) */
   pointer-events: none;
@@ -1100,6 +1105,11 @@ body.h-resizing * {
 /* The property name remains clickable despite pointer-events:none on the parent */
 .restr-prop-row-ro .restr-prop-name {
   pointer-events: auto;
+}
+/* Source class links in inherited rows */
+.restr-prop-row-ro .restr-from-nav {
+  pointer-events: auto;
+  cursor: pointer;
 }
 .restr-child-row-ro {
   display: flex; align-items: center; gap: 3px;
@@ -1432,11 +1442,19 @@ small { color: var(--text-faint); font-size: 10px; }
 
 /* ── Tag inverse (↔ propName) dans l'arbre ObjectProperties ─── */
 .op-inverse-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
   font-size: 10px;
   color: var(--text-dim);
   font-style: italic;
   margin-left: 4px;
   flex-shrink: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.op-inv-nav {
+  cursor: pointer;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

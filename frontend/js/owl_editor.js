@@ -667,6 +667,9 @@ const ClassEditor = {
             ${isClass ? `<div class="ctx-item" onclick="ClassEditor._closeContextMenu();ClassEditor.createSibling()">
                 ${this._svgSister} Add Sibling Class</div>
             <div class="ctx-sep"></div>
+            <div class="ctx-item" onclick="ClassEditor._closeContextMenu();APP.renderSection('individuals');setTimeout(()=>IndividualEditor.selectClass('${id}'),50)">
+                <span class="xsd-dot" style="display:inline-block;vertical-align:middle;margin-right:2px"></span> Go to Individuals Tab</div>
+            <div class="ctx-sep"></div>
             <div class="ctx-item ctx-danger" onclick="ClassEditor._closeContextMenu();ClassEditor.deleteSelected()">
                 ${this._svgDelete} Delete</div>` : ''}
         `;
@@ -1216,8 +1219,31 @@ const RestrictionEditor = {
 
         // ── "Inherited" section ───────────────────────────────
         const inherited  = cls ? this._computeInherited(cls) : [];
+
+        // Order source classes: DFS traversal gives closest-parent-first → reverse = highest-ancestor-first
+        const _srcOrder = [];
+        const _srcSeen  = new Set();
+        inherited.forEach(r => {
+            if (r._fromClass && !_srcSeen.has(r._fromClass)) {
+                _srcSeen.add(r._fromClass);
+                _srcOrder.push(r._fromClass);
+            }
+        });
+        _srcOrder.reverse();
+
+        // Group by (sourceClass → property)
+        const _bySource = {};
+        inherited.forEach(r => {
+            if (!r._fromClass) return;
+            if (!_bySource[r._fromClass]) _bySource[r._fromClass] = {};
+            const prop = r.property || r._marker;
+            if (!prop) return;
+            if (!_bySource[r._fromClass][prop]) _bySource[r._fromClass][prop] = [];
+            _bySource[r._fromClass][prop].push(r);
+        });
+
+        const inhPropIds = [...new Set(inherited.map(r => r.property || r._marker).filter(Boolean))];
         const inhGroups  = this._group(inherited);
-        const inhPropIds = Object.keys(inhGroups).sort(alpha);
 
         const toggleFn = `const b=this.nextElementSibling;const t=this.querySelector('.restr-stoggle');const o=b.style.display!=='none';b.style.display=o?'none':'';t.style.transform=o?'rotate(0deg)':'rotate(90deg)'`;
 
@@ -1232,8 +1258,14 @@ const RestrictionEditor = {
             </div>
             <div class="restr-section-body">
                 <div class="restr-tree">
-                ${inhPropIds.length
-                    ? inhPropIds.map(p => this._renderGroupReadOnly(p, inhGroups[p])).join('')
+                ${_srcOrder.length
+                    ? _srcOrder.map((srcCls, i) => {
+                        const propMap = _bySource[srcCls] || {};
+                        const props   = Object.keys(propMap).sort(alpha);
+                        const rows    = props.map(p => this._renderGroupReadOnly(p, propMap[p])).join('');
+                        const sep     = i > 0 ? '<div class="inh-class-sep"></div>' : '';
+                        return sep + rows;
+                    }).join('')
                     : '<div class="cls-list-empty" style="padding:4px 8px;font-size:11px;font-style:italic">—</div>'}
                 </div>
             </div>
@@ -1306,7 +1338,17 @@ const RestrictionEditor = {
         // Source tag — shown in the header, not in child rows
         const fromClasses = [...new Set(restrictions.map(r => r._fromClass).filter(Boolean))];
         const fromTag = fromClasses.length
-            ? `<span class="restr-prop-summary">(↑ ${fromClasses.join(', ')})</span>`
+            ? `<span class="restr-prop-summary" style="display:inline-flex;align-items:center;gap:4px;flex-wrap:wrap">
+                <span style="opacity:.7">(↑</span>${fromClasses.map(fc => `
+                <span style="display:inline-flex;align-items:center;gap:3px">
+                    <span class="cls-dot" style="flex-shrink:0;width:8px;height:8px"></span>
+                    <span class="restr-from-nav" style="color:var(--text-dim)"
+                          onclick="ClassEditor._expandAncestors('${fc}');ClassEditor._selectedId='${fc}';ClassEditor._owlThingSelected=false;APP.renderSection('classes');setTimeout(()=>ClassEditor.restoreSelection(),50)"
+                          onmouseover="this.style.color='var(--accent,#5f8dd3)';this.style.textDecoration='underline'"
+                          onmouseout="this.style.color='var(--text-dim)';this.style.textDecoration=''">${fc}</span>
+                </span>`).join('<span style="opacity:.5">,</span>')}
+                <span style="opacity:.7">)</span>
+               </span>`
             : '';
 
         // Read-only child rows — without ↑ tag (already in the header)
@@ -2139,7 +2181,10 @@ const OPEditor = {
                     : `<span class="tree-leaf">◦</span>`}
                 <span class="op-prop-dot tree-op-dot"></span>
                 <span class="tree-label">${id}</span>
-                ${prop.inverseOf ? `<span class="op-inverse-tag">↔ ${prop.inverseOf}</span>` : ''}
+                ${prop.inverseOf ? `<span class="op-inverse-tag">(↔&thinsp;<span class="op-prop-dot" style="width:9px;height:6px;flex-shrink:0;display:inline-block;vertical-align:middle"></span>&thinsp;<span class="op-inv-nav"
+                      onclick="event.stopPropagation();APP.navigateTo('object-properties','${prop.inverseOf}')"
+                      onmouseover="this.style.color='var(--accent)';this.style.textDecoration='underline'"
+                      onmouseout="this.style.color='';this.style.textDecoration='';">${prop.inverseOf}</span>)</span>` : ''}
             </div>
             <div id="op-tcn-${id}" style="display:${isOpen ? 'block' : 'none'}">
                 ${children.map(cid => this._renderNode(cid, childrenOf, depth + 1)).join('')}
@@ -3504,6 +3549,7 @@ const IndividualEditor = {
     _selectedIndId:     null,   // last selected individual (col 3 form)
     _selectedIndIds:    new Set(), // all selected individuals (multi-selection)
     _anchorIndId:       null,   // point d'ancrage pour Shift+Click
+    _expandedClasses:   new Set(), // IDs des classes dépliées dans le CLASS HIERARCHY
     _displayProps:      {},     // classId → propId  (simple rule)
     _displayPropsMulti: {},     // classId → [{sep, propId}, ...]  (composite rule)
 
@@ -3550,26 +3596,73 @@ const IndividualEditor = {
         </div>`;
     },
 
+    /** Menu contextuel sur un nœud de la hiérarchie de classes (onglet Individuals) */
+    _showClassContextMenu(event, id) {
+        event.preventDefault();
+        event.stopPropagation();
+        document.getElementById('ind-cls-ctx-menu')?.remove();
+        const menu = document.createElement('div');
+        menu.id = 'ind-cls-ctx-menu';
+        menu.className = 'ctx-menu';
+        menu.style.left = event.clientX + 'px';
+        menu.style.top  = event.clientY + 'px';
+        menu.innerHTML = `
+            <div class="ctx-item" onclick="
+                document.getElementById('ind-cls-ctx-menu')?.remove();
+                ClassEditor._expandAncestors('${id}');
+                ClassEditor._selectedId = '${id}';
+                ClassEditor._owlThingSelected = false;
+                APP.renderSection('classes');
+                setTimeout(() => ClassEditor.restoreSelection(), 50)">
+                <span class="cls-dot" style="display:inline-block;vertical-align:middle;margin-right:4px"></span> Go to Classes Tab
+            </div>`;
+        document.body.appendChild(menu);
+        requestAnimationFrame(() => {
+            const r = menu.getBoundingClientRect();
+            if (r.right  > window.innerWidth)  menu.style.left = (event.clientX - r.width)  + 'px';
+            if (r.bottom > window.innerHeight)  menu.style.top  = (event.clientY - r.height) + 'px';
+        });
+        const close = (e) => {
+            if (!menu.contains(e.target)) {
+                document.getElementById('ind-cls-ctx-menu')?.remove();
+                document.removeEventListener('click', close, true);
+            }
+        };
+        setTimeout(() => document.addEventListener('click', close, true), 0);
+    },
+
+    /** Déplie/replie un nœud de la hiérarchie de classes */
+    toggleClassExpand(id) {
+        if (this._expandedClasses.has(id)) this._expandedClasses.delete(id);
+        else                               this._expandedClasses.add(id);
+        const classTree = document.getElementById('ind-class-tree');
+        if (classTree) classTree.innerHTML = this._renderClassTree(APP.state.individuals);
+    },
+
+    /** Déplie tous les ancêtres d'une classe pour la rendre visible dans l'arbre.
+     *  Logique : cls.subClassOf = [parentId, ...] → expand parentId puis remonter */
+    _expandClassAncestors(classId) {
+        const classes = APP.state.classes || [];
+        const cls = classes.find(c => c.id === classId);
+        if (!cls) return;
+        (cls.subClassOf || [])
+            .filter(s => typeof s === 'string')
+            .forEach(parentId => {
+                this._expandedClasses.add(parentId);   // déplie le parent pour que classId soit visible
+                this._expandClassAncestors(parentId);  // remonte récursivement
+            });
+    },
+
     _renderClassTree(individuals) {
         const classes = APP.state.classes || [];
         const inds    = individuals || APP.state.individuals || [];
         const sel     = this._selectedClassId;
         const { roots, childrenOf } = ClassEditor.buildTree(classes);
-        const lines   = [];
 
-        const dropAttrs = (clsId) => clsId === 'owl:Thing' ? '' :
+        const dropAttrs = (clsId) =>
             `ondragover="IndividualEditor._onClassDragOver(event,this)"
              ondragleave="IndividualEditor._onClassDragLeave(this)"
              ondrop="IndividualEditor._onClassDrop(event,this,'${clsId}')"`;
-
-        // owl:Thing → all individuals
-        lines.push(`<div class="tree-item${sel === null ? ' selected' : ''}" data-id="owl:Thing"
-            style="padding-left:6px" onclick="IndividualEditor.selectClass(null)">
-            <span class="tree-leaf">◦</span>
-            <span class="cls-dot tree-thing-dot"></span>
-            <span class="tree-label" style="font-style:italic">owl:Thing</span>
-            <span class="nav-count" style="margin-left:auto;margin-right:6px">${inds.length}</span>
-        </div>`);
 
         // Recursive collection of all sub-classes of a node (including itself)
         const allDescendants = (id) => {
@@ -3577,32 +3670,56 @@ const IndividualEditor = {
             const queue = [...(childrenOf[id] || [])];
             while (queue.length) {
                 const c = queue.shift();
-                if (!set.has(c)) {
-                    set.add(c);
-                    (childrenOf[c] || []).forEach(gc => queue.push(gc));
-                }
+                if (!set.has(c)) { set.add(c); (childrenOf[c] || []).forEach(gc => queue.push(gc)); }
             }
             return set;
         };
 
-        const visit = (id, depth) => {
-            const pl   = depth * 16 + 6;
-            const desc = allDescendants(id);
-            // Transitive count: individual whose at least 1 type is in the descendant set
-            const count = inds.filter(x => (x.types || []).some(t => desc.has(t))).length;
-            lines.push(`<div class="tree-item${id === sel ? ' selected' : ''}" data-id="${id}"
-                style="padding-left:${pl}px" onclick="IndividualEditor.selectClass('${id}')"
-                ${dropAttrs(id)}>
-                <span class="tree-leaf">◦</span>
-                <span class="cls-dot tree-cls-dot"></span>
-                <span class="tree-label">${id}</span>
-                ${count ? `<span class="nav-count" style="margin-left:auto;margin-right:6px">${count}</span>` : ''}
-            </div>`);
-            (childrenOf[id] || []).forEach(child => visit(child, depth + 1));
-        };
-        roots.forEach(id => visit(id, 1));
+        const renderNode = (id, depth) => {
+            const pl         = depth * 16 + 6;
+            const children   = childrenOf[id] || [];
+            const hasChildren = children.length > 0;
+            const isOpen     = this._expandedClasses.has(id);
+            const desc       = allDescendants(id);
+            const count      = inds.filter(x => (x.types || []).some(t => desc.has(t))).length;
 
-        return lines.join('') || '<div class="cls-list-empty">No classes defined</div>';
+            const toggle = hasChildren
+                ? `<span class="tree-toggle${isOpen ? ' open' : ''}"
+                         onclick="event.stopPropagation();IndividualEditor.toggleClassExpand('${id}')">▶</span>`
+                : `<span class="tree-leaf">◦</span>`;
+
+            const childrenHtml = (hasChildren && isOpen)
+                ? `<div>${children.map(c => renderNode(c, depth + 1)).join('')}</div>`
+                : '';
+
+            return `<div class="tree-root-node">
+                <div class="tree-item${id === sel ? ' selected' : ''}" data-id="${id}"
+                     style="padding-left:${pl}px"
+                     onclick="IndividualEditor.selectClass('${id}')"
+                     oncontextmenu="IndividualEditor._showClassContextMenu(event,'${id}')"
+                     ${dropAttrs(id)}>
+                    ${toggle}
+                    <span class="cls-dot tree-cls-dot"></span>
+                    <span class="tree-label">${id}</span>
+                    ${count ? `<span class="nav-count" style="margin-left:auto;margin-right:6px">${count}</span>` : ''}
+                </div>
+                ${childrenHtml}
+            </div>`;
+        };
+
+        // owl:Thing header
+        const thingHtml = `<div class="tree-item${sel === null ? ' selected' : ''}" data-id="owl:Thing"
+            style="padding-left:6px" onclick="IndividualEditor.selectClass(null)">
+            <span class="tree-toggle open" style="cursor:default">▶</span>
+            <span class="cls-dot tree-thing-dot"></span>
+            <span class="tree-label" style="font-style:italic">owl:Thing</span>
+            <span class="nav-count" style="margin-left:auto;margin-right:6px">${inds.length}</span>
+        </div>`;
+
+        const treeHtml = roots.map(id => renderNode(id, 1)).join('');
+        return treeHtml
+            ? thingHtml + treeHtml
+            : '<div class="cls-list-empty">No classes defined</div>';
     },
 
     _renderIndList(individuals) {
@@ -3727,11 +3844,11 @@ const IndividualEditor = {
         this._selectedIndId   = null;
         this._selectedIndIds.clear();
         this._anchorIndId     = null;
-        // Col 1 — highlighting
-        document.querySelectorAll('#ind-class-tree .tree-item').forEach(el => {
-            const match = classId === null ? el.dataset.id === 'owl:Thing' : el.dataset.id === classId;
-            el.classList.toggle('selected', match);
-        });
+        // Auto-expand les ancêtres pour rendre la classe visible
+        if (classId) this._expandClassAncestors(classId);
+        // Col 1 — re-rendu de l'arbre (structure tree-root-node avec collapse)
+        const classTree = document.getElementById('ind-class-tree');
+        if (classTree) classTree.innerHTML = this._renderClassTree(APP.state.individuals);
         // Col 2 — title + list
         const title = document.getElementById('ind-list-title');
         if (title) title.textContent = classId || 'All Individuals';
