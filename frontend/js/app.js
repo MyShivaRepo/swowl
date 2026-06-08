@@ -2337,6 +2337,13 @@ APP._initKnowledgeBase = function() {
         });
     });
 
+    // Détecter les paires bidirectionnelles et assigner une courbure
+    const pairSet = new Set(links.map(l => `${l.source}__${l.target}`));
+    links.forEach(l => {
+        l.bidir = pairSet.has(`${l.target}__${l.source}`);
+        l.curve = l.bidir ? 40 : 0;  // offset perpendiculaire en px
+    });
+
     APP._kbData = { nodes, links };
 
     // ── Legend ────────────────────────────────────────────────
@@ -2378,9 +2385,23 @@ APP._initKnowledgeBase = function() {
     const labelG = zoomG.append('g').attr('class','kb-edge-labels');
     const nodeG  = zoomG.append('g').attr('class','kb-nodes');
 
-    // ── Render links ──────────────────────────────────────────
-    const linkEls = linkG.selectAll('line').data(links, d => d.id).enter()
-        .append('line')
+    // ── Helper : calcule le point de contrôle de l'arc ───────
+    const arcCtrl = (sx, sy, tx, ty, curve) => {
+        const mx = (sx + tx) / 2, my = (sy + ty) / 2;
+        const dx = tx - sx,       dy = ty - sy;
+        const len = Math.sqrt(dx*dx + dy*dy) || 1;
+        return { cx: mx - dy/len*curve, cy: my + dx/len*curve };
+    };
+    const arcPath = (sx, sy, tx, ty, curve) => {
+        if (!curve) return `M${sx},${sy}L${tx},${ty}`;
+        const { cx, cy } = arcCtrl(sx, sy, tx, ty, curve);
+        return `M${sx},${sy}Q${cx},${cy} ${tx},${ty}`;
+    };
+
+    // ── Render links (path au lieu de line) ───────────────────
+    const linkEls = linkG.selectAll('path').data(links, d => d.id).enter()
+        .append('path')
+        .attr('fill','none')
         .attr('stroke','#2a3a55').attr('stroke-width',1.5)
         .attr('marker-end','url(#kb-arrow)');
 
@@ -2487,12 +2508,17 @@ APP._initKnowledgeBase = function() {
         .force('center', d3.forceCenter(W/2, H/2).strength(0.05))
         .force('collision', d3.forceCollide(28))
         .on('tick', () => {
-            linkEls
-                .attr('x1', d => d.source.x).attr('y1', d => d.source.y)
-                .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
-            edgeLabelEls
-                .attr('x', d => (d.source.x + d.target.x) / 2)
-                .attr('y', d => (d.source.y + d.target.y) / 2 - 4);
+            linkEls.attr('d', d => arcPath(d.source.x, d.source.y, d.target.x, d.target.y, d.curve));
+            edgeLabelEls.each(function(d) {
+                const sx = d.source.x, sy = d.source.y, tx = d.target.x, ty = d.target.y;
+                if (d.curve) {
+                    // Positionner le label au point de contrôle (milieu de l'arc)
+                    const { cx, cy } = arcCtrl(sx, sy, tx, ty, d.curve);
+                    d3.select(this).attr('x', (sx+tx)/2*0.25 + cx*0.75).attr('y', (sy+ty)/2*0.25 + cy*0.75 - 3);
+                } else {
+                    d3.select(this).attr('x', (sx+tx)/2).attr('y', (sy+ty)/2 - 4);
+                }
+            });
             nodeEls.attr('transform', d => `translate(${d.x},${d.y})`);
         });
 
