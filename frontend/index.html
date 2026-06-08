@@ -21,7 +21,7 @@
       <svg class="global-search-ico" width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
         <circle cx="5.5" cy="5.5" r="4.5"/><line x1="9.5" y1="9.5" x2="12" y2="12"/>
       </svg>
-      <input id="global-search-input" type="text" placeholder="Search classes, properties, individuals…"
+      <input id="global-search-input" type="text" placeholder="Search classes, properties, individuals, rules &amp; queries"
              autocomplete="off" spellcheck="false"
              oninput="GlobalSearch.onInput(this.value)"
              onkeydown="GlobalSearch.onKey(event)"
@@ -54,30 +54,30 @@
     </div>
     <div class="nav-item" data-section="annotation-properties" onclick="APP.navigate('annotation-properties')">
       <span class="anno-prop-dot"></span> AnnotationProperties <span class="nav-count" id="nc-annos">0</span>
-      <span class="tab-hide-btn" onclick="event.stopPropagation();TabVisibility.hide('annotation-properties')" title="Masquer cet onglet">✕</span>
+      <span class="tab-hide-btn" onclick="event.stopPropagation();TabVisibility.hide('annotation-properties')" title="Hide this tab">✕</span>
     </div>
     <div class="nav-item" data-section="individuals" onclick="APP.navigate('individuals')">
       <span class="xsd-dot" style="margin:0"></span> Individuals <span class="nav-count" id="nc-inds">0</span>
-      <span class="tab-hide-btn" onclick="event.stopPropagation();TabVisibility.hide('individuals')" title="Masquer cet onglet">✕</span>
+      <span class="tab-hide-btn" onclick="event.stopPropagation();TabVisibility.hide('individuals')" title="Hide this tab">✕</span>
     </div>
 
     <span class="tab-sep"></span>
 
     <div class="nav-item" data-section="swrl-rules" onclick="APP.navigate('swrl-rules')">
       ⚙️ SWRL Rules <span class="nav-count" id="nc-swrl">0</span>
-      <span class="tab-hide-btn" onclick="event.stopPropagation();TabVisibility.hide('swrl-rules')" title="Masquer cet onglet">✕</span>
-    </div>
-    <div class="nav-item" data-section="views" onclick="APP.navigate('views')">
-      <svg width="14" height="10" viewBox="0 0 14 10" fill="none" style="vertical-align:middle;margin-right:3px"><ellipse cx="7" cy="5" rx="6.5" ry="4.5" stroke="currentColor" stroke-width="1.2"/><circle cx="7" cy="5" r="2" fill="currentColor"/></svg> Views
-      <span class="tab-hide-btn" onclick="event.stopPropagation();TabVisibility.hide('views')" title="Masquer cet onglet">✕</span>
+      <span class="tab-hide-btn" onclick="event.stopPropagation();TabVisibility.hide('swrl-rules')" title="Hide this tab">✕</span>
     </div>
     <div class="nav-item" data-section="queries" onclick="APP.navigate('queries')">
       🔎 Queries
-      <span class="tab-hide-btn" onclick="event.stopPropagation();TabVisibility.hide('queries')" title="Masquer cet onglet">✕</span>
+      <span class="tab-hide-btn" onclick="event.stopPropagation();TabVisibility.hide('queries')" title="Hide this tab">✕</span>
+    </div>
+    <div class="nav-item" data-section="views" onclick="APP.navigate('views')">
+      <svg width="14" height="10" viewBox="0 0 14 10" fill="none" style="vertical-align:middle;margin-right:3px"><ellipse cx="7" cy="5" rx="6.5" ry="4.5" stroke="currentColor" stroke-width="1.2"/><circle cx="7" cy="5" r="2" fill="currentColor"/></svg> Views
+      <span class="tab-hide-btn" onclick="event.stopPropagation();TabVisibility.hide('views')" title="Hide this tab">✕</span>
     </div>
     <div class="nav-item" data-section="inferences" onclick="APP.navigate('inferences')">
       🧠 Inferences
-      <span class="tab-hide-btn" onclick="event.stopPropagation();TabVisibility.hide('inferences')" title="Masquer cet onglet">✕</span>
+      <span class="tab-hide-btn" onclick="event.stopPropagation();TabVisibility.hide('inferences')" title="Hide this tab">✕</span>
     </div>
   </nav>
 
@@ -99,7 +99,7 @@
 
 </div>
 
-<!-- ── D3.js (hyperbolic tree view) ── -->
+<!-- ── D3.js v7 (hyperbolic tree + treemap + knowledge base graph) ── -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
 
 <!-- ── Sparnatural (visual SPARQL query builder — v12.2.1 local) ── -->
@@ -107,12 +107,12 @@
 <script src="/js/sparnatural.js"></script>
 
 <!-- ── Scripts ── -->
-<script src="/js/api.js?v=62"></script>
-<script src="/js/owl_editor.js?v=62"></script>
-<script src="/js/swrl_editor.js?v=62"></script>
-<script src="/js/sparql_editor.js?v=62"></script>
-<script src="/js/inference_ui.js?v=62"></script>
-<script src="/js/app.js?v=62"></script>
+<script src="/js/api.js?v=88"></script>
+<script src="/js/owl_editor.js?v=88"></script>
+<script src="/js/swrl_editor.js?v=88"></script>
+<script src="/js/sparql_editor.js?v=88"></script>
+<script src="/js/inference_ui.js?v=88"></script>
+<script src="/js/app.js?v=88"></script>
 
 <script>
 // Update navigation counters

@@ -7,6 +7,7 @@
   --border:   #2a3347;
   --border2:  #3a4a62;
   --text:     #dde4f0;
+  --text1:    #dde4f0;
   --text-dim: #7a8baa;
   --text-faint:#3d4f6a;
   --accent:   #3b82f6;
@@ -115,12 +116,26 @@ body {
   max-height: 380px;
   overflow-y: auto;
 }
+.gs-super-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  color: var(--accent, #5f8dd3);
+  padding: 8px 12px 3px;
+  text-transform: uppercase;
+  border-top: 1px solid var(--border, rgba(255,255,255,.08));
+  margin-top: 2px;
+}
+.gs-super-label:first-child {
+  border-top: none;
+  margin-top: 0;
+}
 .gs-group-label {
   font-size: 10px;
   font-weight: 700;
   letter-spacing: .06em;
   color: var(--text-faint);
-  padding: 8px 12px 4px;
+  padding: 4px 20px 2px;
   text-transform: uppercase;
 }
 .gs-item {
@@ -951,7 +966,7 @@ body.h-resizing * {
 }
 .cls-list-item:hover { background: var(--bg3); }
 .cls-dot {
-  width: 11px; height: 11px;
+  width: 12px; height: 12px;
   border-radius: 50%;
   background: #b87333;
   flex-shrink: 0;
@@ -975,7 +990,7 @@ body.h-resizing * {
   flex-shrink: 0;
 }
 /* alignment placeholder when no class (same size as cls-dot) */
-.restr-filler-ph { width: 11px; height: 11px; display: inline-block; flex-shrink: 0; }
+.restr-filler-ph { width: 12px; height: 12px; display: inline-block; flex-shrink: 0; }
 .cls-list-lbl { flex: 1; cursor: pointer; }
 .cls-list-lbl:hover { color: var(--accent); text-decoration: underline; }
 .cls-list-empty { font-size: 11px; color: var(--text-dim); font-style: italic; padding: 3px 4px; }
@@ -1032,6 +1047,23 @@ body.h-resizing * {
   padding: 1px 4px; font-size: 11px;
 }
 .restr-child-icon { color: #b87333; font-size: 11px; flex-shrink: 0; }
+
+/* ── Restriction type icons (Protégé-style) ─────────────────── */
+.restr-icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 12px; height: 12px;
+  border-radius: 50%;
+  background: #b87333; color: #fff;
+  font-size: 8px; font-weight: 700; font-style: normal;
+  flex-shrink: 0; line-height: 1;
+  font-family: serif;
+}
+.restr-icon-some,
+.restr-icon-all,
+.restr-icon-has,
+.restr-icon-exact,
+.restr-icon-min,
+.restr-icon-max   { /* all share the base .restr-icon style */ }
 .restr-type-sel { font-size: 10px; padding: 1px 2px; max-width: 130px; }
 /* widget custom filler */
 .restr-filler-wrap { flex: 1; min-width: 0; position: relative; }

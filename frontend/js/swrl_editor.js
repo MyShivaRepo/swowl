@@ -137,7 +137,8 @@ const SWRLEditor = {
             return `
             <div class="tree-item${r.id === sel ? ' selected' : ''}" data-id="${r.id}"
                  style="align-items:center${broken ? ';color:var(--red,#ef4444)' : ''}"
-                 onclick="SWRLEditor.selectRule('${r.id}')">
+                 onclick="SWRLEditor.selectRule('${r.id}')"
+                 oncontextmenu="event.preventDefault();SWRLEditor.showContextMenu(event,'${r.id}')">
                 <span style="font-size:13px;flex-shrink:0;line-height:1;${broken ? 'color:var(--red,#ef4444)' : 'color:var(--text-dim)'}">⚙️</span>
                 <span style="flex:1;overflow:hidden;min-width:0">
                     <span class="tree-label" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block${broken ? ';color:var(--red,#ef4444)' : ''}">${mainText}</span>
@@ -153,14 +154,15 @@ const SWRLEditor = {
     restoreSelection() {
         this._initSplitHandle();
         if (this._selectedId) {
-            this.selectRule(this._selectedId);
+            this.selectRule(this._selectedId, false);
         }
     },
 
     // ── Selection / creation ─────────────────────────────────────
-    selectRule(id) {
+    selectRule(id, _hist = true) {
         const rule = (APP.state.swrl_rules || []).find(r => r.id === id);
         if (!rule) return;
+        if (_hist) APP._pushNav('swrl-rules', id);
         this._selectedId  = id;
         this._editingId   = id;
         this._isNew       = false;
@@ -1005,5 +1007,36 @@ const SWRLEditor = {
         document.addEventListener('mouseup', () => {
             if (dragging) { dragging = false; document.body.classList.remove('resizing'); }
         });
+    },
+
+    // ── Menu contextuel (clic droit sur une règle) ────────────
+    showContextMenu(event, id) {
+        this._closeContextMenu();
+        if (this._selectedId !== id) this.selectRule(id);
+        const menu = document.createElement('div');
+        menu.id = 'swrl-ctx-menu';
+        menu.className = 'ctx-menu';
+        menu.innerHTML = `
+            <div class="ctx-item ctx-danger" onclick="SWRLEditor._closeContextMenu();SWRLEditor.delete('${id}')">
+                ${ClassEditor._svgDelete} Delete Rule</div>`;
+        menu.style.left = event.clientX + 'px';
+        menu.style.top  = event.clientY + 'px';
+        document.body.appendChild(menu);
+        requestAnimationFrame(() => {
+            const r = menu.getBoundingClientRect();
+            if (r.right  > window.innerWidth)  menu.style.left = (event.clientX - r.width)  + 'px';
+            if (r.bottom > window.innerHeight)  menu.style.top  = (event.clientY - r.height) + 'px';
+        });
+        const close = (e) => {
+            if (!menu.contains(e.target)) {
+                this._closeContextMenu();
+                document.removeEventListener('click', close, true);
+            }
+        };
+        setTimeout(() => document.addEventListener('click', close, true), 0);
+    },
+
+    _closeContextMenu() {
+        document.getElementById('swrl-ctx-menu')?.remove();
     },
 };

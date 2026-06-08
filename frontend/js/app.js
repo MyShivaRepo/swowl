@@ -204,14 +204,17 @@ const APP = {
     _importFilePath: null,   // path to the OWL file to import
 
     // ── Navigation history ─────────────────────────────────
-    _navHistory: [],     // past states (max 50)
-    _navFuture:  [],     // future states (► button)
+    // Stack interne : tableau d'entrées {section, entityId} + curseur.
+    // Indépendant de window.history — robuste, prévisible.
+    _navStack:  [],   // [{section, entityId}, ...]
+    _navCursor: -1,   // index de l'entrée courante
 
     async init() {
         try {
             await this.loadState();
             this.renderNav();
             this.renderSection(this.currentSection);
+            this._updateNavButtons();
             InferenceUI.startAutoRefresh(4000);
         } catch (e) {
             this.renderSection('ontologies');
@@ -255,96 +258,50 @@ const APP = {
         APP._applyTabVisibility();
     },
 
-    // ── History management ──────────────────────────────────────
+    // ── History management (stack interne) ─────────────────────
 
-    /** Returns the current state {section, entityId} */
-    _currentState() {
-        switch (this.currentSection) {
-            case 'classes':
-                return { section: 'classes', entityId: ClassEditor._selectedId };
-            case 'object-properties':
-                return { section: 'object-properties', entityId: OPEditor._selectedId };
-            case 'datatype-properties':
-                return { section: 'datatype-properties', entityId: DPEditor._selectedId };
-            case 'individuals':
-                return { section: 'individuals', entityId: IndividualEditor._selectedIndId };
-            default:
-                return { section: this.currentSection, entityId: null };
-        }
-    },
+    /** Flag : true pendant une restauration — empêche les select* de pousser */
+    _historyRestoring: false,
 
-    /** Pushes the current state onto the history stack (max 50) and clears the future */
-    _pushHistory() {
-        const cur = this._currentState();
-        this._navHistory.push(cur);
-        if (this._navHistory.length > 50) this._navHistory.shift();
-        this._navFuture = [];
+    /** Pousse une entrée dans le stack — uniquement si entityId est renseigné */
+    _pushNav(section, entityId) {
+        if (this._historyRestoring) return;
+        if (!entityId) return;                                   // on n'enregistre que les entités réelles
+        // Tronque le futur
+        this._navStack  = this._navStack.slice(0, this._navCursor + 1);
+        // Dédoublonnage : ne pas pousser si identique à l'entrée courante
+        const cur = this._navStack[this._navCursor];
+        if (cur && cur.section === section && cur.entityId === entityId) return;
+        this._navStack.push({ section, entityId });
+        this._navCursor = this._navStack.length - 1;
+        if (this._navStack.length > 100) { this._navStack.shift(); this._navCursor--; }
         this._updateNavButtons();
     },
 
-    /** Enables/disables the ◀ ► buttons */
+    /** Retourne l'état courant selon les sélections actives */
+    _currentState() {
+        switch (this.currentSection) {
+            case 'classes':             return { section: 'classes',             entityId: ClassEditor._selectedId       || null };
+            case 'object-properties':   return { section: 'object-properties',   entityId: OPEditor._selectedId          || null };
+            case 'datatype-properties': return { section: 'datatype-properties', entityId: DPEditor._selectedId          || null };
+            case 'annotation-properties': return { section: 'annotation-properties', entityId: APEditor._selectedId     || null };
+            case 'individuals':         return { section: 'individuals',         entityId: IndividualEditor._selectedIndId || null };
+            case 'swrl-rules':          return { section: 'swrl-rules',          entityId: SWRLEditor._selectedId        || null };
+            default:                    return { section: this.currentSection,    entityId: null };
+        }
+    },
+
+    /** Active/désactive les boutons ◀ ► */
     _updateNavButtons() {
         const back = document.getElementById('nav-back');
         const fwd  = document.getElementById('nav-fwd');
-        if (back) back.disabled = this._navHistory.length === 0;
-        if (fwd)  fwd.disabled  = this._navFuture.length  === 0;
+        if (back) back.disabled = (this._navCursor <= 0);
+        if (fwd)  fwd.disabled  = (this._navCursor >= this._navStack.length - 1);
     },
 
-    /** Restores a state {section, entityId} without pushing to history */
-    _restoreState(state) {
-        if (state.entityId) {
-            switch (state.section) {
-                case 'classes':
-                    ClassEditor._selectedId       = state.entityId;
-                    ClassEditor._owlThingSelected = false;
-                    ClassEditor._expandAncestors(state.entityId);
-                    break;
-                case 'object-properties':
-                    OPEditor._selectedId      = state.entityId;
-                    OPEditor._topPropSelected = false;
-                    OPEditor._expandAncestors(state.entityId);
-                    break;
-                case 'datatype-properties':
-                    DPEditor._selectedId      = state.entityId;
-                    DPEditor._topPropSelected = false;
-                    DPEditor._expandAncestors(state.entityId);
-                    break;
-            }
-        }
-        this.renderSection(state.section);
-        if (state.section === 'individuals' && state.entityId) {
-            IndividualEditor.selectIndividual(state.entityId);
-        }
-        this._updateNavButtons();
-    },
-
-    /** Entry point for all tab changes initiated by the user */
-    navigate(section) {
-        this._pushHistory();
-        this.renderSection(section);
-    },
-
-    /** Go back */
-    navigateBack() {
-        if (!this._navHistory.length) return;
-        this._navFuture.push(this._currentState());
-        const prev = this._navHistory.pop();
-        this._restoreState(prev);
-    },
-
-    /** Go forward */
-    navigateForward() {
-        if (!this._navFuture.length) return;
-        this._navHistory.push(this._currentState());
-        const next = this._navFuture.pop();
-        this._restoreState(next);
-    },
-
-    /** Cross-navigation: switches to section tab and selects entity entityId */
-    navigateTo(section, entityId) {
-        // Push current state onto history
-        this._pushHistory();
-        // Pre-position the selection so that restoreSelection() benefits from it
+    /** Positionne les éditeurs sur section+entityId sans rendre ni pousser */
+    _applyEntityId(section, entityId) {
+        if (!entityId) return;
         switch (section) {
             case 'classes':
                 ClassEditor._selectedId       = entityId;
@@ -352,40 +309,85 @@ const APP = {
                 ClassEditor._expandAncestors(entityId);
                 break;
             case 'object-properties':
-                OPEditor._selectedId       = entityId;
-                OPEditor._topPropSelected  = false;
+                OPEditor._selectedId      = entityId;
+                OPEditor._topPropSelected = false;
                 OPEditor._expandAncestors(entityId);
                 break;
             case 'datatype-properties':
-                DPEditor._selectedId       = entityId;
-                DPEditor._topPropSelected  = false;
+                DPEditor._selectedId      = entityId;
+                DPEditor._topPropSelected = false;
                 DPEditor._expandAncestors(entityId);
                 break;
+            case 'annotation-properties':
+                APEditor._selectedId = entityId;
+                APEditor._expanded.add(entityId);
+                break;
+            case 'swrl-rules':
+                SWRLEditor._selectedId = entityId;
+                break;
             case 'individuals': {
-                // Update _selectedClassId with the target individual's type
                 const targetInd = (APP.state.individuals || []).find(x => x.id === entityId);
-                if (targetInd?.types?.length > 0) {
-                    IndividualEditor._selectedClassId = targetInd.types[0];
-                }
+                if (targetInd?.types?.length > 0) IndividualEditor._selectedClassId = targetInd.types[0];
                 IndividualEditor._selectedIndId = entityId;
                 break;
             }
         }
-        if (section === 'swrl-rules' && entityId) {
-            SWRLEditor._selectedId = entityId;
+    },
+
+    /** Restaure un état depuis le stack — ne pousse pas */
+    _restoreState(state) {
+        if (!state?.section) return;
+        this._historyRestoring = true;
+        this._applyEntityId(state.section, state.entityId);
+        this.renderSection(state.section);
+        if (state.section === 'individuals' && state.entityId) {
+            IndividualEditor.selectIndividual(state.entityId, false, false);
         }
-        if (section === 'annotation-properties' && entityId) {
-            APEditor._selectedId = entityId;
-            APEditor._expanded.add(entityId);
-            const allBuiltins = [...(Object.values(AP_BUILTINS || {}).flat())].map(p => p.id);
-            if (allBuiltins.includes(entityId)) {
-                APEditor._expanded.add(entityId.startsWith('rdfs:') ? 'rdfs:' : 'owl:');
-            }
+        this._historyRestoring = false;
+        this._updateNavButtons();
+    },
+
+    /** Renvoie l'entityId actuellement sélectionné dans une section donnée */
+    _entityForSection(section) {
+        switch (section) {
+            case 'classes':               return ClassEditor._selectedId          || null;
+            case 'object-properties':     return OPEditor._selectedId             || null;
+            case 'datatype-properties':   return DPEditor._selectedId             || null;
+            case 'annotation-properties': return APEditor._selectedId             || null;
+            case 'individuals':           return IndividualEditor._selectedIndId  || null;
+            case 'swrl-rules':            return SWRLEditor._selectedId           || null;
+            default:                      return null;
         }
+    },
+
+    /** Clic sur un onglet de la nav bar — ne pousse pas dans l'historique */
+    navigate(section) {
+        this.renderSection(section);
+    },
+
+    /** Bouton ◀ */
+    navigateBack() {
+        if (this._navCursor <= 0) return;
+        this._navCursor--;
+        this._restoreState(this._navStack[this._navCursor]);
+    },
+
+    /** Bouton ► */
+    navigateForward() {
+        if (this._navCursor >= this._navStack.length - 1) return;
+        this._navCursor++;
+        this._restoreState(this._navStack[this._navCursor]);
+    },
+
+    /** Navigation cross-onglet avec entité cible */
+    navigateTo(section, entityId) {
+        this._pushNav(section, entityId);
+        this._applyEntityId(section, entityId);
         this.renderSection(section);
         if (section === 'individuals') {
-            IndividualEditor.selectIndividual(entityId);
+            IndividualEditor.selectIndividual(entityId, false, false);
         }
+        this._updateNavButtons();
     },
 
     _noOntoMsg() {
@@ -397,8 +399,34 @@ const APP = {
     },
 
     renderSection(section) {
+        // Nettoyer le listener de désélection des individuals si on quitte cet onglet
+        if (section !== 'individuals' && IndividualEditor._deselectListener) {
+            document.removeEventListener('mousedown', IndividualEditor._deselectListener, true);
+            IndividualEditor._deselectListener = null;
+        }
+        // Nettoyer le listener de désélection des classes si on quitte cet onglet
+        if (section !== 'classes' && ClassEditor._deselectListener) {
+            document.removeEventListener('mousedown', ClassEditor._deselectListener, true);
+            ClassEditor._deselectListener = null;
+        }
+        // Nettoyer le listener de désélection des ObjectProperties si on quitte cet onglet
+        if (section !== 'object-properties' && OPEditor._deselectListener) {
+            document.removeEventListener('mousedown', OPEditor._deselectListener, true);
+            OPEditor._deselectListener = null;
+        }
+        // Nettoyer le listener de désélection des DatatypeProperties si on quitte cet onglet
+        if (section !== 'datatype-properties' && DPEditor._deselectListener) {
+            document.removeEventListener('mousedown', DPEditor._deselectListener, true);
+            DPEditor._deselectListener = null;
+        }
+        // Nettoyer le listener de désélection des AnnotationProperties si on quitte cet onglet
+        if (section !== 'annotation-properties' && APEditor._deselectListener) {
+            document.removeEventListener('mousedown', APEditor._deselectListener, true);
+            APEditor._deselectListener = null;
+        }
         this.currentSection = section;
         this.renderNav();
+        UndoRedo._updateButtons();
         const main = document.getElementById('main-content');
 
         // Block editing tabs if no ontology is connected
@@ -441,8 +469,9 @@ const APP = {
                 break;
             case 'views':
                 main.innerHTML = APP.renderViews();
-                if (APP._viewsTab === 'ontology') setTimeout(() => APP._initHyperbolicGraph(), 80);
-                if (APP._viewsTab === 'knowledge-base') setTimeout(() => APP._initKnowledgeBase(), 80);
+                if (APP._viewsTab === 'ontology')       setTimeout(() => APP._initHyperbolicGraph(), 80);
+                if (APP._viewsTab === 'treemap')         setTimeout(() => APP._initTreemap(), 80);
+                if (APP._viewsTab === 'knowledge-base')  setTimeout(() => APP._initKnowledgeBase(), 80);
                 break;
             case 'queries':
                 main.innerHTML = APP.renderQueries();
@@ -1401,43 +1430,83 @@ window.addEventListener('DOMContentLoaded', () => {
 // ── Undo / Redo ───────────────────────────────────────────────
 
 const UndoRedo = {
-    _past:   [],   // snapshots avant mutation
-    _future: [],   // snapshots annulés
+    _past:   [],   // snapshots avant mutation  { data, section, entityId }
+    _future: [],   // snapshots annulés          { data, section, entityId }
     _MAX:    20,
+
+    // Onglets pour lesquels l'Undo/Redo est actif
+    _VALID: new Set([
+        'classes', 'object-properties', 'datatype-properties',
+        'annotation-properties', 'individuals', 'swrl-rules',
+    ]),
 
     /** Capture l'état courant avant une mutation (appelé par api.js) */
     snapshot() {
         const s = APP.state;
         if (!s.ontology) return;
-        const snap = JSON.parse(JSON.stringify({
-            classes:             s.classes             || [],
-            object_properties:   s.object_properties   || [],
-            datatype_properties: s.datatype_properties || [],
-            individuals:         s.individuals         || [],
-            swrl_rules:          s.swrl_rules          || [],
-        }));
+        const section  = APP.currentSection;
+        const entityId = this._VALID.has(section) ? (APP._entityForSection(section) || null) : null;
+        const snap = {
+            section,
+            entityId,
+            data: JSON.parse(JSON.stringify({
+                classes:               s.classes               || [],
+                object_properties:     s.object_properties     || [],
+                datatype_properties:   s.datatype_properties   || [],
+                annotation_properties: s.annotation_properties || [],
+                individuals:           s.individuals           || [],
+                swrl_rules:            s.swrl_rules            || [],
+            })),
+        };
         this._past.push(snap);
         if (this._past.length > this._MAX) this._past.shift();
         this._future = [];
         this._updateButtons();
     },
 
+    /** Construit un snapshot de l'état actuel (pour future/past) */
+    _currentSnap() {
+        const s = APP.state;
+        const section  = APP.currentSection;
+        const entityId = this._VALID.has(section) ? (APP._entityForSection(section) || null) : null;
+        return {
+            section,
+            entityId,
+            data: JSON.parse(JSON.stringify({
+                classes:               s.classes               || [],
+                object_properties:     s.object_properties     || [],
+                datatype_properties:   s.datatype_properties   || [],
+                annotation_properties: s.annotation_properties || [],
+                individuals:           s.individuals           || [],
+                swrl_rules:            s.swrl_rules            || [],
+            })),
+        };
+    },
+
+    /** Restaure un snapshot et navigue vers le bon onglet */
+    async _apply(snap) {
+        await API.restoreSnapshot(snap.data);
+        await APP.refresh();
+        // Naviguer vers l'onglet + entité du snapshot (même pattern que _restoreState)
+        if (snap.section && this._VALID.has(snap.section)) {
+            APP._historyRestoring = true;
+            APP._applyEntityId(snap.section, snap.entityId);
+            APP.renderSection(snap.section);
+            if (snap.section === 'individuals' && snap.entityId) {
+                IndividualEditor.selectIndividual(snap.entityId, false, false);
+            }
+            APP._historyRestoring = false;
+        } else {
+            APP.renderSection(APP.currentSection);
+        }
+    },
+
     async undo() {
         if (!this._past.length) return;
         const snap = this._past.pop();
-        // Sauvegarder l'état actuel dans future
-        const s = APP.state;
-        this._future.push(JSON.parse(JSON.stringify({
-            classes:             s.classes             || [],
-            object_properties:   s.object_properties   || [],
-            datatype_properties: s.datatype_properties || [],
-            individuals:         s.individuals         || [],
-            swrl_rules:          s.swrl_rules          || [],
-        })));
+        this._future.push(this._currentSnap());
         try {
-            await API.restoreSnapshot(snap);
-            await APP.refresh();
-            APP.renderSection(APP.currentSection);
+            await this._apply(snap);
             UI.success('Undo ✓');
         } catch (e) { UI.error('Undo failed: ' + e.message); }
         this._updateButtons();
@@ -1446,33 +1515,26 @@ const UndoRedo = {
     async redo() {
         if (!this._future.length) return;
         const snap = this._future.pop();
-        const s = APP.state;
-        this._past.push(JSON.parse(JSON.stringify({
-            classes:             s.classes             || [],
-            object_properties:   s.object_properties   || [],
-            datatype_properties: s.datatype_properties || [],
-            individuals:         s.individuals         || [],
-            swrl_rules:          s.swrl_rules          || [],
-        })));
+        this._past.push(this._currentSnap());
         try {
-            await API.restoreSnapshot(snap);
-            await APP.refresh();
-            APP.renderSection(APP.currentSection);
+            await this._apply(snap);
             UI.success('Redo ✓');
         } catch (e) { UI.error('Redo failed: ' + e.message); }
         this._updateButtons();
     },
 
     _updateButtons() {
+        const onValidTab = this._VALID.has(APP.currentSection);
         const u = document.getElementById('undo-btn');
         const r = document.getElementById('redo-btn');
-        if (u) u.disabled = this._past.length   === 0;
-        if (r) r.disabled = this._future.length === 0;
+        if (u) u.disabled = !onValidTab || this._past.length   === 0;
+        if (r) r.disabled = !onValidTab || this._future.length === 0;
     },
 };
 
-// Raccourcis clavier Ctrl+Z / Ctrl+Y
+// Raccourcis clavier Ctrl+Z / Ctrl+Y — actifs uniquement sur les 6 onglets valides
 document.addEventListener('keydown', e => {
+    if (!UndoRedo._VALID.has(APP.currentSection)) return;
     if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key === 'z') {
         e.preventDefault(); UndoRedo.undo();
     }
@@ -1589,6 +1651,11 @@ const GlobalSearch = {
 
         this._items = [];  // reconstruit dans l'ordre d'affichage → data-idx cohérent
 
+        // Super-sections : Partie A (User Labels) et Partie B (System IDs)
+        const _PART_A = new Set(['rdfs-labels', 'individual-names', 'swrl-labels', 'sparql-labels']);
+        const _PART_B = new Set(['classes', 'object-properties', 'datatype-properties',
+                                  'annotation-properties', 'individuals', 'swrl-rules', 'sparql-vizq']);
+
         const _row = (r, inner) => {
             const idx = this._items.length;
             this._items.push(r);
@@ -1598,33 +1665,56 @@ const GlobalSearch = {
                          onmouseover="GlobalSearch._hover(${idx})">${inner}</div>`;
         };
 
-        return Object.entries(groups).filter(([, arr]) => arr.length).map(([sec, arr]) => {
-            const rows = arr.map(r => {
+        let _superShown = { a: false, b: false };
+        const html = [];
+
+        Object.entries(groups).filter(([, arr]) => arr.length).forEach(([sec, arr]) => {
+            // En-tête de super-section (une seule fois par groupe)
+            if (_PART_A.has(sec) && !_superShown.a) {
+                html.push(`<div class="gs-super-label">🏷 User Labels</div>`);
+                _superShown.a = true;
+            } else if (_PART_B.has(sec) && !_superShown.b) {
+                html.push(`<div class="gs-super-label">🔑 System IDs</div>`);
+                _superShown.b = true;
+            }
+
+            // En-tête de sous-section
+            html.push(`<div class="gs-group-label">${sectionLabels[sec]}</div>`);
+
+            // Lignes
+            arr.forEach(r => {
+                let inner;
                 switch (sec) {
                     case 'rdfs-labels':
-                        return _row(r, `<span class="lbl-dot"></span>
+                        inner = `<span class="lbl-dot"></span>
                             <span class="gs-item-label">${r.label}</span>
                             ${this._dot(r.kind)}
-                            <span class="gs-item-sub">${r.id}</span>`);
+                            <span class="gs-item-sub">${r.id}</span>`;
+                        break;
                     case 'swrl-labels':
-                        return _row(r, `<span style="flex-shrink:0;font-size:11px">⚙️</span>
+                        inner = `<span style="flex-shrink:0;font-size:11px">⚙️</span>
                             <span class="gs-item-label">${r.label}</span>
-                            <span class="gs-item-sub">${r.id}</span>`);
+                            <span class="gs-item-sub">${r.id}</span>`;
+                        break;
                     case 'sparql-labels':
-                        return _row(r, `<span style="flex-shrink:0;font-size:11px">🎯</span>
+                        inner = `<span style="flex-shrink:0;font-size:11px">🎯</span>
                             <span class="gs-item-label">${r.label}</span>
-                            <span class="gs-item-sub">${r.id}</span>`);
+                            <span class="gs-item-sub">${r.id}</span>`;
+                        break;
                     case 'individual-names':
-                        return _row(r, `<span class="xsd-dot" style="flex-shrink:0;margin:0"></span>
+                        inner = `<span class="xsd-dot" style="flex-shrink:0;margin:0"></span>
                             <span class="gs-item-label">${r.label}</span>
-                            <span class="gs-item-sub">${r.id}</span>`);
+                            <span class="gs-item-sub">${r.id}</span>`;
+                        break;
                     default:
-                        return _row(r, `${this._dot(sec)}
-                            <span class="gs-item-label">${r.label}</span>`);
+                        inner = `${this._dot(sec)}
+                            <span class="gs-item-label">${r.label}</span>`;
                 }
-            }).join('');
-            return `<div class="gs-group-label">${sectionLabels[sec]}</div>${rows}`;
-        }).join('');
+                html.push(_row(r, inner));
+            });
+        });
+
+        return html.join('');
     },
 
     onInput(val) {
@@ -1731,7 +1821,7 @@ const GlobalSearch = {
 
 // ── Queries UI ────────────────────────────────────────────────────
 
-APP._queriesTab = APP._queriesTab || 'sparnatural';
+APP._queriesTab = APP._queriesTab || 'vizq';
 
 APP.renderQueries = function() {
     const tab = APP._queriesTab;
@@ -1754,8 +1844,8 @@ APP.renderQueries = function() {
 
     const sidebar = `
         <div style="width:160px;flex-shrink:0;border-right:1px solid var(--border);padding:8px 0">
-            ${tabBtn('sparnatural', '🔎', 'Sparnatural')}
             ${tabBtn('vizq',        '🎯', 'SPARQL VizQ')}
+            ${tabBtn('sparnatural', '🔎', 'Sparnatural')}
         </div>`;
 
     // ── Tab content ───────────────────────────────────────────────
@@ -1802,10 +1892,10 @@ APP._initSparnatural = function() {
             setTimeout(tryInit, 200);
         } else {
             wrap.innerHTML = `<p style="color:#f87171;font-size:13px">
-                ⚠ Sparnatural n'a pas pu être chargé depuis
+                ⚠ Sparnatural could not be loaded from
                 <a href="https://cdn.jsdelivr.net/npm/sparnatural@9.1.6/dist/sparnatural.js"
                    target="_blank" style="color:#60a5fa">jsdelivr.net</a> —
-                vérifiez votre connexion réseau.
+                please check your network connection.
             </p>`;
         }
     };
@@ -1849,7 +1939,7 @@ APP._doInitSparnatural = function(wrap) {
 APP._runSparqlQuery = async function(sparql) {
     const resultsDiv = document.getElementById('sparnatural-results');
     if (!resultsDiv) return;
-    resultsDiv.innerHTML = '<p style="color:var(--text-dim);font-style:italic;font-size:12px">Exécution…</p>';
+    resultsDiv.innerHTML = '<p style="color:var(--text-dim);font-style:italic;font-size:12px">Running…</p>';
     try {
         const res = await fetch('/api/sparql', {
             method: 'POST',
@@ -1869,7 +1959,7 @@ APP._renderSparqlResults = function(container, data) {
     const rows = data.results?.bindings || [];
 
     if (!vars.length) {
-        container.innerHTML = '<p style="color:var(--text-dim);font-size:12px;font-style:italic">Aucun résultat.</p>';
+        container.innerHTML = '<p style="color:var(--text-dim);font-size:12px;font-style:italic">No results.</p>';
         return;
     }
 
@@ -1893,7 +1983,7 @@ APP._renderSparqlResults = function(container, data) {
 
     container.innerHTML = `
         <div style="font-size:11px;color:var(--text-dim);margin-bottom:8px">
-            ${rows.length} résultat${rows.length > 1 ? 's' : ''}
+            ${rows.length} result${rows.length > 1 ? 's' : ''}
         </div>
         <div style="overflow-x:auto">
             <table style="width:100%;border-collapse:collapse;background:var(--bg3);border-radius:4px;overflow:hidden">
@@ -1924,23 +2014,37 @@ APP.renderViews = function() {
     const sidebar = `
         <div style="width:160px;flex-shrink:0;border-right:1px solid var(--border);padding:8px 0">
             ${tabBtn('ontology',       '🗂 Ontology')}
+            ${tabBtn('treemap',        '🟦 Treemap')}
             ${tabBtn('knowledge-base', '🧩 Knowledge Base')}
         </div>`;
 
     let tabContent = '';
-    if (tab === 'ontology') {
+    if (tab === 'treemap') {
         tabContent = `
         <div style="display:flex;flex-direction:column;height:100%">
             <div style="display:flex;align-items:center;gap:8px;padding:8px 14px;border-bottom:1px solid var(--border);flex-shrink:0;background:var(--bg2)">
-                <button class="btn-sm" onclick="APP._hypReset()" title="Reset focus to root">⟳ Reset</button>
-                <div style="position:relative;margin-left:8px">
-                    <input id="hyp-filter-input" type="text" placeholder="Filtrer les classes…"
+                <button class="btn-sm" onclick="APP._tmDrillUp()" id="tm-up-btn" disabled title="Go up one level">⬆ Up</button>
+                <span id="tm-breadcrumb" style="font-size:11px;color:var(--text-dim);margin-left:4px;font-family:var(--font-mono)">owl:Thing</span>
+                <span style="font-size:10px;color:var(--text-dim);margin-left:auto">Click → edit · Double-click → zoom</span>
+                <span id="tm-count" style="font-size:11px;color:var(--text-dim);margin-left:12px"></span>
+            </div>
+            <div id="cy-treemap" style="flex:1;min-height:0;background:#0d1117;overflow:hidden;position:relative"></div>
+        </div>`;
+    } else if (tab === 'ontology') {
+        tabContent = `
+        <div style="display:flex;flex-direction:column;height:100%">
+            <div style="display:flex;align-items:center;gap:8px;padding:8px 14px;border-bottom:1px solid var(--border);flex-shrink:0;background:var(--bg2)">
+                <button class="btn-sm" onclick="APP._hypZoomUp()" id="hyp-up-btn" disabled title="Go up one level">⬆ Up</button>
+                <span id="hyp-breadcrumb" style="font-size:11px;color:var(--text-dim);font-family:var(--font-mono);max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">owl:Thing</span>
+                <button class="btn-sm" onclick="APP._hypReset()" title="Reset view">⟳ Reset</button>
+                <div style="position:relative;margin-left:4px">
+                    <input id="hyp-filter-input" type="text" placeholder="Filter classes…"
                            style="background:var(--bg3);border:1px solid var(--border2);color:var(--text1);
-                                  border-radius:4px;padding:3px 8px;font-size:12px;width:200px"
+                                  border-radius:4px;padding:3px 8px;font-size:12px;width:180px"
                            oninput="APP._hypFilter(this.value)">
                 </div>
-                <span style="font-size:10px;color:var(--text-dim);margin-left:6px">
-                    Clic → focus · Double-clic → éditer
+                <span style="font-size:10px;color:var(--text-dim);margin-left:4px">
+                    Click → center · 2nd click → edit · Double-click → zoom
                 </span>
                 <span id="cy-node-count" style="margin-left:auto;font-size:11px;color:var(--text-dim)"></span>
             </div>
@@ -1952,7 +2056,7 @@ APP.renderViews = function() {
             <div style="display:flex;align-items:center;gap:8px;padding:8px 14px;border-bottom:1px solid var(--border);flex-shrink:0;background:var(--bg2)">
                 <button class="btn-sm" onclick="APP._kbRestart()" title="Relancer la simulation">⟳ Restart</button>
                 <div style="position:relative;margin-left:8px">
-                    <input id="kb-filter-input" type="text" placeholder="Filtrer les individuals…"
+                    <input id="kb-filter-input" type="text" placeholder="Filter individuals…"
                            style="background:var(--bg3);border:1px solid var(--border2);color:var(--text1);
                                   border-radius:4px;padding:3px 8px;font-size:12px;width:200px"
                            oninput="APP._kbFilter(this.value)">
@@ -1983,18 +2087,16 @@ APP.renderViews = function() {
 
 // ── Ontology Graph (D3 — Hyperbolic Tree / Disque de Poincaré) ────────────────
 
+APP._hypZoomStack = [];   // pile des IDs zoomés [{id, label}]
+
 APP._hypBestLabel = function(cls) {
-    const pref = (typeof Settings !== 'undefined') ? Settings.preferredLang : 'en';
-    const annos = Array.isArray(cls.annotations) ? cls.annotations : [];
-    const isLabel = a => a && (a.property === 'rdfs:label' || a.property === 'label');
-    return (annos.find(a => isLabel(a) && a.lang === pref) || annos.find(a => isLabel(a)) || {}).value || cls.id;
+    return cls ? (cls.id || '') : '';
 };
 
 APP._initHyperbolicGraph = function() {
     const container = document.getElementById('cy-ontology');
-
     if (!container) { console.error('[SWOWL] #cy-ontology not found'); return; }
-    if (!container || APP._viewsTab !== 'ontology') return;
+    if (APP._viewsTab !== 'ontology') return;
     container.innerHTML = '';
 
     const classes = APP.state.classes || [];
@@ -2003,7 +2105,7 @@ APP._initHyperbolicGraph = function() {
         return;
     }
     if (typeof d3 === 'undefined') {
-        container.innerHTML = '<p style="padding:24px;color:#f87171">⚠ D3.js not loaded — vérifiez la connexion réseau.</p>';
+        container.innerHTML = '<p style="padding:24px;color:#f87171">⚠ D3.js not loaded — please check your network connection.</p>';
         return;
     }
 
@@ -2022,19 +2124,48 @@ APP._initHyperbolicGraph = function() {
     });
     const roots = classes.filter(c => !hasInternalParent.has(c.id)).map(c => c.id);
 
-    function buildNode(id, depth) {
+    function buildNode(id, depth, ancestors) {
+        if (!classMap[id] || ancestors.has(id)) return null;
+        const next = new Set(ancestors); next.add(id);
         return {
             id, depth,
             label: APP._hypBestLabel(classMap[id]),
             hpos: [0, 0], basePos: [0, 0],
-            children: (childrenOf[id] || []).map(cid => buildNode(cid, depth + 1))
+            children: (childrenOf[id] || []).map(cid => buildNode(cid, depth + 1, next)).filter(Boolean)
         };
     }
-    const treeRoot = {
-        id: 'owl:Thing', label: 'owl:Thing', depth: 0,
-        hpos: [0, 0], basePos: [0, 0],
-        children: roots.map(r => buildNode(r, 1))
-    };
+
+    // ── Zoom : si une pile de zoom existe, on part du nœud zoomé ─
+    const zoomEntry = APP._hypZoomStack.length
+        ? APP._hypZoomStack[APP._hypZoomStack.length - 1]
+        : null;
+
+    let treeRoot;
+    if (zoomEntry && classMap[zoomEntry.id]) {
+        const zNode = buildNode(zoomEntry.id, 0, new Set());
+        treeRoot = zNode || {
+            id: 'owl:Thing', label: 'owl:Thing', depth: 0,
+            hpos: [0,0], basePos: [0,0],
+            children: roots.map(r => buildNode(r, 1, new Set())).filter(Boolean)
+        };
+    } else {
+        APP._hypZoomStack = []; // réinitialise si nœud introuvable
+        treeRoot = {
+            id: 'owl:Thing', label: 'owl:Thing', depth: 0,
+            hpos: [0, 0], basePos: [0, 0],
+            children: roots.map(r => buildNode(r, 1, new Set())).filter(Boolean)
+        };
+    }
+
+    // ── Mise à jour breadcrumb & bouton Up ───────────────────
+    const upBtn     = document.getElementById('hyp-up-btn');
+    const breadcrumb = document.getElementById('hyp-breadcrumb');
+    if (upBtn)      upBtn.disabled = APP._hypZoomStack.length === 0;
+    if (breadcrumb) {
+        const path = ['owl:Thing', ...APP._hypZoomStack.map(e => e.label)];
+        breadcrumb.textContent = path.join(' › ');
+        breadcrumb.title       = path.join(' › ');
+    }
 
     // ── 2. Complex number / Möbius helpers ────────────────────
     const cadd  = (a, b) => [a[0]+b[0], a[1]+b[1]];
@@ -2044,9 +2175,7 @@ APP._initHyperbolicGraph = function() {
     const cabs  = a => Math.sqrt(a[0]*a[0]+a[1]*a[1]);
     const cdiv  = (a, b) => { const d = b[0]*b[0]+b[1]*b[1]; return [(a[0]*b[0]+a[1]*b[1])/d,(a[1]*b[0]-a[0]*b[1])/d]; };
     const polar = (r, t) => [r*Math.cos(t), r*Math.sin(t)];
-    // Move point `a` to origin
-    const mobiusFocus = (z, a) => cdiv(csub(z,a), csub([1,0], cmul(cconj(a),z)));
-    // Translate origin to `a`
+    const mobiusFocus     = (z, a) => cdiv(csub(z,a), csub([1,0], cmul(cconj(a),z)));
     const mobiusTranslate = (z, a) => cdiv(cadd(z,a), cadd([1,0], cmul(cconj(a),z)));
 
     // ── 3. Poincaré layout ────────────────────────────────────
@@ -2089,10 +2218,8 @@ APP._initHyperbolicGraph = function() {
         .attr('width', W).attr('height', H).style('display','block');
     APP._hypSvg = svg;
 
-    // Disk background
     svg.append('circle').attr('cx',CX).attr('cy',CY).attr('r',R+1)
         .attr('fill','#0e1219').attr('stroke','#2a3347').attr('stroke-width',1.5);
-    // Guide rings
     [0.33, 0.60, 0.82].forEach(fr =>
         svg.append('circle').attr('cx',CX).attr('cy',CY).attr('r',R*fr)
             .attr('fill','none').attr('stroke','#1a2030').attr('stroke-width',0.5));
@@ -2103,10 +2230,9 @@ APP._initHyperbolicGraph = function() {
     const nodeGroup = document.createElementNS(svgNS, 'g');
     svg.node().appendChild(edgeGroup);
     svg.node().appendChild(nodeGroup);
-    APP._hypEdgeEls = new Map(); // id → <line>
-    APP._hypNodeEls = new Map(); // id → { g, circle, label }
+    APP._hypEdgeEls = new Map();
+    APP._hypNodeEls = new Map();
 
-    // Create edge elements
     allNodes.filter(n => n.parent).forEach(n => {
         const line = document.createElementNS(svgNS, 'line');
         line.setAttribute('stroke', '#252f42');
@@ -2116,24 +2242,20 @@ APP._initHyperbolicGraph = function() {
         APP._hypEdgeEls.set(n.id, line);
     });
 
-    // Create node elements
     allNodes.forEach(n => {
         const g = document.createElementNS(svgNS, 'g');
         g.style.cursor = 'pointer';
-
         const circle = document.createElementNS(svgNS, 'circle');
         const label  = document.createElementNS(svgNS, 'text');
         label.setAttribute('text-anchor', 'middle');
         label.setAttribute('font-family', 'system-ui,sans-serif');
         label.setAttribute('pointer-events', 'none');
-
         g.appendChild(circle);
         g.appendChild(label);
         nodeGroup.appendChild(g);
         APP._hypNodeEls.set(n.id, { g, circle, label, node: n });
-
-        // Native click event
-        g.addEventListener('click', () => APP._hypClick(n));
+        g.addEventListener('click',    () => APP._hypClick(n));
+        g.addEventListener('dblclick', (e) => { e.stopPropagation(); APP._hypZoomTo(n); });
     });
 
     APP._hypEdgeGroup = edgeGroup;
@@ -2158,7 +2280,6 @@ APP._hypDraw = function(animated) {
         const dist  = cabs(node.hpos);
         const isRoot = node.id === 'owl:Thing';
 
-        // ── Node visuals ─────────────────────────────────────
         const el = APP._hypNodeEls.get(node.id);
         if (!el) return;
 
@@ -2183,11 +2304,9 @@ APP._hypDraw = function(animated) {
         el.label.setAttribute('opacity',     opc);
         el.label.setAttribute('font-weight', dist < 0.15 ? '600' : '400');
 
-        // CSS transition then transform
         el.g.style.transition = TR;
         el.g.setAttribute('transform', `translate(${sx.toFixed(1)},${sy.toFixed(1)})`);
 
-        // ── Edge ─────────────────────────────────────────────
         if (node.parent) {
             const line = APP._hypEdgeEls.get(node.id);
             if (line) {
@@ -2208,7 +2327,6 @@ APP._hypClick = function(node) {
     const { cabs, mobiusFocus } = APP._hypMath;
     const dist = cabs(node.hpos);
 
-    // Nœud déjà au centre → naviguer vers l'éditeur
     if (dist < 0.10 && node.id !== 'owl:Thing') {
         APP.navigate('classes');
         setTimeout(() => {
@@ -2220,7 +2338,6 @@ APP._hypClick = function(node) {
         return;
     }
 
-    // Nœud en périphérie → ramener au centre (Möbius)
     if (dist < 0.02) return;
     const a = [node.hpos[0], node.hpos[1]];
     APP._hypNodes.forEach(n => {
@@ -2229,11 +2346,27 @@ APP._hypClick = function(node) {
     APP._hypDraw(true);
 };
 
-// ── Reset focus ───────────────────────────────────────────────
+// ── Reset focus (recentre la vue sans changer le niveau de zoom) ──
 APP._hypReset = function() {
     if (!APP._hypNodes) return;
     APP._hypNodes.forEach(n => { n.hpos = [...n.basePos]; });
     APP._hypDraw(true);
+};
+
+// ── Zoom in : double-clic → entre dans le sous-arbre ─────────
+APP._hypZoomTo = function(node) {
+    if (!node || node.id === 'owl:Thing') return;
+    // Ne zoome que si le nœud a des enfants
+    if (!node.children || !node.children.length) return;
+    APP._hypZoomStack.push({ id: node.id, label: node.label });
+    APP._initHyperbolicGraph();
+};
+
+// ── Zoom out : remonte d'un niveau ───────────────────────────
+APP._hypZoomUp = function() {
+    if (!APP._hypZoomStack.length) return;
+    APP._hypZoomStack.pop();
+    APP._initHyperbolicGraph();
 };
 
 // ── Filter ────────────────────────────────────────────────────
@@ -2253,10 +2386,263 @@ APP._hypFilter = function(q) {
             el.circle.removeAttribute('stroke');
             el.circle.removeAttribute('stroke-width');
             el.label.removeAttribute('fill');
-            // Re-apply normal style
             APP._hypDraw(false);
         }
     });
+};
+
+// ── Treemap (D3 v7) ──────────────────────────────────────────
+
+APP._tmRoot       = null;   // d3.hierarchy root complet
+APP._tmCurrent    = null;   // nœud courant affiché (drill-down)
+APP._tmSvg        = null;   // sélection SVG D3
+APP._tmW          = 0;
+APP._tmH          = 0;
+
+// Palette de couleurs par branche racine (fond sombre)
+APP._tmPalette = [
+    '#1d3557','#1b4332','#3d1f6e','#7b2d00','#004e64',
+    '#3a0ca3','#023047','#6a0572','#0a3622','#1c2b3a',
+    '#4a1942','#2b4141',
+];
+
+APP._tmBuildHierarchy = function() {
+    const classes = APP.state.classes || [];
+    const realClasses = classes.filter(c => c.id !== 'owl:Thing');
+    const classMap = {};
+    realClasses.forEach(c => { classMap[c.id] = c; });
+    const allIds = new Set(realClasses.map(c => c.id));
+    const childrenOf = {};
+    const hasInternalParent = new Set();
+
+    realClasses.forEach(cls => {
+        (cls.subClassOf || [])
+            .filter(s => typeof s === 'string' && s !== 'owl:Thing' && allIds.has(s))
+            .forEach(parentId => {
+                hasInternalParent.add(cls.id);
+                if (!childrenOf[parentId]) childrenOf[parentId] = [];
+                if (!childrenOf[parentId].includes(cls.id)) childrenOf[parentId].push(cls.id);
+            });
+    });
+    const roots = realClasses.filter(c => !hasInternalParent.has(c.id)).map(c => c.id);
+
+    function buildData(id, ancestors, depth) {
+        if (!id || !classMap[id] || depth > 30 || ancestors.has(id)) return null;
+        const next = new Set(ancestors); next.add(id);
+        const ch = (childrenOf[id] || [])
+            .map(cid => buildData(cid, next, depth + 1))
+            .filter(Boolean);
+        return { id, name: APP._hypBestLabel(classMap[id]), children: ch.length ? ch : undefined };
+    }
+
+    return {
+        id: 'owl:Thing', name: 'owl:Thing',
+        children: roots.map(r => buildData(r, new Set(), 0)).filter(Boolean),
+    };
+};
+
+APP._tmRender = function(node) {
+    if (!APP._tmSvg) return;
+    APP._tmCurrent = node;
+
+    const W = APP._tmW;
+    const H = APP._tmH;
+
+    // Couleur par branche de premier niveau
+    const branchPalette = new Map();
+    (APP._tmRoot.children || []).forEach((ch, i) => {
+        branchPalette.set(ch.data.id, APP._tmPalette[i % APP._tmPalette.length]);
+    });
+
+    function branchBase(d) {
+        let n = d;
+        while (n.depth > 1) n = n.parent;
+        return branchPalette.get(n.data.id) || '#1e2a3a';
+    }
+
+    // Calculer le treemap sur le nœud courant
+    const subtree = d3.hierarchy(node.data, d => d.children)
+        .sum(d => d.children ? 0 : 1)
+        .sort((a, b) => b.value - a.value);
+
+    // Rétablir les profondeurs réelles (pour couleurs cohérentes)
+    subtree.each(d => {
+        d._realDepth = node.depth + d.depth;
+    });
+
+    d3.treemap()
+        .size([W, H])
+        .padding(1)
+        .paddingTop(d => d.depth === 0 ? 0 : 20)
+        .paddingInner(1)
+        .round(true)
+    (subtree);
+
+    // Supprimer les anciens éléments
+    APP._tmSvg.selectAll('*').remove();
+
+    const allNodes = subtree.descendants();
+
+    const cellW = d => Math.max(0, d.x1 - d.x0);
+    const cellH = d => Math.max(0, d.y1 - d.y0);
+
+    // Groupe par nœud
+    const cell = APP._tmSvg.selectAll('g')
+        .data(allNodes)
+        .join('g')
+        .attr('transform', d => `translate(${d.x0},${d.y0})`);
+
+    // Rectangle de fond
+    cell.append('rect')
+        .attr('width',  cellW)
+        .attr('height', cellH)
+        .attr('rx', 2)
+        .attr('fill', d => {
+            if (d.depth === 0) return '#0d1117';
+            let n = d;
+            while (n.parent && n.parent.depth > 0) n = n.parent;
+            const globalChild = (APP._tmRoot.children || []).find(c => c.data.id === n.data.id);
+            const base = globalChild
+                ? (branchPalette.get(globalChild.data.id) || '#1e2a3a')
+                : '#1e2a3a';
+            return d.children ? base : base + 'cc';
+        })
+        .attr('stroke', '#0d1117')
+        .attr('stroke-width', 1)
+        .attr('fill-opacity', d => d.depth === 0 ? 1 : d.children ? 0.9 : 0.65)
+        .style('cursor', d => (d.depth > 0) ? 'pointer' : 'default')
+        .on('click', (event, d) => {
+            if (d.depth === 0) return;
+            event.stopPropagation();
+            if (d.children) {
+                APP._tmDrillInto(d);
+            } else {
+                APP.navigateTo('classes', d.data.id);
+                setTimeout(() => { if (typeof ClassEditor !== 'undefined') ClassEditor.restoreSelection(); }, 80);
+            }
+        })
+        .on('dblclick', (event, d) => {
+            if (d.depth === 0 || d.data.id === 'owl:Thing') return;
+            event.stopPropagation();
+            APP.navigateTo('classes', d.data.id);
+            setTimeout(() => { if (typeof ClassEditor !== 'undefined') ClassEditor.restoreSelection(); }, 80);
+        });
+
+    // Étiquette des nœuds parents
+    cell.filter(d => d.depth > 0 && d.children)
+        .append('text')
+        .attr('x', 4)
+        .attr('y', 14)
+        .attr('font-size', d => { const w = cellW(d); return w > 60 ? '11px' : w > 30 ? '9px' : '0px'; })
+        .attr('font-weight', '600')
+        .attr('fill', '#c8d6f0')
+        .attr('pointer-events', 'none')
+        .text(d => {
+            const w = cellW(d);
+            if (w < 20) return '';
+            const maxCh = Math.max(2, Math.floor(w / 7));
+            const name = d.data.name || d.data.id;
+            return name.length > maxCh ? name.slice(0, maxCh - 1) + '…' : name;
+        });
+
+    // Nombre d'enfants pour les parents
+    cell.filter(d => d.depth > 0 && d.children)
+        .append('text')
+        .attr('x', 4).attr('y', 25)
+        .attr('font-size', '9px')
+        .attr('fill', '#7a8faa')
+        .attr('pointer-events', 'none')
+        .text(d => {
+            if (cellW(d) < 50 || cellH(d) < 32) return '';
+            const n = d.leaves().length;
+            return `${n} classe${n > 1 ? 's' : ''}`;
+        });
+
+    // Étiquette des feuilles
+    cell.filter(d => !d.children)
+        .append('text')
+        .attr('x', 4)
+        .attr('y', d => Math.min(14, cellH(d) - 3))
+        .attr('font-size', d => {
+            const w = cellW(d), h = cellH(d), area = w * h;
+            if (area < 400) return '0px';
+            return Math.min(12, Math.max(8, Math.sqrt(area) / 8)) + 'px';
+        })
+        .attr('fill', '#dde2ee')
+        .attr('pointer-events', 'none')
+        .text(d => {
+            const w = cellW(d), h = cellH(d);
+            if (w * h < 400) return '';
+            const maxCh = Math.max(2, Math.floor(w / 6.5));
+            const name = d.data.name || d.data.id;
+            return name.length > maxCh ? name.slice(0, maxCh - 1) + '…' : name;
+        });
+
+    // Breadcrumb & bouton Up
+    const breadcrumb = document.getElementById('tm-breadcrumb');
+    const upBtn      = document.getElementById('tm-up-btn');
+    const counter    = document.getElementById('tm-count');
+    if (breadcrumb) {
+        // Construire le chemin depuis tmRoot jusqu'au nœud courant
+        const path = [];
+        let n = APP._tmCurrent;
+        while (n) { path.unshift(n.data.name || n.data.id); n = n.parent; }
+        breadcrumb.textContent = path.join(' › ');
+    }
+    if (upBtn)   upBtn.disabled = (APP._tmCurrent === APP._tmRoot);
+    if (counter) {
+        const leaves = subtree.leaves().length;
+        counter.textContent = `${leaves} classe${leaves > 1 ? 's' : ''}`;
+    }
+};
+
+// Drill-down dans un nœud (trouver le nœud correspondant dans tmRoot)
+APP._tmDrillInto = function(subtreeNode) {
+    const targetId = subtreeNode.data.id;
+    // Chercher dans le tmRoot global
+    let found = null;
+    APP._tmRoot.each(n => { if (n.data.id === targetId) found = n; });
+    if (found) APP._tmRender(found);
+};
+
+APP._tmDrillUp = function() {
+    if (!APP._tmCurrent || APP._tmCurrent === APP._tmRoot) return;
+    APP._tmRender(APP._tmCurrent.parent || APP._tmRoot);
+};
+
+APP._initTreemap = function() {
+    const container = document.getElementById('cy-treemap');
+    if (!container || APP._viewsTab !== 'treemap') return;
+    container.innerHTML = '';
+
+    const classes = APP.state.classes || [];
+    if (!classes.length) {
+        container.innerHTML = '<p style="padding:24px;color:var(--text-dim);font-style:italic">No classes in this ontology.</p>';
+        return;
+    }
+
+    const W = container.clientWidth  || 800;
+    const H = container.clientHeight || 500;
+    APP._tmW = W;
+    APP._tmH = H;
+
+    // Construire la hiérarchie complète
+    const rawData = APP._tmBuildHierarchy();
+    APP._tmRoot = d3.hierarchy(rawData, d => d.children)
+        .sum(d => d.children ? 0 : 1)
+        .sort((a, b) => b.value - a.value);
+
+    APP._tmSvg = d3.select(container)
+        .append('svg')
+        .attr('width', W)
+        .attr('height', H)
+        .style('display', 'block');
+
+    APP._tmRender(APP._tmRoot);
+
+    // Compteur global
+    const counter = document.getElementById('tm-count');
+    if (counter) counter.textContent = `${classes.length - (classes.some(c=>c.id==='owl:Thing')?1:0)} classes`;
 };
 
 // ── Knowledge Base Graph (D3 force) ──────────────────────────
@@ -2297,11 +2683,11 @@ APP._initKnowledgeBase = function() {
 
     const individuals = APP.state.individuals || [];
     if (!individuals.length) {
-        container.innerHTML = '<p style="padding:24px;color:var(--text-dim);font-style:italic">Aucun individual dans cette ontologie.</p>';
+        container.innerHTML = '<p style="padding:24px;color:var(--text-dim);font-style:italic">No individuals in this ontology.</p>';
         return;
     }
     if (typeof d3 === 'undefined') {
-        container.innerHTML = '<p style="padding:24px;color:#f87171">⚠ D3.js non chargé.</p>';
+        container.innerHTML = '<p style="padding:24px;color:#f87171">⚠ D3.js not loaded.</p>';
         return;
     }
 
@@ -2564,8 +2950,8 @@ APP.renderGuiTabs = function() {
         { id: 'annotation-properties', label: 'AnnotationProperties', icon: '<span class="anno-prop-dot" style="display:inline-block;vertical-align:middle"></span>',  fixed: false },
         { id: 'individuals',           label: 'Individuals',          icon: '<span class="xsd-dot" style="display:inline-block;vertical-align:middle;margin:0"></span>',fixed: false },
         { id: 'swrl-rules',            label: 'SWRL Rules',           icon: '⚙️', fixed: false },
-        { id: 'views',                 label: 'Views',                icon: `<svg width="14" height="10" viewBox="0 0 14 10" fill="none" style="vertical-align:middle;color:var(--text1)"><ellipse cx="7" cy="5" rx="6.5" ry="4.5" stroke="currentColor" stroke-width="1.2"/><circle cx="7" cy="5" r="2" fill="currentColor"/></svg>`, fixed: false },
         { id: 'queries',               label: 'Queries',              icon: '🎯', fixed: false },
+        { id: 'views',                 label: 'Views',                icon: `<svg width="14" height="10" viewBox="0 0 14 10" fill="none" style="vertical-align:middle;color:var(--text1)"><ellipse cx="7" cy="5" rx="6.5" ry="4.5" stroke="currentColor" stroke-width="1.2"/><circle cx="7" cy="5" r="2" fill="currentColor"/></svg>`, fixed: false },
         { id: 'inferences',            label: 'Inferences',           icon: '🧠', fixed: false },
     ];
 

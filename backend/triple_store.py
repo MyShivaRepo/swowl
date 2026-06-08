@@ -14,7 +14,7 @@ from rdflib.namespace import SKOS
 
 from owl_model import (
     OWLOntology, OWLClass, OWLObjectProperty, OWLDatatypeProperty,
-    OWLIndividual,
+    OWLIndividual, ObjectPropertyAssertion, DataPropertyAssertion,
     SomeValuesFrom, AllValuesFrom, HasValue,
     ExactCardinality, MinCardinality, MaxCardinality,
     UnionOf, IntersectionOf, ComplementOf,
@@ -298,6 +298,68 @@ class TripleStore:
             local = self._local_name(uri_str_val, base)
             return local
 
+        # ── Helper: parse an owl:Restriction BNode → Restriction object ──
+        def _parse_restriction(node):
+            """Parse a BNode that is an owl:Restriction into a Restriction model object.
+            Returns None if the node is not a recognisable restriction."""
+            if not isinstance(node, BNode):
+                return None
+            # Must be typed as owl:Restriction (or inferred via onProperty)
+            on_prop = next(g.objects(node, OWL.onProperty), None)
+            if on_prop is None:
+                return None
+            prop_id = _lid(str(on_prop)) if isinstance(on_prop, URIRef) else None
+            if not prop_id:
+                return None
+
+            def _filler(rdf_node):
+                """Resolve a filler node to a local id string (URIRef only)."""
+                if isinstance(rdf_node, URIRef):
+                    return _lid(str(rdf_node))
+                return None
+
+            # someValuesFrom
+            sv = next(g.objects(node, OWL.someValuesFrom), None)
+            if sv is not None:
+                return SomeValuesFrom(property=prop_id, filler=_filler(sv))
+
+            # allValuesFrom
+            av = next(g.objects(node, OWL.allValuesFrom), None)
+            if av is not None:
+                return AllValuesFrom(property=prop_id, filler=_filler(av))
+
+            # hasValue
+            hv = next(g.objects(node, OWL.hasValue), None)
+            if hv is not None:
+                val = _lid(str(hv)) if isinstance(hv, URIRef) else str(hv)
+                return HasValue(property=prop_id, value=val)
+
+            # exactCardinality (owl:cardinality or owl:qualifiedCardinality)
+            for card_pred in (OWL.cardinality, OWL.qualifiedCardinality):
+                cv = next(g.objects(node, card_pred), None)
+                if cv is not None:
+                    filler_node = next(g.objects(node, OWL.onClass), None)
+                    return ExactCardinality(property=prop_id, cardinality=int(cv),
+                                           filler=_filler(filler_node))
+
+            # minCardinality
+            for card_pred in (OWL.minCardinality, OWL.minQualifiedCardinality):
+                cv = next(g.objects(node, card_pred), None)
+                if cv is not None:
+                    filler_node = next(g.objects(node, OWL.onClass), None)
+                    return MinCardinality(property=prop_id, cardinality=int(cv),
+                                         filler=_filler(filler_node))
+
+            # maxCardinality
+            for card_pred in (OWL.maxCardinality, OWL.maxQualifiedCardinality):
+                cv = next(g.objects(node, card_pred), None)
+                if cv is not None:
+                    filler_node = next(g.objects(node, OWL.onClass), None)
+                    return MaxCardinality(property=prop_id, cardinality=int(cv),
+                                         filler=_filler(filler_node))
+
+            return None
+
         # ── Classes: owl:Class + rdfs:Class ─────────────────────
         seen_cls = set()
         for cls_type in (OWL.Class, RDFS.Class):
@@ -317,6 +379,10 @@ class TripleStore:
                         sup_local = _lid(str(sup))
                         if sup_local:
                             owl_cls.subClassOf.append(sup_local)
+                    elif isinstance(sup, BNode):
+                        restr = _parse_restriction(sup)
+                        if restr is not None:
+                            owl_cls.subClassOf.append(restr)
                 for dj in g.objects(cls_uri, OWL.disjointWith):
                     if isinstance(dj, URIRef):
                         dj_local = _lid(str(dj))
@@ -475,6 +541,81 @@ class TripleStore:
                 )
                 if not already:
                     cls.subClassOf.append(PropertyPresence(property=prop.id))
+
+        # ── Named Individuals: owl:NamedIndividual + owl:Thing (OWL 1) ──
+        # Build a set of all known OP ids for assertion detection
+        op_ids = {p.id for p in onto.object_properties}
+        dp_ids = {p.id for p in onto.datatype_properties}
+        # OWL structural types that must NOT be treated as individuals
+        _owl_structural = {
+            OWL.Class, OWL.ObjectProperty, OWL.DatatypeProperty,
+            OWL.AnnotationProperty, OWL.OntologyProperty,
+            OWL.Ontology, OWL.FunctionalProperty, OWL.InverseFunctionalProperty,
+            OWL.TransitiveProperty, OWL.SymmetricProperty, OWL.AsymmetricProperty,
+            OWL.ReflexiveProperty, OWL.IrreflexiveProperty,
+            RDFS.Class, RDF.Property,
+        }
+        # Collect candidate individual URIs: owl:NamedIndividual (OWL 2)
+        # + owl:Thing subjects that have no structural OWL type (OWL 1 style)
+        ind_candidates = set()
+        for ind_uri in g.subjects(RDF.type, OWL.NamedIndividual):
+            if isinstance(ind_uri, URIRef):
+                ind_candidates.add(ind_uri)
+        for ind_uri in g.subjects(RDF.type, OWL.Thing):
+            if not isinstance(ind_uri, URIRef):
+                continue
+            types_of = set(g.objects(ind_uri, RDF.type))
+            if not (types_of & _owl_structural):
+                ind_candidates.add(ind_uri)
+        seen_ind = set()
+        for ind_uri in ind_candidates:
+            if not isinstance(ind_uri, URIRef) or str(ind_uri) in seen_ind:
+                continue
+            local = _lid(str(ind_uri))
+            if not local:
+                continue
+            seen_ind.add(str(ind_uri))
+            labels, comments = _collect_labels(ind_uri)
+            ind = OWLIndividual(id=local)
+            ind.annotations.labels   = labels
+            ind.annotations.comments = comments
+            # rdf:type assertions (class memberships, skip owl:NamedIndividual itself)
+            for t in g.objects(ind_uri, RDF.type):
+                if isinstance(t, URIRef) and t != OWL.NamedIndividual:
+                    tl = _lid(str(t))
+                    if tl:
+                        ind.types.append(tl)
+            # Object property assertions
+            for pred, obj in g.predicate_objects(ind_uri):
+                if not isinstance(pred, URIRef) or not isinstance(obj, URIRef):
+                    continue
+                pred_l = _lid(str(pred))
+                if pred_l in op_ids:
+                    obj_l = _lid(str(obj))
+                    if obj_l:
+                        ind.objectAssertions.append(
+                            ObjectPropertyAssertion(property=pred_l, target=obj_l))
+            # Data property assertions
+            for pred, obj in g.predicate_objects(ind_uri):
+                if not isinstance(pred, URIRef) or not isinstance(obj, Literal):
+                    continue
+                pred_l = _lid(str(pred))
+                if pred_l in dp_ids:
+                    dt = _lid(str(obj.datatype)) if obj.datatype else "xsd:string"
+                    ind.dataAssertions.append(
+                        DataPropertyAssertion(property=pred_l, value=str(obj), datatype=dt))
+            # sameAs / differentFrom
+            for sa in g.objects(ind_uri, OWL.sameAs):
+                if isinstance(sa, URIRef):
+                    sl = _lid(str(sa))
+                    if sl:
+                        ind.sameAs.append(sl)
+            for df in g.objects(ind_uri, OWL.differentFrom):
+                if isinstance(df, URIRef):
+                    dl = _lid(str(df))
+                    if dl:
+                        ind.differentFrom.append(dl)
+            onto.individuals.append(ind)
 
         self._ontology = onto
         # Enregistrer dans le registre et sauver le fichier

@@ -90,7 +90,8 @@ const SparqlEditor = {
             return `
             <div class="tree-item${x.id === this._selectedId ? ' selected' : ''}"
                  data-id="${x.id}" style="align-items:center"
-                 onclick="SparqlEditor.selectQuery('${x.id}')">
+                 onclick="SparqlEditor.selectQuery('${x.id}')"
+                 oncontextmenu="event.preventDefault();SparqlEditor.showContextMenu(event,'${x.id}')">
                 <span style="font-size:13px;flex-shrink:0;line-height:1">🎯</span>
                 <span style="flex:1;overflow:hidden;min-width:0">
                     <span class="tree-label" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block">${this._esc(mainText)}</span>
@@ -257,7 +258,7 @@ const SparqlEditor = {
                     ${patterns || `
                     <div style="padding:16px;text-align:center;color:var(--text-dim);font-size:12px;
                                 border:1px dashed var(--border);border-radius:6px">
-                        Cliquez <b>＋ Triple</b> pour ajouter votre premier triplet
+                        Click <b>＋ Triple</b> to add your first triple
                     </div>`}
                 </div>
 
@@ -380,7 +381,7 @@ const SparqlEditor = {
                 </div>
                 <div class="sparql-opt-body">
                     ${inner || `<div style="color:var(--text-dim);font-size:11px;padding:4px 8px;
-                                            font-style:italic">OPTIONAL block vide</div>`}
+                                            font-style:italic">OPTIONAL block empty</div>`}
                 </div>
             </div>`;
         }
@@ -436,7 +437,7 @@ const SparqlEditor = {
                            || dps.has(p.predicate);
         if (isLiteralPred) {
             return this._atomFieldText(
-                p.object || '', _objChip, _objEd, idx, 'object', '?var ou valeur littérale', '1', true);
+                p.object || '', _objChip, _objEd, idx, 'object', '?var or literal value', '1', true);
         }
 
         // OP / annotation / inconnu → variable ou individual
@@ -677,7 +678,7 @@ const SparqlEditor = {
         const sparql  = this._buildSparql(this._editingQuery);
         const status  = document.getElementById('sq-status');
         const results = document.getElementById('sq-results');
-        if (status)  status.innerHTML  = '<span style="font-style:italic">Exécution…</span>';
+        if (status)  status.innerHTML  = '<span style="font-style:italic">Running…</span>';
         if (results) results.innerHTML = '';
 
         // Auto-show SPARQL preview
@@ -694,7 +695,7 @@ const SparqlEditor = {
             const data     = await res.json();
             const vars     = data.head?.vars    || [];
             const bindings = data.results?.bindings || [];
-            if (status) status.textContent = `${bindings.length} résultat(s)`;
+            if (status) status.textContent = `${bindings.length} result(s)`;
             if (results) results.innerHTML = this._renderResults(vars, bindings);
         } catch(e) {
             if (status)  status.textContent = '';
@@ -746,7 +747,7 @@ const SparqlEditor = {
             : `<span style="display:inline-block;width:8px;flex-shrink:0"></span>`;
         const curLbl = cur
             ? `<span>${this._esc(cur.label)}</span>`
-            : `<span class="sq-dd-placeholder">— choisir —</span>`;
+            : `<span class="sq-dd-placeholder">— choose —</span>`;
 
         const rows = groups.map(g => {
             const hdr = g.label
@@ -970,7 +971,7 @@ const SparqlEditor = {
         return `<span class="sq-atom-chip${navCls}" id="${chipId}"
                       ${navAttr}
                       oncontextmenu="SparqlEditor._atomEdit('${chipId}','${edId}',null,event)"
-                      title="Clic droit pour modifier">${this._atomChipHtml(value)}</span
+                      title="Right-click to edit">${this._atomChipHtml(value)}</span
                ><input id="${edId}" type="text" class="cls-id-inp"
                        style="display:none;${wStyle};font-family:var(--font-mono);font-size:11px;flex-shrink:0"
                        value="${this._esc(value)}"
@@ -993,7 +994,7 @@ const SparqlEditor = {
         return `<span class="sq-atom-chip${navCls}" id="${chipId}"
                       ${navAttr}
                       oncontextmenu="SparqlEditor._atomEdit('${chipId}','${edId}','${ddId}',event)"
-                      title="Clic droit pour modifier">${this._atomChipHtml(value)}</span
+                      title="Right-click to edit">${this._atomChipHtml(value)}</span
                ><span id="${edId}" style="display:none">${ddHtml}</span>`;
     },
 
@@ -1089,7 +1090,7 @@ const SparqlEditor = {
     _renderResults(vars, bindings) {
         if (!vars.length)
             return `<p style="color:var(--text-dim);font-size:12px;
-                               font-style:italic;padding:8px 0">Aucun résultat.</p>`;
+                               font-style:italic;padding:8px 0">No results.</p>`;
 
         const th = vars.map(v =>
             `<th style="padding:5px 12px;text-align:left;font-size:11px;color:var(--text-dim);
@@ -1167,5 +1168,36 @@ const SparqlEditor = {
     restoreSelection() {
         this._initSplitHandle();
         if (this._selectedId) this.selectQuery(this._selectedId);
+    },
+
+    // ── Menu contextuel (clic droit sur une requête) ──────────
+    showContextMenu(event, id) {
+        this._closeContextMenu();
+        if (this._selectedId !== id) this.selectQuery(id);
+        const menu = document.createElement('div');
+        menu.id = 'sparql-ctx-menu';
+        menu.className = 'ctx-menu';
+        menu.innerHTML = `
+            <div class="ctx-item ctx-danger" onclick="SparqlEditor._closeContextMenu();SparqlEditor.deleteQuery('${id}')">
+                ${ClassEditor._svgDelete} Delete Query</div>`;
+        menu.style.left = event.clientX + 'px';
+        menu.style.top  = event.clientY + 'px';
+        document.body.appendChild(menu);
+        requestAnimationFrame(() => {
+            const r = menu.getBoundingClientRect();
+            if (r.right  > window.innerWidth)  menu.style.left = (event.clientX - r.width)  + 'px';
+            if (r.bottom > window.innerHeight)  menu.style.top  = (event.clientY - r.height) + 'px';
+        });
+        const close = (e) => {
+            if (!menu.contains(e.target)) {
+                this._closeContextMenu();
+                document.removeEventListener('click', close, true);
+            }
+        };
+        setTimeout(() => document.addEventListener('click', close, true), 0);
+    },
+
+    _closeContextMenu() {
+        document.getElementById('sparql-ctx-menu')?.remove();
     },
 };

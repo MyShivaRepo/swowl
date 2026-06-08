@@ -184,7 +184,10 @@ function xsdOptions(selected = 'xsd:string') {
 
 const ClassEditor = {
 
-    _selectedId: null,          // class selected in the tree
+    _selectedId: null,          // class selected in the tree (single)
+    _selectedIds: new Set(),    // all selected classes (multi-selection)
+    _anchorId: null,            // anchor for Shift+Click range selection
+    _deselectListener: null,    // document-level mousedown listener
     _expanded: new Set(),       // IDs of expanded nodes
     _editingId: null,           // original ID of the class being edited
     _owlThingSelected: false,   // true when owl:Thing is selected
@@ -268,15 +271,16 @@ const ClassEditor = {
         const children = childrenOf[id] || [];
         const hasChildren = children.length > 0;
         const label = cls.annotations?.labels?.[0]?.value || '';
-        const isSelected = id === this._selectedId;
+        const isSelected = this._selectedIds.has(id);
         const isOpen = this._expanded.has(id);
 
         return `
         <div class="tree-root-node">
             <div class="tree-item${isSelected ? ' selected' : ''}"
                  style="padding-left:${depth * 16 + 6}px"
+                 data-id="${id}"
                  draggable="true"
-                 onclick="ClassEditor.selectClass('${id}')"
+                 onclick="ClassEditor.selectClass('${id}', event)"
                  oncontextmenu="ClassEditor.showContextMenu(event,'${id}')"
                  ondragstart="ClassEditor.onDragStart(event,'${id}')"
                  ondragover="ClassEditor.onDragOver(event,'${id}')"
@@ -382,10 +386,11 @@ const ClassEditor = {
 
     restoreSelection() {
         this._initSplitPane();
+        this._installDeselectListener();
         if (this._owlThingSelected) {
             this.selectOwlThing();
         } else if (this._selectedId) {
-            this.selectClass(this._selectedId);
+            this.selectClass(this._selectedId, false);
         }
     },
 
@@ -486,6 +491,8 @@ const ClassEditor = {
     async selectOwlThing() {
         if (this._editingId !== null) await this._silentSave();
         this._selectedId = null;
+        this._selectedIds.clear();
+        this._anchorId = null;
         this._owlThingSelected = true;
         // Surbrillance
         document.querySelectorAll('.tree-item, .tree-root-item').forEach(el => el.classList.remove('selected'));
@@ -506,27 +513,77 @@ const ClassEditor = {
         this._updateTreeButtons();
     },
 
-    async selectClass(id) {
-        // Sauvegarde silencieuse de la classe courante avant de changer
-        if (this._editingId !== null && id !== this._editingId) {
-            await this._silentSave();
+    async selectClass(id, evtOrHist = true) {
+        const isShift = (evtOrHist && typeof evtOrHist === 'object') ? evtOrHist.shiftKey : false;
+        const _hist   = (evtOrHist && typeof evtOrHist === 'object') ? true : evtOrHist;
+
+        if (isShift && this._anchorId) {
+            // ── Shift+Click: range selection ─────────────────
+            const items = [...document.querySelectorAll('#class-tree .tree-item[data-id]')];
+            const ids   = items.map(el => el.dataset.id);
+            const from  = ids.indexOf(this._anchorId);
+            const to    = ids.indexOf(id);
+            if (from !== -1 && to !== -1) {
+                const [lo, hi] = from < to ? [from, to] : [to, from];
+                this._selectedIds = new Set(ids.slice(lo, hi + 1));
+            } else {
+                this._selectedIds.add(id);
+            }
+        } else {
+            // ── Single click: single selection ────────────────
+            if (this._editingId !== null && id !== this._editingId) {
+                await this._silentSave();
+            }
+            this._selectedIds = new Set([id]);
+            this._anchorId    = id;
+            if (_hist) APP._pushNav('classes', id);
         }
+
         this._selectedId = id;
         this._owlThingSelected = false;
+
         // Surbrillance
-        document.querySelectorAll('.tree-item, .tree-root-item').forEach(el => el.classList.remove('selected'));
-        document.querySelectorAll('.tree-item').forEach(el => {
-            if (el.querySelector('.tree-label')?.textContent === id) el.classList.add('selected');
+        document.querySelectorAll('#class-tree .tree-item[data-id]').forEach(el => {
+            el.classList.toggle('selected', this._selectedIds.has(el.dataset.id));
         });
+
         // Formulaire dans le panneau droit
         const detail = document.getElementById('class-detail');
         if (!detail) return;
-        const cls = (APP.state.classes || []).find(c => c.id === id);
-        detail.innerHTML = cls ? this.renderForm(cls) : this.renderForm(null);
-        _initHResizers('class-detail');
-        // Super classes panel: update the left column
-        this._updateSuperPanel(cls || null);
+
+        if (this._selectedIds.size === 1) {
+            const cls = (APP.state.classes || []).find(c => c.id === id);
+            detail.innerHTML = cls ? this.renderForm(cls) : this.renderForm(null);
+            _initHResizers('class-detail');
+            this._updateSuperPanel(cls || null);
+        } else {
+            const n = this._selectedIds.size;
+            detail.innerHTML = `<div class="detail-panel-empty">
+                <span style="font-size:28px"><span class="cls-dot" style="display:inline-block;vertical-align:middle"></span><span class="cls-dot" style="display:inline-block;vertical-align:middle;margin-left:4px"></span></span>
+                <span><strong>${n}</strong> classes selected</span>
+            </div>`;
+            this._updateSuperPanel(null);
+        }
         this._updateTreeButtons();
+    },
+
+    _installDeselectListener() {
+        if (this._deselectListener) {
+            document.removeEventListener('mousedown', this._deselectListener, true);
+            this._deselectListener = null;
+        }
+        this._deselectListener = (e) => {
+            if (!this._selectedIds.size) return;
+            if (e.target.closest('.tree-item[data-id]')) return;  // clic sur un item de classe
+            if (e.target.closest('.tree-root-item'))     return;  // clic sur owl:Thing
+            if (e.target.closest('.tree-toggle'))        return;  // clic sur expand/collapse
+            if (e.target.closest('#cls-ctx-menu'))       return;
+            if (e.target.closest('.btn-icon, .btn-sm'))  return;
+            this._selectedIds.clear();
+            this._anchorId   = null;
+            document.querySelectorAll('#class-tree .tree-item[data-id]').forEach(el => el.classList.remove('selected'));
+        };
+        document.addEventListener('mousedown', this._deselectListener, true);
     },
 
     _updateTreeButtons() {
@@ -542,6 +599,13 @@ const ClassEditor = {
             btnChild.disabled  = false;
             btnDelete.disabled = true;
             btnDelete.style.visibility = 'hidden';
+        } else if (this._selectedIds.size > 1) {
+            // Multi-selection: only delete is active
+            btnSister.disabled = true;
+            btnSister.style.visibility = '';
+            btnChild.disabled  = true;
+            btnDelete.disabled = false;
+            btnDelete.style.visibility = '';
         } else if (this._selectedId) {
             // Regular class selected: all buttons active
             btnSister.disabled = false;
@@ -606,8 +670,39 @@ const ClassEditor = {
     },
 
     async deleteSelected() {
-        if (!this._selectedId) return;
-        await this.delete(this._selectedId);
+        const ids = this._selectedIds.size > 0
+            ? [...this._selectedIds]
+            : (this._selectedId ? [this._selectedId] : []);
+        if (!ids.length) return;
+
+        if (ids.length === 1) {
+            // Single delete: use existing method (confirmation + delete)
+            await this.delete(ids[0]);
+            return;
+        }
+
+        // Multi-delete: single confirmation, then batch API calls
+        const confirmed = await UI.confirm(
+            `Delete <strong>${ids.length}</strong> classes?<br>
+             <small style="color:var(--text-dim)">${ids.join(', ')}</small>`
+        );
+        if (!confirmed) return;
+
+        try {
+            for (const id of ids) {
+                await API.deleteClass(id);
+            }
+            UI.success(`${ids.length} classes deleted`);
+            this._selectedIds.clear();
+            this._anchorId    = null;
+            this._selectedId  = null;
+            this._editingId   = null;
+            this._owlThingSelected = false;
+            await APP.refresh();
+            APP.renderSection('classes');
+        } catch (e) {
+            UI.error(e.message);
+        }
     },
 
     /** Creates an ObjectProperty with domain = selected class, then navigates to the OP tab */
@@ -652,26 +747,40 @@ const ClassEditor = {
     showContextMenu(event, id) {
         event.preventDefault();
         event.stopPropagation();
-        // Select the targeted element
-        if (id) this.selectClass(id);
-        else    this.selectOwlThing();
+        // If right-clicking on a class not in the current selection, reset to that class
+        if (id) {
+            if (!this._selectedIds.has(id)) {
+                this._selectedIds = new Set([id]);
+                this._anchorId = id;
+                this._selectedId = id;
+                this._owlThingSelected = false;
+                document.querySelectorAll('#class-tree .tree-item[data-id]').forEach(el => {
+                    el.classList.toggle('selected', el.dataset.id === id);
+                });
+            }
+        } else {
+            this.selectOwlThing();
+        }
         this._closeContextMenu();
 
         const isClass = !!id;
+        const n = this._selectedIds.size;
+        const deleteLabel = n > 1 ? `Delete Classes <strong>(${n})</strong>` : `Delete Class`;
         const menu = document.createElement('div');
         menu.id = 'cls-ctx-menu';
         menu.className = 'ctx-menu';
         menu.innerHTML = `
-            <div class="ctx-item" onclick="ClassEditor._closeContextMenu();ClassEditor.createChild()">
+            ${isClass && n === 1 ? `<div class="ctx-item" onclick="ClassEditor._closeContextMenu();ClassEditor.createChild()">
                 ${this._svgChild} Add Child Class</div>
-            ${isClass ? `<div class="ctx-item" onclick="ClassEditor._closeContextMenu();ClassEditor.createSibling()">
+            <div class="ctx-item" onclick="ClassEditor._closeContextMenu();ClassEditor.createSibling()">
                 ${this._svgSister} Add Sibling Class</div>
             <div class="ctx-sep"></div>
             <div class="ctx-item" onclick="ClassEditor._closeContextMenu();APP.renderSection('individuals');setTimeout(()=>IndividualEditor.selectClass('${id}'),50)">
                 <span class="xsd-dot" style="display:inline-block;vertical-align:middle;margin-right:2px"></span> Go to Individuals Tab</div>
-            <div class="ctx-sep"></div>
-            <div class="ctx-item ctx-danger" onclick="ClassEditor._closeContextMenu();ClassEditor.deleteSelected()">
-                ${this._svgDelete} Delete</div>` : ''}
+            <div class="ctx-sep"></div>` : (!isClass ? `<div class="ctx-item" onclick="ClassEditor._closeContextMenu();ClassEditor.createChild()">
+                ${this._svgChild} Add Child Class</div>` : `<div class="ctx-sep"></div>`)}
+            ${isClass ? `<div class="ctx-item ctx-danger" onclick="ClassEditor._closeContextMenu();ClassEditor.deleteSelected()">
+                ${this._svgDelete} ${deleteLabel}</div>` : ''}
         `;
         menu.style.left = event.clientX + 'px';
         menu.style.top  = event.clientY + 'px';
@@ -700,16 +809,24 @@ const ClassEditor = {
 
     onDragStart(event, id) {
         this._dragId = id;
+        // If dragging an item outside the selection, reset selection to that item
+        if (!this._selectedIds.has(id)) {
+            this._selectedIds = new Set([id]);
+            this._anchorId = id;
+        }
         event.dataTransfer.effectAllowed = 'move';
         event.dataTransfer.setData('text/plain', id);
-        // Slight opacity after drag starts (setTimeout to avoid affecting the ghost)
-        setTimeout(() => event.target.classList.add('dragging'), 0);
+        setTimeout(() => {
+            document.querySelectorAll('#class-tree .tree-item[data-id]').forEach(el => {
+                if (this._selectedIds.has(el.dataset.id)) el.classList.add('dragging');
+            });
+        }, 0);
     },
 
     onDragOver(event, targetId) {
         if (!this._dragId) return;
-        if (this._dragId === targetId) return;               // not on itself
-        if (this._isDescendant(targetId, this._dragId)) return; // pas sur un descendant
+        if (this._selectedIds.has(targetId)) return;          // not on any dragged item
+        if ([...this._selectedIds].some(sid => this._isDescendant(targetId, sid))) return;
         event.preventDefault();
         event.dataTransfer.dropEffect = 'move';
         event.currentTarget.classList.add('drag-over');
@@ -722,36 +839,33 @@ const ClassEditor = {
     async onDrop(event, targetId) {
         event.preventDefault();
         event.currentTarget.classList.remove('drag-over');
-        const draggedId = this._dragId;
+        const dragIds = this._selectedIds.size > 0 ? [...this._selectedIds] : [this._dragId];
         this._dragId = null;
-        if (!draggedId || draggedId === targetId) return;
-        if (this._isDescendant(targetId, draggedId)) {
+        if (!dragIds.length || dragIds.includes(targetId)) return;
+        if (dragIds.some(sid => this._isDescendant(targetId, sid))) {
             UI.warn('Cannot drop on a descendant — would create a cycle');
             return;
         }
-        const cls = (APP.state.classes || []).find(c => c.id === draggedId);
-        if (!cls) return;
-        // Remplace les parents textuels ; conserve les restrictions objet
-        const restrictions = (cls.subClassOf || []).filter(s => typeof s === 'object');
-        const newParents   = targetId ? [targetId] : [];
-        const updated = { ...cls, subClassOf: [...newParents, ...restrictions] };
-        // Expand the new parent to see the moved class
         if (targetId) this._expanded.add(targetId);
-        this._selectedId = draggedId;
-        this._editingId  = draggedId;
         this._owlThingSelected = false;
         try {
-            await API.updateClass(draggedId, updated);
-            UI.success(`'${draggedId}' moved`);
+            for (const draggedId of dragIds) {
+                const cls = (APP.state.classes || []).find(c => c.id === draggedId);
+                if (!cls) continue;
+                const restrictions = (cls.subClassOf || []).filter(s => typeof s === 'object');
+                const newParents   = targetId ? [targetId] : [];
+                await API.updateClass(draggedId, { ...cls, subClassOf: [...newParents, ...restrictions] });
+            }
+            UI.success(dragIds.length > 1 ? `${dragIds.length} classes moved` : `'${dragIds[0]}' moved`);
+            this._selectedId = dragIds[0];
+            this._editingId  = dragIds.length === 1 ? dragIds[0] : null;
             await APP.refresh();
             APP.renderSection('classes');
-        } catch (e) {
-            UI.error(e.message);
-        }
+        } catch (e) { UI.error(e.message); }
     },
 
     onDragEnd(event) {
-        event.target.classList.remove('dragging');
+        document.querySelectorAll('.tree-item.dragging').forEach(el => el.classList.remove('dragging'));
         document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
         this._dragId = null;
     },
@@ -1341,9 +1455,9 @@ const RestrictionEditor = {
             ? `<span class="restr-prop-summary" style="display:inline-flex;align-items:center;gap:4px;flex-wrap:wrap">
                 <span style="opacity:.7">(↑</span>${fromClasses.map(fc => `
                 <span style="display:inline-flex;align-items:center;gap:3px">
-                    <span class="cls-dot" style="flex-shrink:0;width:8px;height:8px"></span>
+                    <span class="cls-dot" style="flex-shrink:0;width:12px;height:12px"></span>
                     <span class="restr-from-nav" style="color:var(--text-dim)"
-                          onclick="ClassEditor._expandAncestors('${fc}');ClassEditor._selectedId='${fc}';ClassEditor._owlThingSelected=false;APP.renderSection('classes');setTimeout(()=>ClassEditor.restoreSelection(),50)"
+                          onclick="ClassEditor._expandAncestors('${fc}');ClassEditor._selectedId='${fc}';ClassEditor._selectedIds=new Set(['${fc}']);ClassEditor._anchorId='${fc}';ClassEditor._owlThingSelected=false;APP.renderSection('classes');setTimeout(()=>ClassEditor.restoreSelection(),50)"
                           onmouseover="this.style.color='var(--accent,#5f8dd3)';this.style.textDecoration='underline'"
                           onmouseout="this.style.color='var(--text-dim)';this.style.textDecoration=''">${fc}</span>
                 </span>`).join('<span style="opacity:.5">,</span>')}
@@ -1363,19 +1477,24 @@ const RestrictionEditor = {
             } else {
                 const fv = r.filler || r.value || '';
                 if (fv) {
-                    const isFillerClass = (APP.state.classes || []).some(c => c.id === fv);
-                    const navAttr = isFillerClass
+                    const isFillerClass = (APP.state.classes     || []).some(c => c.id === fv);
+                    const isFillerInd   = !isFillerClass && (APP.state.individuals || []).some(i => i.id === fv);
+                    const fillerSection = isFillerClass ? 'classes' : isFillerInd ? 'individuals' : null;
+                    const navAttr = fillerSection
                         ? `style="color:var(--text);cursor:pointer"
-                           onclick="APP.navigateTo('classes','${fv}')"
+                           onclick="APP.navigateTo('${fillerSection}','${fv}')"
                            onmouseover="this.style.textDecoration='underline';this.style.color='var(--accent,#5f8dd3)'"
                            onmouseout="this.style.textDecoration='';this.style.color='var(--text)'"`
                         : `style="color:var(--text)"`;
+                    const dotIcon = isFillerInd
+                        ? `<span class="xsd-dot" style="flex-shrink:0;margin:0"></span>`
+                        : `<span class="cls-dot tree-cls-dot"></span>`;
                     valueHtml = `
                     <div style="display:inline-flex;align-items:center;gap:3px;
                                 background:var(--bg3);border:1px solid var(--border);
                                 border-radius:4px;padding:1px 4px;font-size:12px">
                         <span class="tree-leaf">◦</span>
-                        <span class="cls-dot tree-cls-dot"></span>
+                        ${dotIcon}
                         <span ${navAttr}>${fv}</span>
                     </div>`;
                 }
@@ -1383,8 +1502,7 @@ const RestrictionEditor = {
             return `
             <div style="display:flex;align-items:center;gap:3px;padding:1px 4px;font-size:12px;color:var(--text2)">
                 <span style="width:20px;flex-shrink:0"></span>
-                <span style="opacity:.6;font-size:10px">◈</span>
-                <span style="color:var(--text-dim);font-size:10px;flex-shrink:0">${r.type || ''}</span>
+                ${this._restrIcon(r.type)}
                 ${valueHtml}
             </div>`;
         }).join('');
@@ -1409,6 +1527,20 @@ const RestrictionEditor = {
             g[r.property].push(r);
         });
         return g;
+    },
+
+    _restrIcon(type) {
+        const map = {
+            someValuesFrom:   ['restr-icon-some',  '∃'],
+            allValuesFrom:    ['restr-icon-all',   '∀'],
+            hasValue:         ['restr-icon-has',   '∋'],
+            exactCardinality: ['restr-icon-exact', '='],
+            minCardinality:   ['restr-icon-min',   '≥'],
+            maxCardinality:   ['restr-icon-max',   '≤'],
+        };
+        const [cls, sym] = map[type] || ['restr-child-icon', '◈'];
+        if (cls === 'restr-child-icon') return `<span class="restr-child-icon">◈</span>`;
+        return `<span class="restr-icon ${cls}" title="${type}">${sym}</span>`;
     },
 
     _desc(r) {
@@ -1472,12 +1604,13 @@ const RestrictionEditor = {
         const types      = ['someValuesFrom','allValuesFrom','hasValue','exactCardinality','minCardinality','maxCardinality'];
         const isCard     = (r.type || '').includes('Cardinality');
         const fv         = r.filler || r.value || '';
-        const isNavClass = fv && (APP.state.classes || []).some(c => c.id === fv);
+        const isNavClass = fv && (APP.state.classes     || []).some(c => c.id === fv);
+        const isNavInd   = fv && !isNavClass && (APP.state.individuals || []).some(i => i.id === fv);
         const racCard    = 'onchange="if(ClassEditor._editingId!==null)ClassEditor.autoSave()"';
         return `
         <div class="restr-child-row" id="restr-child-${gid}" data-prop="${prop}" data-li="${li}">
             <span style="width:20px;flex-shrink:0"></span>
-            <span class="restr-child-icon">◈</span>
+            ${this._restrIcon(r.type)}
             <select class="restr-type-sel" onchange="RestrictionEditor.onChildType('${gid}')">
                 ${types.map(t => `<option value="${t}" ${t === r.type ? 'selected':''}>${t}</option>`).join('')}
             </select>
@@ -1485,10 +1618,18 @@ const RestrictionEditor = {
                 <div class="tree-item restr-filler-btn" style="margin:0;padding:2px 4px"
                      onclick="RestrictionEditor.toggleFillerPicker('${gid}')">
                     <span class="tree-leaf">◦</span>
-                    ${fv ? '<span class="cls-dot tree-cls-dot"></span>' : '<span class="restr-filler-ph"></span>'}
+                    ${fv
+                        ? (isNavInd
+                            ? '<span class="xsd-dot" style="flex-shrink:0;margin:0"></span>'
+                            : '<span class="cls-dot tree-cls-dot"></span>')
+                        : '<span class="restr-filler-ph"></span>'}
                     <span class="restr-filler-lbl" style="flex:0 1 auto"
                         ${isNavClass ? `
                             onclick="event.stopPropagation();APP.navigateTo('classes','${fv}')"
+                            onmouseover="this.style.textDecoration='underline';this.style.color='var(--accent,#5f8dd3)';this.style.cursor='pointer'"
+                            onmouseout="this.style.textDecoration='';this.style.color=''"
+                        ` : isNavInd ? `
+                            onclick="event.stopPropagation();APP.navigateTo('individuals','${fv}')"
                             onmouseover="this.style.textDecoration='underline';this.style.color='var(--accent,#5f8dd3)';this.style.cursor='pointer'"
                             onmouseout="this.style.textDecoration='';this.style.color=''"
                         ` : ''}
@@ -1517,7 +1658,17 @@ const RestrictionEditor = {
         if (!el) return;
         const v = el.style.display !== 'none';
         el.style.display = v ? 'none' : '';
-        if (!v) el.focus();
+        if (!v) {
+            el.focus();
+            // Fermer si clic en dehors du picker
+            const _close = (e) => {
+                if (!el.contains(e.target) && !e.target.closest('[onclick*="showPropPicker"]')) {
+                    el.style.display = 'none';
+                    document.removeEventListener('mousedown', _close, true);
+                }
+            };
+            document.addEventListener('mousedown', _close, true);
+        }
     },
 
     addProperty(propId) {
@@ -1652,6 +1803,9 @@ const RestrictionEditor = {
         if (!row) return;
         const type   = row.querySelector('.restr-type-sel')?.value;
         const isCard = type?.includes('Cardinality');
+        // Update restriction icon
+        const iconEl = row.querySelector('.restr-icon, .restr-child-icon');
+        if (iconEl) iconEl.outerHTML = this._restrIcon(type);
         const card   = row.querySelector('.restr-card-inp');
         const filler = document.getElementById(`restr-filler-${gid}`);
         if (card)   card.style.display   = isCard ? 'inline' : 'none';
@@ -2099,6 +2253,9 @@ function _initHResizers(containerId) {
 const OPEditor = {
 
     _selectedId: null,
+    _selectedIds: new Set(),    // multi-selection
+    _anchorId: null,            // anchor for Shift+Click range selection
+    _deselectListener: null,    // document-level mousedown listener
     _editingId:  null,
     _expanded: new Set(),
     _topPropSelected: false,
@@ -2161,14 +2318,15 @@ const OPEditor = {
         if (!prop) return '';
         const children = childrenOf[id] || [];
         const hasChildren = children.length > 0;
-        const isSelected = id === this._selectedId;
+        const isSelected = this._selectedIds.has(id);
         const isOpen = this._expanded.has(id);
         return `
         <div class="tree-root-node">
             <div class="tree-item${isSelected ? ' selected' : ''}"
                  style="padding-left:${depth * 16 + 6}px"
+                 data-id="${id}"
                  draggable="true"
-                 onclick="OPEditor.selectProp('${id}')"
+                 onclick="OPEditor.selectProp('${id}', event)"
                  oncontextmenu="OPEditor.showContextMenu(event,'${id}')"
                  ondragstart="OPEditor.onDragStart(event,'${id}')"
                  ondragover="OPEditor.onDragOver(event,'${id}')"
@@ -2273,10 +2431,11 @@ const OPEditor = {
 
     restoreSelection() {
         this._initSplitPane();
+        this._installDeselectListener();
         if (this._topPropSelected) {
             this.selectTopProp();
         } else if (this._selectedId) {
-            this.selectProp(this._selectedId);
+            this.selectProp(this._selectedId, false);
         }
     },
 
@@ -2358,6 +2517,8 @@ const OPEditor = {
 
     selectTopProp() {
         this._selectedId = null;
+        this._selectedIds.clear();
+        this._anchorId = null;
         this._topPropSelected = true;
         document.querySelectorAll('#op-tree .tree-item, #op-tree .tree-root-item').forEach(el => el.classList.remove('selected'));
         document.querySelector('#op-tree .tree-root-item')?.classList.add('selected');
@@ -2375,21 +2536,74 @@ const OPEditor = {
         this._updateTreeButtons();
     },
 
-    selectProp(id) {
+    selectProp(id, evtOrHist = true) {
+        const isShift = (evtOrHist && typeof evtOrHist === 'object') ? evtOrHist.shiftKey : false;
+        const _hist   = (evtOrHist && typeof evtOrHist === 'object') ? true : evtOrHist;
+
+        if (isShift && this._anchorId) {
+            // ── Shift+Click: range selection ─────────────────
+            const items = [...document.querySelectorAll('#op-tree .tree-item[data-id]')];
+            const ids   = items.map(el => el.dataset.id);
+            const from  = ids.indexOf(this._anchorId);
+            const to    = ids.indexOf(id);
+            if (from !== -1 && to !== -1) {
+                const [lo, hi] = from < to ? [from, to] : [to, from];
+                this._selectedIds = new Set(ids.slice(lo, hi + 1));
+            } else {
+                this._selectedIds.add(id);
+            }
+        } else {
+            // ── Single click: single selection ────────────────
+            this._selectedIds = new Set([id]);
+            this._anchorId    = id;
+            if (_hist) APP._pushNav('object-properties', id);
+        }
+
         this._selectedId = id;
         this._topPropSelected = false;
-        document.querySelectorAll('#op-tree .tree-item, #op-tree .tree-root-item').forEach(el => el.classList.remove('selected'));
-        document.querySelectorAll('#op-tree .tree-item').forEach(el => {
-            if (el.querySelector('.tree-label')?.textContent === id) el.classList.add('selected');
+
+        // Highlight
+        document.querySelectorAll('#op-tree .tree-item[data-id]').forEach(el => {
+            el.classList.toggle('selected', this._selectedIds.has(el.dataset.id));
         });
+
         const detail = document.getElementById('op-detail');
         if (!detail) return;
-        const prop = (APP.state.object_properties || []).find(p => p.id === id);
-        detail.innerHTML = this.renderForm(prop);
-        _initHResizers('op-detail');
-        this._updateSuperPanel(prop || null);
+
+        if (this._selectedIds.size === 1) {
+            const prop = (APP.state.object_properties || []).find(p => p.id === id);
+            detail.innerHTML = this.renderForm(prop);
+            _initHResizers('op-detail');
+            this._updateSuperPanel(prop || null);
+            this._loadInferredInverse(id);
+        } else {
+            const n = this._selectedIds.size;
+            detail.innerHTML = `<div class="detail-panel-empty">
+                <span style="font-size:28px"><span class="op-prop-dot" style="display:inline-block;vertical-align:middle;width:20px;height:10px"></span><span class="op-prop-dot" style="display:inline-block;vertical-align:middle;width:20px;height:10px;margin-left:4px"></span></span>
+                <span><strong>${n}</strong> object properties selected</span>
+            </div>`;
+            this._updateSuperPanel(null);
+        }
         this._updateTreeButtons();
-        this._loadInferredInverse(id);
+    },
+
+    _installDeselectListener() {
+        if (this._deselectListener) {
+            document.removeEventListener('mousedown', this._deselectListener, true);
+            this._deselectListener = null;
+        }
+        this._deselectListener = (e) => {
+            if (!this._selectedIds.size) return;
+            if (e.target.closest('.tree-item[data-id]')) return;
+            if (e.target.closest('.tree-root-item'))     return;
+            if (e.target.closest('.tree-toggle'))        return;
+            if (e.target.closest('#op-ctx-menu'))        return;
+            if (e.target.closest('.btn-icon, .btn-sm'))  return;
+            this._selectedIds.clear();
+            this._anchorId = null;
+            document.querySelectorAll('#op-tree .tree-item[data-id]').forEach(el => el.classList.remove('selected'));
+        };
+        document.addEventListener('mousedown', this._deselectListener, true);
     },
 
     _updateTreeButtons() {
@@ -2403,6 +2617,12 @@ const OPEditor = {
             btnChild.disabled  = false;
             btnDelete.disabled = true;
             btnDelete.style.visibility = 'hidden';
+        } else if (this._selectedIds.size > 1) {
+            btnSister.disabled = true;
+            btnSister.style.visibility = '';
+            btnChild.disabled  = true;
+            btnDelete.disabled = false;
+            btnDelete.style.visibility = '';
         } else if (this._selectedId) {
             btnSister.disabled = false;
             btnSister.style.visibility = '';
@@ -2474,22 +2694,36 @@ const OPEditor = {
     showContextMenu(event, id) {
         event.preventDefault();
         event.stopPropagation();
-        if (id) this.selectProp(id);
-        else    this.selectTopProp();
+        if (id) {
+            if (!this._selectedIds.has(id)) {
+                this._selectedIds = new Set([id]);
+                this._anchorId = id;
+                this._selectedId = id;
+                this._topPropSelected = false;
+                document.querySelectorAll('#op-tree .tree-item[data-id]').forEach(el => {
+                    el.classList.toggle('selected', el.dataset.id === id);
+                });
+            }
+        } else {
+            this.selectTopProp();
+        }
         this._closeContextMenu();
 
         const isProp = !!id;
+        const n = this._selectedIds.size;
+        const deleteLabel = n > 1 ? `Delete Properties <strong>(${n})</strong>` : `Delete`;
         const menu = document.createElement('div');
         menu.id = 'op-ctx-menu';
         menu.className = 'ctx-menu';
         menu.innerHTML = `
-            <div class="ctx-item" onclick="OPEditor._closeContextMenu();OPEditor.createChild()">
+            ${isProp && n === 1 ? `<div class="ctx-item" onclick="OPEditor._closeContextMenu();OPEditor.createChild()">
                 ${this._svgChild} Add Child Property</div>
-            ${isProp ? `<div class="ctx-item" onclick="OPEditor._closeContextMenu();OPEditor.createSibling()">
+            <div class="ctx-item" onclick="OPEditor._closeContextMenu();OPEditor.createSibling()">
                 ${this._svgSister} Add Sibling Property</div>
-            <div class="ctx-sep"></div>
-            <div class="ctx-item ctx-danger" onclick="OPEditor._closeContextMenu();OPEditor.deleteSelected()">
-                ${this._svgDelete} Delete</div>` : ''}
+            <div class="ctx-sep"></div>` : (!isProp ? `<div class="ctx-item" onclick="OPEditor._closeContextMenu();OPEditor.createChild()">
+                ${this._svgChild} Add Child Property</div>` : `<div class="ctx-sep"></div>`)}
+            ${isProp ? `<div class="ctx-item ctx-danger" onclick="OPEditor._closeContextMenu();OPEditor.deleteSelected()">
+                ${this._svgDelete} ${deleteLabel}</div>` : ''}
         `;
         menu.style.left = event.clientX + 'px';
         menu.style.top  = event.clientY + 'px';
@@ -2516,15 +2750,23 @@ const OPEditor = {
 
     onDragStart(event, id) {
         this._dragId = id;
+        if (!this._selectedIds.has(id)) {
+            this._selectedIds = new Set([id]);
+            this._anchorId = id;
+        }
         event.dataTransfer.effectAllowed = 'move';
         event.dataTransfer.setData('text/plain', id);
-        setTimeout(() => event.target.classList.add('dragging'), 0);
+        setTimeout(() => {
+            document.querySelectorAll('#op-tree .tree-item[data-id]').forEach(el => {
+                if (this._selectedIds.has(el.dataset.id)) el.classList.add('dragging');
+            });
+        }, 0);
     },
 
     onDragOver(event, targetId) {
         if (!this._dragId) return;
-        if (this._dragId === targetId) return;
-        if (this._isDescendant(targetId, this._dragId)) return;
+        if (this._selectedIds.has(targetId)) return;
+        if ([...this._selectedIds].some(sid => this._isDescendant(targetId, sid))) return;
         event.preventDefault();
         event.dataTransfer.dropEffect = 'move';
         event.currentTarget.classList.add('drag-over');
@@ -2537,31 +2779,31 @@ const OPEditor = {
     async onDrop(event, targetId) {
         event.preventDefault();
         event.currentTarget.classList.remove('drag-over');
-        const draggedId = this._dragId;
+        const dragIds = this._selectedIds.size > 0 ? [...this._selectedIds] : [this._dragId];
         this._dragId = null;
-        if (!draggedId || draggedId === targetId) return;
-        if (this._isDescendant(targetId, draggedId)) {
+        if (!dragIds.length || dragIds.includes(targetId)) return;
+        if (dragIds.some(sid => this._isDescendant(targetId, sid))) {
             UI.warn('Cannot drop on a descendant — would create a cycle');
             return;
         }
-        const prop = (APP.state.object_properties || []).find(p => p.id === draggedId);
-        if (!prop) return;
-        const newParents = targetId ? [targetId] : [];
-        const updated = { ...prop, subPropertyOf: newParents };
         if (targetId) this._expanded.add(targetId);
-        this._selectedId = draggedId;
-        this._editingId  = draggedId;
         this._topPropSelected = false;
         try {
-            await API.updateOP(draggedId, updated);
-            UI.success(`'${draggedId}' moved`);
+            for (const draggedId of dragIds) {
+                const prop = (APP.state.object_properties || []).find(p => p.id === draggedId);
+                if (!prop) continue;
+                await API.updateOP(draggedId, { ...prop, subPropertyOf: targetId ? [targetId] : [] });
+            }
+            UI.success(dragIds.length > 1 ? `${dragIds.length} properties moved` : `'${dragIds[0]}' moved`);
+            this._selectedId = dragIds[0];
+            this._editingId  = dragIds.length === 1 ? dragIds[0] : null;
             await APP.refresh();
             APP.renderSection('object-properties');
         } catch (e) { UI.error(e.message); }
     },
 
     onDragEnd(event) {
-        event.target.classList.remove('dragging');
+        document.querySelectorAll('.tree-item.dragging').forEach(el => el.classList.remove('dragging'));
         document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
         this._dragId = null;
     },
@@ -2576,7 +2818,35 @@ const OPEditor = {
         return visit(ancestorId);
     },
 
-    deleteSelected() { if (this._selectedId) this.delete(this._selectedId); },
+    async deleteSelected() {
+        const ids = this._selectedIds.size > 0
+            ? [...this._selectedIds]
+            : (this._selectedId ? [this._selectedId] : []);
+        if (!ids.length) return;
+
+        if (ids.length === 1) {
+            await this.delete(ids[0]);
+            return;
+        }
+
+        const confirmed = await UI.confirm(
+            `Delete <strong>${ids.length}</strong> object properties?<br>
+             <small style="color:var(--text-dim)">${ids.join(', ')}</small>`
+        );
+        if (!confirmed) return;
+
+        try {
+            for (const id of ids) { await API.deleteOP(id); }
+            UI.success(`${ids.length} object properties deleted`);
+            this._selectedIds.clear();
+            this._anchorId = null;
+            this._selectedId = null;
+            this._editingId  = null;
+            this._topPropSelected = false;
+            await APP.refresh();
+            APP.renderSection('object-properties');
+        } catch (e) { UI.error(e.message); }
+    },
 
     // ── Protégé-style form ─────────────────────────────────
 
@@ -2830,11 +3100,25 @@ const OPEditor = {
     },
 
     async delete(id) {
-        if (!await UI.confirm(`Delete ObjectProperty <strong>${id}</strong>?`)) return;
+        // Collect descendants
+        const { childrenOf } = this.buildTree(APP.state.object_properties || []);
+        const descendants = [];
+        const collect = (cid) => (childrenOf[cid] || []).forEach(c => { descendants.push(c); collect(c); });
+        collect(id);
+
+        const confirmed = await UI.confirm(
+            descendants.length > 0
+                ? `Delete <strong>${id}</strong> and its ${descendants.length} sub-propert${descendants.length > 1 ? 'ies' : 'y'}?<br>
+                   <small style="color:var(--text-dim)">${descendants.join(', ')}</small>`
+                : `Delete ObjectProperty <strong>${id}</strong>?`
+        );
+        if (!confirmed) return;
         try {
-            await API.deleteOP(id);
-            UI.success(`ObjectProperty '${id}' deleted`);
+            const result = await API.deleteOP(id);
+            const n = (result?.deleted || [id]).length;
+            UI.success(`${n} object propert${n > 1 ? 'ies' : 'y'} deleted`);
             this._selectedId = null; this._editingId = null;
+            this._selectedIds.clear(); this._anchorId = null;
             await APP.refresh(); APP.renderSection('object-properties');
         } catch (e) { UI.error(e.message); }
     },
@@ -2848,6 +3132,9 @@ const OPEditor = {
 const DPEditor = {
 
     _selectedId: null,
+    _selectedIds: new Set(),    // multi-selection
+    _anchorId: null,            // anchor for Shift+Click range selection
+    _deselectListener: null,    // document-level mousedown listener
     _editingId:  null,
     _expanded: new Set(),
     _topPropSelected: false,
@@ -2910,14 +3197,15 @@ const DPEditor = {
         if (!prop) return '';
         const children = childrenOf[id] || [];
         const hasChildren = children.length > 0;
-        const isSelected = id === this._selectedId;
+        const isSelected = this._selectedIds.has(id);
         const isOpen = this._expanded.has(id);
         return `
         <div class="tree-root-node">
             <div class="tree-item${isSelected ? ' selected' : ''}"
                  style="padding-left:${depth * 16 + 6}px"
+                 data-id="${id}"
                  draggable="true"
-                 onclick="DPEditor.selectProp('${id}')"
+                 onclick="DPEditor.selectProp('${id}', event)"
                  oncontextmenu="DPEditor.showContextMenu(event,'${id}')"
                  ondragstart="DPEditor.onDragStart(event,'${id}')"
                  ondragover="DPEditor.onDragOver(event,'${id}')"
@@ -3024,10 +3312,11 @@ const DPEditor = {
 
     restoreSelection() {
         this._initSplitPane();
+        this._installDeselectListener();
         if (this._topPropSelected) {
             this.selectTopProp();
         } else if (this._selectedId) {
-            this.selectProp(this._selectedId);
+            this.selectProp(this._selectedId, false);
         }
     },
 
@@ -3117,6 +3406,8 @@ const DPEditor = {
 
     selectTopProp() {
         this._selectedId = null;
+        this._selectedIds.clear();
+        this._anchorId = null;
         this._topPropSelected = true;
         document.querySelectorAll('#dp-tree .tree-item, #dp-tree .tree-root-item').forEach(el => el.classList.remove('selected'));
         document.querySelector('#dp-tree .tree-root-item')?.classList.add('selected');
@@ -3135,20 +3426,70 @@ const DPEditor = {
         this._updateTreeButtons();
     },
 
-    selectProp(id) {
+    selectProp(id, evtOrHist = true) {
+        const isShift = (evtOrHist && typeof evtOrHist === 'object') ? evtOrHist.shiftKey : false;
+        const _hist   = (evtOrHist && typeof evtOrHist === 'object') ? true : evtOrHist;
+
+        if (isShift && this._anchorId) {
+            const items = [...document.querySelectorAll('#dp-tree .tree-item[data-id]')];
+            const ids   = items.map(el => el.dataset.id);
+            const from  = ids.indexOf(this._anchorId);
+            const to    = ids.indexOf(id);
+            if (from !== -1 && to !== -1) {
+                const [lo, hi] = from < to ? [from, to] : [to, from];
+                this._selectedIds = new Set(ids.slice(lo, hi + 1));
+            } else {
+                this._selectedIds.add(id);
+            }
+        } else {
+            this._selectedIds = new Set([id]);
+            this._anchorId    = id;
+            if (_hist) APP._pushNav('datatype-properties', id);
+        }
+
         this._selectedId = id;
         this._topPropSelected = false;
-        document.querySelectorAll('#dp-tree .tree-item, #dp-tree .tree-root-item').forEach(el => el.classList.remove('selected'));
-        document.querySelectorAll('#dp-tree .tree-item').forEach(el => {
-            if (el.querySelector('.tree-label')?.textContent === id) el.classList.add('selected');
+
+        document.querySelectorAll('#dp-tree .tree-item[data-id]').forEach(el => {
+            el.classList.toggle('selected', this._selectedIds.has(el.dataset.id));
         });
+
         const detail = document.getElementById('dp-detail');
         if (!detail) return;
-        const prop = (APP.state.datatype_properties || []).find(p => p.id === id);
-        detail.innerHTML = this.renderForm(prop);
-        _initHResizers('dp-detail');
-        this._updateSuperPanel(prop || null);
+
+        if (this._selectedIds.size === 1) {
+            const prop = (APP.state.datatype_properties || []).find(p => p.id === id);
+            detail.innerHTML = this.renderForm(prop);
+            _initHResizers('dp-detail');
+            this._updateSuperPanel(prop || null);
+        } else {
+            const n = this._selectedIds.size;
+            detail.innerHTML = `<div class="detail-panel-empty">
+                <span style="font-size:28px"><span class="dp-prop-dot" style="display:inline-block;vertical-align:middle;width:20px;height:10px"></span><span class="dp-prop-dot" style="display:inline-block;vertical-align:middle;width:20px;height:10px;margin-left:4px"></span></span>
+                <span><strong>${n}</strong> datatype properties selected</span>
+            </div>`;
+            this._updateSuperPanel(null);
+        }
         this._updateTreeButtons();
+    },
+
+    _installDeselectListener() {
+        if (this._deselectListener) {
+            document.removeEventListener('mousedown', this._deselectListener, true);
+            this._deselectListener = null;
+        }
+        this._deselectListener = (e) => {
+            if (!this._selectedIds.size) return;
+            if (e.target.closest('.tree-item[data-id]')) return;
+            if (e.target.closest('.tree-root-item'))     return;
+            if (e.target.closest('.tree-toggle'))        return;
+            if (e.target.closest('#dp-ctx-menu'))        return;
+            if (e.target.closest('.btn-icon, .btn-sm'))  return;
+            this._selectedIds.clear();
+            this._anchorId = null;
+            document.querySelectorAll('#dp-tree .tree-item[data-id]').forEach(el => el.classList.remove('selected'));
+        };
+        document.addEventListener('mousedown', this._deselectListener, true);
     },
 
     _updateTreeButtons() {
@@ -3162,6 +3503,12 @@ const DPEditor = {
             btnChild.disabled  = false;
             btnDelete.disabled = true;
             btnDelete.style.visibility = 'hidden';
+        } else if (this._selectedIds.size > 1) {
+            btnSister.disabled = true;
+            btnSister.style.visibility = '';
+            btnChild.disabled  = true;
+            btnDelete.disabled = false;
+            btnDelete.style.visibility = '';
         } else if (this._selectedId) {
             btnSister.disabled = false;
             btnSister.style.visibility = '';
@@ -3232,22 +3579,36 @@ const DPEditor = {
     showContextMenu(event, id) {
         event.preventDefault();
         event.stopPropagation();
-        if (id) this.selectProp(id);
-        else    this.selectTopProp();
+        if (id) {
+            if (!this._selectedIds.has(id)) {
+                this._selectedIds = new Set([id]);
+                this._anchorId = id;
+                this._selectedId = id;
+                this._topPropSelected = false;
+                document.querySelectorAll('#dp-tree .tree-item[data-id]').forEach(el => {
+                    el.classList.toggle('selected', el.dataset.id === id);
+                });
+            }
+        } else {
+            this.selectTopProp();
+        }
         this._closeContextMenu();
 
         const isProp = !!id;
+        const n = this._selectedIds.size;
+        const deleteLabel = n > 1 ? `Delete Properties <strong>(${n})</strong>` : `Delete`;
         const menu = document.createElement('div');
         menu.id = 'dp-ctx-menu';
         menu.className = 'ctx-menu';
         menu.innerHTML = `
-            <div class="ctx-item" onclick="DPEditor._closeContextMenu();DPEditor.createChild()">
+            ${isProp && n === 1 ? `<div class="ctx-item" onclick="DPEditor._closeContextMenu();DPEditor.createChild()">
                 ${this._svgChild} Add Child Property</div>
-            ${isProp ? `<div class="ctx-item" onclick="DPEditor._closeContextMenu();DPEditor.createSibling()">
+            <div class="ctx-item" onclick="DPEditor._closeContextMenu();DPEditor.createSibling()">
                 ${this._svgSister} Add Sibling Property</div>
-            <div class="ctx-sep"></div>
-            <div class="ctx-item ctx-danger" onclick="DPEditor._closeContextMenu();DPEditor.deleteSelected()">
-                ${this._svgDelete} Delete</div>` : ''}
+            <div class="ctx-sep"></div>` : (!isProp ? `<div class="ctx-item" onclick="DPEditor._closeContextMenu();DPEditor.createChild()">
+                ${this._svgChild} Add Child Property</div>` : `<div class="ctx-sep"></div>`)}
+            ${isProp ? `<div class="ctx-item ctx-danger" onclick="DPEditor._closeContextMenu();DPEditor.deleteSelected()">
+                ${this._svgDelete} ${deleteLabel}</div>` : ''}
         `;
         menu.style.left = event.clientX + 'px';
         menu.style.top  = event.clientY + 'px';
@@ -3274,15 +3635,23 @@ const DPEditor = {
 
     onDragStart(event, id) {
         this._dragId = id;
+        if (!this._selectedIds.has(id)) {
+            this._selectedIds = new Set([id]);
+            this._anchorId = id;
+        }
         event.dataTransfer.effectAllowed = 'move';
         event.dataTransfer.setData('text/plain', id);
-        setTimeout(() => event.target.classList.add('dragging'), 0);
+        setTimeout(() => {
+            document.querySelectorAll('#dp-tree .tree-item[data-id]').forEach(el => {
+                if (this._selectedIds.has(el.dataset.id)) el.classList.add('dragging');
+            });
+        }, 0);
     },
 
     onDragOver(event, targetId) {
         if (!this._dragId) return;
-        if (this._dragId === targetId) return;
-        if (this._isDescendant(targetId, this._dragId)) return;
+        if (this._selectedIds.has(targetId)) return;
+        if ([...this._selectedIds].some(sid => this._isDescendant(targetId, sid))) return;
         event.preventDefault();
         event.dataTransfer.dropEffect = 'move';
         event.currentTarget.classList.add('drag-over');
@@ -3295,31 +3664,31 @@ const DPEditor = {
     async onDrop(event, targetId) {
         event.preventDefault();
         event.currentTarget.classList.remove('drag-over');
-        const draggedId = this._dragId;
+        const dragIds = this._selectedIds.size > 0 ? [...this._selectedIds] : [this._dragId];
         this._dragId = null;
-        if (!draggedId || draggedId === targetId) return;
-        if (this._isDescendant(targetId, draggedId)) {
+        if (!dragIds.length || dragIds.includes(targetId)) return;
+        if (dragIds.some(sid => this._isDescendant(targetId, sid))) {
             UI.warn('Cannot drop on a descendant — would create a cycle');
             return;
         }
-        const prop = (APP.state.datatype_properties || []).find(p => p.id === draggedId);
-        if (!prop) return;
-        const newParents = targetId ? [targetId] : [];
-        const updated = { ...prop, subPropertyOf: newParents };
         if (targetId) this._expanded.add(targetId);
-        this._selectedId = draggedId;
-        this._editingId  = draggedId;
         this._topPropSelected = false;
         try {
-            await API.updateDP(draggedId, updated);
-            UI.success(`'${draggedId}' moved`);
+            for (const draggedId of dragIds) {
+                const prop = (APP.state.datatype_properties || []).find(p => p.id === draggedId);
+                if (!prop) continue;
+                await API.updateDP(draggedId, { ...prop, subPropertyOf: targetId ? [targetId] : [] });
+            }
+            UI.success(dragIds.length > 1 ? `${dragIds.length} properties moved` : `'${dragIds[0]}' moved`);
+            this._selectedId = dragIds[0];
+            this._editingId  = dragIds.length === 1 ? dragIds[0] : null;
             await APP.refresh();
             APP.renderSection('datatype-properties');
         } catch (e) { UI.error(e.message); }
     },
 
     onDragEnd(event) {
-        event.target.classList.remove('dragging');
+        document.querySelectorAll('.tree-item.dragging').forEach(el => el.classList.remove('dragging'));
         document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
         this._dragId = null;
     },
@@ -3334,7 +3703,35 @@ const DPEditor = {
         return visit(ancestorId);
     },
 
-    deleteSelected() { if (this._selectedId) this.delete(this._selectedId); },
+    async deleteSelected() {
+        const ids = this._selectedIds.size > 0
+            ? [...this._selectedIds]
+            : (this._selectedId ? [this._selectedId] : []);
+        if (!ids.length) return;
+
+        if (ids.length === 1) {
+            await this.delete(ids[0]);
+            return;
+        }
+
+        const confirmed = await UI.confirm(
+            `Delete <strong>${ids.length}</strong> datatype properties?<br>
+             <small style="color:var(--text-dim)">${ids.join(', ')}</small>`
+        );
+        if (!confirmed) return;
+
+        try {
+            for (const id of ids) { await API.deleteDP(id); }
+            UI.success(`${ids.length} datatype properties deleted`);
+            this._selectedIds.clear();
+            this._anchorId = null;
+            this._selectedId = null;
+            this._editingId  = null;
+            this._topPropSelected = false;
+            await APP.refresh();
+            APP.renderSection('datatype-properties');
+        } catch (e) { UI.error(e.message); }
+    },
 
     // ── Protégé-style form ─────────────────────────────────
 
@@ -3527,11 +3924,25 @@ const DPEditor = {
     },
 
     async delete(id) {
-        if (!await UI.confirm(`Delete DatatypeProperty <strong>${id}</strong>?`)) return;
+        // Collect descendants
+        const { childrenOf } = this.buildTree(APP.state.datatype_properties || []);
+        const descendants = [];
+        const collect = (cid) => (childrenOf[cid] || []).forEach(c => { descendants.push(c); collect(c); });
+        collect(id);
+
+        const confirmed = await UI.confirm(
+            descendants.length > 0
+                ? `Delete <strong>${id}</strong> and its ${descendants.length} sub-propert${descendants.length > 1 ? 'ies' : 'y'}?<br>
+                   <small style="color:var(--text-dim)">${descendants.join(', ')}</small>`
+                : `Delete DatatypeProperty <strong>${id}</strong>?`
+        );
+        if (!confirmed) return;
         try {
-            await API.deleteDP(id);
-            UI.success(`DatatypeProperty '${id}' deleted`);
+            const result = await API.deleteDP(id);
+            const n = (result?.deleted || [id]).length;
+            UI.success(`${n} datatype propert${n > 1 ? 'ies' : 'y'} deleted`);
             this._selectedId = null; this._editingId = null;
+            this._selectedIds.clear(); this._anchorId = null;
             await APP.refresh(); APP.renderSection('datatype-properties');
         } catch (e) { UI.error(e.message); }
     },
@@ -3583,7 +3994,8 @@ const IndividualEditor = {
                                 onclick="IndividualEditor.deleteSelected()" title="Delete selected individual">${ClassEditor._svgDelete}</button>
                     </div>
                 </div>
-                <div class="tree-scroll" id="ind-list-scroll">${listContent}</div>
+                <div class="tree-scroll" id="ind-list-scroll"
+                     onclick="IndividualEditor._onListBgClick(event)">${listContent}</div>
             </div>
             <div class="split-handle" id="ind-split-h2"></div>
             <div class="detail-panel" id="ind-detail">
@@ -3611,6 +4023,8 @@ const IndividualEditor = {
                 document.getElementById('ind-cls-ctx-menu')?.remove();
                 ClassEditor._expandAncestors('${id}');
                 ClassEditor._selectedId = '${id}';
+                ClassEditor._selectedIds = new Set(['${id}']);
+                ClassEditor._anchorId = '${id}';
                 ClassEditor._owlThingSelected = false;
                 APP.renderSection('classes');
                 setTimeout(() => ClassEditor.restoreSelection(), 50)">
@@ -3769,7 +4183,8 @@ const IndividualEditor = {
                  draggable="true"
                  ondragstart="IndividualEditor._onIndDragStart(event,'${ind.id}')"
                  ondragend="IndividualEditor._onIndDragEnd(event)"
-                 onclick="IndividualEditor.selectIndividual('${ind.id}', event.shiftKey)">
+                 onclick="IndividualEditor.selectIndividual('${ind.id}', event.shiftKey)"
+                 oncontextmenu="event.preventDefault();IndividualEditor.showContextMenu(event,'${ind.id}')">
                 <span class="xsd-dot" style="flex-shrink:0;margin:0"></span>
                 <span style="flex:1;overflow:hidden;min-width:0">
                     <span class="tree-label" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;display:block"
@@ -3830,7 +4245,7 @@ const IndividualEditor = {
         const updated = { ...ind, types: newTypes };
         try {
             await API.updateIndividual(indId, updated);
-            UI.success(`'${indId}' déplacé vers '${targetClassId}'`);
+            UI.success(`'${indId}' moved to '${targetClassId}'`);
             await APP.refresh();
             APP.renderSection('individuals');
             this.selectIndividual(indId);
@@ -3871,7 +4286,7 @@ const IndividualEditor = {
         if (btn) btn.disabled = !enabled;
     },
 
-    selectIndividual(id, isShift = false) {
+    selectIndividual(id, isShift = false, _hist = true) {
         if (isShift && this._anchorIndId) {
             // ── Shift+Click: range selection ─────────────────
             const items  = [...document.querySelectorAll('#ind-list-scroll .tree-item[data-id]')];
@@ -3892,6 +4307,7 @@ const IndividualEditor = {
 
         this._selectedIndId = id;
         this._editingId     = this._selectedIndIds.size === 1 ? id : null;
+        if (_hist && !isShift) APP._pushNav('individuals', id);
         this._setDelBtn(this._selectedIndIds.size > 0);
 
         // Col 2 — multi-highlight
@@ -3908,12 +4324,9 @@ const IndividualEditor = {
             if (ind) { detail.innerHTML = this.renderForm(ind); _initHResizers('ind-detail'); }
         } else {
             const n = this._selectedIndIds.size;
-            const ico = ClassEditor._svgDelete;
             detail.innerHTML = `<div class="detail-panel-empty">
                 <span style="font-size:28px">◆◆</span>
                 <span><strong>${n}</strong> individuals selected</span>
-                <button class="btn-icon btn-icon-danger" onclick="IndividualEditor.deleteSelected()"
-                        style="gap:6px">${ico} Delete all selected</button>
             </div>`;
         }
     },
@@ -4001,6 +4414,80 @@ const IndividualEditor = {
         } catch (e) { UI.error(e.message); }
     },
 
+    // ── Listener document-level : désélectionner si clic hors liste ─
+    _deselectListener: null,
+
+    _installDeselectListener() {
+        // Nettoyer l'ancien listener s'il existe
+        if (this._deselectListener) {
+            document.removeEventListener('mousedown', this._deselectListener, true);
+            this._deselectListener = null;
+        }
+        this._deselectListener = (e) => {
+            if (!this._selectedIndIds.size) return;
+            // Ignorer si clic dans la liste d'individuals, dans le menu contextuel ou sur un bouton
+            if (e.target.closest('#ind-list-scroll'))   return;
+            if (e.target.closest('#ind-ctx-menu'))      return;
+            if (e.target.closest('.btn-icon, .btn-sm')) return;
+            // Tout autre clic → désélectionner
+            this._selectedIndIds.clear();
+            this._selectedIndId = null;
+            this._anchorIndId   = null;
+            this._editingId     = null;
+            this._setDelBtn(false);
+            document.querySelectorAll('#ind-list-scroll .tree-item').forEach(el => el.classList.remove('selected'));
+            const detail = document.getElementById('ind-detail');
+            if (detail) detail.innerHTML = `<div class="detail-panel-empty">
+                <span class="xsd-dot" style="width:28px;height:28px"></span>
+                <span>Select an individual to view details</span>
+            </div>`;
+        };
+        document.addEventListener('mousedown', this._deselectListener, true);
+    },
+
+    // ── Clic sur le fond de la liste → désélectionner tout ───
+    _onListBgClick(event) {
+        // Géré par _deselectListener — garder pour compatibilité
+    },
+
+    // ── Menu contextuel (clic droit sur un individual) ────────
+    showContextMenu(event, id) {
+        this._closeContextMenu();
+        // Si l'individual cliqué n'est pas dans la sélection courante, on le sélectionne seul
+        if (!this._selectedIndIds.has(id)) {
+            this.selectIndividual(id, false);
+        }
+        const n = this._selectedIndIds.size;
+        const label = n > 1
+            ? `Delete Individuals <strong>(${n})</strong>`
+            : `Delete Individual`;
+        const menu = document.createElement('div');
+        menu.id = 'ind-ctx-menu';
+        menu.className = 'ctx-menu';
+        menu.innerHTML = `
+            <div class="ctx-item ctx-danger" onclick="IndividualEditor._closeContextMenu();IndividualEditor.deleteSelected()">
+                ${ClassEditor._svgDelete} ${label}</div>`;
+        menu.style.left = event.clientX + 'px';
+        menu.style.top  = event.clientY + 'px';
+        document.body.appendChild(menu);
+        requestAnimationFrame(() => {
+            const r = menu.getBoundingClientRect();
+            if (r.right  > window.innerWidth)  menu.style.left = (event.clientX - r.width)  + 'px';
+            if (r.bottom > window.innerHeight)  menu.style.top  = (event.clientY - r.height) + 'px';
+        });
+        const close = (e) => {
+            if (!menu.contains(e.target)) {
+                this._closeContextMenu();
+                document.removeEventListener('click', close, true);
+            }
+        };
+        setTimeout(() => document.addEventListener('click', close, true), 0);
+    },
+
+    _closeContextMenu() {
+        document.getElementById('ind-ctx-menu')?.remove();
+    },
+
     /** Persists the display rules in the ontology (backend) */
     _saveDisplayRules() {
         const rules = { single: this._displayProps, multi: this._displayPropsMulti };
@@ -4018,6 +4505,7 @@ const IndividualEditor = {
     restoreSelection() {
         this._loadDisplayRules();
         this._initSplitPanes();
+        this._installDeselectListener();
         // Col 1 — restore highlighting
         const treeId = this._selectedClassId === null ? 'owl:Thing' : this._selectedClassId;
         document.querySelectorAll('#ind-class-tree .tree-item').forEach(el => {
@@ -4382,7 +4870,7 @@ const IndividualEditor = {
                       onmouseover="this.style.textDecoration='underline'"
                       onmouseout="this.style.textDecoration=''"
                       title="Navigate to ${propId}">${propId}</span>
-                <span style="margin-left:6px;font-size:10px;color:var(--text-faint)">🧠 inféré</span>
+                <span style="margin-left:6px;font-size:10px;color:var(--text-faint)">🧠 inferred</span>
             </div>
             <div class="cls-frame-body">${rows}</div>
         </div>`;
@@ -5367,8 +5855,11 @@ const AP_BUILTINS = {
 
 const APEditor = {
 
-    _selectedId:   null,   // null | 'rdfs:' | 'owl:' | user-prop id
-    _editingId:    null,   // original id being edited (null = new)
+    _selectedId:   null,              // null | 'rdfs:' | 'owl:' | user-prop id
+    _selectedIds:  new Set(),         // multi-selection (user props only)
+    _anchorId:     null,              // anchor for Shift+Click range selection
+    _deselectListener: null,          // document-level mousedown listener
+    _editingId:    null,              // original id being edited (null = new)
     _expanded:     new Set(['rdfs:', 'owl:']),
 
     // ── Shared SVG icons ──────────────────────────────────────
@@ -5462,14 +5953,16 @@ const APEditor = {
         if (!prop) return '';
         const children = childrenOf[id] || [];
         const hasChildren = children.length > 0;
-        const isSel = this._selectedId === id;
+        const isSel = this._selectedIds.has(id);
         const isOpen = this._expanded.has(id);
         const sid = id.replace(/'/g, "\\'");
         return `
         <div class="tree-root-node">
             <div class="tree-item${isSel ? ' selected' : ''}" style="padding-left:${depth * 16 + 6}px"
+                 data-id="${id}"
                  draggable="true"
-                 onclick="APEditor.selectProp('${sid}')"
+                 onclick="APEditor.selectProp('${sid}', event)"
+                 oncontextmenu="event.preventDefault();APEditor.showContextMenu(event,'${sid}')"
                  ondragstart="APEditor.onDragStart(event,'${sid}')"
                  ondragover="APEditor.onDragOver(event,'${sid}')"
                  ondragleave="APEditor.onDragLeave(event)"
@@ -5582,7 +6075,8 @@ const APEditor = {
 
     restoreSelection() {
         this._initSplitPane();
-        if (this._selectedId) this.selectProp(this._selectedId);
+        this._installDeselectListener();
+        if (this._selectedId) this.selectProp(this._selectedId, false);
     },
 
     _initSplitPane() {
@@ -5611,13 +6105,46 @@ const APEditor = {
 
     // ── Selection ────────────────────────────────────────────
 
-    selectProp(id) {
+    selectProp(id, evtOrHist = true) {
+        const isShift = (evtOrHist && typeof evtOrHist === 'object') ? evtOrHist.shiftKey : false;
+        const _hist   = (evtOrHist && typeof evtOrHist === 'object') ? true : evtOrHist;
+
+        const isUserProp = id && !this._isRoot(id) && !this._isBuiltin(id);
+
+        if (isShift && isUserProp && this._anchorId) {
+            // ── Shift+Click: range selection over visible user props ──
+            const items = [...document.querySelectorAll('#ap-tree .tree-item[data-id]')];
+            const ids   = items.map(el => el.dataset.id);
+            const from  = ids.indexOf(this._anchorId);
+            const to    = ids.indexOf(id);
+            if (from !== -1 && to !== -1) {
+                const [lo, hi] = from < to ? [from, to] : [to, from];
+                this._selectedIds = new Set(ids.slice(lo, hi + 1));
+            } else {
+                this._selectedIds.add(id);
+            }
+        } else {
+            // ── Single click ──────────────────────────────────────────
+            this._selectedIds = isUserProp ? new Set([id]) : new Set();
+            if (isUserProp) this._anchorId = id;
+            if (_hist && !isShift) APP._pushNav('annotation-properties', id);
+        }
+
         this._selectedId = id;
         this._highlightSelected();
         this._updateButtons();
+
         const detail = document.getElementById('ap-detail');
         if (!detail) return;
-        if (this._isRoot(id)) {
+
+        if (this._selectedIds.size > 1) {
+            const n = this._selectedIds.size;
+            detail.innerHTML = `<div class="detail-panel-empty">
+                <span style="font-size:28px"><span class="anno-prop-dot" style="display:inline-block;vertical-align:middle;width:20px;height:10px"></span><span class="anno-prop-dot" style="display:inline-block;vertical-align:middle;width:20px;height:10px;margin-left:4px"></span></span>
+                <span><strong>${n}</strong> annotation properties selected</span>
+            </div>`;
+            this._updateSuperPanel(null);
+        } else if (this._isRoot(id)) {
             detail.innerHTML = this._renderRootDetail(id);
             this._updateSuperPanel(null);
         } else if (this._isBuiltin(id)) {
@@ -5630,11 +6157,28 @@ const APEditor = {
         }
     },
 
+    _installDeselectListener() {
+        if (this._deselectListener) {
+            document.removeEventListener('mousedown', this._deselectListener, true);
+            this._deselectListener = null;
+        }
+        this._deselectListener = (e) => {
+            if (!this._selectedIds.size) return;
+            if (e.target.closest('.tree-item[data-id]')) return;
+            if (e.target.closest('.tree-root-item'))     return;
+            if (e.target.closest('.tree-toggle'))        return;
+            if (e.target.closest('#ap-ctx-menu'))        return;
+            if (e.target.closest('.btn-icon, .btn-sm'))  return;
+            this._selectedIds.clear();
+            this._anchorId = null;
+            const tree = document.getElementById('ap-tree');
+            if (tree) tree.innerHTML = this._renderTree(APP.state.annotation_properties || []);
+        };
+        document.addEventListener('mousedown', this._deselectListener, true);
+    },
+
     _highlightSelected() {
-        document.querySelectorAll('#ap-tree .tree-item, #ap-tree .tree-root-item').forEach(el => {
-            el.classList.toggle('selected', el.closest('[onclick]')?.getAttribute('onclick')?.includes(`'${this._selectedId}'`));
-        });
-        // More reliable: re-render
+        // Re-render the tree — highlighting is done via _selectedIds in _renderUserNode
         const tree = document.getElementById('ap-tree');
         if (tree) tree.innerHTML = this._renderTree(APP.state.annotation_properties || []);
     },
@@ -5649,17 +6193,24 @@ const APEditor = {
         const isRoot    = this._isRoot(id);
         const isBuiltin = id && this._isBuiltin(id);
         const isUser    = id && !isRoot && !isBuiltin;
+        const isMulti   = this._selectedIds.size > 1;
 
-        // Root selected → hide all buttons
-        // Built-in selected → Child only (no Sibling, no Delete)
-        // User-defined → Child + Sibling (no Delete for now, keep for safety)
-        btnChild.style.display  = isRoot ? 'none' : '';
-        btnSister.style.display = (isRoot || isBuiltin) ? 'none' : '';
-        btnDelete.style.display = (isRoot || isBuiltin) ? 'none' : '';
-
-        btnChild.disabled  = !id;     // enabled for built-ins and user props alike
-        btnSister.disabled = !isUser;
-        btnDelete.disabled = !isUser;
+        if (isMulti) {
+            // Multi-selection: only Delete active
+            btnChild.style.display  = '';
+            btnSister.style.display = '';
+            btnDelete.style.display = '';
+            btnChild.disabled  = true;
+            btnSister.disabled = true;
+            btnDelete.disabled = false;
+        } else {
+            btnChild.style.display  = isRoot ? 'none' : '';
+            btnSister.style.display = (isRoot || isBuiltin) ? 'none' : '';
+            btnDelete.style.display = (isRoot || isBuiltin) ? 'none' : '';
+            btnChild.disabled  = !id;
+            btnSister.disabled = !isUser;
+            btnDelete.disabled = !isUser;
+        }
     },
 
     // ── Detail panels (read-only) ─────────────────────────────
@@ -5904,15 +6455,24 @@ const APEditor = {
 
     onDragStart(event, id) {
         this._dragId = id;
+        if (!this._selectedIds.has(id)) {
+            this._selectedIds = new Set([id]);
+            this._anchorId = id;
+        }
         event.dataTransfer.effectAllowed = 'move';
         event.dataTransfer.setData('text/plain', id);
-        setTimeout(() => event.target.classList.add('dragging'), 0);
+        setTimeout(() => {
+            document.querySelectorAll('#ap-tree .tree-item[data-id]').forEach(el => {
+                if (this._selectedIds.has(el.dataset.id)) el.classList.add('dragging');
+            });
+        }, 0);
     },
 
     onDragOver(event, targetId) {
         if (!this._dragId) return;
-        if (this._dragId === targetId) return;
-        if (!this._isRoot(targetId) && !this._isBuiltin(targetId) && this._isDescendant(targetId, this._dragId)) return;
+        if (this._selectedIds.has(targetId)) return;
+        if (!this._isRoot(targetId) && !this._isBuiltin(targetId) &&
+            [...this._selectedIds].some(sid => this._isDescendant(targetId, sid))) return;
         event.preventDefault();
         event.dataTransfer.dropEffect = 'move';
         event.currentTarget.classList.add('drag-over');
@@ -5925,33 +6485,26 @@ const APEditor = {
     async onDrop(event, targetId) {
         event.preventDefault();
         event.currentTarget.classList.remove('drag-over');
-        const draggedId = this._dragId;
+        const dragIds = this._selectedIds.size > 0 ? [...this._selectedIds] : [this._dragId];
         this._dragId = null;
-        if (!draggedId || draggedId === targetId) return;
-        const props = APP.state.annotation_properties || [];
-        const prop = props.find(p => p.id === draggedId);
-        if (!prop) return;
-
-        let newParents;
-        if (this._isRoot(targetId)) {
-            // Drop on namespace root → no parent (orphan under that namespace)
-            newParents = [];
-        } else {
-            newParents = [targetId];
-        }
-
+        if (!dragIds.length || dragIds.includes(targetId)) return;
+        const newParents = this._isRoot(targetId) ? [] : [targetId];
         if (targetId && !this._isRoot(targetId)) this._expanded.add(targetId);
-        this._selectedId = draggedId;
         try {
-            await API.updateAP(draggedId, { ...prop, subPropertyOf: newParents });
-            UI.success(`'${draggedId}' moved`);
+            for (const draggedId of dragIds) {
+                const prop = (APP.state.annotation_properties || []).find(p => p.id === draggedId);
+                if (!prop) continue;
+                await API.updateAP(draggedId, { ...prop, subPropertyOf: newParents });
+            }
+            UI.success(dragIds.length > 1 ? `${dragIds.length} properties moved` : `'${dragIds[0]}' moved`);
+            this._selectedId = dragIds[0];
             await APP.refresh();
             APP.renderSection('annotation-properties');
         } catch (e) { UI.error(e.message); }
     },
 
     onDragEnd(event) {
-        event.target.classList.remove('dragging');
+        document.querySelectorAll('.tree-item.dragging').forEach(el => el.classList.remove('dragging'));
         document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
         this._dragId = null;
     },
@@ -5969,24 +6522,105 @@ const APEditor = {
     // ── Delete ────────────────────────────────────────────────
 
     async deleteSelected() {
-        const id = this._selectedId;
-        if (!id || this._isRoot(id) || this._isBuiltin(id)) return;
-        if (!await UI.confirm(`Delete annotation property <strong>${id}</strong>?`)) return;
+        const ids = this._selectedIds.size > 0
+            ? [...this._selectedIds]
+            : (this._selectedId && !this._isRoot(this._selectedId) && !this._isBuiltin(this._selectedId) ? [this._selectedId] : []);
+        if (!ids.length) return;
+
+        if (ids.length === 1) {
+            const id = ids[0];
+            // Collect descendants for display in confirm dialog
+            const props = APP.state.annotation_properties || [];
+            const childrenOf = {};
+            props.forEach(p => { childrenOf[p.id] = []; });
+            props.forEach(p => { (p.subPropertyOf || []).forEach(par => { if (childrenOf[par]) childrenOf[par].push(p.id); }); });
+            const descendants = [];
+            const collect = (cid) => (childrenOf[cid] || []).forEach(c => { descendants.push(c); collect(c); });
+            collect(id);
+
+            const confirmed = await UI.confirm(
+                descendants.length > 0
+                    ? `Delete <strong>${id}</strong> and its ${descendants.length} sub-propert${descendants.length > 1 ? 'ies' : 'y'}?<br>
+                       <small style="color:var(--text-dim)">${descendants.join(', ')}</small>`
+                    : `Delete annotation property <strong>${id}</strong>?`
+            );
+            if (!confirmed) return;
+            try {
+                const result = await API.deleteAP(id);
+                const n = (result?.deleted || [id]).length;
+                UI.success(`${n} annotation propert${n > 1 ? 'ies' : 'y'} deleted`);
+                this._selectedId  = null;
+                this._selectedIds.clear();
+                this._anchorId    = null;
+                await APP.refresh();
+                const detail = document.getElementById('ap-detail');
+                if (detail) detail.innerHTML = `
+                    <div class="detail-panel-empty">
+                        <span class="anno-prop-dot" style="width:40px;height:20px"></span>
+                        <span>Select an <strong>Annotation Property</strong> or create a new one</span>
+                        <button class="btn-primary btn-sm" onclick="APEditor.createChild()">＋ Create Annotation Property</button>
+                    </div>`;
+                const tree = document.getElementById('ap-tree');
+                if (tree) tree.innerHTML = this._renderTree(APP.state.annotation_properties || []);
+                this._updateButtons();
+            } catch (e) { UI.error(e.message); }
+            return;
+        }
+
+        const confirmed = await UI.confirm(
+            `Delete <strong>${ids.length}</strong> annotation properties?<br>
+             <small style="color:var(--text-dim)">${ids.join(', ')}</small>`
+        );
+        if (!confirmed) return;
         try {
-            await API.deleteAP(id);
-            UI.success(`Annotation Property '${id}' deleted`);
-            this._selectedId = null;
+            for (const id of ids) { await API.deleteAP(id); }
+            UI.success(`${ids.length} annotation properties deleted`);
+            this._selectedId  = null;
+            this._selectedIds.clear();
+            this._anchorId    = null;
+            this._editingId   = null;
             await APP.refresh();
-            const detail = document.getElementById('ap-detail');
-            if (detail) detail.innerHTML = `
-                <div class="detail-panel-empty">
-                    <span class="anno-prop-dot" style="width:40px;height:20px"></span>
-                    <span>Select an <strong>Annotation Property</strong> or create a new one</span>
-                    <button class="btn-primary btn-sm" onclick="APEditor.createChild()">＋ Create Annotation Property</button>
-                </div>`;
-            const tree = document.getElementById('ap-tree');
-            if (tree) tree.innerHTML = this._renderTree(APP.state.annotation_properties || []);
-            this._updateButtons();
+            APP.renderSection('annotation-properties');
         } catch (e) { UI.error(e.message); }
+    },
+
+    showContextMenu(event, id) {
+        event.stopPropagation();
+        if (!this._selectedIds.has(id)) {
+            this._selectedIds = new Set([id]);
+            this._anchorId    = id;
+            this._selectedId  = id;
+            this._highlightSelected();
+            this._updateButtons();
+        }
+        this._closeContextMenu();
+
+        const n = this._selectedIds.size;
+        const deleteLabel = n > 1 ? `Delete Properties <strong>(${n})</strong>` : `Delete Property`;
+        const menu = document.createElement('div');
+        menu.id = 'ap-ctx-menu';
+        menu.className = 'ctx-menu';
+        menu.innerHTML = `
+            <div class="ctx-item ctx-danger" onclick="APEditor._closeContextMenu();APEditor.deleteSelected()">
+                ${this._svgDelete} ${deleteLabel}</div>`;
+        menu.style.left = event.clientX + 'px';
+        menu.style.top  = event.clientY + 'px';
+        document.body.appendChild(menu);
+        requestAnimationFrame(() => {
+            const r = menu.getBoundingClientRect();
+            if (r.right  > window.innerWidth)  menu.style.left = (event.clientX - r.width)  + 'px';
+            if (r.bottom > window.innerHeight)  menu.style.top  = (event.clientY - r.height) + 'px';
+        });
+        const close = (e) => {
+            if (!menu.contains(e.target)) {
+                this._closeContextMenu();
+                document.removeEventListener('click', close, true);
+            }
+        };
+        setTimeout(() => document.addEventListener('click', close, true), 0);
+    },
+
+    _closeContextMenu() {
+        document.getElementById('ap-ctx-menu')?.remove();
     },
 };

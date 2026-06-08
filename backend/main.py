@@ -67,6 +67,19 @@ def _collect_class_descendants(onto: OWLOntology, class_id: str) -> set:
     return descendants
 
 
+def _collect_prop_descendants(prop_list: list, prop_id: str) -> set:
+    """Retourne l'ensemble des IDs de toutes les sous-propriétés descendantes (récursivement)."""
+    descendants: set = set()
+    to_visit = {prop_id}
+    while to_visit:
+        current = to_visit.pop()
+        for p in prop_list:
+            if current in (p.subPropertyOf or []) and p.id not in descendants:
+                descendants.add(p.id)
+                to_visit.add(p.id)
+    return descendants
+
+
 def _rename_swrl_atom(atom, old_id: str, new_id: str, kind: str) -> None:
     """Propage un renommage dans un atome SWRL (récursif pour NAFBlock et Conditional)."""
     if kind == 'class' and getattr(atom, 'class_id', None) == old_id:
@@ -521,17 +534,19 @@ class OntologySnapshot(PydanticModel):
     classes:               list = []
     object_properties:     list = []
     datatype_properties:   list = []
+    annotation_properties: list = []
     individuals:           list = []
     swrl_rules:            list = []
 
 @app.post("/api/snapshot/restore", tags=["Undo"])
 def restore_snapshot(snap: OntologySnapshot):
     onto = require_onto()
-    onto.classes             = [OWLClass(**c)             for c in snap.classes]
-    onto.object_properties   = [OWLObjectProperty(**p)   for p in snap.object_properties]
-    onto.datatype_properties = [OWLDatatypeProperty(**p) for p in snap.datatype_properties]
-    onto.individuals         = [OWLIndividual(**i)        for i in snap.individuals]
-    onto.swrl_rules          = [SWRLRule(**r)             for r in snap.swrl_rules]
+    onto.classes               = [OWLClass(**c)                for c in snap.classes]
+    onto.object_properties     = [OWLObjectProperty(**p)       for p in snap.object_properties]
+    onto.datatype_properties   = [OWLDatatypeProperty(**p)     for p in snap.datatype_properties]
+    onto.annotation_properties = [OWLAnnotationProperty(**p)   for p in snap.annotation_properties]
+    onto.individuals           = [OWLIndividual(**i)            for i in snap.individuals]
+    onto.swrl_rules            = [SWRLRule(**r)                 for r in snap.swrl_rules]
     store.save()
     return {"ok": True}
 
@@ -739,16 +754,23 @@ def delete_object_property(prop_id: str):
     prop = next((p for p in onto.object_properties if p.id == prop_id), None)
     if not prop:
         raise HTTPException(404, f"ObjectProperty '{prop_id}' not found")
-    # ── Symétrie owl:inverseOf ───────────────────────────────────
-    if prop.inverseOf:
-        inv = next((p for p in onto.object_properties if p.id == prop.inverseOf), None)
-        if inv and inv.inverseOf == prop_id:
-            inv.inverseOf = None
-    # ── Marqueurs domain → classes ───────────────────────────────
-    _sync_domain_markers(onto, prop_id, set(prop.domain or []), set())
-    onto.object_properties = [p for p in onto.object_properties if p.id != prop_id]
+    # ── Cascade : collect all descendants ───────────────────────
+    to_delete = _collect_prop_descendants(onto.object_properties, prop_id)
+    to_delete.add(prop_id)
+    for pid in to_delete:
+        p = next((x for x in onto.object_properties if x.id == pid), None)
+        if not p:
+            continue
+        # ── Symétrie owl:inverseOf ───────────────────────────────
+        if p.inverseOf:
+            inv = next((x for x in onto.object_properties if x.id == p.inverseOf), None)
+            if inv and inv.inverseOf == pid:
+                inv.inverseOf = None
+        # ── Marqueurs domain → classes ───────────────────────────
+        _sync_domain_markers(onto, pid, set(p.domain or []), set())
+    onto.object_properties = [p for p in onto.object_properties if p.id not in to_delete]
     store.save()
-    return {"deleted": prop_id}
+    return {"deleted": sorted(to_delete)}
 
 
 # ════════════════════════════════════════════════════════════════
@@ -808,11 +830,16 @@ def delete_datatype_property(prop_id: str):
     prop = next((p for p in onto.datatype_properties if p.id == prop_id), None)
     if not prop:
         raise HTTPException(404, f"DatatypeProperty '{prop_id}' not found")
-    # ── Marqueurs domain → classes ───────────────────────────────
-    _sync_domain_markers(onto, prop_id, set(prop.domain or []), set())
-    onto.datatype_properties = [p for p in onto.datatype_properties if p.id != prop_id]
+    # ── Cascade : collect all descendants ───────────────────────
+    to_delete = _collect_prop_descendants(onto.datatype_properties, prop_id)
+    to_delete.add(prop_id)
+    for pid in to_delete:
+        p = next((x for x in onto.datatype_properties if x.id == pid), None)
+        if p:
+            _sync_domain_markers(onto, pid, set(p.domain or []), set())
+    onto.datatype_properties = [p for p in onto.datatype_properties if p.id not in to_delete]
     store.save()
-    return {"deleted": prop_id}
+    return {"deleted": sorted(to_delete)}
 
 
 # ════════════════════════════════════════════════════════════════
@@ -869,13 +896,16 @@ def delete_annotation_property(prop_id: str):
     prop = next((p for p in onto.annotation_properties if p.id == prop_id), None)
     if not prop:
         raise HTTPException(404, f"AnnotationProperty '{prop_id}' not found")
-    # Remove subPropertyOf references
+    # ── Cascade : collect all descendants ───────────────────────
+    to_delete = _collect_prop_descendants(onto.annotation_properties, prop_id)
+    to_delete.add(prop_id)
+    # Remove subPropertyOf references pointing to any deleted prop
     for p in onto.annotation_properties:
-        if prop_id in p.subPropertyOf:
-            p.subPropertyOf = [s for s in p.subPropertyOf if s != prop_id]
-    onto.annotation_properties = [p for p in onto.annotation_properties if p.id != prop_id]
+        if p.id not in to_delete:
+            p.subPropertyOf = [s for s in (p.subPropertyOf or []) if s not in to_delete]
+    onto.annotation_properties = [p for p in onto.annotation_properties if p.id not in to_delete]
     store.save()
-    return {"deleted": prop_id}
+    return {"deleted": sorted(to_delete)}
 
 
 # ════════════════════════════════════════════════════════════════
