@@ -9,8 +9,8 @@
 - [REQ-FTS-002 — Recherche dans les Display Names des `Individual` (partie A.2)](#req-fts-002--recherche-dans-les-display-names-des-individual-partie-a2)
 - [REQ-FTS-003 — Recherche dans les labels des SWRL Rules (partie A.3)](#req-fts-003--recherche-dans-les-labels-des-swrl-rules-partie-a3)
 - [REQ-FTS-004 — Recherche dans les labels des SPARQL VizQ (partie A.4)](#req-fts-004--recherche-dans-les-labels-des-sparql-vizq-partie-a4)
-- [REQ-FTS-005 — Recherche dans les IDs système — `Class`, `ObjectProperty`, `DatatypeProperty`, `AnnotationProperty` (partie B)](#req-fts-005--recherche-dans-les-ids-système--class-objectproperty-datatypeproperty-annotationproperty-partie-b)
-- [REQ-FTS-006 — Recherche dans les IDs système — `Individual`, SWRL Rule, SPARQL VizQ (partie B)](#req-fts-006--recherche-dans-les-ids-système--individual-swrl-rule-sparql-vizq-partie-b)
+- [REQ-FTS-005 — Recherche dans les IDs système — `Class`, `ObjectProperty`, `DatatypeProperty`, `AnnotationProperty`, `Individual` (partie B)](#req-fts-005--recherche-dans-les-ids-système--class-objectproperty-datatypeproperty-annotationproperty-individual-partie-b)
+- [REQ-FTS-006 — Recherche dans les IDs système — SWRL Rule, SPARQL VizQ (partie B)](#req-fts-006--recherche-dans-les-ids-système--swrl-rule-sparql-vizq-partie-b)
 - [REQ-FTS-007 — Coexistence des résultats Partie A et Partie B](#req-fts-007--coexistence-des-résultats-partie-a-et-partie-b)
 - [REQ-FTS-008 — Navigation vers l'entité depuis un résultat](#req-fts-008--navigation-vers-lentité-depuis-un-résultat)
 
@@ -69,23 +69,23 @@
 
 ---
 
-### REQ-FTS-005 — Recherche dans les IDs système — `Class`, `ObjectProperty`, `DatatypeProperty`, `AnnotationProperty` (partie B)
+### REQ-FTS-005 — Recherche dans les IDs système — `Class`, `ObjectProperty`, `DatatypeProperty`, `AnnotationProperty`, `Individual` (partie B)
 
 | **Si** | l'utilisateur saisit une chaîne de caractères dans le champ de recherche, |
 |---|---|
-| **Alors** | le système parcourt les IDs de toutes les `Class`, `ObjectProperty`, `DatatypeProperty` et `AnnotationProperty` et retient toute entité dont l'ID contient cette chaîne (insensible à la casse). |
+| **Alors** | le système parcourt les IDs de toutes les `Class`, `ObjectProperty`, `DatatypeProperty`, `AnnotationProperty` et `Individual` et retient toute entité dont l'ID contient cette chaîne (insensible à la casse). |
 
-**Code source :** `app.js` → `GlobalSearch._search()` — Pour chaque collection (`classes`, `object_properties`, `datatype_properties`, `annotation_properties`), teste `entity.id.toLowerCase().includes(lq)` ; si vrai, produit un item `{ section: '<section>', id: entity.id, label: entity.id }`.
+**Code source :** `app.js` → `GlobalSearch._search()` — Pour chaque collection (`classes`, `object_properties`, `datatype_properties`, `annotation_properties`, `individuals`), teste `entity.id.toLowerCase().includes(lq)` ; si vrai, produit un item `{ section: '<section>', id: entity.id, label: entity.id }`.
 
 ---
 
-### REQ-FTS-006 — Recherche dans les IDs système — `Individual`, SWRL Rule, SPARQL VizQ (partie B)
+### REQ-FTS-006 — Recherche dans les IDs système — SWRL Rule, SPARQL VizQ (partie B)
 
 | **Si** | l'utilisateur saisit une chaîne de caractères dans le champ de recherche, |
 |---|---|
-| **Alors** | le système parcourt les IDs de tous les `Individual`, SWRL Rules et requêtes SPARQL VizQ et retient toute entité dont l'ID contient cette chaîne (insensible à la casse). |
+| **Alors** | le système parcourt les IDs de toutes les SWRL Rules et requêtes SPARQL VizQ et retient toute entité dont l'ID contient cette chaîne (insensible à la casse). |
 
-**Code source :** `app.js` → `GlobalSearch._search()` — Pour `individuals` et `swrl_rules`, teste `entity.id.toLowerCase().includes(lq)`. Pour les SPARQL VizQ, itère sur `SparqlEditor._loadAll()` et teste `query.id.toLowerCase().includes(lq)` ; chaque correspondance produit un item `{ section: 'individuals' | 'swrl-rules' | 'sparql-vizq', id: entity.id, label: entity.id }`.
+**Code source :** `app.js` → `GlobalSearch._search()` — Pour `swrl_rules`, teste `entity.id.toLowerCase().includes(lq)`. Pour les SPARQL VizQ, itère sur `SparqlEditor._loadAll()` et teste `query.id.toLowerCase().includes(lq)` ; chaque correspondance produit un item `{ section: 'swrl-rules' | 'sparql-vizq', id: entity.id, label: entity.id }`.
 
 ---
 
