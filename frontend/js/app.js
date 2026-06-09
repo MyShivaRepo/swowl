@@ -1581,7 +1581,7 @@ const GlobalSearch = {
             ...(s.individuals           || []).map(e => ({ e, kind: 'individuals' })),
         ].forEach(({ e, kind }) => {
             _lblMatches(e).forEach(l =>
-                results.push({ section: 'rdfs-labels', id: e.id, label: l.value, kind })
+                results.push({ section: 'rdfs-labels', id: e.id, label: l.value, lang: l.lang || '', kind })
             );
         });
 
@@ -1687,7 +1687,7 @@ const GlobalSearch = {
                 switch (sec) {
                     case 'rdfs-labels':
                         inner = `<span class="lbl-dot"></span>
-                            <span class="gs-item-label">${r.label}</span>
+                            <span class="gs-item-label">${r.label}${r.lang ? ` <span class="gs-lang-tag">(${r.lang})</span>` : ''}</span>
                             ${this._dot(r.kind)}
                             <span class="gs-item-sub">${r.id}</span>`;
                         break;

@@ -4425,9 +4425,9 @@ const IndividualEditor = {
         }
         this._deselectListener = (e) => {
             if (!this._selectedIndIds.size) return;
-            // Ignorer si clic dans la liste d'individuals, dans le menu contextuel ou sur un bouton
-            if (e.target.closest('#ind-list-scroll'))   return;
-            if (e.target.closest('#ind-ctx-menu'))      return;
+            // Ignorer si clic sur un item individual, le menu contextuel ou un bouton
+            if (e.target.closest('.tree-item[data-id]')) return;
+            if (e.target.closest('#ind-ctx-menu'))       return;
             if (e.target.closest('.btn-icon, .btn-sm')) return;
             // Tout autre clic → désélectionner
             this._selectedIndIds.clear();
