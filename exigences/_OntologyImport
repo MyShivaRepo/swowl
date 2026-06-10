@@ -2,132 +2,198 @@
 
 > Généré le 2026-06-10 | Dérivé strictement du code source | Aucune hallucination
 
+## Périmètre
+
+Ce document décrit les fonctions d'**import d'ontologies externes** dans SWOWL.
+Une ontologie courante peut déclarer l'import d'une ou plusieurs ontologies.
+Les entités importées sont chargées en lecture seule et s'appliquent à l'ensemble des onglets.
+
+| Onglet              | Entités importées concernées              |
+|---------------------|-------------------------------------------|
+| Classes             | `owl:Class`                               |
+| ObjectProperties    | `owl:ObjectProperty`                      |
+| DatatypeProperties  | `owl:DatatypeProperty`                    |
+| AnnotationProperties| `owl:AnnotationProperty`                  |
+| Individuals         | `owl:NamedIndividual`                     |
+| SWRL Rules          | Règles SWRL                               |
+| Queries             | Requêtes SPARQL VizQ                      |
+
+---
+
 ## Table des matières
 
-### Fond
+### Chargement
 - [REQ-IMP-001 — Déclaration d'imports dans l'ontologie courante](#req-imp-001--déclaration-dimports-dans-lontologie-courante)
-- [REQ-IMP-002 — Chargement et fusion des entités importées](#req-imp-002--chargement-et-fusion-des-entités-importées)
-- [REQ-IMP-003 — Héritage des règles de nommage](#req-imp-003--héritage-des-règles-de-nommage)
-- [REQ-IMP-004 — Lecture seule : modification et suppression impossibles](#req-imp-004--lecture-seule--modification-et-suppression-impossibles)
-- [REQ-IMP-005 — Persistance des entités importées](#req-imp-005--persistance-des-entités-importées)
+- [REQ-IMP-002 — Fusion des entités importées dans l'état de l'application](#req-imp-002--fusion-des-entités-importées-dans-létat-de-lapplication)
+- [REQ-IMP-003 — Héritage des règles de nommage (display_rules)](#req-imp-003--héritage-des-règles-de-nommage-display_rules)
+- [REQ-IMP-004 — Persistance : les entités importées ne sont pas sauvegardées localement](#req-imp-004--persistance--les-entités-importées-ne-sont-pas-sauvegardées-localement)
 
-### Forme
-- [REQ-IMP-006 — Présentation dans les listes et arbres](#req-imp-006--présentation-dans-les-listes-et-arbres)
-- [REQ-IMP-007 — Nœuds racines des arbres : même style que les importés](#req-imp-007--nœuds-racines-des-arbres--même-style-que-les-importés)
-- [REQ-IMP-008 — Panneau détail : bannière verrouillée et formulaire en lecture seule](#req-imp-008--panneau-détail--bannière-verrouillée-et-formulaire-en-lecture-seule)
-- [REQ-IMP-009 — Références aux entités importées dans les panneaux de détail](#req-imp-009--références-aux-entités-importées-dans-les-panneaux-de-détail)
-- [REQ-IMP-010 — Menu contextuel des entités importées](#req-imp-010--menu-contextuel-des-entités-importées)
+### Lecture seule
+- [REQ-IMP-005 — Modification et suppression impossibles sur les entités importées](#req-imp-005--modification-et-suppression-impossibles-sur-les-entités-importées)
 
----
+### Présentation — Listes et arbres
+- [REQ-IMP-006 — Style visuel atténué dans les listes et arbres](#req-imp-006--style-visuel-atténué-dans-les-listes-et-arbres)
+- [REQ-IMP-007 — Nœuds racines des arbres : même style visuel que les entités importées](#req-imp-007--nœuds-racines-des-arbres--même-style-visuel-que-les-entités-importées)
+- [REQ-IMP-008 — Menu contextuel des entités importées](#req-imp-008--menu-contextuel-des-entités-importées)
 
-## 1. Fond — Règles métier et logique fonctionnelle
-
-> Exigences indépendantes de l'IHM : règles de chargement, priorités, comportements algorithmiques.
+### Présentation — Panneau détail
+- [REQ-IMP-009 — Bannière verrouillée et formulaire en lecture seule](#req-imp-009--bannière-verrouillée-et-formulaire-en-lecture-seule)
+- [REQ-IMP-010 — Références aux entités importées dans les panneaux de détail locaux](#req-imp-010--références-aux-entités-importées-dans-les-panneaux-de-détail-locaux)
 
 ---
+
+## 1. Chargement
 
 ### REQ-IMP-001 — Déclaration d'imports dans l'ontologie courante
 
 | **Si** | l'ontologie courante déclare un ou plusieurs imports (champ `imports`), |
 |---|---|
-| **Alors** | chaque import est identifié par un **préfixe** (ex. `plm`) et un **nom d'ontologie** (ex. `RoHS_Ontology`). Ces imports sont affichés dans l'onglet **Ontologies** en lecture seule. |
+| **Alors** | chaque import est identifié par un **préfixe** (ex. `plm`) et un **nom d'ontologie** (ex. `RoHS_Ontology`). Les imports sont listés dans l'onglet **Ontologies** en lecture seule. |
 
-**Code source :** `backend/main.py` → `GET /api/imported-entities` — Charge chaque ontologie référencée dans `onto.imports`, lit son fichier JSON et en extrait les entités. `frontend/js/app.js` → `loadState()` — Appelle `API.getImportedEntities()` après le chargement de l'ontologie courante.
+**Applicabilité :** Tous onglets ✓
+
+**Code source :** `backend/main.py`, `frontend/js/app.js`
+- `GET /api/imported-entities` — lit le champ `imports` de l'ontologie courante et charge chaque ontologie référencée
+- `app.js → loadState()` — appelle `API.getImportedEntities()` après le chargement de l'ontologie courante
 
 ---
 
-### REQ-IMP-002 — Chargement et fusion des entités importées
+### REQ-IMP-002 — Fusion des entités importées dans l'état de l'application
 
 | **Si** | l'ontologie courante déclare des imports, |
 |---|---|
-| **Alors** | au chargement, le système fusionne dans l'état de l'application (`APP.state`) les entités suivantes issues des ontologies importées : `classes`, `object_properties`, `datatype_properties`, `annotation_properties`, `individuals`, `swrl_rules` et `queries`. Chaque entité importée est taguée `_imported: true`, `_importPrefix` (préfixe de l'import) et `_importName` (nom de l'ontologie source). |
+| **Alors** | le système fusionne dans `APP.state` les 7 types d'entités issus des ontologies importées : `classes`, `object_properties`, `datatype_properties`, `annotation_properties`, `individuals`, `swrl_rules` et `queries`. Chaque entité importée est taguée `_imported: true`, `_importPrefix` (préfixe) et `_importName` (nom de l'ontologie source). |
 
-**Code source :** `backend/main.py` → `get_imported_entities()` — Itère sur les 7 types d'entités et ajoute le tag `{ "_imported": True, "_importPrefix": prefix, "_importName": name }` à chaque entité. `frontend/js/app.js` → `loadState()` — Fusionne chaque collection : `this.state.classes = [...this.state.classes, ...(imp.classes || [])]` (idem pour les 6 autres types).
+**Applicabilité :** Classes ✓ · OPs ✓ · DPs ✓ · APs ✓ · Individuals ✓ · SWRL Rules ✓ · Queries ✓
+
+**Code source :** `backend/main.py`, `frontend/js/app.js`
+- `get_imported_entities()` — itère sur les 7 types et ajoute `{ "_imported": True, "_importPrefix": prefix, "_importName": name }` à chaque entité
+- `app.js → loadState()` — fusionne chaque collection : `this.state.classes = [...this.state.classes, ...(imp.classes || [])]` (idem pour les 6 autres types)
 
 ---
 
-### REQ-IMP-003 — Héritage des règles de nommage
+### REQ-IMP-003 — Héritage des règles de nommage (display_rules)
 
 | **Si** | une ontologie importée définit des règles de nommage (`display_rules`), |
 |---|---|
-| **Alors** | ces règles sont recopiées dans l'état de l'ontologie courante. En cas de conflit sur la même classe, les règles **locales ont la priorité** sur les règles importées. Cela permet d'afficher correctement le nom des `Individual` de l'ontologie importée. |
+| **Alors** | ces règles sont copiées dans l'état de l'ontologie courante afin d'afficher correctement les noms des `Individual` de l'ontologie importée. En cas de conflit sur la même classe, les règles **locales ont la priorité** sur les règles importées. |
 
-**Code source :** `backend/main.py` → `get_imported_entities()` — Construit `result["display_rules"]` par fusion des `display_rules` importées (première occurrence gagne). `frontend/js/app.js` → `loadState()` — Fusionne avec `{ single: { ...(impDr.single), ...(local.single) }, multi: { ...(impDr.multi), ...(local.multi) } }` : les clés locales écrasent les importées.
+**Applicabilité :** Individuals ✓
 
----
-
-### REQ-IMP-004 — Lecture seule : modification et suppression impossibles
-
-| **Si** | l'utilisateur tente de modifier ou supprimer une entité importée (via le formulaire, le bouton de suppression ou le menu contextuel), |
-|---|---|
-| **Alors** | l'action est bloquée. Les boutons de suppression sont masqués, les champs du formulaire sont désactivés, et une tentative programmatique de suppression affiche un message d'erreur. |
-
-**Code source :** `frontend/js/owl_editor.js` → `_applyReadOnly(detail)` — Désactive tous les `input, select, textarea, button` du panneau. `SWRLEditor.delete()`, `SparqlEditor.deleteQuery()` — Vérifient `rule._imported` / `query._imported` avant toute suppression et appellent `UI.error('Cannot delete an imported ...')` si vrai. `renderList()` de chaque éditeur — Masque le bouton de suppression si `isImported`.
+**Code source :** `backend/main.py`, `frontend/js/app.js`
+- `get_imported_entities()` — construit `result["display_rules"]` par fusion des `display_rules` importées (première occurrence gagne)
+- `app.js → loadState()` — fusionne avec `{ single: { ...(impDr.single), ...(local.single) }, multi: { ...(impDr.multi), ...(local.multi) } }` : les clés locales écrasent les importées
 
 ---
 
-### REQ-IMP-005 — Persistance des entités importées
+### REQ-IMP-004 — Persistance : les entités importées ne sont pas sauvegardées localement
 
 | **Si** | une opération de sauvegarde, d'annulation (undo) ou de rétablissement (redo) est effectuée, |
 |---|---|
-| **Alors** | les entités importées ne sont **pas stockées** dans le fichier de l'ontologie courante. Elles sont rechargées dynamiquement depuis le backend à chaque ouverture. Les snapshots undo/redo ne contiennent pas les entités importées. |
+| **Alors** | les entités importées ne sont **pas stockées** dans le fichier de l'ontologie courante. Elles sont rechargées dynamiquement depuis le backend à chaque ouverture. Les snapshots undo/redo ne contiennent que les entités locales. |
 
-**Code source :** `backend/main.py` → `PUT /api/ontology` — Sauvegarde uniquement les données de l'ontologie courante, sans les entités importées. `frontend/js/app.js` → `UndoRedo._snap()` — Sauvegarde uniquement `s.classes` (sans importés), `s.swrl_rules` (sans importés), etc. Les entités importées sont rechargées via `loadState()` à chaque `APP.refresh()`.
+**Applicabilité :** Tous onglets ✓
 
----
-
-## 2. Forme — Règles d'interface et de présentation
-
-> Exigences portant sur l'affichage, les icônes, l'ordre visuel et les interactions IHM.
+**Code source :** `backend/main.py`, `frontend/js/app.js`
+- `PUT /api/ontology` — sauvegarde uniquement les données de l'ontologie courante, sans les entités importées
+- `app.js → UndoRedo._snap()` — sauvegarde uniquement les collections locales ; les entités importées sont rechargées via `loadState()` à chaque `APP.refresh()`
 
 ---
 
-### REQ-IMP-006 — Présentation dans les listes et arbres
+## 2. Lecture seule
 
-| **Si** | une entité importée apparaît dans la liste ou l'arbre d'un onglet (`Classes`, `ObjectProperties`, `DatatypeProperties`, `AnnotationProperties`, `Individuals`, `SWRL Rules`, `Queries`), |
+### REQ-IMP-005 — Modification et suppression impossibles sur les entités importées
+
+| **Si** | l'utilisateur tente de modifier ou supprimer une entité importée (formulaire, bouton de suppression ou menu contextuel), |
+|---|---|
+| **Alors** | l'action est bloquée : les champs du formulaire sont désactivés, le bouton de suppression est masqué dans la liste, et toute tentative programmatique de suppression affiche un message d'erreur. |
+
+**Applicabilité :** Classes ✓ · OPs ✓ · DPs ✓ · APs ✓ · Individuals ✓ · SWRL Rules ✓ · Queries ✓
+
+**Code source :** `frontend/js/owl_editor.js`, `frontend/js/swrl_editor.js`, `frontend/js/sparql_editor.js`
+- `owl_editor.js → _applyReadOnly(detail)` — désactive tous les `input, select, textarea, button` du panneau
+- `SWRLEditor.delete()` — vérifie `rule._imported` et appelle `UI.error('Cannot delete an imported rule.')` si vrai
+- `SparqlEditor.deleteQuery()` — même vérification sur `query._imported`
+- `renderList()` de chaque éditeur — masque le bouton de suppression si `isImported`
+
+---
+
+## 3. Présentation — Listes et arbres
+
+### REQ-IMP-006 — Style visuel atténué dans les listes et arbres
+
+| **Si** | une entité importée apparaît dans la liste ou l'arbre d'un onglet, |
 |---|---|
 | **Alors** | elle est affichée avec : (1) une **opacité atténuée** (`opacity: 0.5`), (2) un texte en **italique**, (3) son identifiant précédé du **préfixe d'import** (ex. `plm:Article`), (4) le **bouton de suppression masqué**. |
 
-**Code source :** `frontend/css/style.css` → `.imported-entity { font-style: italic; opacity: 0.5; }`. Chaque éditeur (`ClassEditor._renderNode()`, `OPEditor._renderNode()`, `DPEditor._renderNode()`, `APEditor._renderUserNode()`, `IndividualEditor` renderList, `SWRLEditor.renderList()`, `SparqlEditor.renderList()`) — Applique `imported-entity` CSS class et préfixe si `entity._imported === true`.
+**Applicabilité :** Classes ✓ · OPs ✓ · DPs ✓ · APs ✓ · Individuals ✓ · SWRL Rules ✓ · Queries ✓
+
+**Code source :** `frontend/css/style.css`, `frontend/js/owl_editor.js`, `frontend/js/swrl_editor.js`, `frontend/js/sparql_editor.js`
+- `style.css → .imported-entity { font-style: italic; opacity: 0.5; }`
+- `ClassEditor._renderNode()`, `OPEditor._renderNode()`, `DPEditor._renderNode()`, `APEditor._renderUserNode()` — appliquent la classe CSS `imported-entity` et le préfixe si `entity._imported === true`
+- `SWRLEditor.renderList()`, `SparqlEditor.renderList()` — même logique pour les onglets SWRL Rules et Queries
 
 ---
 
-### REQ-IMP-007 — Nœuds racines des arbres : même style que les importés
+### REQ-IMP-007 — Nœuds racines des arbres : même style visuel que les entités importées
 
 | **Si** | l'arbre des `Classes`, `ObjectProperties` ou `DatatypeProperties` est affiché, |
 |---|---|
-| **Alors** | le nœud racine (`owl:Thing`, `owl:topObjectProperty`, `owl:topDataProperty`) adopte le **même style visuel** que les entités importées : même opacité (`0.5`), même couleur de texte (`var(--text)`) et même couleur de dot que les items enfants. |
+| **Alors** | le nœud racine (`owl:Thing`, `owl:topObjectProperty`, `owl:topDataProperty`) adopte le **même style visuel** que les entités importées : même opacité (`0.5`), même couleur de texte (`var(--text)`) et même couleur de dot que les items enfants réguliers. |
 
-**Code source :** `frontend/css/style.css` → `.tree-root-item { color: var(--text); opacity: 0.5; }`. Les dots racines alignés sur les dots réguliers : `.tree-thing-dot { background: #b87333 }` (= `.cls-dot`), `.tree-op-top-dot { background: var(--accent) }` (= `.op-prop-dot`), `.tree-dp-top-dot { background: var(--accent2) }` (= `.dp-prop-dot`).
+**Applicabilité :** Classes ✓ · OPs ✓ · DPs ✓
 
----
-
-### REQ-IMP-008 — Panneau détail : bannière verrouillée et formulaire en lecture seule
-
-| **Si** | l'utilisateur sélectionne une entité importée dans un onglet, |
-|---|---|
-| **Alors** | le panneau de détail affiche : (1) une **bannière 🔒** en haut indiquant le nom de l'ontologie source (ex. `🔒 Imported from RoHS_Ontology (plm:)`), (2) le contenu du formulaire avec une **opacité atténuée** (`0.55`), (3) tous les champs et boutons du formulaire **désactivés**. |
-
-**Code source :** `frontend/js/owl_editor.js` → `_importedBannerHtml(entity)` — Génère le HTML de la bannière. `_applyImportedView(detail, entity, html)` — Si `entity._imported`, injecte la bannière + le HTML, ajoute la classe `is-imported-view`, et appelle `_applyReadOnly(detail)`. CSS : `.is-imported-view > *:not(.imported-detail-banner) { opacity: 0.55; }`.
+**Code source :** `frontend/css/style.css`
+- `.tree-root-item { color: var(--text); opacity: 0.5; }` — aligne la couleur et l'opacité du nœud racine sur les items enfants
+- `.tree-thing-dot { background: #b87333 }` — identique à `.cls-dot`
+- `.tree-op-top-dot { background: var(--accent) }` — identique à `.op-prop-dot`
+- `.tree-dp-top-dot { background: var(--accent2) }` — identique à `.dp-prop-dot`
 
 ---
 
-### REQ-IMP-009 — Références aux entités importées dans les panneaux de détail
-
-| **Si** | un panneau de détail d'une entité **locale** affiche des références vers des entités importées (valeur de propriété d'objet, membre de classe, règle SWRL, propriété inférée, etc.), |
-|---|---|
-| **Alors** | chaque référence pointant vers une entité importée est affichée avec le style atténué (classe CSS `imported-entity` : `opacity: 0.5`, italique). Ceci s'applique aux assertions de propriétés d'objet, aux propriétés inférées, et aux sections **"Where Used In Rules"** des onglets `Classes`, `ObjectProperties`, `DatatypeProperties` et `Individuals`. |
-
-**Code source :** `frontend/js/owl_editor.js` → `_markImportedRefs(container)` — Construit un `Set` de tous les IDs importés (`classes`, `object_properties`, `datatype_properties`, `annotation_properties`, `individuals`) et ajoute la classe `imported-entity` à tout `[data-id]` correspondant. Les lignes OP assertions et Inferred Properties incluent `data-id="${value}"`. `_whereUsedFrame()` — Ajoute directement la classe `imported-entity` et le préfixe sur les items de règles SWRL importées.
-
----
-
-### REQ-IMP-010 — Menu contextuel des entités importées
+### REQ-IMP-008 — Menu contextuel des entités importées
 
 | **Si** | l'utilisateur ouvre le menu contextuel (clic droit) sur une entité importée, |
 |---|---|
-| **Alors** | le menu affiche une icône 🔒 suivie du nom de l'ontologie source, sans proposer d'actions de modification ni de suppression. |
+| **Alors** | le menu affiche une icône 🔒 suivie du nom de l'ontologie source (ex. `🔒 Imported from RoHS_Ontology (plm:)`), sans proposer d'actions de modification ni de suppression. |
 
-**Code source :** `frontend/js/owl_editor.js` → `ClassEditor.showContextMenu()`, `OPEditor.showContextMenu()`, `DPEditor.showContextMenu()` — Vérifient `isImported` et remplacent les items d'action par `<div>🔒 Imported from ${entity._importName}</div>`. `SWRLEditor.showContextMenu()`, `SparqlEditor.showContextMenu()` — Même logique sur `rule._imported` / `query._imported`.
+**Applicabilité :** Classes ✓ · OPs ✓ · DPs ✓ · APs ✓ · Individuals ✓ · SWRL Rules ✓ · Queries ✓
+
+**Code source :** `frontend/js/owl_editor.js`, `frontend/js/swrl_editor.js`, `frontend/js/sparql_editor.js`
+- `ClassEditor.showContextMenu()`, `OPEditor.showContextMenu()`, `DPEditor.showContextMenu()` — vérifient `isImported` et remplacent les items d'action par `<div>🔒 Imported from ${entity._importName}</div>`
+- `SWRLEditor.showContextMenu()`, `SparqlEditor.showContextMenu()` — même logique sur `rule._imported` / `query._imported`
+
+---
+
+## 4. Présentation — Panneau détail
+
+### REQ-IMP-009 — Bannière verrouillée et formulaire en lecture seule
+
+| **Si** | l'utilisateur sélectionne une entité importée dans un onglet, |
+|---|---|
+| **Alors** | le panneau de détail affiche : (1) une **bannière 🔒** en haut indiquant le nom de l'ontologie source, (2) le contenu du formulaire avec une **opacité atténuée** (`0.55`), (3) tous les champs et boutons **désactivés**. |
+
+**Applicabilité :** Classes ✓ · OPs ✓ · DPs ✓ · APs ✓ · Individuals ✓ · SWRL Rules ✓ · Queries ✓
+
+**Code source :** `frontend/js/owl_editor.js`
+- `_importedBannerHtml(entity)` — génère le HTML de la bannière 🔒
+- `_applyImportedView(detail, entity, html)` — si `entity._imported`, injecte la bannière + le HTML, ajoute la classe `is-imported-view`, et appelle `_applyReadOnly(detail)`
+- `style.css → .is-imported-view > *:not(.imported-detail-banner) { opacity: 0.55; }` — atténue le contenu du formulaire sans affecter la bannière
+
+---
+
+### REQ-IMP-010 — Références aux entités importées dans les panneaux de détail locaux
+
+| **Si** | un panneau de détail d'une entité **locale** affiche des références vers des entités importées (valeur de propriété d'objet, membre de classe, propriété inférée, règle SWRL référencée), |
+|---|---|
+| **Alors** | chaque référence pointant vers une entité importée est affichée avec le style atténué (`opacity: 0.5`, italique). Ceci s'applique aux assertions de propriétés d'objet sur les `Individual`, aux propriétés inférées, et aux sections **"Where Used In Rules"** des onglets `Classes`, `ObjectProperties`, `DatatypeProperties` et `Individuals`. |
+
+**Applicabilité :** Classes ✓ · OPs ✓ · DPs ✓ · Individuals ✓
+
+**Code source :** `frontend/js/owl_editor.js`
+- `_markImportedRefs(container)` — construit un `Set` de tous les IDs importés et ajoute la classe `imported-entity` à tout `[data-id]` correspondant dans le panneau
+- Assertions OP sur `Individual` : `ind-prop-row[data-id="${target}"]` — permet à `_markImportedRefs` de détecter et atténuer la valeur cible importée
+- Inferred Properties : `_renderInferredPanel()` — ajoute `data-id="${value}"` sur les lignes de type `op` pour détection par `_markImportedRefs`
+- `_whereUsedFrame()` — ajoute directement la classe `imported-entity` et le préfixe sur les items de règles SWRL importées
 
 ---
