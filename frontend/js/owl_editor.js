@@ -9,8 +9,6 @@ const ALL_ANNO_PROPS = [
     'owl:versionInfo', 'owl:deprecated', 'owl:priorVersion',
     'owl:backwardCompatibleWith', 'owl:incompatibleWith',
 ];
-/** The 7 "other" properties (excluding label/comment which have their own buttons) */
-const OTHER_ANNO_PROPS = ALL_ANNO_PROPS.filter(p => p !== 'rdfs:label' && p !== 'rdfs:comment');
 
 // ── OWL ID validation ───────────────────────────────────────
 
@@ -179,10 +177,122 @@ function xsdOptions(selected = 'xsd:string') {
 
 
 // ════════════════════════════════════════════════════════════════
+// SHARED TREE BEHAVIOURS (REQ-HM-*) — single implementation for the
+// behaviours that must stay strictly identical across the hierarchy
+// tabs (Classes / OPs / DPs / APs). Each editor declares a `_cfg`:
+//   { tree, ctxMenu, detail, tcnPrefix, entities(), onDeselect? }
+// ════════════════════════════════════════════════════════════════
+
+/** Escapes user-provided text before interpolation into innerHTML templates. */
+function _escapeHtml(s) {
+    return String(s ?? '')
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+const _TreeCommon = {
+
+    /** buildTree() result cached per editor — invalidated by APP.refresh(). */
+    getTree(ed) {
+        if (!ed._treeCache) ed._treeCache = ed.buildTree(ed._cfg.entities() || []);
+        return ed._treeCache;
+    },
+
+    invalidateCaches() {
+        [ClassEditor, OPEditor, DPEditor, APEditor].forEach(ed => { ed._treeCache = null; });
+    },
+
+    installDeselectListener(ed) {
+        if (ed._deselectListener) {
+            document.removeEventListener('mousedown', ed._deselectListener, true);
+            ed._deselectListener = null;
+        }
+        ed._deselectListener = (e) => {
+            if (!ed._selectedIds.size) return;
+            if (e.target.closest('.tree-item[data-id]')) return;  // item row
+            if (e.target.closest('.tree-root-item'))     return;  // root node
+            if (e.target.closest('.tree-toggle'))        return;  // expand/collapse
+            if (e.target.closest(ed._cfg.detail))        return;  // detail panel (forms, nav links…)
+            if (e.target.closest(ed._cfg.ctxMenu))       return;
+            if (e.target.closest('.ind-picker-overlay')) return;  // shared modals
+            if (e.target.closest('.btn-icon, .btn-sm'))  return;
+            ed._selectedIds.clear();
+            ed._anchorId = null;
+            if (ed._cfg.onDeselect) ed._cfg.onDeselect();
+            else document.querySelectorAll(`${ed._cfg.tree} .tree-item[data-id]`)
+                         .forEach(el => el.classList.remove('selected'));
+        };
+        document.addEventListener('mousedown', ed._deselectListener, true);
+    },
+
+    toggleNode(ed, id) {
+        const el = document.getElementById(`${ed._cfg.tcnPrefix}${id}`);
+        if (!el) return;
+        const isOpen = el.style.display !== 'none';
+        el.style.display = isOpen ? 'none' : 'block';
+        if (isOpen) ed._expanded.delete(id);
+        else        ed._expanded.add(id);
+        const toggle = el.previousElementSibling?.querySelector('.tree-toggle');
+        if (toggle) toggle.classList.toggle('open', !isOpen);
+    },
+
+    isDescendant(ed, potentialDesc, ancestorId) {
+        if (!potentialDesc || !ancestorId) return false;
+        const { childrenOf } = this.getTree(ed);
+        const visit = (id) => {
+            if (id === potentialDesc) return true;
+            return (childrenOf[id] || []).some(child => visit(child));
+        };
+        return visit(ancestorId);
+    },
+
+    onDragStart(ed, event, id) {
+        ed._dragId = id;
+        if (!ed._selectedIds.has(id)) {
+            ed._selectedIds = new Set([id]);
+            ed._anchorId = id;
+        }
+        event.dataTransfer.effectAllowed = 'move';
+        event.dataTransfer.setData('text/plain', id);
+        setTimeout(() => {
+            document.querySelectorAll(`${ed._cfg.tree} .tree-item[data-id]`).forEach(el => {
+                if (ed._selectedIds.has(el.dataset.id)) el.classList.add('dragging');
+            });
+        }, 0);
+    },
+
+    onDragOver(ed, event, targetId) {
+        if (!ed._dragId) return;
+        if (ed._selectedIds.has(targetId)) return;
+        if ([...ed._selectedIds].some(sid => ed._isDescendant(targetId, sid))) return;
+        event.preventDefault();
+        event.dataTransfer.dropEffect = 'move';
+        event.currentTarget.classList.add('drag-over');
+    },
+
+    onDragEnd(ed) {
+        document.querySelectorAll('.tree-item.dragging').forEach(el => el.classList.remove('dragging'));
+        document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+        ed._dragId = null;
+    },
+};
+
+
+// ════════════════════════════════════════════════════════════════
 // CLASSES — Protégé-style tree view
 // ════════════════════════════════════════════════════════════════
 
 const ClassEditor = {
+
+    _cfg: {
+        tree:      '#class-tree',
+        ctxMenu:   '#cls-ctx-menu',
+        detail:    '#class-detail',
+        tcnPrefix: 'tcn-',
+        entities:  () => APP.state.classes,
+    },
+    _treeCache: null,
+    _autoSaveTimer: null,
 
     _selectedId: null,          // class selected in the tree (single)
     _selectedIds: new Set(),    // all selected classes (multi-selection)
@@ -532,11 +642,12 @@ const ClassEditor = {
         } else {
             // ── Single click: single selection ────────────────
             if (this._editingId !== null && id !== this._editingId) {
+                clearTimeout(this._autoSaveTimer);
                 await this._silentSave();
             }
             this._selectedIds = new Set([id]);
             this._anchorId    = id;
-            if (_hist) APP._pushNav('classes', id);
+            if (_hist && !isShift) APP._pushNav('classes', id);
         }
 
         this._selectedId = id;
@@ -567,24 +678,7 @@ const ClassEditor = {
         this._updateTreeButtons();
     },
 
-    _installDeselectListener() {
-        if (this._deselectListener) {
-            document.removeEventListener('mousedown', this._deselectListener, true);
-            this._deselectListener = null;
-        }
-        this._deselectListener = (e) => {
-            if (!this._selectedIds.size) return;
-            if (e.target.closest('.tree-item[data-id]')) return;  // clic sur un item de classe
-            if (e.target.closest('.tree-root-item'))     return;  // clic sur owl:Thing
-            if (e.target.closest('.tree-toggle'))        return;  // clic sur expand/collapse
-            if (e.target.closest('#cls-ctx-menu'))       return;
-            if (e.target.closest('.btn-icon, .btn-sm'))  return;
-            this._selectedIds.clear();
-            this._anchorId   = null;
-            document.querySelectorAll('#class-tree .tree-item[data-id]').forEach(el => el.classList.remove('selected'));
-        };
-        document.addEventListener('mousedown', this._deselectListener, true);
-    },
+    _installDeselectListener() { _TreeCommon.installDeselectListener(this); },
 
     _updateTreeButtons() {
         const btnSister = document.getElementById('btn-cls-sister');
@@ -807,34 +901,10 @@ const ClassEditor = {
 
     // ── Drag & Drop ──────────────────────────────────────────────
 
-    onDragStart(event, id) {
-        this._dragId = id;
-        // If dragging an item outside the selection, reset selection to that item
-        if (!this._selectedIds.has(id)) {
-            this._selectedIds = new Set([id]);
-            this._anchorId = id;
-        }
-        event.dataTransfer.effectAllowed = 'move';
-        event.dataTransfer.setData('text/plain', id);
-        setTimeout(() => {
-            document.querySelectorAll('#class-tree .tree-item[data-id]').forEach(el => {
-                if (this._selectedIds.has(el.dataset.id)) el.classList.add('dragging');
-            });
-        }, 0);
-    },
-
-    onDragOver(event, targetId) {
-        if (!this._dragId) return;
-        if (this._selectedIds.has(targetId)) return;          // not on any dragged item
-        if ([...this._selectedIds].some(sid => this._isDescendant(targetId, sid))) return;
-        event.preventDefault();
-        event.dataTransfer.dropEffect = 'move';
-        event.currentTarget.classList.add('drag-over');
-    },
-
-    onDragLeave(event) {
-        event.currentTarget.classList.remove('drag-over');
-    },
+    onDragStart(event, id)       { _TreeCommon.onDragStart(this, event, id); },
+    onDragOver(event, targetId)  { _TreeCommon.onDragOver(this, event, targetId); },
+    onDragLeave(event)           { event.currentTarget.classList.remove('drag-over'); },
+    onDragEnd()                  { _TreeCommon.onDragEnd(this); },
 
     async onDrop(event, targetId) {
         event.preventDefault();
@@ -849,13 +919,13 @@ const ClassEditor = {
         if (targetId) this._expanded.add(targetId);
         this._owlThingSelected = false;
         try {
-            for (const draggedId of dragIds) {
+            await Promise.all(dragIds.map(draggedId => {
                 const cls = (APP.state.classes || []).find(c => c.id === draggedId);
-                if (!cls) continue;
+                if (!cls) return null;
                 const restrictions = (cls.subClassOf || []).filter(s => typeof s === 'object');
                 const newParents   = targetId ? [targetId] : [];
-                await API.updateClass(draggedId, { ...cls, subClassOf: [...newParents, ...restrictions] });
-            }
+                return API.updateClass(draggedId, { ...cls, subClassOf: [...newParents, ...restrictions] });
+            }));
             UI.success(dragIds.length > 1 ? `${dragIds.length} classes moved` : `'${dragIds[0]}' moved`);
             this._selectedId = dragIds[0];
             this._editingId  = dragIds.length === 1 ? dragIds[0] : null;
@@ -864,33 +934,9 @@ const ClassEditor = {
         } catch (e) { UI.error(e.message); }
     },
 
-    onDragEnd(event) {
-        document.querySelectorAll('.tree-item.dragging').forEach(el => el.classList.remove('dragging'));
-        document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
-        this._dragId = null;
-    },
+    _isDescendant(potentialDesc, ancestorId) { return _TreeCommon.isDescendant(this, potentialDesc, ancestorId); },
 
-    _isDescendant(potentialDesc, ancestorId) {
-        if (!potentialDesc || !ancestorId) return false;
-        const { childrenOf } = this.buildTree(APP.state.classes || []);
-        const visit = (id) => {
-            if (id === potentialDesc) return true;
-            return (childrenOf[id] || []).some(child => visit(child));
-        };
-        return visit(ancestorId);
-    },
-
-    toggleNode(id) {
-        const el = document.getElementById(`tcn-${id}`);
-        if (!el) return;
-        const isOpen = el.style.display !== 'none';
-        el.style.display = isOpen ? 'none' : 'block';
-        if (isOpen) this._expanded.delete(id);
-        else        this._expanded.add(id);
-        // Update the toggle icon
-        const toggle = el.previousElementSibling?.querySelector('.tree-toggle');
-        if (toggle) toggle.classList.toggle('open', !isOpen);
-    },
+    toggleNode(id) { _TreeCommon.toggleNode(this, id); },
 
     openNew() {
         this._selectedId = null;
@@ -1163,7 +1209,10 @@ const ClassEditor = {
     },
 
     autoSave() {
-        if (this._editingId !== null) this.save(false);
+        clearTimeout(this._autoSaveTimer);
+        this._autoSaveTimer = setTimeout(() => {
+            if (this._editingId !== null) this.save(false);
+        }, 500);
     },
 
     /** Silent save: persists the current DOM state without re-rendering or global refresh */
@@ -1197,7 +1246,8 @@ const ClassEditor = {
             // In-memory update without re-render
             const idx = (APP.state.classes || []).findIndex(c => c.id === originalId);
             if (idx >= 0) APP.state.classes[idx] = cls;
-        } catch (_) { /* fail silently */ }
+            this._treeCache = null;
+        } catch (e) { console.warn('[SWOWL] silent save failed (class):', e.message); }
     },
 
     openEdit(id) {
@@ -1931,7 +1981,7 @@ function _annoRow(type, value, lang, editor, ac, prop = null) {
     }
     return `<tr class="anno-row" data-type="${type}"${dataProp}>
         <td class="anno-prop">${propLabel}</td>
-        <td class="anno-val"><input type="text" class="anno-value" value="${(value||'').replace(/"/g,'&quot;')}" ${ac}></td>
+        <td class="anno-val"><input type="text" class="anno-value" value="${_escapeHtml(value||'')}" ${ac}></td>
         <td class="anno-lang-cell">${langCell}</td>
         <td><button class="btn-frame-del" onclick="${editor}.removeAnnotRow(this)">✕</button></td>
     </tr>`;
@@ -2252,6 +2302,16 @@ function _initHResizers(containerId) {
 
 const OPEditor = {
 
+    _cfg: {
+        tree:      '#op-tree',
+        ctxMenu:   '#op-ctx-menu',
+        detail:    '#op-detail',
+        tcnPrefix: 'op-tcn-',
+        entities:  () => APP.state.object_properties,
+    },
+    _treeCache: null,
+    _autoSaveTimer: null,
+
     _selectedId: null,
     _selectedIds: new Set(),    // multi-selection
     _anchorId: null,            // anchor for Shift+Click range selection
@@ -2536,7 +2596,7 @@ const OPEditor = {
         this._updateTreeButtons();
     },
 
-    selectProp(id, evtOrHist = true) {
+    async selectProp(id, evtOrHist = true) {
         const isShift = (evtOrHist && typeof evtOrHist === 'object') ? evtOrHist.shiftKey : false;
         const _hist   = (evtOrHist && typeof evtOrHist === 'object') ? true : evtOrHist;
 
@@ -2554,9 +2614,13 @@ const OPEditor = {
             }
         } else {
             // ── Single click: single selection ────────────────
+            if (this._editingId !== null && id !== this._editingId) {
+                clearTimeout(this._autoSaveTimer);
+                await this._silentSave();
+            }
             this._selectedIds = new Set([id]);
             this._anchorId    = id;
-            if (_hist) APP._pushNav('object-properties', id);
+            if (_hist && !isShift) APP._pushNav('object-properties', id);
         }
 
         this._selectedId = id;
@@ -2587,24 +2651,7 @@ const OPEditor = {
         this._updateTreeButtons();
     },
 
-    _installDeselectListener() {
-        if (this._deselectListener) {
-            document.removeEventListener('mousedown', this._deselectListener, true);
-            this._deselectListener = null;
-        }
-        this._deselectListener = (e) => {
-            if (!this._selectedIds.size) return;
-            if (e.target.closest('.tree-item[data-id]')) return;
-            if (e.target.closest('.tree-root-item'))     return;
-            if (e.target.closest('.tree-toggle'))        return;
-            if (e.target.closest('#op-ctx-menu'))        return;
-            if (e.target.closest('.btn-icon, .btn-sm'))  return;
-            this._selectedIds.clear();
-            this._anchorId = null;
-            document.querySelectorAll('#op-tree .tree-item[data-id]').forEach(el => el.classList.remove('selected'));
-        };
-        document.addEventListener('mousedown', this._deselectListener, true);
-    },
+    _installDeselectListener() { _TreeCommon.installDeselectListener(this); },
 
     _updateTreeButtons() {
         const btnSister = document.getElementById('op-btn-sister');
@@ -2638,16 +2685,7 @@ const OPEditor = {
         }
     },
 
-    toggleNode(id) {
-        const el = document.getElementById(`op-tcn-${id}`);
-        if (!el) return;
-        const isOpen = el.style.display !== 'none';
-        el.style.display = isOpen ? 'none' : 'block';
-        if (isOpen) this._expanded.delete(id);
-        else        this._expanded.add(id);
-        const toggle = el.previousElementSibling?.querySelector('.tree-toggle');
-        if (toggle) toggle.classList.toggle('open', !isOpen);
-    },
+    toggleNode(id) { _TreeCommon.toggleNode(this, id); },
 
     async createSibling() {
         if (!this._selectedId) return;
@@ -2748,33 +2786,10 @@ const OPEditor = {
 
     // ── Drag & Drop ──────────────────────────────────────────────
 
-    onDragStart(event, id) {
-        this._dragId = id;
-        if (!this._selectedIds.has(id)) {
-            this._selectedIds = new Set([id]);
-            this._anchorId = id;
-        }
-        event.dataTransfer.effectAllowed = 'move';
-        event.dataTransfer.setData('text/plain', id);
-        setTimeout(() => {
-            document.querySelectorAll('#op-tree .tree-item[data-id]').forEach(el => {
-                if (this._selectedIds.has(el.dataset.id)) el.classList.add('dragging');
-            });
-        }, 0);
-    },
-
-    onDragOver(event, targetId) {
-        if (!this._dragId) return;
-        if (this._selectedIds.has(targetId)) return;
-        if ([...this._selectedIds].some(sid => this._isDescendant(targetId, sid))) return;
-        event.preventDefault();
-        event.dataTransfer.dropEffect = 'move';
-        event.currentTarget.classList.add('drag-over');
-    },
-
-    onDragLeave(event) {
-        event.currentTarget.classList.remove('drag-over');
-    },
+    onDragStart(event, id)       { _TreeCommon.onDragStart(this, event, id); },
+    onDragOver(event, targetId)  { _TreeCommon.onDragOver(this, event, targetId); },
+    onDragLeave(event)           { event.currentTarget.classList.remove('drag-over'); },
+    onDragEnd()                  { _TreeCommon.onDragEnd(this); },
 
     async onDrop(event, targetId) {
         event.preventDefault();
@@ -2789,11 +2804,11 @@ const OPEditor = {
         if (targetId) this._expanded.add(targetId);
         this._topPropSelected = false;
         try {
-            for (const draggedId of dragIds) {
+            await Promise.all(dragIds.map(draggedId => {
                 const prop = (APP.state.object_properties || []).find(p => p.id === draggedId);
-                if (!prop) continue;
-                await API.updateOP(draggedId, { ...prop, subPropertyOf: targetId ? [targetId] : [] });
-            }
+                if (!prop) return null;
+                return API.updateOP(draggedId, { ...prop, subPropertyOf: targetId ? [targetId] : [] });
+            }));
             UI.success(dragIds.length > 1 ? `${dragIds.length} properties moved` : `'${dragIds[0]}' moved`);
             this._selectedId = dragIds[0];
             this._editingId  = dragIds.length === 1 ? dragIds[0] : null;
@@ -2802,21 +2817,7 @@ const OPEditor = {
         } catch (e) { UI.error(e.message); }
     },
 
-    onDragEnd(event) {
-        document.querySelectorAll('.tree-item.dragging').forEach(el => el.classList.remove('dragging'));
-        document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
-        this._dragId = null;
-    },
-
-    _isDescendant(potentialDesc, ancestorId) {
-        if (!potentialDesc || !ancestorId) return false;
-        const { childrenOf } = this.buildTree(APP.state.object_properties || []);
-        const visit = (id) => {
-            if (id === potentialDesc) return true;
-            return (childrenOf[id] || []).some(child => visit(child));
-        };
-        return visit(ancestorId);
-    },
+    _isDescendant(potentialDesc, ancestorId) { return _TreeCommon.isDescendant(this, potentialDesc, ancestorId); },
 
     async deleteSelected() {
         const ids = this._selectedIds.size > 0
@@ -3063,26 +3064,51 @@ const OPEditor = {
 
     // ── Sauvegarde ───────────────────────────────────────────────
 
-    autoSave() { if (this._editingId !== null) this.save(false); },
+    autoSave() {
+        clearTimeout(this._autoSaveTimer);
+        this._autoSaveTimer = setTimeout(() => {
+            if (this._editingId !== null) this.save(false);
+        }, 500);
+    },
+
+    /** Collects the current form state from the DOM (shared by save / _silentSave). */
+    _collectFormProp(id) {
+        const { labels, comments, other } = _collectAnnotations('op-annotations-body');
+        const domain  = _collectList('op-domain-list');
+        const range   = _collectList('op-range-list');
+        const subPropertyOf = _collectList('op-sub-list');
+        const inverseOf = document.getElementById('op-inverse-value')?.value || null;
+        const chars = {};
+        ['functional','inverseFunctional','transitive','symmetric','asymmetric','reflexive','irreflexive']
+            .forEach(k => { chars[k] = document.getElementById(`op-${k}`)?.checked || false; });
+        return { id, annotations: { labels, comments, other },
+            domain, range, subPropertyOf, inverseOf: inverseOf || null,
+            characteristics: chars, propertyChainAxiom: [] };
+    },
+
+    /** Silent save: persists the current DOM state without re-rendering or global refresh */
+    async _silentSave() {
+        const originalId = this._editingId;
+        if (originalId === null) return;
+        const idEl = document.getElementById('op-id');
+        if (!idEl) return;
+        const id = idEl.value.trim();
+        if (!id || _validateId(id, 'Identifier')) return;
+        const prop = this._collectFormProp(id);
+        try {
+            await API.updateOP(originalId, prop);
+            const idx = (APP.state.object_properties || []).findIndex(p => p.id === originalId);
+            if (idx >= 0) APP.state.object_properties[idx] = prop;
+            this._treeCache = null;
+        } catch (e) { console.warn('[SWOWL] silent save failed (OP):', e.message); }
+    },
 
     async save(isNew) {
         const originalId = isNew ? null : this._editingId;
         const id = document.getElementById('op-id').value.trim();
         const _idErr = _validateId(id, 'Identifier'); if (_idErr) return UI.error(_idErr);
 
-        const { labels, comments, other } = _collectAnnotations('op-annotations-body');
-        const domain  = _collectList('op-domain-list');
-        const range   = _collectList('op-range-list');
-        const subPropertyOf = _collectList('op-sub-list');
-        const inverseOf = document.getElementById('op-inverse-value')?.value || null;
-
-        const chars = {};
-        ['functional','inverseFunctional','transitive','symmetric','asymmetric','reflexive','irreflexive']
-            .forEach(k => { chars[k] = document.getElementById(`op-${k}`)?.checked || false; });
-
-        const prop = { id, annotations: { labels, comments, other },
-            domain, range, subPropertyOf, inverseOf: inverseOf || null,
-            characteristics: chars, propertyChainAxiom: [] };
+        const prop = this._collectFormProp(id);
 
         try {
             if (isNew) {
@@ -3119,6 +3145,7 @@ const OPEditor = {
             UI.success(`${n} object propert${n > 1 ? 'ies' : 'y'} deleted`);
             this._selectedId = null; this._editingId = null;
             this._selectedIds.clear(); this._anchorId = null;
+            this._topPropSelected = false;
             await APP.refresh(); APP.renderSection('object-properties');
         } catch (e) { UI.error(e.message); }
     },
@@ -3130,6 +3157,16 @@ const OPEditor = {
 // ════════════════════════════════════════════════════════════════
 
 const DPEditor = {
+
+    _cfg: {
+        tree:      '#dp-tree',
+        ctxMenu:   '#dp-ctx-menu',
+        detail:    '#dp-detail',
+        tcnPrefix: 'dp-tcn-',
+        entities:  () => APP.state.datatype_properties,
+    },
+    _treeCache: null,
+    _autoSaveTimer: null,
 
     _selectedId: null,
     _selectedIds: new Set(),    // multi-selection
@@ -3426,7 +3463,7 @@ const DPEditor = {
         this._updateTreeButtons();
     },
 
-    selectProp(id, evtOrHist = true) {
+    async selectProp(id, evtOrHist = true) {
         const isShift = (evtOrHist && typeof evtOrHist === 'object') ? evtOrHist.shiftKey : false;
         const _hist   = (evtOrHist && typeof evtOrHist === 'object') ? true : evtOrHist;
 
@@ -3442,9 +3479,13 @@ const DPEditor = {
                 this._selectedIds.add(id);
             }
         } else {
+            if (this._editingId !== null && id !== this._editingId) {
+                clearTimeout(this._autoSaveTimer);
+                await this._silentSave();
+            }
             this._selectedIds = new Set([id]);
             this._anchorId    = id;
-            if (_hist) APP._pushNav('datatype-properties', id);
+            if (_hist && !isShift) APP._pushNav('datatype-properties', id);
         }
 
         this._selectedId = id;
@@ -3473,24 +3514,7 @@ const DPEditor = {
         this._updateTreeButtons();
     },
 
-    _installDeselectListener() {
-        if (this._deselectListener) {
-            document.removeEventListener('mousedown', this._deselectListener, true);
-            this._deselectListener = null;
-        }
-        this._deselectListener = (e) => {
-            if (!this._selectedIds.size) return;
-            if (e.target.closest('.tree-item[data-id]')) return;
-            if (e.target.closest('.tree-root-item'))     return;
-            if (e.target.closest('.tree-toggle'))        return;
-            if (e.target.closest('#dp-ctx-menu'))        return;
-            if (e.target.closest('.btn-icon, .btn-sm'))  return;
-            this._selectedIds.clear();
-            this._anchorId = null;
-            document.querySelectorAll('#dp-tree .tree-item[data-id]').forEach(el => el.classList.remove('selected'));
-        };
-        document.addEventListener('mousedown', this._deselectListener, true);
-    },
+    _installDeselectListener() { _TreeCommon.installDeselectListener(this); },
 
     _updateTreeButtons() {
         const btnSister = document.getElementById('dp-btn-sister');
@@ -3524,16 +3548,7 @@ const DPEditor = {
         }
     },
 
-    toggleNode(id) {
-        const el = document.getElementById(`dp-tcn-${id}`);
-        if (!el) return;
-        const isOpen = el.style.display !== 'none';
-        el.style.display = isOpen ? 'none' : 'block';
-        if (isOpen) this._expanded.delete(id);
-        else        this._expanded.add(id);
-        const toggle = el.previousElementSibling?.querySelector('.tree-toggle');
-        if (toggle) toggle.classList.toggle('open', !isOpen);
-    },
+    toggleNode(id) { _TreeCommon.toggleNode(this, id); },
 
     async createSibling() {
         if (!this._selectedId) return;
@@ -3633,33 +3648,10 @@ const DPEditor = {
 
     // ── Drag & Drop ──────────────────────────────────────────────
 
-    onDragStart(event, id) {
-        this._dragId = id;
-        if (!this._selectedIds.has(id)) {
-            this._selectedIds = new Set([id]);
-            this._anchorId = id;
-        }
-        event.dataTransfer.effectAllowed = 'move';
-        event.dataTransfer.setData('text/plain', id);
-        setTimeout(() => {
-            document.querySelectorAll('#dp-tree .tree-item[data-id]').forEach(el => {
-                if (this._selectedIds.has(el.dataset.id)) el.classList.add('dragging');
-            });
-        }, 0);
-    },
-
-    onDragOver(event, targetId) {
-        if (!this._dragId) return;
-        if (this._selectedIds.has(targetId)) return;
-        if ([...this._selectedIds].some(sid => this._isDescendant(targetId, sid))) return;
-        event.preventDefault();
-        event.dataTransfer.dropEffect = 'move';
-        event.currentTarget.classList.add('drag-over');
-    },
-
-    onDragLeave(event) {
-        event.currentTarget.classList.remove('drag-over');
-    },
+    onDragStart(event, id)       { _TreeCommon.onDragStart(this, event, id); },
+    onDragOver(event, targetId)  { _TreeCommon.onDragOver(this, event, targetId); },
+    onDragLeave(event)           { event.currentTarget.classList.remove('drag-over'); },
+    onDragEnd()                  { _TreeCommon.onDragEnd(this); },
 
     async onDrop(event, targetId) {
         event.preventDefault();
@@ -3674,11 +3666,11 @@ const DPEditor = {
         if (targetId) this._expanded.add(targetId);
         this._topPropSelected = false;
         try {
-            for (const draggedId of dragIds) {
+            await Promise.all(dragIds.map(draggedId => {
                 const prop = (APP.state.datatype_properties || []).find(p => p.id === draggedId);
-                if (!prop) continue;
-                await API.updateDP(draggedId, { ...prop, subPropertyOf: targetId ? [targetId] : [] });
-            }
+                if (!prop) return null;
+                return API.updateDP(draggedId, { ...prop, subPropertyOf: targetId ? [targetId] : [] });
+            }));
             UI.success(dragIds.length > 1 ? `${dragIds.length} properties moved` : `'${dragIds[0]}' moved`);
             this._selectedId = dragIds[0];
             this._editingId  = dragIds.length === 1 ? dragIds[0] : null;
@@ -3687,21 +3679,7 @@ const DPEditor = {
         } catch (e) { UI.error(e.message); }
     },
 
-    onDragEnd(event) {
-        document.querySelectorAll('.tree-item.dragging').forEach(el => el.classList.remove('dragging'));
-        document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
-        this._dragId = null;
-    },
-
-    _isDescendant(potentialDesc, ancestorId) {
-        if (!potentialDesc || !ancestorId) return false;
-        const { childrenOf } = this.buildTree(APP.state.datatype_properties || []);
-        const visit = (id) => {
-            if (id === potentialDesc) return true;
-            return (childrenOf[id] || []).some(child => visit(child));
-        };
-        return visit(ancestorId);
-    },
+    _isDescendant(potentialDesc, ancestorId) { return _TreeCommon.isDescendant(this, potentialDesc, ancestorId); },
 
     async deleteSelected() {
         const ids = this._selectedIds.size > 0
@@ -3892,21 +3870,47 @@ const DPEditor = {
 
     // ── Save / delete ─────────────────────────────────
 
-    autoSave() { if (this._editingId !== null) this.save(false); },
+    autoSave() {
+        clearTimeout(this._autoSaveTimer);
+        this._autoSaveTimer = setTimeout(() => {
+            if (this._editingId !== null) this.save(false);
+        }, 500);
+    },
+
+    /** Collects the current form state from the DOM (shared by save / _silentSave). */
+    _collectFormProp(id) {
+        const { labels, comments, other } = _collectAnnotations('dp-annotations-body');
+        const domain  = _collectList('dp-domain-list');
+        const range   = _collectList('dp-range-list');
+        const subPropertyOf = _collectList('dp-sub-list');
+        return { id, annotations: { labels, comments, other },
+            domain, range, subPropertyOf,
+            functional: document.getElementById('dp-functional')?.checked || false };
+    },
+
+    /** Silent save: persists the current DOM state without re-rendering or global refresh */
+    async _silentSave() {
+        const originalId = this._editingId;
+        if (originalId === null) return;
+        const idEl = document.getElementById('dp-id');
+        if (!idEl) return;
+        const id = idEl.value.trim();
+        if (!id || _validateId(id, 'Identifier')) return;
+        const prop = this._collectFormProp(id);
+        try {
+            await API.updateDP(originalId, prop);
+            const idx = (APP.state.datatype_properties || []).findIndex(p => p.id === originalId);
+            if (idx >= 0) APP.state.datatype_properties[idx] = prop;
+            this._treeCache = null;
+        } catch (e) { console.warn('[SWOWL] silent save failed (DP):', e.message); }
+    },
 
     async save(isNew) {
         const originalId = isNew ? null : this._editingId;
         const id = document.getElementById('dp-id').value.trim();
         const _idErr = _validateId(id, 'Identifier'); if (_idErr) return UI.error(_idErr);
 
-        const { labels, comments, other } = _collectAnnotations('dp-annotations-body');
-        const domain  = _collectList('dp-domain-list');
-        const range   = _collectList('dp-range-list');
-        const subPropertyOf = _collectList('dp-sub-list');
-
-        const prop = { id, annotations: { labels, comments, other },
-            domain, range, subPropertyOf,
-            functional: document.getElementById('dp-functional')?.checked || false };
+        const prop = this._collectFormProp(id);
 
         try {
             if (isNew) {
@@ -3943,6 +3947,7 @@ const DPEditor = {
             UI.success(`${n} datatype propert${n > 1 ? 'ies' : 'y'} deleted`);
             this._selectedId = null; this._editingId = null;
             this._selectedIds.clear(); this._anchorId = null;
+            this._topPropSelected = false;
             await APP.refresh(); APP.renderSection('datatype-properties');
         } catch (e) { UI.error(e.message); }
     },
@@ -4425,8 +4430,10 @@ const IndividualEditor = {
         }
         this._deselectListener = (e) => {
             if (!this._selectedIndIds.size) return;
-            // Ignorer si clic sur un item individual, le menu contextuel ou un bouton
+            // Ignorer si clic sur un item individual, dans le panneau détail, dans un modal ou sur un bouton
             if (e.target.closest('.tree-item[data-id]')) return;
+            if (e.target.closest('#ind-detail'))         return;  // property panels, navigation links…
+            if (e.target.closest('.ind-picker-overlay')) return;  // picker modal + display modals
             if (e.target.closest('#ind-ctx-menu'))       return;
             if (e.target.closest('.btn-icon, .btn-sm')) return;
             // Tout autre clic → désélectionner
@@ -4742,7 +4749,7 @@ const IndividualEditor = {
                 return `
                 <div class="ind-prop-row" style="display:flex;align-items:center;gap:4px;padding:2px 4px">
                     <input type="text" class="ind-dp-value"
-                        value="${(a.value||'').replace(/"/g,'&quot;')}" placeholder="value" ${ac}
+                        value="${_escapeHtml(a.value||'')}" placeholder="value" ${ac}
                         style="flex:1;font-size:11px;border:1px solid var(--border);border-radius:3px;
                                padding:2px 4px;background:var(--bg2);color:var(--text1)">
                     ${urlBtn}
@@ -5713,7 +5720,13 @@ const IndividualEditor = {
         this.selectIndividual(id);
     },
 
-    autoSave() { if (this._editingId !== null) this.save(false); },
+    _autoSaveTimer: null,
+    autoSave() {
+        clearTimeout(this._autoSaveTimer);
+        this._autoSaveTimer = setTimeout(() => {
+            if (this._editingId !== null) this.save(false);
+        }, 500);
+    },
 
     // ── Sauvegarde ───────────────────────────────────────────────
 
@@ -5854,6 +5867,17 @@ const AP_BUILTINS = {
 };
 
 const APEditor = {
+
+    _cfg: {
+        tree:      '#ap-tree',
+        ctxMenu:   '#ap-ctx-menu',
+        detail:    '#ap-detail',
+        tcnPrefix: 'ap-tcn-',          // unused — AP tree re-renders on toggle
+        entities:  () => APP.state.annotation_properties,
+        onDeselect: () => APEditor._highlightSelected(),
+    },
+    _treeCache: null,
+    _autoSaveTimer: null,
 
     _selectedId:   null,              // null | 'rdfs:' | 'owl:' | user-prop id
     _selectedIds:  new Set(),         // multi-selection (user props only)
@@ -6105,11 +6129,16 @@ const APEditor = {
 
     // ── Selection ────────────────────────────────────────────
 
-    selectProp(id, evtOrHist = true) {
+    async selectProp(id, evtOrHist = true) {
         const isShift = (evtOrHist && typeof evtOrHist === 'object') ? evtOrHist.shiftKey : false;
         const _hist   = (evtOrHist && typeof evtOrHist === 'object') ? true : evtOrHist;
 
         const isUserProp = id && !this._isRoot(id) && !this._isBuiltin(id);
+
+        if (!isShift && this._editingId !== null && id !== this._editingId) {
+            clearTimeout(this._autoSaveTimer);
+            await this._silentSave();
+        }
 
         if (isShift && isUserProp && this._anchorId) {
             // ── Shift+Click: range selection over visible user props ──
@@ -6132,7 +6161,7 @@ const APEditor = {
 
         this._selectedId = id;
         this._highlightSelected();
-        this._updateButtons();
+        this._updateTreeButtons();
 
         const detail = document.getElementById('ap-detail');
         if (!detail) return;
@@ -6157,25 +6186,7 @@ const APEditor = {
         }
     },
 
-    _installDeselectListener() {
-        if (this._deselectListener) {
-            document.removeEventListener('mousedown', this._deselectListener, true);
-            this._deselectListener = null;
-        }
-        this._deselectListener = (e) => {
-            if (!this._selectedIds.size) return;
-            if (e.target.closest('.tree-item[data-id]')) return;
-            if (e.target.closest('.tree-root-item'))     return;
-            if (e.target.closest('.tree-toggle'))        return;
-            if (e.target.closest('#ap-ctx-menu'))        return;
-            if (e.target.closest('.btn-icon, .btn-sm'))  return;
-            this._selectedIds.clear();
-            this._anchorId = null;
-            const tree = document.getElementById('ap-tree');
-            if (tree) tree.innerHTML = this._renderTree(APP.state.annotation_properties || []);
-        };
-        document.addEventListener('mousedown', this._deselectListener, true);
-    },
+    _installDeselectListener() { _TreeCommon.installDeselectListener(this); },
 
     _highlightSelected() {
         // Re-render the tree — highlighting is done via _selectedIds in _renderUserNode
@@ -6183,7 +6194,7 @@ const APEditor = {
         if (tree) tree.innerHTML = this._renderTree(APP.state.annotation_properties || []);
     },
 
-    _updateButtons() {
+    _updateTreeButtons() {
         const id        = this._selectedId;
         const btnChild  = document.getElementById('ap-btn-child');
         const btnSister = document.getElementById('ap-btn-sister');
@@ -6257,7 +6268,7 @@ const APEditor = {
     _renderForm(prop) {
         APEditor._editingId = prop?.id || null;
         const p          = prop || { id: '', comment: '', subPropertyOf: [], annotations: { labels: [], comments: [], other: [] } };
-        const ac         = `onchange="APEditor._autoSave()"`;
+        const ac         = `onchange="APEditor.autoSave()"`;
         const baseIri    = (APP.state.ontology?.id || '').replace(/#$/, '');
         const propIri    = (p.id && baseIri) ? `${baseIri}#${p.id}` : '';
         const allBuiltins = [...AP_BUILTINS['rdfs:'], ...AP_BUILTINS['owl:']];
@@ -6278,7 +6289,7 @@ const APEditor = {
                     <input type="text" id="ap-id" class="cls-id-inp" value="${p.id}"
                            placeholder="NewAnnotationProperty"
                            oninput="_sanitizeId(this)"
-                           onchange="APEditor._autoSave()"
+                           onchange="APEditor.autoSave()"
                            title="Local IRI identifier">
                     <span class="cls-editor-meta">(instance of owl:AnnotationProperty)</span>
                 </div>
@@ -6288,7 +6299,7 @@ const APEditor = {
     },
 
     addAnnotRow(type) {
-        const ac   = `onchange="APEditor._autoSave()"`;
+        const ac   = `onchange="APEditor.autoSave()"`;
         const tbody = document.getElementById('ap-annotations-body');
         if (tbody) tbody.appendChild(_makeAnnotRow(type, 'APEditor', ac));
     },
@@ -6344,7 +6355,12 @@ const APEditor = {
         return { id, comment: '', subPropertyOf, annotations: { labels, comments, other } };
     },
 
-    async _autoSave() {
+    autoSave() {
+        clearTimeout(this._autoSaveTimer);
+        this._autoSaveTimer = setTimeout(() => this._doAutoSave(), 500);
+    },
+
+    async _doAutoSave() {
         const id = this._selectedId;
         if (!id || this._isRoot(id) || this._isBuiltin(id)) return;
         const data = this._collectForm();
@@ -6358,6 +6374,20 @@ const APEditor = {
             await APP.refresh();
             APEditor.restoreSelection();
         } catch (e) { UI.error(e.message); }
+    },
+
+    /** Silent save: persists the current DOM state without re-rendering or global refresh */
+    async _silentSave() {
+        const originalId = this._editingId;
+        if (originalId === null || this._isRoot(originalId) || this._isBuiltin(originalId)) return;
+        const data = this._collectForm();
+        if (!data.id) return;
+        try {
+            await API.updateAP(originalId, data);
+            const idx = (APP.state.annotation_properties || []).findIndex(p => p.id === originalId);
+            if (idx >= 0) APP.state.annotation_properties[idx] = data;
+            this._treeCache = null;
+        } catch (e) { console.warn('[SWOWL] silent save failed (AP):', e.message); }
     },
 
     async save() {
@@ -6453,21 +6483,12 @@ const APEditor = {
 
     _dragId: null,
 
-    onDragStart(event, id) {
-        this._dragId = id;
-        if (!this._selectedIds.has(id)) {
-            this._selectedIds = new Set([id]);
-            this._anchorId = id;
-        }
-        event.dataTransfer.effectAllowed = 'move';
-        event.dataTransfer.setData('text/plain', id);
-        setTimeout(() => {
-            document.querySelectorAll('#ap-tree .tree-item[data-id]').forEach(el => {
-                if (this._selectedIds.has(el.dataset.id)) el.classList.add('dragging');
-            });
-        }, 0);
-    },
+    onDragStart(event, id)  { _TreeCommon.onDragStart(this, event, id); },
+    onDragLeave(event)      { event.currentTarget.classList.remove('drag-over'); },
+    onDragEnd()             { _TreeCommon.onDragEnd(this); },
 
+    /** AP-specific dragover: namespace roots and built-ins are valid drop
+     *  targets, so the descendant check only applies to user properties. */
     onDragOver(event, targetId) {
         if (!this._dragId) return;
         if (this._selectedIds.has(targetId)) return;
@@ -6478,24 +6499,20 @@ const APEditor = {
         event.currentTarget.classList.add('drag-over');
     },
 
-    onDragLeave(event) {
-        event.currentTarget.classList.remove('drag-over');
-    },
-
     async onDrop(event, targetId) {
         event.preventDefault();
         event.currentTarget.classList.remove('drag-over');
         const dragIds = this._selectedIds.size > 0 ? [...this._selectedIds] : [this._dragId];
         this._dragId = null;
         if (!dragIds.length || dragIds.includes(targetId)) return;
-        const newParents = this._isRoot(targetId) ? [] : [targetId];
+        const newParents = (!targetId || this._isRoot(targetId)) ? [] : [targetId];
         if (targetId && !this._isRoot(targetId)) this._expanded.add(targetId);
         try {
-            for (const draggedId of dragIds) {
+            await Promise.all(dragIds.map(draggedId => {
                 const prop = (APP.state.annotation_properties || []).find(p => p.id === draggedId);
-                if (!prop) continue;
-                await API.updateAP(draggedId, { ...prop, subPropertyOf: newParents });
-            }
+                if (!prop) return null;
+                return API.updateAP(draggedId, { ...prop, subPropertyOf: newParents });
+            }));
             UI.success(dragIds.length > 1 ? `${dragIds.length} properties moved` : `'${dragIds[0]}' moved`);
             this._selectedId = dragIds[0];
             await APP.refresh();
@@ -6503,21 +6520,10 @@ const APEditor = {
         } catch (e) { UI.error(e.message); }
     },
 
-    onDragEnd(event) {
-        document.querySelectorAll('.tree-item.dragging').forEach(el => el.classList.remove('dragging'));
-        document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
-        this._dragId = null;
-    },
+    /** buildTree alias so _TreeCommon can cache the AP user-prop tree. */
+    buildTree(props) { return this._buildUserTree(props); },
 
-    _isDescendant(potentialDesc, ancestorId) {
-        if (!potentialDesc || !ancestorId) return false;
-        const { childrenOf } = this._buildUserTree(APP.state.annotation_properties || []);
-        const visit = (id) => {
-            if (id === potentialDesc) return true;
-            return (childrenOf[id] || []).some(child => visit(child));
-        };
-        return visit(ancestorId);
-    },
+    _isDescendant(potentialDesc, ancestorId) { return _TreeCommon.isDescendant(this, potentialDesc, ancestorId); },
 
     // ── Delete ────────────────────────────────────────────────
 
@@ -6562,7 +6568,7 @@ const APEditor = {
                     </div>`;
                 const tree = document.getElementById('ap-tree');
                 if (tree) tree.innerHTML = this._renderTree(APP.state.annotation_properties || []);
-                this._updateButtons();
+                this._updateTreeButtons();
             } catch (e) { UI.error(e.message); }
             return;
         }
@@ -6591,7 +6597,7 @@ const APEditor = {
             this._anchorId    = id;
             this._selectedId  = id;
             this._highlightSelected();
-            this._updateButtons();
+            this._updateTreeButtons();
         }
         this._closeContextMenu();
 

@@ -53,31 +53,36 @@ app.add_middleware(
 
 # ── Helpers ──────────────────────────────────────────────────
 
-def _collect_class_descendants(onto: OWLOntology, class_id: str) -> set:
-    """Retourne l'ensemble des IDs de toutes les classes descendantes (récursivement)."""
+def _collect_descendants(children_of: dict, root_id: str) -> set:
+    """BFS sur un index parent → enfants pré-construit (O(n))."""
     descendants: set = set()
-    to_visit = {class_id}
+    to_visit = {root_id}
     while to_visit:
         current = to_visit.pop()
-        for cls in onto.classes:
-            parents = [s for s in (cls.subClassOf or []) if isinstance(s, str)]
-            if current in parents and cls.id not in descendants:
-                descendants.add(cls.id)
-                to_visit.add(cls.id)
+        for child in children_of.get(current, ()):
+            if child not in descendants:
+                descendants.add(child)
+                to_visit.add(child)
     return descendants
+
+
+def _collect_class_descendants(onto: OWLOntology, class_id: str) -> set:
+    """Retourne l'ensemble des IDs de toutes les classes descendantes (récursivement)."""
+    children_of: dict = {}
+    for cls in onto.classes:
+        for parent in (cls.subClassOf or []):
+            if isinstance(parent, str):
+                children_of.setdefault(parent, []).append(cls.id)
+    return _collect_descendants(children_of, class_id)
 
 
 def _collect_prop_descendants(prop_list: list, prop_id: str) -> set:
     """Retourne l'ensemble des IDs de toutes les sous-propriétés descendantes (récursivement)."""
-    descendants: set = set()
-    to_visit = {prop_id}
-    while to_visit:
-        current = to_visit.pop()
-        for p in prop_list:
-            if current in (p.subPropertyOf or []) and p.id not in descendants:
-                descendants.add(p.id)
-                to_visit.add(p.id)
-    return descendants
+    children_of: dict = {}
+    for p in prop_list:
+        for parent in (p.subPropertyOf or []):
+            children_of.setdefault(parent, []).append(p.id)
+    return _collect_descendants(children_of, prop_id)
 
 
 def _rename_swrl_atom(atom, old_id: str, new_id: str, kind: str) -> None:

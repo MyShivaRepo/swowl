@@ -13,7 +13,7 @@ const InferenceUI = {
             this.render();
         } catch (e) {
             document.getElementById('inference-panel').innerHTML =
-                `<p class="error">Inference error: ${e.message}</p>`;
+                `<p class="error">Inference error: ${_escapeHtml(e.message)}</p>`;
         }
     },
 

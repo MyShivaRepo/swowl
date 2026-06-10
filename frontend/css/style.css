@@ -56,12 +56,17 @@ body {
   font-family: var(--font-mono);
   font-size: 14px;
   font-weight: 600;
-  color: var(--accent);
+  color: #ffffff;
 }
-.topbar-subtitle {
-  font-size: 11px;
-  color: var(--text-faint);
+.topbar-logo-link {
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
 }
+.topbar-logo-link:hover {
+  text-decoration: underline;
+}
+
 
 /* ── Global search ─────────────────────────────────────────── */
 .global-search-wrap {
@@ -215,7 +220,7 @@ body {
   flex-shrink: 0;
 }
 
-.nav-group-title { display: none; }   /* hidden in horizontal mode */
+   /* hidden in horizontal mode */
 
 .nav-item {
   display: flex;
@@ -223,7 +228,7 @@ body {
   gap: 6px;
   padding: 0 14px;
   cursor: pointer;
-  color: var(--text-dim);
+  color: #ffffff;
   font-size: 12px;
   white-space: nowrap;
   border-bottom: 2px solid transparent;
@@ -237,10 +242,7 @@ body {
   border-bottom-color: var(--accent);
   background: rgba(59,130,246,.07);
 }
-.nav-item.active-infer {
-  color: var(--purple);
-  border-bottom-color: var(--purple);
-}
+
 .nav-count {
   font-family: var(--font-mono);
   font-size: 10px;
@@ -289,23 +291,16 @@ body {
   justify-content: space-between;
 }
 
-/* ── Home ───────────────────────────────────────────────────── */
-.home-panel { max-width: 600px; }
-.home-panel h1 { font-size: 22px; font-weight: 600; margin-bottom: 8px; }
-.home-panel > p { color: var(--text-dim); margin-bottom: 20px; }
-.onto-card {
-  background: var(--bg2);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 16px 20px;
-  margin-bottom: 20px;
-}
-.onto-card.empty-onto { color: var(--text-dim); font-style: italic; }
-.onto-card-title { font-size: 11px; color: var(--text-faint); text-transform: uppercase; letter-spacing: .08em; margin-bottom: 6px; }
-.onto-card-id { font-family: var(--font-mono); font-size: 13px; margin-bottom: 6px; color: var(--accent); }
-.onto-card-stats { font-size: 11px; color: var(--text-dim); }
-.home-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
-.export-group { display: flex; align-items: center; gap: 6px; margin-left: 10px; color: var(--text-dim); font-size: 11px; }
+
+
+
+
+
+
+
+
+
+
 
 /* ── Section headers ────────────────────────────────────────── */
 .section-header {
@@ -349,15 +344,8 @@ body {
 }
 td.actions { display: flex; gap: 4px; }
 
-/* ── Forms ──────────────────────────────────────────────────── */
-.form-section { max-width: 700px; }
-.form-section h3 {
-  font-size: 14px;
-  font-weight: 500;
-  margin-bottom: 18px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid var(--border);
-}
+
+
 .form-group { margin-bottom: 14px; }
 .form-group label {
   display: block;
@@ -366,23 +354,8 @@ td.actions { display: flex; gap: 4px; }
   margin-bottom: 5px;
   font-weight: 500;
 }
-.form-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 14px;
-  margin-bottom: 14px;
-}
-.section-label {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: .08em;
-  color: var(--purple);
-  display: block;
-  margin-bottom: 8px;
-  border-bottom: 1px solid rgba(139,92,246,.2);
-  padding-bottom: 4px;
-}
+
+
 input[type="text"], input[type="number"], textarea, select {
   width: 100%;
   background: var(--bg3);
@@ -403,28 +376,11 @@ textarea { resize: vertical; min-height: 60px; }
 select[multiple] { padding: 4px; }
 select[multiple] option { padding: 3px 6px; border-radius: 3px; }
 
-.checkbox-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 16px;
-}
-.checkbox-label {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  color: var(--text-dim);
-  cursor: pointer;
-}
+
+
 input[type="checkbox"] { accent-color: var(--accent); }
 
-.form-actions {
-  display: flex;
-  gap: 10px;
-  margin-top: 20px;
-  padding-top: 16px;
-  border-top: 1px solid var(--border);
-}
+
 
 /* ── Buttons ────────────────────────────────────────────────── */
 button, .btn-primary, .btn-secondary, .btn-sm {
@@ -447,7 +403,7 @@ button, .btn-primary, .btn-secondary, .btn-sm {
   border: 1px solid var(--border);
 }
 .btn-secondary:hover { background: var(--bg4); color: var(--text); }
-.btn-lg { padding: 10px 20px; font-size: 13px; }
+
 .btn-sm {
   padding: 4px 8px;
   font-size: 11px;
@@ -480,39 +436,11 @@ button, .btn-primary, .btn-secondary, .btn-sm {
 .restriction-row select, .restriction-row input,
 .assertion-row select, .assertion-row input { flex: 1; min-width: 80px; }
 
-/* ── SWRL Editor ────────────────────────────────────────────── */
-.swrl-arrow {
-  text-align: center;
-  font-size: 28px;
-  color: var(--danger);
-  font-weight: bold;
-  margin: 10px 0;
-}
-.atom-list {
-  background: var(--bg3);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 10px;
-  min-height: 40px;
-  margin-bottom: 8px;
-}
-.atom-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 0;
-  border-bottom: 1px dashed var(--border);
-  flex-wrap: wrap;
-}
-.atom-row:last-child { border-bottom: none; }
-.atom-type-badge {
-  font-family: var(--font-mono);
-  font-size: 9px;
-  padding: 2px 6px;
-  border-radius: 3px;
-  white-space: nowrap;
-  flex-shrink: 0;
-}
+
+
+
+
+
 .badge-class { background: rgba(59,130,246,.15); color: #60a5fa; border: 1px solid rgba(59,130,246,.3); }
 .badge-op    { background: rgba(52,211,153,.12); color: #34d399; border: 1px solid rgba(52,211,153,.3); }
 .badge-dp    { background: rgba(251,191,36,.12); color: #fbbf24; border: 1px solid rgba(251,191,36,.3); }
@@ -1577,13 +1505,7 @@ small { color: var(--text-faint); font-size: 10px; }
 }
 .char-check input[type=checkbox] { cursor: pointer; }
 
-/* ── Chain row ──────────────────────────────────────────────── */
-.chain-row {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 3px 4px;
-}
+
 .chain-input {
   flex: 1;
   font-family: var(--font-mono);

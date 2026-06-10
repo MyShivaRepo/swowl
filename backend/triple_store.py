@@ -6,6 +6,7 @@ Registre centralisé : ~/.swowl/registry.json (indépendant du répertoire proje
 from __future__ import annotations
 import os
 import json
+import threading
 from pathlib import Path
 from typing import Optional
 
@@ -202,12 +203,19 @@ class TripleStore:
         return onto
 
     # ── Persistance ontologie ────────────────────────────────
+    # Verrou d'écriture : le frontend peut émettre des mutations en parallèle
+    # (multi-drag → Promise.all) ; chaque endpoint tourne dans un thread du
+    # pool FastAPI. Le lock sérialise les écritures fichier pour éviter deux
+    # write_text entrelacés sur le même chemin.
+
+    _save_lock = threading.Lock()
 
     def _save_onto(self, onto: OWLOntology, host_path: str) -> None:
         container_path = host_to_container(host_path)
         p = Path(container_path)
-        p.parent.mkdir(parents=True, exist_ok=True)
-        p.write_text(onto.model_dump_json(indent=2), encoding="utf-8")
+        with self._save_lock:
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_text(onto.model_dump_json(indent=2), encoding="utf-8")
 
     def save(self) -> None:
         if not self._ontology:

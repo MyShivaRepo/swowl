@@ -1,5 +1,8 @@
 /**
  * api.js — HTTP client for the FastAPI backend
+ * Note: the backend exposes more endpoints (GET lists / GET by id / import /
+ * health…) usable by external clients; only the methods actually used by the
+ * SWOWL frontend are declared here.
  */
 const API = {
     base: '/api',
@@ -44,62 +47,38 @@ const API = {
         fetch(`${API.base}/ontologies/${encodeURIComponent(name)}/export?fmt=${fmt}`)
         .then(r => { if (!r.ok) throw new Error(r.statusText); return r.blob(); }),
 
-    importOntology: async (file, name, path, uri, prefix) => {
-        const fd = new FormData();
-        fd.append('file', file);
-        const url = `${API.base}/ontologies/import?name=${encodeURIComponent(name)}&path=${encodeURIComponent(path)}&uri=${encodeURIComponent(uri)}&prefix=${encodeURIComponent(prefix)}`;
-        const res = await fetch(url, { method: 'POST', body: fd });
-        if (!res.ok) throw new Error((await res.json()).detail || res.statusText);
-        return res.json();
-    },
-
     // ── Classes ────────────────────────────────────────
-    listClasses:   ()         => API._fetch('GET',    '/classes'),
     createClass:   (cls)      => API._fetch('POST',   '/classes', cls),
-    getClass:      (id)       => API._fetch('GET',    `/classes/${id}`),
     updateClass:   (id, cls)  => API._fetch('PUT',    `/classes/${id}`, cls),
     deleteClass:   (id)       => API._fetch('DELETE', `/classes/${id}`),
 
     // ── ObjectProperties ───────────────────────────────
-    listOPs:    ()          => API._fetch('GET',    '/object-properties'),
     createOP:   (p)         => API._fetch('POST',   '/object-properties', p),
-    getOP:      (id)        => API._fetch('GET',    `/object-properties/${id}`),
     updateOP:   (id, p)     => API._fetch('PUT',    `/object-properties/${id}`, p),
     deleteOP:   (id)        => API._fetch('DELETE', `/object-properties/${id}`),
 
     // ── DatatypeProperties ─────────────────────────────
-    listDPs:    ()          => API._fetch('GET',    '/datatype-properties'),
     createDP:   (p)         => API._fetch('POST',   '/datatype-properties', p),
-    getDP:      (id)        => API._fetch('GET',    `/datatype-properties/${id}`),
     updateDP:   (id, p)     => API._fetch('PUT',    `/datatype-properties/${id}`, p),
     deleteDP:   (id)        => API._fetch('DELETE', `/datatype-properties/${id}`),
 
     // ── AnnotationProperties ──────────────────────────────────
-    listAPs:    ()          => API._fetch('GET',    '/annotation-properties'),
     createAP:   (p)         => API._fetch('POST',   '/annotation-properties', p),
-    getAP:      (id)        => API._fetch('GET',    `/annotation-properties/${encodeURIComponent(id)}`),
     updateAP:   (id, p)     => API._fetch('PUT',    `/annotation-properties/${encodeURIComponent(id)}`, p),
     deleteAP:   (id)        => API._fetch('DELETE', `/annotation-properties/${encodeURIComponent(id)}`),
 
     // ── Individuals ──────────────────────────────────────────
-    listIndividuals:   ()        => API._fetch('GET',    '/individuals'),
     createIndividual:  (ind)     => API._fetch('POST',   '/individuals', ind),
-    getIndividual:     (id)      => API._fetch('GET',    `/individuals/${id}`),
     updateIndividual:  (id, ind) => API._fetch('PUT',    `/individuals/${id}`, ind),
     deleteIndividual:  (id)      => API._fetch('DELETE', `/individuals/${id}`),
 
-
     // ── SWRL ──────────────────────────────────────────
-    listSWRLRules:    ()      => API._fetch('GET',    '/swrl-rules'),
     createSWRLRule:   (r)     => API._fetch('POST',   '/swrl-rules', r),
-    getSWRLRule:      (id)    => API._fetch('GET',    `/swrl-rules/${id}`),
     updateSWRLRule:   (id, r) => API._fetch('PUT',    `/swrl-rules/${id}`, r),
     deleteSWRLRule:   (id)    => API._fetch('DELETE', `/swrl-rules/${id}`),
 
     // ── Inferences ─────────────────────────────────────────
     getInferences:      ()   => API._fetch('GET', '/inferences'),
-    getViolations:      ()   => API._fetch('GET', '/inferences/violations'),
-    getSubclassClosure: ()   => API._fetch('GET', '/inferences/subclass-closure'),
 
     restoreSnapshot: (snap) => API._fetch('POST', '/snapshot/restore', snap),
 
@@ -108,6 +87,5 @@ const API = {
     fsBrowse: (path, ext = '.json') => API._fetch('GET', `/fs/browse?path=${encodeURIComponent(path)}&ext=${encodeURIComponent(ext)}`),
 
     fetchBuiltins:  () => API._fetch('POST', '/builtins/fetch'),
-    health:         () => API._fetch('GET',  '/health'),
     revealInFinder: (path) => API._fetch('POST', `/reveal?path=${encodeURIComponent(path)}`),
 };

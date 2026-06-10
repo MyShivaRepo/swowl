@@ -244,6 +244,7 @@ const APP = {
 
     async refresh() {
         await this.loadState();
+        _TreeCommon.invalidateCaches();   // hierarchy trees changed → drop buildTree caches
         this.updateStats();
         InferenceUI.refresh();
     },
@@ -304,9 +305,14 @@ const APP = {
         if (!entityId) return;
         switch (section) {
             case 'classes':
-                ClassEditor._selectedId       = entityId;
-                ClassEditor._owlThingSelected = false;
-                ClassEditor._expandAncestors(entityId);
+                if (entityId === 'owl:Thing') {
+                    ClassEditor._owlThingSelected = true;
+                    ClassEditor._selectedId       = null;
+                } else {
+                    ClassEditor._selectedId       = entityId;
+                    ClassEditor._owlThingSelected = false;
+                    ClassEditor._expandAncestors(entityId);
+                }
                 break;
             case 'object-properties':
                 OPEditor._selectedId      = entityId;
@@ -532,7 +538,8 @@ const APP = {
         if (this._ontoImportExpanded.has(path)) this._ontoImportExpanded.delete(path);
         else this._ontoImportExpanded.add(path);
         // Re-render only the table body (fast, no API call)
-        API.listOntologies().then(list => this._refreshOntoTable(list)).catch(() => {});
+        API.listOntologies().then(list => this._refreshOntoTable(list))
+            .catch(e => console.warn('[SWOWL] ontology table refresh failed:', e.message));
     },
 
     selectOntoRow(name) {
@@ -1625,7 +1632,7 @@ const GlobalSearch = {
 
     _render(results) {
         if (!results.length)
-            return `<div class="gs-empty">No results for "<strong>${this._query}</strong>"</div>`;
+            return `<div class="gs-empty">No results for "<strong>${_escapeHtml(this._query)}</strong>"</div>`;
 
         // Ordre des sections : A avant B
         const groups = {
@@ -1687,28 +1694,28 @@ const GlobalSearch = {
                 switch (sec) {
                     case 'rdfs-labels':
                         inner = `<span class="lbl-dot"></span>
-                            <span class="gs-item-label">${r.label}${r.lang ? ` <span class="gs-lang-tag">(${r.lang})</span>` : ''}</span>
+                            <span class="gs-item-label">${_escapeHtml(r.label)}${r.lang ? ` <span class="gs-lang-tag">(${_escapeHtml(r.lang)})</span>` : ''}</span>
                             ${this._dot(r.kind)}
-                            <span class="gs-item-sub">${r.id}</span>`;
+                            <span class="gs-item-sub">${_escapeHtml(r.id)}</span>`;
                         break;
                     case 'swrl-labels':
                         inner = `<span style="flex-shrink:0;font-size:11px">⚙️</span>
-                            <span class="gs-item-label">${r.label}</span>
-                            <span class="gs-item-sub">${r.id}</span>`;
+                            <span class="gs-item-label">${_escapeHtml(r.label)}</span>
+                            <span class="gs-item-sub">${_escapeHtml(r.id)}</span>`;
                         break;
                     case 'sparql-labels':
                         inner = `<span style="flex-shrink:0;font-size:11px">🎯</span>
-                            <span class="gs-item-label">${r.label}</span>
-                            <span class="gs-item-sub">${r.id}</span>`;
+                            <span class="gs-item-label">${_escapeHtml(r.label)}</span>
+                            <span class="gs-item-sub">${_escapeHtml(r.id)}</span>`;
                         break;
                     case 'individual-names':
                         inner = `<span class="xsd-dot" style="flex-shrink:0;margin:0"></span>
-                            <span class="gs-item-label">${r.label}</span>
-                            <span class="gs-item-sub">${r.id}</span>`;
+                            <span class="gs-item-label">${_escapeHtml(r.label)}</span>
+                            <span class="gs-item-sub">${_escapeHtml(r.id)}</span>`;
                         break;
                     default:
                         inner = `${this._dot(sec)}
-                            <span class="gs-item-label">${r.label}</span>`;
+                            <span class="gs-item-label">${_escapeHtml(r.label)}</span>`;
                 }
                 html.push(_row(r, inner));
             });
@@ -1950,7 +1957,7 @@ APP._runSparqlQuery = async function(sparql) {
         const data = await res.json();
         APP._renderSparqlResults(resultsDiv, data);
     } catch (e) {
-        resultsDiv.innerHTML = `<p style="color:#f87171;font-size:12px">⚠ Erreur : ${e.message}</p>`;
+        resultsDiv.innerHTML = `<p style="color:#f87171;font-size:12px">⚠ Error: ${_escapeHtml(e.message)}</p>`;
     }
 };
 
