@@ -131,22 +131,24 @@ const SWRLEditor = {
             return `<div class="cls-list-empty" style="padding:12px">${this._searchQuery ? 'No matching rule' : 'No SWRL rule'}</div>`;
         const sel = this._selectedId;
         return filtered.map(r => {
-            const broken   = this._ruleHasBrokenRefs(r);
-            const mainText = r.label || r.id;
-            const subText  = r.label ? r.id : '';
+            const broken     = this._ruleHasBrokenRefs(r);
+            const isImported = !!r._imported;
+            const mainText   = r.label || r.id;
+            const subText    = r.label ? r.id : '';
+            const importedPrefix = isImported ? `${r._importPrefix}:` : '';
             return `
-            <div class="tree-item${r.id === sel ? ' selected' : ''}" data-id="${r.id}"
+            <div class="tree-item${r.id === sel ? ' selected' : ''}${isImported ? ' imported-entity' : ''}" data-id="${r.id}"
                  style="align-items:center${broken ? ';color:var(--red,#ef4444)' : ''}"
                  onclick="SWRLEditor.selectRule('${r.id}')"
                  oncontextmenu="event.preventDefault();SWRLEditor.showContextMenu(event,'${r.id}')">
                 <span style="font-size:13px;flex-shrink:0;line-height:1;${broken ? 'color:var(--red,#ef4444)' : 'color:var(--text-dim)'}">⚙️</span>
                 <span style="flex:1;overflow:hidden;min-width:0">
-                    <span class="tree-label" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block${broken ? ';color:var(--red,#ef4444)' : ''}">${mainText}</span>
+                    <span class="tree-label" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block${broken ? ';color:var(--red,#ef4444)' : ''}">${importedPrefix}${mainText}</span>
                     ${subText ? `<span style="font-size:10px;color:${broken ? 'var(--red,#ef4444)' : 'var(--text-faint)'};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block">${subText}</span>` : ''}
                 </span>
-                <button class="btn-icon btn-icon-danger" style="flex-shrink:0;padding:2px 4px"
+                ${!isImported ? `<button class="btn-icon btn-icon-danger" style="flex-shrink:0;padding:2px 4px"
                         onclick="event.stopPropagation();SWRLEditor.delete('${r.id}')"
-                        title="Delete rule">${ClassEditor._svgDelete}</button>
+                        title="Delete rule">${ClassEditor._svgDelete}</button>` : ''}
             </div>`;
         }).join('');
     },
@@ -201,7 +203,9 @@ const SWRLEditor = {
     _renderDetail() {
         const detail = document.getElementById('swrl-detail');
         if (!detail) return;
-        detail.innerHTML = this._renderForm(this._editingRule, this._isNew);
+        const isImported = !!this._editingRule?._imported;
+        _applyImportedView(detail, this._editingRule,
+            this._renderForm(this._editingRule, isImported ? false : this._isNew));
         _initHResizers('swrl-detail');
         if (!this._isNew) {
             // Focus on the ID field so the user can rename it directly
@@ -961,6 +965,8 @@ const SWRLEditor = {
     },
 
     async delete(id) {
+        const rule = (APP.state.swrl_rules || []).find(r => r.id === id);
+        if (rule?._imported) { UI.error('Cannot delete an imported rule.'); return; }
         if (!await UI.confirm(`Delete SWRL rule <strong>${id}</strong>?`)) return;
         try {
             await API.deleteSWRLRule(id);
@@ -1016,8 +1022,10 @@ const SWRLEditor = {
         const menu = document.createElement('div');
         menu.id = 'swrl-ctx-menu';
         menu.className = 'ctx-menu';
-        menu.innerHTML = `
-            <div class="ctx-item ctx-danger" onclick="SWRLEditor._closeContextMenu();SWRLEditor.delete('${id}')">
+        const isImported = _isImportedId('swrl_rules', id);
+        menu.innerHTML = isImported
+            ? _importedCtxBanner()
+            : `<div class="ctx-item ctx-danger" onclick="SWRLEditor._closeContextMenu();SWRLEditor.delete('${id}')">
                 ${ClassEditor._svgDelete} Delete Rule</div>`;
         menu.style.left = event.clientX + 'px';
         menu.style.top  = event.clientY + 'px';

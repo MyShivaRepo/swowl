@@ -15,7 +15,7 @@ from pydantic import BaseModel as PydanticModel
 from owl_model import (
     OWLOntology, OWLClass, OWLObjectProperty, OWLDatatypeProperty,
     OWLAnnotationProperty,
-    OWLIndividual, SWRLRule, InferenceResult, PropertyPresence,
+    OWLIndividual, SWRLRule, SparqlQuery, InferenceResult, PropertyPresence,
     ObjectPropertyAssertion,
 )
 from triple_store import store
@@ -288,6 +288,102 @@ def update_ontology_entry(name: str, req: UpdateEntryRequest):
     return entry.to_dict()
 
 
+@app.get("/api/ontologies/importable", tags=["Ontologie"])
+def list_importable_ontologies(exclude: str = Query(default="", description="Name of the ontology to exclude (the import target itself)")):
+    """Retourne les ontologies importables.
+    Critères : non readonly, uri et prefix définis, différente de l'ontologie cible (exclude)."""
+    return [
+        e.to_dict() for e in store._registry.values()
+        if not e.readonly and e.uri and e.prefix and e.name != exclude
+    ]
+
+
+class ImportsUpdateRequest(PydanticModel):
+    imports: list[str] = []
+
+
+@app.put("/api/ontologies/{name}/imports", tags=["Ontologie"])
+def update_ontology_imports(name: str, req: ImportsUpdateRequest):
+    """Met à jour la liste des URIs importées d'une entrée du registre."""
+    entry = store._registry.get(name)
+    if not entry:
+        raise HTTPException(404, f"Ontologie '{name}' introuvable dans le registre.")
+    entry.imports = req.imports
+    store._save_registry()
+    return entry.to_dict()
+
+
+@app.get("/api/ontologies/current/imported-entities", tags=["Ontologie"])
+def get_imported_entities():
+    """Retourne les entités de toutes les ontologies importées transitivement par l'ontologie
+    courante (BFS sur l'arbre des imports). Les builtins readonly sont ignorés (owl, rdfs, rdf
+    sont déjà gérés nativement par l'éditeur). Chaque entité est enrichie de _imported,
+    _importPrefix et _importName."""
+    import json as _json
+    from pathlib import Path as FPath
+
+    require_onto()
+    # Chercher l'entrée connectée (le nom dans le JSON peut différer du nom du registre)
+    root_entry = next((e for e in store._registry.values() if e.connected), None)
+    result: dict = {
+        "classes": [], "object_properties": [],
+        "datatype_properties": [], "annotation_properties": [],
+        "individuals": [], "swrl_rules": [], "queries": [],
+        "display_rules": {"single": {}, "multi": {}},
+    }
+    if not root_entry:
+        return result
+
+    def _resolve(uri: str):
+        """Retourne l'entrée de registry correspondant à un URI (normalisation du # final)."""
+        for e in store._registry.values():
+            if e.uri == uri or e.uri == uri.rstrip('#') or uri == e.uri.rstrip('#'):
+                return e
+        return None
+
+    # BFS : on visite chaque URI importée une seule fois (cycle-safe)
+    visited_uris: set = set()
+    queue: list = list(root_entry.imports or [])
+
+    while queue:
+        uri = queue.pop(0)
+        if uri in visited_uris:
+            continue
+        visited_uris.add(uri)
+
+        imp_entry = _resolve(uri)
+        if not imp_entry:
+            continue
+        # Les builtins W3C (readonly) sont gérés nativement — on continue le BFS
+        # pour propager leurs imports déclarés, mais on ne charge pas leurs entités.
+        if not imp_entry.readonly:
+            container_path = host_to_container(imp_entry.path)
+            p = FPath(container_path)
+            if p.exists():
+                try:
+                    data = _json.loads(p.read_text(encoding="utf-8"))
+                    tag = {"_imported": True, "_importPrefix": imp_entry.prefix, "_importName": imp_entry.name}
+                    for key in ("classes", "object_properties", "datatype_properties",
+                                "annotation_properties", "individuals", "swrl_rules", "queries"):
+                        for entity in (data.get(key) or []):
+                            result[key].append({**entity, **tag})
+                    # Merge display_rules — first-visited (closest import) wins over deeper imports
+                    imp_dr = data.get("display_rules") or {}
+                    for dr_key in ("single", "multi"):
+                        for cls_id, rule in (imp_dr.get(dr_key) or {}).items():
+                            if cls_id not in result["display_rules"][dr_key]:
+                                result["display_rules"][dr_key][cls_id] = rule
+                except Exception:
+                    pass
+
+        # Enqueue les imports de cet ontologie (cascade)
+        for child_uri in (imp_entry.imports or []):
+            if child_uri not in visited_uris:
+                queue.append(child_uri)
+
+    return result
+
+
 @app.delete("/api/ontologies/{name}", tags=["Ontologie"])
 def unregister_ontology(name: str):
     """Retire une ontologie du registre (ne supprime pas le fichier)."""
@@ -542,6 +638,7 @@ class OntologySnapshot(PydanticModel):
     annotation_properties: list = []
     individuals:           list = []
     swrl_rules:            list = []
+    queries:               list = []
 
 @app.post("/api/snapshot/restore", tags=["Undo"])
 def restore_snapshot(snap: OntologySnapshot):
@@ -552,6 +649,7 @@ def restore_snapshot(snap: OntologySnapshot):
     onto.annotation_properties = [OWLAnnotationProperty(**p)   for p in snap.annotation_properties]
     onto.individuals           = [OWLIndividual(**i)            for i in snap.individuals]
     onto.swrl_rules            = [SWRLRule(**r)                 for r in snap.swrl_rules]
+    onto.queries               = [SparqlQuery(**q)              for q in snap.queries]
     store.save()
     return {"ok": True}
 
@@ -1101,6 +1199,59 @@ def delete_sword_rule(rule_id: str):
         raise HTTPException(404, f"SWRL rule '{rule_id}' not found")
     store.save()
     return {"deleted": rule_id}
+
+
+# ════════════════════════════════════════════════════════════════
+# SPARQL QUERIES
+# ════════════════════════════════════════════════════════════════
+
+@app.get("/api/queries", tags=["Queries"])
+def list_queries():
+    return require_onto().queries
+
+
+@app.post("/api/queries", tags=["Queries"], status_code=201)
+def create_query(query: SparqlQuery):
+    onto = require_onto()
+    if any(q.id == query.id for q in onto.queries):
+        raise HTTPException(409, f"Query '{query.id}' already exists")
+    onto.queries.append(query)
+    store.save()
+    return query
+
+
+@app.get("/api/queries/{query_id}", tags=["Queries"])
+def get_query(query_id: str):
+    onto = require_onto()
+    q = next((q for q in onto.queries if q.id == query_id), None)
+    if not q:
+        raise HTTPException(404, f"Query '{query_id}' not found")
+    return q
+
+
+@app.put("/api/queries/{query_id}", tags=["Queries"])
+def update_query(query_id: str, query: SparqlQuery):
+    onto = require_onto()
+    idx = next((i for i, q in enumerate(onto.queries) if q.id == query_id), None)
+    if idx is None:
+        raise HTTPException(404, f"Query '{query_id}' not found")
+    if query.id != query_id:
+        if any(q.id == query.id for i2, q in enumerate(onto.queries) if i2 != idx):
+            raise HTTPException(409, f"Query '{query.id}' already exists")
+    onto.queries[idx] = query
+    store.save()
+    return query
+
+
+@app.delete("/api/queries/{query_id}", tags=["Queries"])
+def delete_query(query_id: str):
+    onto = require_onto()
+    before = len(onto.queries)
+    onto.queries = [q for q in onto.queries if q.id != query_id]
+    if len(onto.queries) == before:
+        raise HTTPException(404, f"Query '{query_id}' not found")
+    store.save()
+    return {"deleted": query_id}
 
 
 # ════════════════════════════════════════════════════════════════

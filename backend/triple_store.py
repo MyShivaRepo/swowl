@@ -160,11 +160,58 @@ class TripleStore:
         if name not in self._registry:
             return None
         was_connected = self._registry[name].connected
+        old_imports   = self._registry[name].imports
         del self._registry[name]
-        entry = RegistryEntry(name=new_name, path=path, uri=uri, prefix=prefix, connected=was_connected)
+        entry = RegistryEntry(name=new_name, path=path, uri=uri, prefix=prefix,
+                              connected=was_connected, imports=old_imports)
         self._registry[new_name] = entry
         self._save_registry()
         return entry
+
+    def update_imports(self, name: str, import_uris: list) -> Optional[RegistryEntry]:
+        """Met à jour la liste des imports déclarés pour une entrée du registre."""
+        if name not in self._registry:
+            return None
+        self._registry[name].imports = import_uris
+        self._save_registry()
+        return self._registry[name]
+
+    def load_imported_entities(self, name: str) -> list:
+        """Charge les entités des ontologies importées par `name`.
+        Retourne une liste de dicts {prefix, uri, classes, object_properties,
+        datatype_properties, individuals}."""
+        entry = self._registry.get(name)
+        if not entry or not entry.imports:
+            return []
+        results = []
+        for imp_uri in entry.imports:
+            # Trouver l'entrée du registre correspondant à cet URI
+            imp_entry = next(
+                (e for e in self._registry.values()
+                 if e.uri == imp_uri or e.uri == imp_uri + '#'
+                 or imp_uri == e.uri + '#'),
+                None
+            )
+            if not imp_entry:
+                continue
+            container_path = host_to_container(imp_entry.path)
+            p = Path(container_path)
+            if not p.exists():
+                continue
+            try:
+                data = json.loads(p.read_text(encoding="utf-8"))
+                results.append({
+                    "name":                 imp_entry.name,
+                    "prefix":               imp_entry.prefix,
+                    "uri":                  imp_entry.uri,
+                    "classes":              data.get("classes", []),
+                    "object_properties":    data.get("object_properties", []),
+                    "datatype_properties":  data.get("datatype_properties", []),
+                    "individuals":          data.get("individuals", []),
+                })
+            except Exception:
+                continue
+        return results
 
     # ── Connexion / déconnexion ──────────────────────────────
 

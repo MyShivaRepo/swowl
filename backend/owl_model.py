@@ -246,6 +246,17 @@ class SWRLRule(BaseModel):
     enabled: bool = True
 
 
+class SparqlQuery(BaseModel):
+    id: str
+    label: str = ""
+    comment: str = ""
+    distinct: bool = False
+    patterns: list = []
+    order_by: str = ""
+    order_dir: str = "ASC"
+    limit: int = 100
+
+
 # ── Ontologie complète ────────────────────────────────────────
 
 class OWLAnnotationProperty(BaseModel):
@@ -266,6 +277,7 @@ class OWLOntology(BaseModel):
     annotation_properties: List[OWLAnnotationProperty] = []
     individuals: List[OWLIndividual] = []
     swrl_rules: List[SWRLRule] = []
+    queries: List[SparqlQuery] = []
     display_rules: dict = Field(default_factory=dict)  # {"single": {classId: propId}, "multi": {classId: [{sep, propId}]}}
 
 

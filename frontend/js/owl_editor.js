@@ -190,6 +190,112 @@ function _escapeHtml(s) {
         .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
+/**
+ * Render a read-only detail panel for an entity imported from another ontology.
+ * @param {object} entity  - the entity object (class, property or individual)
+ * @param {string} kind    - 'class' | 'object-property' | 'datatype-property' | 'individual'
+ */
+function _renderImportedDetail(entity, kind) {
+    const prefix = _escapeHtml(entity._importPrefix || '');
+    const name   = _escapeHtml(entity._importName   || entity._importPrefix || '');
+    const id     = _escapeHtml(entity.id || '');
+    const label  = entity.annotations?.labels?.[0]?.value || '';
+    const comment = entity.annotations?.comments?.[0]?.value || '';
+    return `
+    <div class="detail-panel imported-detail-panel">
+        <div class="imported-detail-banner">
+            <span class="imported-detail-icon">🔒</span>
+            <span>Imported from <strong>${name}</strong> <code>(${prefix}:)</code> — read only</span>
+        </div>
+        <div class="cls-frame" style="margin:10px 12px">
+            <div class="cls-frame-bar"><span class="cls-frame-tag">Identity</span></div>
+            <div class="cls-frame-body">
+                <table class="entity-table" style="width:100%">
+                    <tr><th style="width:90px">ID</th><td><code>${id}</code></td></tr>
+                    ${prefix ? `<tr><th>Prefixed</th><td><code>${prefix}:${id}</code></td></tr>` : ''}
+                    ${label   ? `<tr><th>Label</th><td>${_escapeHtml(label)}</td></tr>` : ''}
+                    ${comment ? `<tr><th>Comment</th><td style="white-space:pre-wrap">${_escapeHtml(comment)}</td></tr>` : ''}
+                </table>
+            </div>
+        </div>
+    </div>`;
+}
+
+/** Returns only the read-only banner HTML to prepend to a full renderForm result. */
+function _importedBannerHtml(entity) {
+    const prefix = _escapeHtml(entity._importPrefix || '');
+    const name   = _escapeHtml(entity._importName || entity._importPrefix || '');
+    return `<div class="imported-detail-banner imported-detail-banner--form">
+        <span class="imported-detail-icon">🔒</span>
+        <span>Imported from <strong>${name}</strong> <code>(${prefix}:)</code> — read only</span>
+    </div>`;
+}
+
+/** Disables all interactive elements inside a detail panel to make it read-only. */
+function _applyReadOnly(detail) {
+    detail.querySelectorAll('input, select, textarea, button').forEach(el => { el.disabled = true; });
+}
+
+/** Display id of an entity: prefixed with its import prefix when imported. */
+function _displayId(entity) {
+    return entity?._imported ? `${entity._importPrefix}:${entity.id}` : (entity?.id ?? '');
+}
+
+/** True if the entity with this id in APP.state[stateKey] is imported. */
+function _isImportedId(stateKey, id) {
+    return !!(APP.state[stateKey] || []).find(e => e.id === id)?._imported;
+}
+
+/** Context-menu banner for an imported entity (no actions available). */
+function _importedCtxBanner() {
+    return `<div class="ctx-item" style="opacity:0.6;cursor:default;font-style:italic">🔒 Imported — read only</div>`;
+}
+
+/**
+ * Sets the detail panel content for an entity, applying the imported-view treatment
+ * (lock banner + dimming + read-only) when the entity is imported.
+ * Returns true if the entity is imported, false otherwise.
+ */
+function _applyImportedView(detail, entity, html) {
+    if (entity?._imported) {
+        detail.innerHTML = _importedBannerHtml(entity) + html;
+        detail.classList.add('is-imported-view');
+        _applyReadOnly(detail);
+        return true;
+    }
+    detail.classList.remove('is-imported-view');
+    detail.innerHTML = html;
+    return false;
+}
+
+/**
+ * After any panel render, marks every [data-id] element whose id belongs to an
+ * imported entity with the 'imported-entity' CSS class (dimmed icon + text).
+ * Safe to call multiple times — adding an already-present class is a no-op.
+ */
+let _importedIdsCache = null;   // Set of imported entity ids — invalidated by _TreeCommon.invalidateCaches()
+
+function _markImportedRefs(container) {
+    if (!container) return;
+    if (!_importedIdsCache) {
+        _importedIdsCache = new Set();
+        ['classes', 'object_properties', 'datatype_properties', 'annotation_properties', 'individuals'].forEach(key => {
+            (APP.state[key] || []).filter(e => e._imported).forEach(e => _importedIdsCache.add(e.id));
+        });
+    }
+    const importedSet = _importedIdsCache;
+    if (!importedSet.size) return;
+    // List items referencing a class or property by data-id
+    container.querySelectorAll('[data-id]').forEach(el => {
+        if (importedSet.has(el.dataset.id)) el.classList.add('imported-entity');
+    });
+    // Restriction group containers and individual property panels (data-prop)
+    // Only top-level containers — NOT restr-child-row — to avoid double opacity stacking
+    container.querySelectorAll('.restr-prop-group[data-prop], .ind-prop-panel[data-prop]').forEach(el => {
+        if (importedSet.has(el.dataset.prop)) el.classList.add('imported-entity');
+    });
+}
+
 const _TreeCommon = {
 
     /** buildTree() result cached per editor — invalidated by APP.refresh(). */
@@ -200,6 +306,7 @@ const _TreeCommon = {
 
     invalidateCaches() {
         [ClassEditor, OPEditor, DPEditor, APEditor].forEach(ed => { ed._treeCache = null; });
+        _importedIdsCache = null;
     },
 
     installDeselectListener(ed) {
@@ -380,29 +487,30 @@ const ClassEditor = {
         if (!cls) return '';
         const children = childrenOf[id] || [];
         const hasChildren = children.length > 0;
-        const label = cls.annotations?.labels?.[0]?.value || '';
         const isSelected = this._selectedIds.has(id);
         const isOpen = this._expanded.has(id);
+        const isImported = !!cls._imported;
+        const displayId = _displayId(cls);
+        const importedClass = isImported ? ' imported-entity' : '';
+        const dragAttrs = `${isImported ? '' : `draggable="true" ondragstart="ClassEditor.onDragStart(event,'${id}')" ondragend="ClassEditor.onDragEnd(event)"`}
+                 ondragover="ClassEditor.onDragOver(event,'${id}')"
+                 ondragleave="ClassEditor.onDragLeave(event)"
+                 ondrop="ClassEditor.onDrop(event,'${id}')"`.trim();
 
         return `
         <div class="tree-root-node">
-            <div class="tree-item${isSelected ? ' selected' : ''}"
+            <div class="tree-item${isSelected ? ' selected' : ''}${importedClass}"
                  style="padding-left:${depth * 16 + 6}px"
                  data-id="${id}"
-                 draggable="true"
+                 ${dragAttrs}
                  onclick="ClassEditor.selectClass('${id}', event)"
-                 oncontextmenu="ClassEditor.showContextMenu(event,'${id}')"
-                 ondragstart="ClassEditor.onDragStart(event,'${id}')"
-                 ondragover="ClassEditor.onDragOver(event,'${id}')"
-                 ondragleave="ClassEditor.onDragLeave(event)"
-                 ondrop="ClassEditor.onDrop(event,'${id}')"
-                 ondragend="ClassEditor.onDragEnd(event)">
+                 oncontextmenu="ClassEditor.showContextMenu(event,'${id}')">
                 ${hasChildren
                     ? `<span class="tree-toggle${isOpen ? ' open' : ''}"
                              onclick="event.stopPropagation();ClassEditor.toggleNode('${id}')">▶</span>`
                     : `<span class="tree-leaf">◦</span>`}
                 <span class="cls-dot tree-cls-dot"></span>
-                <span class="tree-label">${id}</span>
+                <span class="tree-label">${_escapeHtml(displayId)}</span>
             </div>
             <div id="tcn-${id}" style="display:${isOpen ? 'block' : 'none'}">
                 ${children.map(cid => this._renderNode(cid, childrenOf, depth + 1)).join('')}
@@ -664,9 +772,11 @@ const ClassEditor = {
 
         if (this._selectedIds.size === 1) {
             const cls = (APP.state.classes || []).find(c => c.id === id);
-            detail.innerHTML = cls ? this.renderForm(cls) : this.renderForm(null);
+            const isImp = _applyImportedView(detail, cls, cls ? this.renderForm(cls) : this.renderForm(null));
             _initHResizers('class-detail');
-            this._updateSuperPanel(cls || null);
+            this._updateSuperPanel(isImp ? null : (cls || null));
+            _markImportedRefs(detail);
+            _markImportedRefs(document.getElementById('cls-supers-list'));
         } else {
             const n = this._selectedIds.size;
             detail.innerHTML = `<div class="detail-panel-empty">
@@ -686,29 +796,29 @@ const ClassEditor = {
         const btnDelete = document.getElementById('btn-cls-delete');
         if (!btnSister || !btnChild || !btnDelete) return;
 
+        const _isImportedCls = (sid) => _isImportedId('classes', sid);
+        const _hasImported   = this._selectedIds.size > 0 && [...this._selectedIds].some(_isImportedCls);
+        const _selImported   = this._selectedId && _isImportedCls(this._selectedId);
+
         if (this._owlThingSelected) {
-            // owl:Thing selected: only "Child"
             btnSister.disabled = true;
             btnSister.style.visibility = 'hidden';
             btnChild.disabled  = false;
             btnDelete.disabled = true;
             btnDelete.style.visibility = 'hidden';
         } else if (this._selectedIds.size > 1) {
-            // Multi-selection: only delete is active
             btnSister.disabled = true;
             btnSister.style.visibility = '';
             btnChild.disabled  = true;
-            btnDelete.disabled = false;
+            btnDelete.disabled = _hasImported;
             btnDelete.style.visibility = '';
         } else if (this._selectedId) {
-            // Regular class selected: all buttons active
-            btnSister.disabled = false;
-            btnSister.style.visibility = '';
+            btnSister.disabled = !!_selImported;
+            btnSister.style.visibility = _selImported ? 'hidden' : '';
             btnChild.disabled  = false;
-            btnDelete.disabled = false;
-            btnDelete.style.visibility = '';
+            btnDelete.disabled = !!_selImported;
+            btnDelete.style.visibility = _selImported ? 'hidden' : '';
         } else {
-            // Nothing selected
             btnSister.disabled = true;
             btnSister.style.visibility = '';
             btnChild.disabled  = true;
@@ -858,6 +968,7 @@ const ClassEditor = {
         this._closeContextMenu();
 
         const isClass = !!id;
+        const isImported = isClass && _isImportedId('classes', id);
         const n = this._selectedIds.size;
         const deleteLabel = n > 1 ? `Delete Classes <strong>(${n})</strong>` : `Delete Class`;
         const menu = document.createElement('div');
@@ -869,12 +980,14 @@ const ClassEditor = {
             <div class="ctx-item" onclick="ClassEditor._closeContextMenu();ClassEditor.createSibling()">
                 ${this._svgSister} Add Sibling Class</div>
             <div class="ctx-sep"></div>
-            <div class="ctx-item" onclick="ClassEditor._closeContextMenu();APP.renderSection('individuals');setTimeout(()=>IndividualEditor.selectClass('${id}'),50)">
+            <div class="ctx-item" onclick="ClassEditor._closeContextMenu();APP.navigate('individuals');setTimeout(()=>IndividualEditor.selectClass('${id}'),50)">
                 <span class="xsd-dot" style="display:inline-block;vertical-align:middle;margin-right:2px"></span> Go to Individuals Tab</div>
-            <div class="ctx-sep"></div>` : (!isClass ? `<div class="ctx-item" onclick="ClassEditor._closeContextMenu();ClassEditor.createChild()">
-                ${this._svgChild} Add Child Class</div>` : `<div class="ctx-sep"></div>`)}
-            ${isClass ? `<div class="ctx-item ctx-danger" onclick="ClassEditor._closeContextMenu();ClassEditor.deleteSelected()">
-                ${this._svgDelete} ${deleteLabel}</div>` : ''}
+            ${!isImported ? `<div class="ctx-sep"></div>
+            <div class="ctx-item ctx-danger" onclick="ClassEditor._closeContextMenu();ClassEditor.deleteSelected()">
+                ${this._svgDelete} ${deleteLabel}</div>` : ''}` : (!isClass ? `<div class="ctx-item" onclick="ClassEditor._closeContextMenu();ClassEditor.createChild()">
+                ${this._svgChild} Add Child Class</div>` : `
+            ${!isImported ? `<div class="ctx-item ctx-danger" onclick="ClassEditor._closeContextMenu();ClassEditor.deleteSelected()">
+                ${this._svgDelete} ${deleteLabel}</div>` : ''}`)}
         `;
         menu.style.left = event.clientX + 'px';
         menu.style.top  = event.clientY + 'px';
@@ -2077,14 +2190,15 @@ function _whereUsedFrame(testFn) {
     const rows = used.map(r => {
         const mainText = r.label || r.id;
         const subText  = r.label ? r.id : '';
+        const importedPrefix = r._imported ? `${r._importPrefix}:` : '';
         return `
-        <div class="cls-list-item" style="cursor:default;align-items:center">
+        <div class="cls-list-item${r._imported ? ' imported-entity' : ''}" data-id="${r.id}" style="cursor:default;align-items:center">
             <span style="font-size:11px;flex-shrink:0">⚙️</span>
             <span style="flex:1;overflow:hidden;min-width:0;cursor:pointer"
                   onclick="APP.navigateTo('swrl-rules','${r.id}')"
                   onmouseover="this.querySelector('.swrl-main-lbl').style.textDecoration='underline';this.querySelector('.swrl-main-lbl').style.color='var(--accent,#5f8dd3)'"
                   onmouseout="this.querySelector('.swrl-main-lbl').style.textDecoration='';this.querySelector('.swrl-main-lbl').style.color=''">
-                <span class="cls-list-lbl swrl-main-lbl" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block">${mainText}</span>
+                <span class="cls-list-lbl swrl-main-lbl" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block">${importedPrefix}${mainText}</span>
                 ${subText ? `<span style="font-size:10px;color:var(--text-faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block">${subText}</span>` : ''}
             </span>
         </div>`;
@@ -2380,26 +2494,28 @@ const OPEditor = {
         const hasChildren = children.length > 0;
         const isSelected = this._selectedIds.has(id);
         const isOpen = this._expanded.has(id);
-        return `
-        <div class="tree-root-node">
-            <div class="tree-item${isSelected ? ' selected' : ''}"
-                 style="padding-left:${depth * 16 + 6}px"
-                 data-id="${id}"
-                 draggable="true"
-                 onclick="OPEditor.selectProp('${id}', event)"
-                 oncontextmenu="OPEditor.showContextMenu(event,'${id}')"
-                 ondragstart="OPEditor.onDragStart(event,'${id}')"
+        const isImported = !!prop._imported;
+        const displayId = _displayId(prop);
+        const importedClass = isImported ? ' imported-entity' : '';
+        const dragAttrs = `${isImported ? '' : `draggable="true" ondragstart="OPEditor.onDragStart(event,'${id}')" ondragend="OPEditor.onDragEnd(event)"`}
                  ondragover="OPEditor.onDragOver(event,'${id}')"
                  ondragleave="OPEditor.onDragLeave(event)"
-                 ondrop="OPEditor.onDrop(event,'${id}')"
-                 ondragend="OPEditor.onDragEnd(event)">
+                 ondrop="OPEditor.onDrop(event,'${id}')"`.trim();
+        return `
+        <div class="tree-root-node">
+            <div class="tree-item${isSelected ? ' selected' : ''}${importedClass}"
+                 style="padding-left:${depth * 16 + 6}px"
+                 data-id="${id}"
+                 ${dragAttrs}
+                 onclick="OPEditor.selectProp('${id}', event)"
+                 oncontextmenu="OPEditor.showContextMenu(event,'${id}')">
                 ${hasChildren
                     ? `<span class="tree-toggle${isOpen ? ' open' : ''}"
                              onclick="event.stopPropagation();OPEditor.toggleNode('${id}')">▶</span>`
                     : `<span class="tree-leaf">◦</span>`}
                 <span class="op-prop-dot tree-op-dot"></span>
-                <span class="tree-label">${id}</span>
-                ${prop.inverseOf ? `<span class="op-inverse-tag">(↔&thinsp;<span class="op-prop-dot" style="width:9px;height:6px;flex-shrink:0;display:inline-block;vertical-align:middle"></span>&thinsp;<span class="op-inv-nav"
+                <span class="tree-label">${_escapeHtml(displayId)}</span>
+                ${!isImported && prop.inverseOf ? `<span class="op-inverse-tag">(↔&thinsp;<span class="op-prop-dot" style="width:9px;height:6px;flex-shrink:0;display:inline-block;vertical-align:middle"></span>&thinsp;<span class="op-inv-nav"
                       onclick="event.stopPropagation();APP.navigateTo('object-properties','${prop.inverseOf}')"
                       onmouseover="this.style.color='var(--accent)';this.style.textDecoration='underline'"
                       onmouseout="this.style.color='';this.style.textDecoration='';">${prop.inverseOf}</span>)</span>` : ''}
@@ -2636,10 +2752,12 @@ const OPEditor = {
 
         if (this._selectedIds.size === 1) {
             const prop = (APP.state.object_properties || []).find(p => p.id === id);
-            detail.innerHTML = this.renderForm(prop);
+            const isImp = _applyImportedView(detail, prop, this.renderForm(prop));
             _initHResizers('op-detail');
-            this._updateSuperPanel(prop || null);
-            this._loadInferredInverse(id);
+            this._updateSuperPanel(isImp ? null : (prop || null));
+            if (!isImp) this._loadInferredInverse(id);
+            _markImportedRefs(detail);
+            _markImportedRefs(document.getElementById('op-supers-list'));
         } else {
             const n = this._selectedIds.size;
             detail.innerHTML = `<div class="detail-panel-empty">
@@ -2658,6 +2776,10 @@ const OPEditor = {
         const btnChild  = document.getElementById('op-btn-child');
         const btnDelete = document.getElementById('op-btn-delete');
         if (!btnSister || !btnChild || !btnDelete) return;
+        const _isImportedOP = (sid) => _isImportedId('object_properties', sid);
+        const _hasImported  = this._selectedIds.size > 0 && [...this._selectedIds].some(_isImportedOP);
+        const _selImported  = this._selectedId && _isImportedOP(this._selectedId);
+
         if (this._topPropSelected) {
             btnSister.disabled = true;
             btnSister.style.visibility = 'hidden';
@@ -2668,14 +2790,14 @@ const OPEditor = {
             btnSister.disabled = true;
             btnSister.style.visibility = '';
             btnChild.disabled  = true;
-            btnDelete.disabled = false;
+            btnDelete.disabled = _hasImported;
             btnDelete.style.visibility = '';
         } else if (this._selectedId) {
-            btnSister.disabled = false;
-            btnSister.style.visibility = '';
+            btnSister.disabled = !!_selImported;
+            btnSister.style.visibility = _selImported ? 'hidden' : '';
             btnChild.disabled  = false;
-            btnDelete.disabled = false;
-            btnDelete.style.visibility = '';
+            btnDelete.disabled = !!_selImported;
+            btnDelete.style.visibility = _selImported ? 'hidden' : '';
         } else {
             btnSister.disabled = true;
             btnSister.style.visibility = '';
@@ -2748,6 +2870,7 @@ const OPEditor = {
         this._closeContextMenu();
 
         const isProp = !!id;
+        const isImported = isProp && _isImportedId('object_properties', id);
         const n = this._selectedIds.size;
         const deleteLabel = n > 1 ? `Delete Properties <strong>(${n})</strong>` : `Delete`;
         const menu = document.createElement('div');
@@ -2758,10 +2881,11 @@ const OPEditor = {
                 ${this._svgChild} Add Child Property</div>
             <div class="ctx-item" onclick="OPEditor._closeContextMenu();OPEditor.createSibling()">
                 ${this._svgSister} Add Sibling Property</div>
-            <div class="ctx-sep"></div>` : (!isProp ? `<div class="ctx-item" onclick="OPEditor._closeContextMenu();OPEditor.createChild()">
-                ${this._svgChild} Add Child Property</div>` : `<div class="ctx-sep"></div>`)}
-            ${isProp ? `<div class="ctx-item ctx-danger" onclick="OPEditor._closeContextMenu();OPEditor.deleteSelected()">
-                ${this._svgDelete} ${deleteLabel}</div>` : ''}
+            ${!isImported ? `<div class="ctx-sep"></div>
+            <div class="ctx-item ctx-danger" onclick="OPEditor._closeContextMenu();OPEditor.deleteSelected()">
+                ${this._svgDelete} ${deleteLabel}</div>` : ''}` : (!isProp ? `<div class="ctx-item" onclick="OPEditor._closeContextMenu();OPEditor.createChild()">
+                ${this._svgChild} Add Child Property</div>` : `${!isImported ? `<div class="ctx-item ctx-danger" onclick="OPEditor._closeContextMenu();OPEditor.deleteSelected()">
+                ${this._svgDelete} ${deleteLabel}</div>` : ''}`)}
         `;
         menu.style.left = event.clientX + 'px';
         menu.style.top  = event.clientY + 'px';
@@ -3236,25 +3360,27 @@ const DPEditor = {
         const hasChildren = children.length > 0;
         const isSelected = this._selectedIds.has(id);
         const isOpen = this._expanded.has(id);
-        return `
-        <div class="tree-root-node">
-            <div class="tree-item${isSelected ? ' selected' : ''}"
-                 style="padding-left:${depth * 16 + 6}px"
-                 data-id="${id}"
-                 draggable="true"
-                 onclick="DPEditor.selectProp('${id}', event)"
-                 oncontextmenu="DPEditor.showContextMenu(event,'${id}')"
-                 ondragstart="DPEditor.onDragStart(event,'${id}')"
+        const isImported = !!prop._imported;
+        const displayId = _displayId(prop);
+        const importedClass = isImported ? ' imported-entity' : '';
+        const dragAttrs = `${isImported ? '' : `draggable="true" ondragstart="DPEditor.onDragStart(event,'${id}')" ondragend="DPEditor.onDragEnd(event)"`}
                  ondragover="DPEditor.onDragOver(event,'${id}')"
                  ondragleave="DPEditor.onDragLeave(event)"
-                 ondrop="DPEditor.onDrop(event,'${id}')"
-                 ondragend="DPEditor.onDragEnd(event)">
+                 ondrop="DPEditor.onDrop(event,'${id}')"`.trim();
+        return `
+        <div class="tree-root-node">
+            <div class="tree-item${isSelected ? ' selected' : ''}${importedClass}"
+                 style="padding-left:${depth * 16 + 6}px"
+                 data-id="${id}"
+                 ${dragAttrs}
+                 onclick="DPEditor.selectProp('${id}', event)"
+                 oncontextmenu="DPEditor.showContextMenu(event,'${id}')">
                 ${hasChildren
                     ? `<span class="tree-toggle${isOpen ? ' open' : ''}"
                              onclick="event.stopPropagation();DPEditor.toggleNode('${id}')">▶</span>`
                     : `<span class="tree-leaf">◦</span>`}
                 <span class="dp-prop-dot tree-dp-dot"></span>
-                <span class="tree-label">${id}</span>
+                <span class="tree-label">${_escapeHtml(displayId)}</span>
             </div>
             <div id="dp-tcn-${id}" style="display:${isOpen ? 'block' : 'none'}">
                 ${children.map(cid => this._renderNode(cid, childrenOf, depth + 1)).join('')}
@@ -3500,9 +3626,11 @@ const DPEditor = {
 
         if (this._selectedIds.size === 1) {
             const prop = (APP.state.datatype_properties || []).find(p => p.id === id);
-            detail.innerHTML = this.renderForm(prop);
+            const isImp = _applyImportedView(detail, prop, this.renderForm(prop));
             _initHResizers('dp-detail');
-            this._updateSuperPanel(prop || null);
+            this._updateSuperPanel(isImp ? null : (prop || null));
+            _markImportedRefs(detail);
+            _markImportedRefs(document.getElementById('dp-supers-list'));
         } else {
             const n = this._selectedIds.size;
             detail.innerHTML = `<div class="detail-panel-empty">
@@ -3521,6 +3649,10 @@ const DPEditor = {
         const btnChild  = document.getElementById('dp-btn-child');
         const btnDelete = document.getElementById('dp-btn-delete');
         if (!btnSister || !btnChild || !btnDelete) return;
+        const _isImportedDP = (sid) => _isImportedId('datatype_properties', sid);
+        const _hasImported  = this._selectedIds.size > 0 && [...this._selectedIds].some(_isImportedDP);
+        const _selImported  = this._selectedId && _isImportedDP(this._selectedId);
+
         if (this._topPropSelected) {
             btnSister.disabled = true;
             btnSister.style.visibility = 'hidden';
@@ -3531,14 +3663,14 @@ const DPEditor = {
             btnSister.disabled = true;
             btnSister.style.visibility = '';
             btnChild.disabled  = true;
-            btnDelete.disabled = false;
+            btnDelete.disabled = _hasImported;
             btnDelete.style.visibility = '';
         } else if (this._selectedId) {
-            btnSister.disabled = false;
-            btnSister.style.visibility = '';
+            btnSister.disabled = !!_selImported;
+            btnSister.style.visibility = _selImported ? 'hidden' : '';
             btnChild.disabled  = false;
-            btnDelete.disabled = false;
-            btnDelete.style.visibility = '';
+            btnDelete.disabled = !!_selImported;
+            btnDelete.style.visibility = _selImported ? 'hidden' : '';
         } else {
             btnSister.disabled = true;
             btnSister.style.visibility = '';
@@ -3610,6 +3742,7 @@ const DPEditor = {
         this._closeContextMenu();
 
         const isProp = !!id;
+        const isImported = isProp && _isImportedId('datatype_properties', id);
         const n = this._selectedIds.size;
         const deleteLabel = n > 1 ? `Delete Properties <strong>(${n})</strong>` : `Delete`;
         const menu = document.createElement('div');
@@ -3620,10 +3753,11 @@ const DPEditor = {
                 ${this._svgChild} Add Child Property</div>
             <div class="ctx-item" onclick="DPEditor._closeContextMenu();DPEditor.createSibling()">
                 ${this._svgSister} Add Sibling Property</div>
-            <div class="ctx-sep"></div>` : (!isProp ? `<div class="ctx-item" onclick="DPEditor._closeContextMenu();DPEditor.createChild()">
-                ${this._svgChild} Add Child Property</div>` : `<div class="ctx-sep"></div>`)}
-            ${isProp ? `<div class="ctx-item ctx-danger" onclick="DPEditor._closeContextMenu();DPEditor.deleteSelected()">
-                ${this._svgDelete} ${deleteLabel}</div>` : ''}
+            ${!isImported ? `<div class="ctx-sep"></div>
+            <div class="ctx-item ctx-danger" onclick="DPEditor._closeContextMenu();DPEditor.deleteSelected()">
+                ${this._svgDelete} ${deleteLabel}</div>` : ''}` : (!isProp ? `<div class="ctx-item" onclick="DPEditor._closeContextMenu();DPEditor.createChild()">
+                ${this._svgChild} Add Child Property</div>` : `${!isImported ? `<div class="ctx-item ctx-danger" onclick="DPEditor._closeContextMenu();DPEditor.deleteSelected()">
+                ${this._svgDelete} ${deleteLabel}</div>` : ''}`)}
         `;
         menu.style.left = event.clientX + 'px';
         menu.style.top  = event.clientY + 'px';
@@ -3732,8 +3866,6 @@ const DPEditor = {
 
         // Domain
         const domainRows = _listRows(p.domain || [], 'dp-domain-list', 'DPEditor.removeDomain', 'cls-dot', '', '', 'classes');
-        const availDomain = (APP.state.classes || []).filter(c => !(p.domain||[]).includes(c.id))
-            .map(c => `<option value="${c.id}">${c.id}</option>`).join('');
 
         // Range (type XSD — 1 seule valeur)
         const rangeRows = _listRows(p.range || [], 'dp-range-list', 'DPEditor.removeRange', 'xsd-dot');
@@ -3785,8 +3917,9 @@ const DPEditor = {
                     </div>
                     <div class="cls-frame-body" id="dp-domain-list">
                         ${domainRows || '<div class="cls-list-empty">owl:Thing</div>'}
-                        <select id="dp-domain-picker" class="cls-picker" style="display:none" onchange="DPEditor.addDomain(this.value)">
-                            <option value="">— choose —</option>${availDomain}</select>
+                        <div id="dp-domain-picker" class="cls-tree-picker" style="display:none">
+                            ${_classTreePickerItems('DPEditor.addDomain', p.domain||[])}
+                        </div>
                     </div>
                 </div>
                 <div class="cls-frame cls-frame-half">
@@ -4095,12 +4228,17 @@ const IndividualEditor = {
         };
 
         const renderNode = (id, depth) => {
-            const pl         = depth * 16 + 6;
-            const children   = childrenOf[id] || [];
+            const pl          = depth * 16 + 6;
+            const children    = childrenOf[id] || [];
             const hasChildren = children.length > 0;
-            const isOpen     = this._expandedClasses.has(id);
-            const desc       = allDescendants(id);
-            const count      = inds.filter(x => (x.types || []).some(t => desc.has(t))).length;
+            const isOpen      = this._expandedClasses.has(id);
+            const desc        = allDescendants(id);
+            const count       = inds.filter(x => (x.types || []).some(t => desc.has(t))).length;
+            const clsObj      = classes.find(c => c.id === id);
+            const isImported  = !!clsObj?._imported;
+            const displayId   = _displayId(clsObj);
+            const importedCls = isImported ? ' imported-entity' : '';
+            const dragDrop    = dropAttrs(id);
 
             const toggle = hasChildren
                 ? `<span class="tree-toggle${isOpen ? ' open' : ''}"
@@ -4112,14 +4250,14 @@ const IndividualEditor = {
                 : '';
 
             return `<div class="tree-root-node">
-                <div class="tree-item${id === sel ? ' selected' : ''}" data-id="${id}"
+                <div class="tree-item${id === sel ? ' selected' : ''}${importedCls}" data-id="${id}"
                      style="padding-left:${pl}px"
                      onclick="IndividualEditor.selectClass('${id}')"
                      oncontextmenu="IndividualEditor._showClassContextMenu(event,'${id}')"
-                     ${dropAttrs(id)}>
+                     ${dragDrop}>
                     ${toggle}
                     <span class="cls-dot tree-cls-dot"></span>
-                    <span class="tree-label">${id}</span>
+                    <span class="tree-label">${_escapeHtml(displayId)}</span>
                     ${count ? `<span class="nav-count" style="margin-left:auto;margin-right:6px">${count}</span>` : ''}
                 </div>
                 ${childrenHtml}
@@ -4127,7 +4265,7 @@ const IndividualEditor = {
         };
 
         // owl:Thing header
-        const thingHtml = `<div class="tree-item${sel === null ? ' selected' : ''}" data-id="owl:Thing"
+        const thingHtml = `<div class="tree-item imported-entity${sel === null ? ' selected' : ''}" data-id="owl:Thing"
             style="padding-left:6px" onclick="IndividualEditor.selectClass(null)">
             <span class="tree-toggle open" style="cursor:default">▶</span>
             <span class="cls-dot tree-thing-dot"></span>
@@ -4179,23 +4317,28 @@ const IndividualEditor = {
         });
 
         return filtered.map(ind => {
+            const isImported = !!ind._imported;
             const dispLabel = this._resolveDisplayLabel(ind, this._selectedClassId);
-            const mainText  = dispLabel || ind.id;
-            const subText   = dispLabel ? ind.id : '';
-            return `
-            <div class="tree-item${this._selectedIndIds.has(ind.id) ? ' selected' : ''}" data-id="${ind.id}"
-                 style="padding:4px 6px 4px 10px;display:flex;align-items:center;gap:4px;cursor:grab"
-                 draggable="true"
+            const rawMain   = dispLabel || ind.id;
+            const mainText  = isImported ? `${ind._importPrefix}:${rawMain}` : rawMain;
+            const subText   = dispLabel && !isImported ? ind.id : '';
+            const importedClass = isImported ? ' imported-entity' : '';
+            const dragAttrs = isImported ? '' :
+                `draggable="true"
                  ondragstart="IndividualEditor._onIndDragStart(event,'${ind.id}')"
-                 ondragend="IndividualEditor._onIndDragEnd(event)"
+                 ondragend="IndividualEditor._onIndDragEnd(event)"`;
+            return `
+            <div class="tree-item${this._selectedIndIds.has(ind.id) ? ' selected' : ''}${importedClass}" data-id="${ind.id}"
+                 style="padding:4px 6px 4px 10px;display:flex;align-items:center;gap:4px;${isImported ? 'cursor:default' : 'cursor:grab'}"
+                 ${dragAttrs}
                  onclick="IndividualEditor.selectIndividual('${ind.id}', event.shiftKey)"
                  oncontextmenu="event.preventDefault();IndividualEditor.showContextMenu(event,'${ind.id}')">
                 <span class="xsd-dot" style="flex-shrink:0;margin:0"></span>
                 <span style="flex:1;overflow:hidden;min-width:0">
                     <span class="tree-label" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;display:block"
                           onmouseover="this.style.textDecoration='underline';this.style.color='var(--accent,#5f8dd3)'"
-                          onmouseout="this.style.textDecoration='';this.style.color=''">${mainText}</span>
-                    ${subText ? `<span style="font-size:10px;color:var(--text-faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block">${subText}</span>` : ''}
+                          onmouseout="this.style.textDecoration='';this.style.color=''">${_escapeHtml(mainText)}</span>
+                    ${subText ? `<span style="font-size:10px;color:var(--text-faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block">${_escapeHtml(subText)}</span>` : ''}
                 </span>
             </div>`;
         }).join('');
@@ -4313,7 +4456,8 @@ const IndividualEditor = {
         this._selectedIndId = id;
         this._editingId     = this._selectedIndIds.size === 1 ? id : null;
         if (_hist && !isShift) APP._pushNav('individuals', id);
-        this._setDelBtn(this._selectedIndIds.size > 0);
+        const hasImportedSel = [...this._selectedIndIds].some(sid => _isImportedId('individuals', sid));
+        this._setDelBtn(this._selectedIndIds.size > 0 && !hasImportedSel);
 
         // Col 2 — multi-highlight
         document.querySelector('#ind-list-scroll .ind-new-placeholder')?.remove();
@@ -4326,7 +4470,11 @@ const IndividualEditor = {
         if (!detail) return;
         if (this._selectedIndIds.size === 1) {
             const ind = (APP.state.individuals || []).find(x => x.id === id);
-            if (ind) { detail.innerHTML = this.renderForm(ind); _initHResizers('ind-detail'); }
+            if (ind) {
+                _applyImportedView(detail, ind, this.renderForm(ind, ind._imported ? this._selectedClassId : undefined));
+                _initHResizers('ind-detail');
+            }
+            _markImportedRefs(detail);
         } else {
             const n = this._selectedIndIds.size;
             detail.innerHTML = `<div class="detail-panel-empty">
@@ -4464,6 +4612,7 @@ const IndividualEditor = {
         if (!this._selectedIndIds.has(id)) {
             this.selectIndividual(id, false);
         }
+        const isImported = _isImportedId('individuals', id);
         const n = this._selectedIndIds.size;
         const label = n > 1
             ? `Delete Individuals <strong>(${n})</strong>`
@@ -4471,7 +4620,7 @@ const IndividualEditor = {
         const menu = document.createElement('div');
         menu.id = 'ind-ctx-menu';
         menu.className = 'ctx-menu';
-        menu.innerHTML = `
+        menu.innerHTML = isImported ? _importedCtxBanner() : `
             <div class="ctx-item ctx-danger" onclick="IndividualEditor._closeContextMenu();IndividualEditor.deleteSelected()">
                 ${ClassEditor._svgDelete} ${label}</div>`;
         menu.style.left = event.clientX + 'px';
@@ -4725,7 +4874,7 @@ const IndividualEditor = {
                 const lbl = this._labelForId(a.target, ctxClass);
                 const sub = lbl !== a.target ? `<span style="font-size:10px;color:var(--text-faint);display:block">${a.target}</span>` : '';
                 return `
-                <div class="ind-prop-row" style="display:flex;align-items:center;gap:4px;padding:2px 4px">
+                <div class="ind-prop-row" data-id="${a.target}" style="display:flex;align-items:center;gap:4px;padding:2px 4px">
                     <span class="xsd-dot" style="flex-shrink:0;margin:0"></span>
                     <span class="ind-op-label" style="flex:1;font-size:12px;font-family:var(--font-mono);cursor:pointer"
                           onclick="APP.navigateTo('individuals','${a.target}')"
@@ -4859,7 +5008,7 @@ const IndividualEditor = {
                    style="font-size:12px;font-family:var(--font-mono);flex:1;cursor:pointer;font-style:italic"`
                 : `style="font-size:11px;font-family:var(--font-mono);flex:1;font-style:italic;color:var(--text-dim)"`;
             return `
-            <div style="display:flex;align-items:center;gap:4px;padding:2px 4px">
+            <div ${kind === 'op' ? `data-id="${value}"` : ''} style="display:flex;align-items:center;gap:4px;padding:2px 4px">
                 <span class="xsd-dot" style="flex-shrink:0;margin:0;opacity:0.6"></span>
                 <span ${navClick}>${(lbl+'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</span>
                 ${dtype}
@@ -5890,6 +6039,8 @@ const APEditor = {
     _svgChild:  ClassEditor._svgChild,
     _svgSister: ClassEditor._svgSister,
     _svgDelete: ClassEditor._svgDelete,
+    _svgChild:  ClassEditor._svgChild,
+    _svgSister: ClassEditor._svgSister,
 
     // ── Helpers ───────────────────────────────────────────────
 
@@ -5953,7 +6104,7 @@ const APEditor = {
         const isOpen     = this._expanded.has(p.id);
         return `
         <div class="tree-root-node">
-            <div class="tree-item${isSel ? ' selected' : ''}" style="padding-left:32px"
+            <div class="tree-item builtin-ap${isSel ? ' selected' : ''}" style="padding-left:32px"
                  onclick="APEditor.selectProp('${p.id}')"
                  ondragover="APEditor.onDragOver(event,'${p.id}')"
                  ondragleave="APEditor.onDragLeave(event)"
@@ -5979,25 +6130,27 @@ const APEditor = {
         const hasChildren = children.length > 0;
         const isSel = this._selectedIds.has(id);
         const isOpen = this._expanded.has(id);
+        const isImported = !!prop._imported;
+        const displayId = _displayId(prop);
+        const importedClass = isImported ? ' imported-entity' : '';
         const sid = id.replace(/'/g, "\\'");
-        return `
-        <div class="tree-root-node">
-            <div class="tree-item${isSel ? ' selected' : ''}" style="padding-left:${depth * 16 + 6}px"
-                 data-id="${id}"
-                 draggable="true"
-                 onclick="APEditor.selectProp('${sid}', event)"
-                 oncontextmenu="event.preventDefault();APEditor.showContextMenu(event,'${sid}')"
-                 ondragstart="APEditor.onDragStart(event,'${sid}')"
+        const dragAttrs = `${isImported ? '' : `draggable="true" ondragstart="APEditor.onDragStart(event,'${sid}')" ondragend="APEditor.onDragEnd(event)"`}
                  ondragover="APEditor.onDragOver(event,'${sid}')"
                  ondragleave="APEditor.onDragLeave(event)"
-                 ondrop="APEditor.onDrop(event,'${sid}')"
-                 ondragend="APEditor.onDragEnd(event)">
+                 ondrop="APEditor.onDrop(event,'${sid}')"`.trim();
+        return `
+        <div class="tree-root-node">
+            <div class="tree-item${isSel ? ' selected' : ''}${importedClass}" style="padding-left:${depth * 16 + 6}px"
+                 data-id="${id}"
+                 ${dragAttrs}
+                 onclick="APEditor.selectProp('${sid}', event)"
+                 oncontextmenu="event.preventDefault();APEditor.showContextMenu(event,'${sid}')">
                 ${hasChildren
                     ? `<span class="tree-toggle${isOpen ? ' open' : ''}"
                              onclick="event.stopPropagation();APEditor.toggleNode('${sid}')">▶</span>`
                     : `<span class="tree-leaf">◦</span>`}
                 <span class="anno-prop-dot tree-ap-dot"></span>
-                <span class="tree-label">${id}</span>
+                <span class="tree-label">${_escapeHtml(displayId)}</span>
             </div>
             <div style="display:${isOpen ? 'block' : 'none'}">
                 ${children.map(cid => this._renderUserNode(cid, childrenOf, depth + 1, props)).join('')}
@@ -6181,8 +6334,10 @@ const APEditor = {
             this._updateSuperPanel(id);
         } else {
             const prop = (APP.state.annotation_properties || []).find(p => p.id === id);
-            detail.innerHTML = prop ? this._renderForm(prop) : '';
-            this._updateSuperPanel(id);
+            const isImp = _applyImportedView(detail, prop, prop ? this._renderForm(prop) : '');
+            this._updateSuperPanel(isImp ? null : id);
+            _markImportedRefs(detail);
+            _markImportedRefs(document.getElementById('ap-supers-list'));
         }
     },
 
@@ -6201,23 +6356,25 @@ const APEditor = {
         const btnDelete = document.getElementById('ap-btn-delete');
         if (!btnChild) return;
 
-        const isRoot    = this._isRoot(id);
-        const isBuiltin = id && this._isBuiltin(id);
-        const isUser    = id && !isRoot && !isBuiltin;
-        const isMulti   = this._selectedIds.size > 1;
+        const isRoot     = this._isRoot(id);
+        const isBuiltin  = id && this._isBuiltin(id);
+        const isImported = id && _isImportedId('annotation_properties', id);
+        const isUser     = id && !isRoot && !isBuiltin && !isImported;
+        const isMulti    = this._selectedIds.size > 1;
 
         if (isMulti) {
-            // Multi-selection: only Delete active
+            // Multi-selection: only Delete active (only if no imported in selection)
+            const hasImported = [...this._selectedIds].some(sid => _isImportedId('annotation_properties', sid));
             btnChild.style.display  = '';
             btnSister.style.display = '';
             btnDelete.style.display = '';
             btnChild.disabled  = true;
             btnSister.disabled = true;
-            btnDelete.disabled = false;
+            btnDelete.disabled = hasImported;
         } else {
             btnChild.style.display  = isRoot ? 'none' : '';
-            btnSister.style.display = (isRoot || isBuiltin) ? 'none' : '';
-            btnDelete.style.display = (isRoot || isBuiltin) ? 'none' : '';
+            btnSister.style.display = (isRoot || isBuiltin || isImported) ? 'none' : '';
+            btnDelete.style.display = (isRoot || isBuiltin || isImported) ? 'none' : '';
             btnChild.disabled  = !id;
             btnSister.disabled = !isUser;
             btnDelete.disabled = !isUser;
@@ -6601,14 +6758,20 @@ const APEditor = {
         }
         this._closeContextMenu();
 
+        const isImported = _isImportedId('annotation_properties', id);
         const n = this._selectedIds.size;
         const deleteLabel = n > 1 ? `Delete Properties <strong>(${n})</strong>` : `Delete Property`;
         const menu = document.createElement('div');
         menu.id = 'ap-ctx-menu';
         menu.className = 'ctx-menu';
         menu.innerHTML = `
+            ${n === 1 ? `<div class="ctx-item" onclick="APEditor._closeContextMenu();APEditor.createChild()">
+                ${this._svgChild} Add Child Property</div>
+            <div class="ctx-item" onclick="APEditor._closeContextMenu();APEditor.createSibling()">
+                ${this._svgSister} Add Sibling Property</div>` : ''}
+            ${!isImported ? `${n === 1 ? '<div class="ctx-sep"></div>' : ''}
             <div class="ctx-item ctx-danger" onclick="APEditor._closeContextMenu();APEditor.deleteSelected()">
-                ${this._svgDelete} ${deleteLabel}</div>`;
+                ${this._svgDelete} ${deleteLabel}</div>` : ''}`;
         menu.style.left = event.clientX + 'px';
         menu.style.top  = event.clientY + 'px';
         document.body.appendChild(menu);

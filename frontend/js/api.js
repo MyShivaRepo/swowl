@@ -39,6 +39,9 @@ const API = {
     getCurrentOntology: ()           => API._fetch('GET',    '/ontologies/current'),
     updateOntology:     (data)       => API._fetch('PUT',    '/ontologies/current', data),
     updateDisplayRules: (rules)      => API._fetch('PUT',    '/display-rules', rules),
+    listImportableOntologies: (exclude = '') => API._fetch('GET', `/ontologies/importable?exclude=${encodeURIComponent(exclude)}`),
+    updateOntologyImports: (name, imports) => API._fetch('PUT', `/ontologies/${encodeURIComponent(name)}/imports`, { imports }),
+    getImportedEntities: ()          => API._fetch('GET',    '/ontologies/current/imported-entities'),
 
     exportOntology: (fmt) => fetch(`${API.base}/ontologies/export?fmt=${fmt}`)
         .then(r => { if (!r.ok) throw new Error(r.statusText); return r.blob(); }),
@@ -76,6 +79,11 @@ const API = {
     createSWRLRule:   (r)     => API._fetch('POST',   '/swrl-rules', r),
     updateSWRLRule:   (id, r) => API._fetch('PUT',    `/swrl-rules/${id}`, r),
     deleteSWRLRule:   (id)    => API._fetch('DELETE', `/swrl-rules/${id}`),
+
+    // ── Queries ────────────────────────────────────────
+    createQuery:   (q)     => API._fetch('POST',   '/queries', q),
+    updateQuery:   (id, q) => API._fetch('PUT',    `/queries/${id}`, q),
+    deleteQuery:   (id)    => API._fetch('DELETE', `/queries/${id}`),
 
     // ── Inferences ─────────────────────────────────────────
     getInferences:      ()   => API._fetch('GET', '/inferences'),

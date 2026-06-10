@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SWOWL : A Best In Class OWL/SWRL Editor</title>
-<link rel="stylesheet" href="/css/style.css">
+<link rel="stylesheet" href="/css/style.css?v=130">
 </head>
 <body>
 
@@ -13,10 +13,14 @@
   <!-- ── Topbar ── -->
   <header class="topbar">
     <span class="topbar-logo">🦉 <a href="https://github.com/MyShivaRepo/swowl" target="_blank" rel="noopener" title="Go to Github" class="topbar-logo-link">SWOWL</a> : A Best In Class OWL/SWRL Editor</span>
+    <span class="topbar-vsep">│</span>
+    <span id="topbar-onto-label" class="topbar-onto-label" style="display:none"></span>
+    <span class="topbar-vsep topbar-vsep-nav" style="display:none">│</span>
     <div class="topbar-nav-hist">
       <button id="nav-back" class="btn-nav-hist" onclick="APP.navigateBack()"    disabled title="Back">◀</button>
       <button id="nav-fwd"  class="btn-nav-hist" onclick="APP.navigateForward()" disabled title="Forward">▶</button>
     </div>
+    <span class="topbar-vsep">│</span>
     <div class="global-search-wrap" id="global-search-wrap">
       <svg class="global-search-ico" width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
         <circle cx="5.5" cy="5.5" r="4.5"/><line x1="9.5" y1="9.5" x2="12" y2="12"/>
@@ -30,7 +34,8 @@
       <span id="global-search-clear" class="global-search-clear" style="display:none" onclick="GlobalSearch.clear()">✕</span>
       <div id="global-search-dropdown" class="global-search-dropdown" style="display:none"></div>
     </div>
-    <div class="topbar-nav-hist" style="margin-left:auto">
+    <span class="topbar-vsep" style="margin-left:auto">│</span>
+    <div class="topbar-nav-hist">
       <button id="undo-btn" class="btn-nav-hist" onclick="UndoRedo.undo()" disabled title="Undo (Ctrl+Z)" style="font-size:26px;width:38px;height:34px;color:var(--text1);line-height:1">⟲</button>
       <button id="redo-btn" class="btn-nav-hist" onclick="UndoRedo.redo()" disabled title="Redo (Ctrl+Y)" style="font-size:26px;width:38px;height:34px;color:var(--text1);line-height:1">⟳</button>
     </div>
@@ -107,12 +112,12 @@
 <script src="/js/sparnatural.js"></script>
 
 <!-- ── Scripts ── -->
-<script src="/js/api.js?v=93"></script>
-<script src="/js/owl_editor.js?v=93"></script>
-<script src="/js/swrl_editor.js?v=93"></script>
-<script src="/js/sparql_editor.js?v=93"></script>
-<script src="/js/inference_ui.js?v=93"></script>
-<script src="/js/app.js?v=93"></script>
+<script src="/js/api.js?v=130"></script>
+<script src="/js/owl_editor.js?v=130"></script>
+<script src="/js/swrl_editor.js?v=130"></script>
+<script src="/js/sparql_editor.js?v=130"></script>
+<script src="/js/inference_ui.js?v=130"></script>
+<script src="/js/app.js?v=130"></script>
 
 <script>
 // Update navigation counters

@@ -199,6 +199,7 @@ const APP = {
         annotation_properties: [],
         individuals: [],
         swrl_rules: [],
+        queries: [],
     },
     currentSection: 'ontologies',
     _importFilePath: null,   // path to the OWL file to import
@@ -231,6 +232,27 @@ const APP = {
             this.state.annotation_properties  = onto.annotation_properties  || [];
             this.state.individuals            = onto.individuals            || [];
             this.state.swrl_rules             = onto.swrl_rules             || [];
+            this.state.queries                = onto.queries                || [];
+            // Merge imported-ontology entities (read-only, tagged _imported)
+            try {
+                const imp = await API.getImportedEntities();
+                this.state.classes               = [...this.state.classes,               ...(imp.classes                || [])];
+                this.state.object_properties     = [...this.state.object_properties,     ...(imp.object_properties      || [])];
+                this.state.datatype_properties   = [...this.state.datatype_properties,   ...(imp.datatype_properties    || [])];
+                this.state.annotation_properties = [...this.state.annotation_properties, ...(imp.annotation_properties  || [])];
+                this.state.individuals           = [...this.state.individuals,           ...(imp.individuals            || [])];
+                this.state.swrl_rules            = [...this.state.swrl_rules,            ...(imp.swrl_rules             || [])];
+                this.state.queries               = [...this.state.queries,               ...(imp.queries                || [])];
+                // Merge imported display_rules — local rules take precedence
+                if (this.state.ontology && imp.display_rules) {
+                    const local = this.state.ontology.display_rules || {};
+                    const impDr = imp.display_rules;
+                    this.state.ontology.display_rules = {
+                        single: { ...(impDr.single || {}), ...(local.single || {}) },
+                        multi:  { ...(impDr.multi  || {}), ...(local.multi  || {}) },
+                    };
+                }
+            } catch (_) { /* imported entities are best-effort */ }
         } catch (e) {
             this.state.ontology = null;
             this.state.classes                = [];
@@ -239,6 +261,37 @@ const APP = {
             this.state.annotation_properties  = [];
             this.state.individuals            = [];
             this.state.swrl_rules             = [];
+            this.state.queries                = [];
+        }
+        this._updateTopbarOntology();
+    },
+
+    _updateTopbarOntology() {
+        const el = document.getElementById('topbar-onto-label');
+        if (!el) return;
+        const onto = this.state.ontology;
+        if (onto) {
+            const prefix = onto.prefix || '';
+            const name   = onto.name   || '';
+            const label  = prefix && name ? `${prefix}:${name}` : name || prefix;
+            el.textContent = label;
+            el.title = 'Go to ontology';
+            el.style.display = '';
+            el.style.cursor = 'pointer';
+            el.onclick = () => {
+                APP.navigate('ontologies');
+                setTimeout(() => {
+                    const row = document.querySelector(`#onto-registry-body tr[data-name="${CSS.escape(name)}"]`);
+                    if (row) { row.scrollIntoView({ block: 'center' }); row.classList.add('highlight-flash'); setTimeout(() => row.classList.remove('highlight-flash'), 1200); }
+                }, 120);
+            };
+            const sep = document.querySelector('.topbar-vsep-nav');
+            if (sep) sep.style.display = '';
+        } else {
+            el.textContent = '';
+            el.style.display = 'none';
+            const sep = document.querySelector('.topbar-vsep-nav');
+            if (sep) sep.style.display = 'none';
         }
     },
 
@@ -633,6 +686,15 @@ const APP = {
 
         if (!this._ontoImportExpanded) this._ontoImportExpanded = new Set();
 
+        const OWL_URI = 'http://www.w3.org/2002/07/owl#';
+        // Returns effective imports for any entry: user ontologies always implicitly import OWL
+        const effectiveImportsOf = (entry) => {
+            if (!entry || entry.readonly) return entry ? (entry.imports || []) : [];
+            const declared = entry.imports || [];
+            const hasOwl = declared.some(u => u.startsWith('http://www.w3.org/2002/07/owl'));
+            return hasOwl ? declared : [...declared, OWL_URI];
+        };
+
         // Recursively render import sub-rows with collapsible toggle
         const renderImportRows = (uri, depth, parentPath, visited = new Set()) => {
             if (visited.has(uri)) return '';
@@ -640,7 +702,7 @@ const APP = {
             const entry      = resolveImport(uri);
             const name       = entry ? entry.name   : uri;
             const prefix     = entry ? entry.prefix : '';
-            const subImports = entry ? (entry.imports || []) : [];
+            const subImports = effectiveImportsOf(entry);
             const hasKids    = subImports.length > 0;
             const path       = parentPath + '/' + name;
             const safeP      = path.replace(/'/g, "\\'");
@@ -692,17 +754,14 @@ const APP = {
                    <button class="btn-sm" onclick="APP._ontoExportDropdown(this,'${safe}','rules')" title="Export rules">↓ Rules</button>
                    <button class="btn-sm btn-del" onclick="APP.doUnregister('${safe}')" title="Remove from registry">✕</button>`;
             // Every user ontology implicitly imports OWL (unless already declared or readonly)
-            const effectiveImports = o.readonly
-                ? (o.imports || [])
-                : (o.imports || []).length
-                    ? o.imports
-                    : ['http://www.w3.org/2002/07/owl#'];
-            const importRows = effectiveImports.map(u => renderImportRows(u, 1, o.name)).join('');
+            const importRows = effectiveImportsOf(o).map(u => renderImportRows(u, 1, o.name)).join('');
             const isSel = o.name === this._selectedOntoName;
             return `<tr data-name="${o.name}" onclick="APP.selectOntoRow('${safe}')" style="cursor:pointer"
                 class="${isConn ? 'onto-current-row' : ''}${isReadonly ? ' onto-readonly-row' : ''}${isSel ? ' onto-selected-row' : ''}">
                 <td style="text-align:center">${dot}</td>
-                <td><strong>${o.name}</strong>${isReadonly ? ' <span style="font-size:10px;color:var(--text-faint);font-style:italic">W3C</span>' : ''}</td>
+                <td ${!isReadonly ? `oncontextmenu="event.preventDefault();event.stopPropagation();APP._showImportPicker('${safe}',event)" title="Right-click to manage imports"` : ''}>
+                    <strong>${o.name}</strong>${isReadonly ? ' <span style="font-size:10px;color:var(--text-faint);font-style:italic">W3C</span>' : ''}
+                </td>
                 <td class="onto-iri-cell onto-path-cell"
                     title="Click to open in Finder"
                     onclick="API.revealInFinder('${o.path.replace(/'/g,"\\'")}').catch(e=>UI.warn('Start host_agent.py to enable Finder reveal.'))"
@@ -1052,6 +1111,75 @@ const APP = {
         }
     },
 
+    // ── Import picker ─────────────────────────────────────────
+
+    async _showImportPicker(name) {
+        const list = await API.listOntologies().catch(() => []);
+        const target = list.find(o => o.name === name);
+        if (!target) return;
+
+        let importables;
+        try {
+            importables = await API.listImportableOntologies(name);
+        } catch (e) {
+            UI.error(`Cannot load importable ontologies: ${e.message}`);
+            return;
+        }
+        if (!importables.length) {
+            UI.warn('No other ontology with a namespace and prefix is registered yet.');
+            return;
+        }
+
+        const currentImports = new Set(target.imports || []);
+
+        // Remove existing modal if any
+        document.getElementById('onto-import-picker-modal')?.remove();
+
+        const rows = importables.map(o => `
+            <label class="onto-import-picker-row">
+                <input type="checkbox" value="${_escapeHtml(o.uri)}"
+                    ${currentImports.has(o.uri) ? 'checked' : ''}>
+                <span class="onto-import-picker-name">${_escapeHtml(o.name)}</span>
+                <code class="onto-import-picker-prefix">${_escapeHtml(o.prefix)}:</code>
+                <span class="onto-import-picker-uri">${_escapeHtml(o.uri)}</span>
+            </label>`).join('');
+
+        const modal = document.createElement('div');
+        modal.id = 'onto-import-picker-modal';
+        modal.className = 'onto-import-picker-overlay';
+        modal.innerHTML = `
+            <div class="onto-import-picker-box">
+                <div class="cls-frame-bar" style="border-radius:6px 6px 0 0">
+                    <span class="cls-frame-tag">📥 Import ontologies into <strong>${_escapeHtml(name)}</strong></span>
+                    <button class="btn-frame-del" onclick="document.getElementById('onto-import-picker-modal').remove()" style="margin-left:auto">✕</button>
+                </div>
+                <div class="onto-import-picker-list">${rows || '<p class="empty" style="padding:12px">No ontologies available.</p>'}</div>
+                <div style="display:flex;gap:8px;justify-content:flex-end;padding:10px 14px;border-top:1px solid var(--border1)">
+                    <button class="btn-sm" onclick="document.getElementById('onto-import-picker-modal').remove()">Cancel</button>
+                    <button class="btn-sm btn-edit" onclick="APP._confirmImportPicker('${_escapeHtml(name)}')">✔ Apply</button>
+                </div>
+            </div>`;
+        // Close on backdrop click
+        modal.addEventListener('mousedown', e => { if (e.target === modal) modal.remove(); });
+        document.body.appendChild(modal);
+    },
+
+    async _confirmImportPicker(name) {
+        const modal = document.getElementById('onto-import-picker-modal');
+        if (!modal) return;
+        const checked = [...modal.querySelectorAll('input[type=checkbox]:checked')].map(cb => cb.value);
+        try {
+            await API.updateOntologyImports(name, checked);
+            UI.success(`Imports updated for "${name}".`);
+        } catch (e) {
+            UI.error(`Failed to update imports: ${e.message}`);
+            return;
+        }
+        modal.remove();
+        await APP.refresh();
+        APP.renderOntologies();
+    },
+
     async _fetchBuiltins() {
         const btn = document.getElementById('btn-fetch-builtins');
         if (btn) btn.disabled = true;
@@ -1074,7 +1202,15 @@ const APP = {
             await API.connectOntology(name);
             UI.success(`Ontology "${name}" connected.`);
             await this.refresh();
-            this.renderOntologies();
+            // Re-render the current section so imported entities appear immediately
+            this.renderSection(this.currentSection);
+            // Also refresh the ontologies table (green dot update) if not already there
+            if (this.currentSection !== 'ontologies') {
+                API.listOntologies().then(list => {
+                    const tbody = document.getElementById('onto-registry-body');
+                    if (tbody) this._refreshOntoTable(list);
+                }).catch(() => {});
+            }
         } catch (e) { UI.error(e.message); }
     },
 
@@ -1463,6 +1599,7 @@ const UndoRedo = {
                 annotation_properties: s.annotation_properties || [],
                 individuals:           s.individuals           || [],
                 swrl_rules:            s.swrl_rules            || [],
+                queries:               s.queries               || [],
             })),
         };
         this._past.push(snap);
@@ -1486,6 +1623,7 @@ const UndoRedo = {
                 annotation_properties: s.annotation_properties || [],
                 individuals:           s.individuals           || [],
                 swrl_rules:            s.swrl_rules            || [],
+                queries:               s.queries               || [],
             })),
         };
     },

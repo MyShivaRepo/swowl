@@ -66,6 +66,30 @@ body {
 .topbar-logo-link:hover {
   text-decoration: underline;
 }
+.topbar-vsep {
+  color: rgba(255,255,255,0.3);
+  font-size: 16px;
+  padding: 0 6px;
+  user-select: none;
+}
+.topbar-onto-label {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.85);
+  white-space: nowrap;
+  border-bottom: 1px solid rgba(255,255,255,0.4);
+  transition: color 0.15s, border-color 0.15s;
+}
+.topbar-onto-label:hover {
+  color: #ffffff;
+  border-bottom-color: rgba(255,255,255,0.9);
+}
+@keyframes highlight-flash {
+  0%   { background: color-mix(in srgb, var(--accent) 35%, transparent); }
+  100% { background: transparent; }
+}
+.highlight-flash { animation: highlight-flash 1.2s ease-out; }
 
 
 /* ── Global search ─────────────────────────────────────────── */
@@ -910,7 +934,7 @@ body.h-resizing * {
   flex-shrink: 0;
 }
 /* owl:Thing dot: same shape, slightly lighter brown */
-.tree-thing-dot { background: #c9956b; }
+.tree-thing-dot { background: #b87333; }
 /* large format version (detail panel) */
 .thing-icon-lg {
   width: 36px; height: 36px;
@@ -1150,17 +1174,19 @@ body.h-resizing * {
   padding: 5px 8px;
   font-size: 12px;
   font-weight: 600;
-  color: var(--text-dim);
+  color: var(--text);
   cursor: pointer;
   margin: 1px 4px;
   border-radius: 4px;
   user-select: none;
   transition: background .1s;
+  opacity: 0.5;
 }
-.tree-root-item:hover   { background: rgba(255,255,255,.06); }
+.tree-root-item:hover   { background: rgba(255,255,255,.06); opacity: 0.7; }
 .tree-root-item.selected {
   background: rgba(59,130,246,.18);
   color: #93c5fd;
+  opacity: 0.85;
 }
 
 /* Boutons d'action de l'arbre */
@@ -1399,7 +1425,7 @@ small { color: var(--text-faint); font-size: 10px; }
   flex-shrink: 0;
 }
 /* nœud racine owl:topObjectProperty : bleu plus clair */
-.tree-op-top-dot { background: #93c5fd; }
+.tree-op-top-dot { background: var(--accent); }
 
 /* ── Tag inverse (↔ propName) dans l'arbre ObjectProperties ─── */
 .op-inverse-tag {
@@ -1429,7 +1455,7 @@ small { color: var(--text-faint); font-size: 10px; }
   flex-shrink: 0;
 }
 /* nœud racine owl:topDataProperty : vert plus clair */
-.tree-dp-top-dot { background: #6ee7b7; }
+.tree-dp-top-dot { background: var(--accent2); }
 
 /* ── DatatypeProperty icon (text, used in lists) ─── */
 .dp-icon { font-size: 10px; }
@@ -1452,12 +1478,19 @@ small { color: var(--text-faint); font-size: 10px; }
   width: 12px;
   height: 8px;
   border-radius: 2px;
-  background: #d4e042;
+  background: #e8d400;
   flex-shrink: 0;
   vertical-align: middle;
 }
 /* Annotation property tree dot (same color, used inside tree nodes) */
 .tree-ap-dot { margin-right: 4px; }
+/* Built-in OWL/RDFS APs: dot atténué + texte atténué (même règle que les importés) */
+.builtin-ap { opacity: 0.45; font-style: italic; }
+.builtin-ap:hover { opacity: 0.65; }
+.builtin-ap.selected { opacity: 0.8; }
+.builtin-ap .anno-prop-dot { background: #8a9420; }
+/* Imported APs: même couleur atténuée que les built-ins */
+.imported-entity .anno-prop-dot { background: #8a9420; }
 
 /* Navigable entity links (annotation props, classes, etc.) */
 .nav-link {
@@ -2123,3 +2156,81 @@ small { color: var(--text-faint); font-size: 10px; }
 .nice-select ul.list li:hover {
   color: #fff !important;
 }
+
+/* ── Imported entities ──────────────────────────────────────── */
+.imported-entity {
+  font-style: italic;
+  opacity: 0.5;
+}
+.imported-entity:hover  { opacity: 0.7; }
+.imported-entity.selected { opacity: 0.85; }
+
+.imported-detail-panel {
+  min-height: 100%;
+  overflow: auto;
+}
+.imported-detail-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  border-bottom: 1px solid var(--border1);
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.imported-detail-icon { font-size: 16px; }
+/* Banner prepended to the full read-only form (not inside its own panel wrapper) */
+.imported-detail-banner--form {
+  margin: 0;
+  border-bottom: 1px solid var(--border1);
+  border-top: none;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+/* Dim entire form content when panel shows an imported entity (banner stays bright) */
+.is-imported-view > *:not(.imported-detail-banner) {
+  opacity: 0.55;
+}
+
+/* ── Import picker modal ────────────────────────────────────── */
+.onto-import-picker-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+.onto-import-picker-box {
+  background: var(--bg2);
+  border: 1px solid var(--border2);
+  border-radius: 8px;
+  width: 560px;
+  max-width: 95vw;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0,0,0,.4);
+}
+.onto-import-picker-list {
+  overflow-y: auto;
+  padding: 8px 0;
+  flex: 1;
+}
+.onto-import-picker-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 16px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.onto-import-picker-row:hover { background: var(--hover); }
+.onto-import-picker-row input[type=checkbox] { flex-shrink: 0; accent-color: var(--accent); }
+.onto-import-picker-name  { font-weight: 600; color: var(--text); min-width: 100px; }
+.onto-import-picker-prefix { color: var(--accent); font-size: 11px; }
+.onto-import-picker-uri   { color: var(--text-dim); font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
