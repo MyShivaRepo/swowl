@@ -1,1 +1,98 @@
+# Exigences — Import d'ontologies
 
+## Contexte
+
+Une ontologie SWOWL peut déclarer l'import d'une ou plusieurs ontologies externes.
+Les entités issues de ces imports sont chargées en lecture seule dans l'éditeur
+et doivent être clairement distinguées visuellement des entités locales.
+
+---
+
+## EX-IMP-01 — Déclaration d'import
+
+- L'ontologie courante peut déclarer des imports via l'onglet **Ontologies**.
+- Chaque import est identifié par un **préfixe** (ex. `plm`) et un **nom d'ontologie** (ex. `RoHS_Ontology`).
+- Un import ne peut pas être modifié depuis l'éditeur (lecture seule).
+
+---
+
+## EX-IMP-02 — Chargement des entités importées
+
+Au chargement de l'ontologie, les entités suivantes sont fusionnées dans l'état de l'application :
+
+| Type                    | Onglet concerné          |
+|-------------------------|--------------------------|
+| Classes                 | Classes                  |
+| ObjectProperties        | ObjectProperties         |
+| DatatypeProperties      | DatatypeProperties       |
+| AnnotationProperties    | AnnotationProperties     |
+| Individuals             | Individuals              |
+| SWRL Rules              | SWRL Rules               |
+| SPARQL Queries          | Queries                  |
+| Display Rules (nommage) | (appliquées globalement) |
+
+Les entités importées sont taguées `_imported: true`, `_importPrefix` et `_importName`.
+
+---
+
+## EX-IMP-03 — Présentation visuelle — Liste / Arbre
+
+Les entités importées doivent être visuellement distinguées dans les listes et arbres de chaque onglet :
+
+- **Opacité atténuée** : `opacity: 0.5` (identique aux nœuds racines built-in comme `owl:Thing`).
+- **Texte en italique**.
+- **Préfixe affiché** : l'identifiant est précédé du préfixe d'import (ex. `plm:Article`).
+- **Bouton "Supprimer" masqué** : les entités importées ne peuvent pas être supprimées.
+- **Menu contextuel** : affiche une icône 🔒 à la place des actions de modification/suppression.
+
+Les **nœuds racines** des arbres (`owl:Thing`, `owl:topObjectProperty`, `owl:topDataProperty`) adoptent le même style visuel (même opacité, même couleur de dot) que les entités importées.
+
+---
+
+## EX-IMP-04 — Présentation visuelle — Panneau détail
+
+Lorsqu'une entité importée est sélectionnée, le panneau de détail affiche :
+
+- Une **bannière 🔒** en haut du panneau, indiquant le nom de l'ontologie source.
+- Le formulaire en mode **lecture seule** (tous les champs désactivés).
+- Une **opacité atténuée** sur le contenu du formulaire (hors bannière).
+
+---
+
+## EX-IMP-05 — Références aux entités importées
+
+Dans les panneaux de détail des entités locales, toute **référence à une entité importée** (superclasse, restriction, valeur de propriété, membre de classe, etc.) doit être affichée avec le style atténué (`opacity: 0.5`, italique), cohérent avec la présentation des entités importées dans les listes.
+
+Cela s'applique notamment :
+- Aux assertions de propriétés d'objet sur les **Individuals** (valeur cible).
+- Aux **Inferred Properties** des Individuals.
+- Aux sections **"Where Used In Rules"** (onglets Classes, OPs, DPs, Individuals).
+
+---
+
+## EX-IMP-06 — Héritage des règles de nommage (Display Rules)
+
+Les règles de nommage (`display_rules`) définies dans une ontologie importée sont **recopiées** dans l'ontologie qui importe :
+
+- Les règles locales ont la **priorité** sur les règles importées (en cas de conflit sur la même classe).
+- Les règles importées permettent d'afficher correctement les **Individuals** de l'ontologie importée avec le bon libellé.
+
+---
+
+## EX-IMP-07 — SPARQL Queries importées
+
+Les requêtes SPARQL définies dans une ontologie importée suivent les mêmes règles de présentation que les autres entités importées (EX-IMP-03 et EX-IMP-04).
+
+---
+
+## EX-IMP-08 — SWRL Rules importées
+
+Les règles SWRL définies dans une ontologie importée suivent les mêmes règles de présentation que les autres entités importées (EX-IMP-03 et EX-IMP-04).
+
+---
+
+## EX-IMP-09 — Persistance
+
+- Les entités importées ne sont **pas stockées** dans le fichier de l'ontologie courante.
+- Elles sont rechargées dynamiquement à chaque ouverture depuis le backend.
+- Les modifications apportées à l'ontologie locale (undo/redo, snapshots) n'affectent pas les entités importées.
