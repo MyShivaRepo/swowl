@@ -2246,6 +2246,8 @@ small { color: var(--text-faint); font-size: 10px; }
   font-style: italic;
   opacity: 0.5;
 }
+/* Compteur d'individus : même luminosité que l'ID de classe dans une ligne importée */
+.imported-entity .nav-count { color: var(--text); }
 .imported-entity:hover  { opacity: 0.7; }
 .imported-entity.selected { opacity: 0.85; }
 

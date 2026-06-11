@@ -4592,10 +4592,12 @@ const IndividualEditor = {
 
         return filtered.map(ind => {
             const isImported = !!ind._imported;
+            const prefix    = isImported ? `${ind._importPrefix}:` : '';
             const dispLabel = this._resolveDisplayLabel(ind, this._selectedClassId);
-            const rawMain   = dispLabel || ind.id;
-            const mainText  = isImported ? `${ind._importPrefix}:${rawMain}` : rawMain;
-            const subText   = dispLabel && !isImported ? ind.id : '';
+            // Display Name présent → libellé en haut + ID (préfixé si importé) en dessous ;
+            // sinon → juste l'ID (préfixé si importé) en taille normale.
+            const mainText  = dispLabel ? dispLabel : `${prefix}${ind.id}`;
+            const subText   = dispLabel ? `${prefix}${ind.id}` : '';
             const importedClass = isImported ? ' imported-entity' : '';
             const dragAttrs = isImported ? '' :
                 `draggable="true"
@@ -4612,7 +4614,7 @@ const IndividualEditor = {
                     <span class="tree-label" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;display:block"
                           onmouseover="this.style.textDecoration='underline';this.style.color='var(--accent,#5f8dd3)'"
                           onmouseout="this.style.textDecoration='';this.style.color=''">${_escapeHtml(mainText)}</span>
-                    ${subText ? `<span style="font-size:10px;color:var(--text-faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block">${_escapeHtml(subText)}</span>` : ''}
+                    ${subText ? `<span style="font-size:10px;color:var(--text-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block">${_escapeHtml(subText)}</span>` : ''}
                 </span>
             </div>`;
         }).join('');
@@ -5146,7 +5148,7 @@ const IndividualEditor = {
             const ctxClass = effectiveRange[0] || null;
             rows = current.map(a => {
                 const lbl = this._labelForId(a.target, ctxClass);
-                const sub = lbl !== a.target ? `<span style="font-size:10px;color:var(--text-faint);display:block">${a.target}</span>` : '';
+                const sub = lbl !== a.target ? `<span style="font-size:10px;color:var(--text-dim);display:block">${a.target}</span>` : '';
                 return `
                 <div class="ind-prop-row" data-id="${a.target}" style="display:flex;align-items:center;gap:4px;padding:2px 4px">
                     <span class="xsd-dot" style="flex-shrink:0;margin:0"></span>
@@ -5611,7 +5613,7 @@ const IndividualEditor = {
     /** Une ligne d'individu dans le volet droit du picker (avec, en option, sa classe). */
     _pickerIndRow(x, ctxClass, showClass) {
         const lbl = this._resolveDisplayLabel(x, ctxClass);
-        const sub = lbl ? `<span style="font-size:10px;color:var(--text-faint);display:block">${x.id}</span>` : '';
+        const sub = lbl ? `<span style="font-size:10px;color:var(--text-dim);display:block">${x.id}</span>` : '';
         const cls = showClass ? (x.types || []).find(t => this._picker.clsIds?.has(t)) : '';
         const clsTag = cls ? `<span style="margin-left:auto;font-size:10px;color:var(--text-faint);padding-left:8px;flex-shrink:0">${cls}</span>` : '';
         return `<div class="tree-item ind-picker-ind" data-id="${x.id}"
@@ -5707,7 +5709,7 @@ const IndividualEditor = {
             row.style.cssText = 'display:flex;align-items:center;gap:4px;padding:2px 4px';
             const selIndObj = (APP.state.individuals || []).find(x => x.id === selectedInd);
             const selLbl = selIndObj ? (this._resolveDisplayLabel(selIndObj, this._picker.selectedClass) || selectedInd) : selectedInd;
-            const selSub = selLbl !== selectedInd ? `<span style="font-size:10px;color:var(--text-faint);display:block">${selectedInd}</span>` : '';
+            const selSub = selLbl !== selectedInd ? `<span style="font-size:10px;color:var(--text-dim);display:block">${selectedInd}</span>` : '';
             row.innerHTML = `
                 <span class="xsd-dot" style="flex-shrink:0;margin:0"></span>
                 <span class="ind-op-label" style="flex:1;font-size:12px;font-family:var(--font-mono);cursor:pointer"

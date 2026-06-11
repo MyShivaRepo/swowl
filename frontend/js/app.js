@@ -1588,26 +1588,29 @@ const UndoRedo = {
         'annotation-properties', 'individuals', 'swrl-rules',
     ]),
 
+    /** N'inclut QUE les entités locales — les entités importées (lecture seule, taguées
+     *  _imported) ne doivent jamais être persistées dans l'ontologie courante. */
+    _localData() {
+        const s = APP.state;
+        const local = (arr) => (arr || []).filter(e => !e._imported);
+        return JSON.parse(JSON.stringify({
+            classes:               local(s.classes),
+            object_properties:     local(s.object_properties),
+            datatype_properties:   local(s.datatype_properties),
+            annotation_properties: local(s.annotation_properties),
+            individuals:           local(s.individuals),
+            swrl_rules:            local(s.swrl_rules),
+            queries:               local(s.queries),
+        }));
+    },
+
     /** Capture l'état courant avant une mutation (appelé par api.js) */
     snapshot() {
         const s = APP.state;
         if (!s.ontology) return;
         const section  = APP.currentSection;
         const entityId = this._VALID.has(section) ? (APP._entityForSection(section) || null) : null;
-        const snap = {
-            section,
-            entityId,
-            data: JSON.parse(JSON.stringify({
-                classes:               s.classes               || [],
-                object_properties:     s.object_properties     || [],
-                datatype_properties:   s.datatype_properties   || [],
-                annotation_properties: s.annotation_properties || [],
-                individuals:           s.individuals           || [],
-                swrl_rules:            s.swrl_rules            || [],
-                queries:               s.queries               || [],
-            })),
-        };
-        this._past.push(snap);
+        this._past.push({ section, entityId, data: this._localData() });
         if (this._past.length > this._MAX) this._past.shift();
         this._future = [];
         this._updateButtons();
@@ -1615,22 +1618,9 @@ const UndoRedo = {
 
     /** Construit un snapshot de l'état actuel (pour future/past) */
     _currentSnap() {
-        const s = APP.state;
         const section  = APP.currentSection;
         const entityId = this._VALID.has(section) ? (APP._entityForSection(section) || null) : null;
-        return {
-            section,
-            entityId,
-            data: JSON.parse(JSON.stringify({
-                classes:               s.classes               || [],
-                object_properties:     s.object_properties     || [],
-                datatype_properties:   s.datatype_properties   || [],
-                annotation_properties: s.annotation_properties || [],
-                individuals:           s.individuals           || [],
-                swrl_rules:            s.swrl_rules            || [],
-                queries:               s.queries               || [],
-            })),
-        };
+        return { section, entityId, data: this._localData() };
     },
 
     /** Restaure un snapshot et navigue vers le bon onglet */
