@@ -1,5 +1,5 @@
 """
-main.py — FastAPI application — OWL/SWORD Editor API
+main.py — FastAPI application — OWL/SWRL Editor API
 """
 from __future__ import annotations
 import uuid
@@ -37,8 +37,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="OWL/SWORD Editor API",
-    description="API REST pour créer et éditer des ontologies OWL 2 avec règles SWORD",
+    title="OWL/SWRL Editor API",
+    description="API REST pour créer et éditer des ontologies OWL 2 avec règles SWRL",
     version="1.0.0",
     lifespan=lifespan,
 )

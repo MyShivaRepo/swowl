@@ -8,11 +8,20 @@ le tout en Docker.
 
 ## Démarrage
 
+### Pré-requis
+
+- Docker Desktop (ou OrbStack)
+- Docker Compose
+
+### Installation
+
 ```bash
 git clone https://github.com/MyShivaRepo/swowl.git
 cd swowl
 docker compose up --build
 ```
+
+### Connexion
 
 | Service        | URL                          |
 |----------------|------------------------------|
