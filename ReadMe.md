@@ -39,6 +39,11 @@ docker compose up --build
   domain/range, inverse, chaînes de propriétés, détection de violations…
 - **Import / Export** — OWL/XML, Turtle, JSON-LD, SWORD.
 
+## Persistance
+
+Les ontologies complètes (OWL + SWRL) sont stockées dans des fichiers **JSON** référencés dans `~/.swowl/registry.json`.
+Elles sont relues à chaque démarrage et restent sur l'hôte (hors conteneur).
+
 ## Architecture technique
 
 Deux conteneurs Docker orchestrés par Compose :
@@ -51,11 +56,6 @@ Deux conteneurs Docker orchestrés par Compose :
 - **Communication** — API REST ; Nginx sert les fichiers statiques et relaie `/api/` vers le backend (Uvicorn, port 8000).
 - **Modèle** — entités OWL 2 et SWRL typées via des modèles Pydantic ; un triple store rdflib gère l'import/export RDF.
 - **Inférence** — moteur maison (forward chaining) côté backend, exposé en temps réel à l'interface.
-
-## Persistance
-
-Les ontologies complètes (OWL + SWRL) sont stockées dans des fichiers **JSON** référencés dans `~/.swowl/registry.json`.
-Elles sont relues à chaque démarrage et restent sur l'hôte (hors conteneur).
 
 ## Structure
 
