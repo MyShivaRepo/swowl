@@ -412,12 +412,24 @@ def get_imported_entities():
 
 
 @app.delete("/api/ontologies/{name}", tags=["Ontologie"])
-def unregister_ontology(name: str):
-    """Retire une ontologie du registre (ne supprime pas le fichier)."""
-    ok = store.unregister(name)
-    if not ok:
+def unregister_ontology(name: str, delete_file: bool = Query(False, description="Supprime aussi le fichier .json du disque")):
+    """Retire une ontologie du registre. Si delete_file=true, supprime aussi le fichier .json."""
+    entry = store._registry.get(name)
+    if not entry:
         raise HTTPException(404, f"Ontologie '{name}' introuvable dans le registre.")
-    return {"unregistered": name}
+    host_path = entry.path
+    store.unregister(name)
+    file_deleted = False
+    if delete_file and host_path:
+        from pathlib import Path as _P
+        p = _P(host_to_container(host_path))
+        try:
+            if p.exists():
+                p.unlink()
+                file_deleted = True
+        except Exception:
+            pass  # suppression best-effort — l'entrée registre est déjà retirée
+    return {"unregistered": name, "file_deleted": file_deleted}
 
 
 @app.post("/api/ontologies/{name}/connect", tags=["Ontologie"])

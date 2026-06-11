@@ -33,7 +33,7 @@ const API = {
     listOntologies:     ()           => API._fetch('GET',    '/ontologies'),
     registerOntology:   (data)       => API._fetch('POST',   '/ontologies/register', data),
     updateOntologyEntry:(name, data) => API._fetch('PUT',    `/ontologies/${encodeURIComponent(name)}`, data),
-    unregisterOntology: (name)       => API._fetch('DELETE', `/ontologies/${encodeURIComponent(name)}`),
+    unregisterOntology: (name, deleteFile = false) => API._fetch('DELETE', `/ontologies/${encodeURIComponent(name)}?delete_file=${deleteFile ? 'true' : 'false'}`),
     connectOntology:    (name)       => API._fetch('POST',   `/ontologies/${encodeURIComponent(name)}/connect`),
     disconnectOntology: ()           => API._fetch('POST',   '/ontologies/disconnect'),
     getCurrentOntology: ()           => API._fetch('GET',    '/ontologies/current'),

@@ -1228,11 +1228,21 @@ const APP = {
         } catch (e) { UI.error(e.message); }
     },
 
+    _delFileOnUnregister: false,
     async doUnregister(name) {
-        if (!await UI.confirm(`Remove <strong>${name}</strong> from the registry?<br><small style="color:var(--text-dim)">The file on disk will not be deleted.</small>`)) return;
+        this._delFileOnUnregister = false;
+        const html = `Remove <strong>${name}</strong> from the registry?<br>
+            <label style="display:flex;align-items:center;gap:6px;margin-top:10px;font-size:12px;color:var(--text-dim);cursor:pointer">
+                <input type="checkbox" onchange="APP._delFileOnUnregister=this.checked">
+                Delete also the .json file?
+            </label>`;
+        if (!await UI.confirm(html)) return;
+        const deleteFile = this._delFileOnUnregister;
         try {
-            await API.unregisterOntology(name);
-            UI.success(`"${name}" removed from registry.`);
+            const res = await API.unregisterOntology(name, deleteFile);
+            UI.success(deleteFile && res?.file_deleted
+                ? `"${name}" removed from registry and .json file deleted.`
+                : `"${name}" removed from registry.`);
             await this.refresh();
             this.renderOntologies();
         } catch (e) { UI.error(e.message); }

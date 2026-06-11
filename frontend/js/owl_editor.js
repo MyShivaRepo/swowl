@@ -917,7 +917,19 @@ const ClassEditor = {
         this._selectedId = id;
         this._owlThingSelected = false;
 
-        // Surbrillance
+        // Révèle TOUTES les occurrences de la classe (cas multi-héritage : la classe
+        // apparaît sous chacune de ses mères) en dépliant tous les chemins d'ancêtres.
+        // On ne re-rend l'arbre que si le dépliage change réellement quelque chose.
+        if (!isShift) {
+            const _expBefore = this._expanded.size;
+            this._expandAncestors(id);
+            if (this._expanded.size !== _expBefore) {
+                const treeEl = document.getElementById('class-tree');
+                if (treeEl) treeEl.innerHTML = this.renderTree(APP.state.classes);
+            }
+        }
+
+        // Surbrillance (toutes les occurrences ayant ce data-id)
         document.querySelectorAll('#class-tree .tree-item[data-id]').forEach(el => {
             el.classList.toggle('selected', this._selectedIds.has(el.dataset.id));
         });
