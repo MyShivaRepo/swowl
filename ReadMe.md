@@ -10,8 +10,7 @@ le tout en Docker.
 
 ### Pré-requis
 
-- Docker Desktop (ou OrbStack)
-- Docker Compose
+- Docker Desktop (Docker Compose inclus)
 
 ### Installation
 
