@@ -121,31 +121,192 @@ function _opTreePickerItems(onSelectExpr, excludeIds = []) {
 }
 
 /** Class picker items — same structure as the Asserted Hierarchy */
-function _classHierarchyItems(idx, selectedId) {
+/** Individus dont la classe (en propre, types directs) contient classId. */
+function _individualsOfClass(classId) {
+    if (!classId || classId === 'owl:Thing') {
+        // owl:Thing : on ne montre que les individus explicitement typés owl:Thing
+        return (APP.state.individuals || []).filter(i => (i.types || []).includes('owl:Thing'));
+    }
+    return (APP.state.individuals || []).filter(i => (i.types || []).includes(classId));
+}
+
+/** Surligne le terme recherché dans un libellé. */
+function _fillerHl(text, q) {
+    if (!q) return _escapeHtml(text);
+    const lo = text.toLowerCase(), i = lo.indexOf(q);
+    if (i < 0) return _escapeHtml(text);
+    return _escapeHtml(text.slice(0, i))
+        + `<span class="rfs-hl">${_escapeHtml(text.slice(i, i + q.length))}</span>`
+        + _escapeHtml(text.slice(i + q.length));
+}
+
+/** Lignes du volet "Classes" (arbre), filtrées par q.
+ *  mode 'class' : classe sélectionnable (clic → sélection+fermeture).
+ *  mode 'ind'   : classe = navigation seule (clic → charge ses individus). */
+function _fillerClassRows(gid, selectedId, activeId, q, mode) {
     const classes = APP.state.classes || [];
     const { roots, childrenOf } = ClassEditor.buildTree(classes);
     const lines = [];
+    const match = (id) => !q || id.toLowerCase().includes(q)
+        || (mode === 'ind' && _individualsOfClass(id).some(i => i.id.toLowerCase().includes(q)));
 
-    // owl:Thing — racine implicite (depth 0)
-    lines.push(`<div class="tree-item${selectedId === 'owl:Thing' ? ' selected' : ''}" data-id="owl:Thing"
-        style="padding-left:6px" onclick="RestrictionEditor.selectFiller('${idx}',this.dataset.id)">
-        <span class="tree-leaf">◦</span>
-        <span class="cls-dot tree-thing-dot"></span>
-        <span class="tree-label" style="font-style:italic">owl:Thing</span>
-    </div>`);
+    const row = (id, depth, italic) => {
+        const pl  = depth * 14 + 6;
+        const cls = ['tree-item', 'rfs-row'];
+        if (mode === 'class' && id === selectedId) cls.push('selected');
+        else if (mode === 'ind' && id === activeId) cls.push('rfs-active');
+        const click = mode === 'class'
+            ? `RestrictionEditor.selectFiller('${gid}',this.dataset.cls,'class',true)`
+            : `RestrictionEditor._fillerNavClass('${gid}',this.dataset.cls)`;
+        const n = mode === 'ind' ? _individualsOfClass(id).length : 0;
+        const cnt = n ? `<span class="rfs-cnt">${n}</span>` : '';
+        return `<div class="${cls.join(' ')}" style="padding-left:${pl}px" data-cls="${id}" onclick="${click}">
+            <span class="cls-dot ${id === 'owl:Thing' ? 'tree-thing-dot' : 'tree-cls-dot'}"></span>
+            <span class="tree-label"${italic ? ' style="font-style:italic"' : ''}>${_fillerHl(id, q)}</span>${cnt}
+        </div>`;
+    };
 
+    if (match('owl:Thing')) lines.push(row('owl:Thing', 0, true));
     const visit = (id, depth) => {
-        const pl = depth * 16 + 6;
-        lines.push(`<div class="tree-item${id === selectedId ? ' selected' : ''}" data-id="${id}"
-            style="padding-left:${pl}px" onclick="RestrictionEditor.selectFiller('${idx}',this.dataset.id)">
-            <span class="tree-leaf">◦</span>
-            <span class="cls-dot tree-cls-dot"></span>
-            <span class="tree-label">${id}</span>
-        </div>`);
-        (childrenOf[id] || []).forEach(child => visit(child, depth + 1));
+        if (match(id) || (childrenOf[id] || []).some(c => match(c))) lines.push(row(id, depth, false));
+        (childrenOf[id] || []).forEach(c => visit(c, depth + 1));
     };
     roots.forEach(id => visit(id, 1));
-    return lines.join('');
+    return lines.join('') || '<div class="rfs-empty">No class</div>';
+}
+
+/** Lignes du volet "Individus" pour la classe active, filtrées par q (mode 'ind'). */
+function _fillerIndRows(gid, classId, selectedId, q) {
+    if (!classId) return '<div class="rfs-empty">Pick a class on the left</div>';
+    const all  = _individualsOfClass(classId);
+    const inds = all.filter(i => !q || i.id.toLowerCase().includes(q));
+    if (!all.length)  return '<div class="rfs-empty">This class has no individual</div>';
+    if (!inds.length) return '<div class="rfs-empty">No matching individual</div>';
+    return inds.map(i => `<div class="tree-item rfs-row${i.id === selectedId ? ' selected' : ''}" data-ind="${i.id}"
+        onclick="RestrictionEditor.selectFiller('${gid}',this.dataset.ind,'ind',true)">
+        <span class="xsd-dot rfs-ind-dot"></span>
+        <span class="tree-label">${_fillerHl(i.id, q)}</span>
+    </div>`).join('');
+}
+
+/** Placeholder de la valeur selon le type de restriction et la nature de la propriété.
+ *  hasValue + DatatypeProperty → littéral ; hasValue + ObjectProperty → individu ; sinon classe. */
+function _fillerPlaceholder(prop, type) {
+    if (type !== 'hasValue') return '— class —';
+    const isDP = (APP.state.datatype_properties || []).some(p => p.id === prop);
+    return isDP ? '— value —' : '— individual —';
+}
+
+/** Contenu interne du filler d'une restriction :
+ *  - hasValue + DatatypeProperty → champ de saisie d'un littéral
+ *  - sinon → sélecteur classe/individu (chip + dropdown). */
+function _fillerInner(prop, type, fv, gid) {
+    const isDP = (APP.state.datatype_properties || []).some(p => p.id === prop);
+
+    // hasValue + DatatypeProperty → littéral (champ texte)
+    if (type === 'hasValue' && isDP) {
+        const dp  = (APP.state.datatype_properties || []).find(p => p.id === prop);
+        const rng = (dp && dp.range && dp.range[0]) || 'xsd:string';
+        return `<div class="restr-literal-row" style="display:flex;align-items:center;gap:6px">
+                <span class="tree-leaf">◦</span>
+                <input type="text" class="restr-filler-val restr-literal-inp"
+                    value="${_escapeHtml(fv)}" placeholder="literal value"
+                    title="Literal value (${_escapeHtml(rng)})"
+                    onchange="if(ClassEditor._editingId!==null)ClassEditor.autoSave()">
+                <span class="restr-literal-type" title="Datatype (range of ${_escapeHtml(prop)})">${_escapeHtml(rng)}</span>
+                <button class="btn-frame-del restr-filler-clear" style="flex-shrink:0"
+                    onclick="RestrictionEditor.deleteChild('${gid}')">✕</button>
+            </div>`;
+    }
+
+    // someValuesFrom / allValuesFrom / hasValue+OP → sélecteur classe/individu
+    const isNavClass = fv && (APP.state.classes      || []).some(c => c.id === fv);
+    const isNavInd   = fv && !isNavClass && (APP.state.individuals || []).some(i => i.id === fv);
+    const fillerPh   = _fillerPlaceholder(prop, type);
+    return `<div class="tree-item restr-filler-btn" style="margin:0;padding:2px 4px"
+                 onclick="RestrictionEditor.toggleFillerPicker('${gid}')">
+                <span class="tree-leaf">◦</span>
+                ${fv
+                    ? (isNavInd
+                        ? '<span class="xsd-dot" style="flex-shrink:0;margin:0"></span>'
+                        : '<span class="cls-dot tree-cls-dot"></span>')
+                    : '<span class="restr-filler-ph"></span>'}
+                <span class="restr-filler-lbl" style="flex:0 1 auto"
+                    oncontextmenu="event.preventDefault();event.stopPropagation();RestrictionEditor.toggleFillerPicker('${gid}')"
+                    title="Right-click to pick a value"
+                    ${isNavClass ? `
+                        onclick="event.stopPropagation();APP.navigateTo('classes','${fv}')"
+                        onmouseover="this.style.textDecoration='underline';this.style.color='var(--accent,#5f8dd3)';this.style.cursor='pointer'"
+                        onmouseout="this.style.textDecoration='';this.style.color=''"
+                    ` : isNavInd ? `
+                        onclick="event.stopPropagation();APP.navigateTo('individuals','${fv}')"
+                        onmouseover="this.style.textDecoration='underline';this.style.color='var(--accent,#5f8dd3)';this.style.cursor='pointer'"
+                        onmouseout="this.style.textDecoration='';this.style.color=''"
+                    ` : ''}
+                >${fv || fillerPh}</span>
+                <button class="btn-frame-del restr-filler-clear" style="flex-shrink:0"
+                    onclick="event.stopPropagation();RestrictionEditor.deleteChild('${gid}')">✕</button>
+                <span style="flex:1"></span>
+            </div>
+            <div class="restr-filler-dropdown" style="display:none">${_classHierarchyItems(gid, fv, _fillerModeFor(prop, type))}</div>
+            <input type="hidden" class="restr-filler-val" value="${_escapeHtml(fv)}">`;
+}
+
+/** Mode du sélecteur d'après prop+type (utilisé au rendu initial). */
+function _fillerModeFor(prop, type) {
+    if (type !== 'hasValue') return 'class';
+    const isDP = (APP.state.datatype_properties || []).some(p => p.id === prop);
+    return isDP ? 'class' : 'ind';   // DP géré en littéral, pas via ce sélecteur
+}
+
+/** Mode du picker pour un gid : déduit de prop+type de la ligne. */
+function _fillerMode(gid) {
+    const row  = document.getElementById(`restr-child-${gid}`);
+    const type = row?.querySelector('.restr-type-sel')?.value || '';
+    return _fillerModeFor(row?.dataset.prop, type);
+}
+
+/** Sélecteur adaptatif : 1 volet (classes) pour someValuesFrom/allValuesFrom,
+ *  2 volets (navigation classes + individus) pour hasValue. */
+function _classHierarchyItems(gid, selectedId, mode) {
+    mode = mode || 'class';
+    const filter = `<div class="rfs-filter">
+        <input type="text" class="rfs-filter-inp"
+               placeholder="${mode === 'ind' ? 'Filter classes &amp; individuals…' : 'Filter classes…'}"
+               autocomplete="off" spellcheck="false"
+               oninput="RestrictionEditor._fillerFilter('${gid}',this.value)"></div>`;
+
+    if (mode === 'class') {
+        return `<div class="rfs rfs-mode-class" data-gid="${gid}" data-mode="class">
+            ${filter}
+            <div class="rfs-list rfs-cls-list">${_fillerClassRows(gid, selectedId, '', '', 'class')}</div>
+        </div>`;
+    }
+
+    // mode 'ind' — la valeur est un individu ; classe = navigation pour le retrouver
+    const classes  = APP.state.classes || [];
+    const selIsInd = selectedId && (APP.state.individuals || []).some(i => i.id === selectedId);
+    let active = '';
+    if (selIsInd) {
+        const ind = (APP.state.individuals || []).find(i => i.id === selectedId);
+        active = (ind && (ind.types || [])[0]) || '';
+    } else if (selectedId && classes.some(c => c.id === selectedId)) {
+        active = selectedId;
+    }
+    return `<div class="rfs rfs-mode-ind" data-gid="${gid}" data-mode="ind" data-active="${active}">
+        ${filter}
+        <div class="rfs-panes">
+            <div class="rfs-pane">
+                <div class="rfs-pane-hdr"><span class="cls-dot" style="background:#b87333"></span> Browse by class</div>
+                <div class="rfs-list rfs-cls-list">${_fillerClassRows(gid, '', active, '', 'ind')}</div>
+            </div>
+            <div class="rfs-pane">
+                <div class="rfs-pane-hdr"><span class="xsd-dot rfs-ind-dot"></span> Pick an individual
+                    <span class="rfs-active-lbl">${active || ''}</span></div>
+                <div class="rfs-list rfs-ind-list">${_fillerIndRows(gid, active, selIsInd ? selectedId : '', '')}</div>
+            </div>
+        </div>
+    </div>`;
 }
 
 function opOptions(selectedId = '') {
@@ -1767,8 +1928,6 @@ const RestrictionEditor = {
         const types      = ['someValuesFrom','allValuesFrom','hasValue','exactCardinality','minCardinality','maxCardinality'];
         const isCard     = (r.type || '').includes('Cardinality');
         const fv         = r.filler || r.value || '';
-        const isNavClass = fv && (APP.state.classes     || []).some(c => c.id === fv);
-        const isNavInd   = fv && !isNavClass && (APP.state.individuals || []).some(i => i.id === fv);
         const racCard    = 'onchange="if(ClassEditor._editingId!==null)ClassEditor.autoSave()"';
         return `
         <div class="restr-child-row" id="restr-child-${gid}" data-prop="${prop}" data-li="${li}">
@@ -1778,35 +1937,7 @@ const RestrictionEditor = {
                 ${types.map(t => `<option value="${t}" ${t === r.type ? 'selected':''}>${t}</option>`).join('')}
             </select>
             <div class="restr-filler-wrap" id="restr-filler-${gid}" style="display:${isCard ? 'none' : ''}">
-                <div class="tree-item restr-filler-btn" style="margin:0;padding:2px 4px"
-                     onclick="RestrictionEditor.toggleFillerPicker('${gid}')">
-                    <span class="tree-leaf">◦</span>
-                    ${fv
-                        ? (isNavInd
-                            ? '<span class="xsd-dot" style="flex-shrink:0;margin:0"></span>'
-                            : '<span class="cls-dot tree-cls-dot"></span>')
-                        : '<span class="restr-filler-ph"></span>'}
-                    <span class="restr-filler-lbl" style="flex:0 1 auto"
-                        oncontextmenu="event.preventDefault();event.stopPropagation();RestrictionEditor.toggleFillerPicker('${gid}')"
-                        title="Right-click to pick a class"
-                        ${isNavClass ? `
-                            onclick="event.stopPropagation();APP.navigateTo('classes','${fv}')"
-                            onmouseover="this.style.textDecoration='underline';this.style.color='var(--accent,#5f8dd3)';this.style.cursor='pointer'"
-                            onmouseout="this.style.textDecoration='';this.style.color=''"
-                        ` : isNavInd ? `
-                            onclick="event.stopPropagation();APP.navigateTo('individuals','${fv}')"
-                            onmouseover="this.style.textDecoration='underline';this.style.color='var(--accent,#5f8dd3)';this.style.cursor='pointer'"
-                            onmouseout="this.style.textDecoration='';this.style.color=''"
-                        ` : ''}
-                    >${fv || '— class —'}</span>
-                    <button class="btn-frame-del restr-filler-clear" style="flex-shrink:0"
-                        onclick="event.stopPropagation();RestrictionEditor.deleteChild('${gid}')">✕</button>
-                    <span style="flex:1"></span>
-                </div>
-                <div class="restr-filler-dropdown" style="display:none">
-                    ${_classHierarchyItems(gid, fv)}
-                </div>
-                <input type="hidden" class="restr-filler-val" value="${fv}">
+                ${_fillerInner(prop, r.type, fv, gid)}
             </div>
             <span class="tree-leaf" style="display:${isCard ? 'inline' : 'none'}">◦</span>
             <input class="restr-card-inp" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="n"
@@ -1978,8 +2109,23 @@ const RestrictionEditor = {
         // Show/hide the ◦ before the cardinality field
         const cardDot = card?.previousElementSibling;
         if (cardDot?.classList.contains('tree-leaf')) cardDot.style.display = isCard ? 'inline' : 'none';
-        // Close the dropdown when switching to cardinality
-        if (isCard) row.querySelector('.restr-filler-dropdown') && (row.querySelector('.restr-filler-dropdown').style.display = 'none');
+        // Régénère le contenu du filler dans la bonne forme (picker classe/individu ou champ littéral),
+        // en effaçant la valeur si elle devient incompatible avec le nouveau type.
+        if (filler && !isCard) {
+            const prop = row.dataset.prop;
+            let val = filler.querySelector('.restr-filler-val')?.value || '';
+            if (val && !this._fillerValueCompatible(prop, type, val)) val = '';
+            filler.innerHTML = _fillerInner(prop, type, val, gid);
+        }
+    },
+
+    /** Une valeur reste-t-elle cohérente avec le nouveau type de restriction ? */
+    _fillerValueCompatible(prop, type, val) {
+        const mode = _fillerModeFor(prop, type);
+        const isDP = (APP.state.datatype_properties || []).some(p => p.id === prop);
+        if (type === 'hasValue' && isDP) return true;                 // littéral : tout texte convient
+        if (mode === 'class') return (APP.state.classes || []).some(c => c.id === val) || val === 'owl:Thing';
+        return (APP.state.individuals || []).some(i => i.id === val); // mode 'ind'
     },
 
     // ── Filler picker (position fixed, flotte par-dessus) ────────
@@ -1990,14 +2136,33 @@ const RestrictionEditor = {
         const isOpen = dd.style.display !== 'none';
         document.querySelectorAll('.restr-filler-dropdown').forEach(el => el.style.display = 'none');
         if (!isOpen) {
-            const trigger = wrap.querySelector('.restr-filler-btn');
+            // Régénère le sélecteur depuis la valeur courante, dans le mode du type de restriction
+            const curVal = wrap.querySelector('.restr-filler-val')?.value || '';
+            const mode   = _fillerMode(gid);
+            dd.innerHTML = _classHierarchyItems(gid, curVal, mode);
+            const trigger = wrap.querySelector('.restr-filler-btn') || wrap;
             const rect    = trigger.getBoundingClientRect();
+            const W        = mode === 'ind' ? 440 : 300;
+            const margin   = 10;
+            // Évite le débordement à droite de la fenêtre
+            const left     = Math.min(rect.left, window.innerWidth - W - 12);
             dd.style.position = 'fixed';
-            dd.style.top      = (rect.bottom + 2) + 'px';
-            dd.style.left     = rect.left + 'px';
+            dd.style.left     = Math.max(8, left) + 'px';
             dd.style.right    = 'auto';
-            dd.style.minWidth = Math.max(rect.width, 160) + 'px';
-            dd.style.display  = 'block';
+            dd.style.display  = 'flex';
+            // Borne la hauteur à l'espace disponible (scroll interne) ; retourne vers le haut si besoin
+            const spaceBelow = window.innerHeight - rect.bottom - margin;
+            const spaceAbove = rect.top - margin;
+            if (spaceBelow >= 240 || spaceBelow >= spaceAbove) {
+                dd.style.maxHeight = Math.max(160, spaceBelow) + 'px';
+                dd.style.top       = (rect.bottom + 2) + 'px';
+            } else {
+                dd.style.maxHeight = Math.max(160, spaceAbove) + 'px';
+                const h = dd.getBoundingClientRect().height;   // hauteur réelle (déjà bornée)
+                dd.style.top = Math.max(8, rect.top - h - 2) + 'px';
+            }
+            // Focus le champ filtre
+            setTimeout(() => dd.querySelector('.rfs-filter-inp')?.focus(), 0);
             setTimeout(() => document.addEventListener('click', function close(e) {
                 if (!wrap.contains(e.target) && !dd.contains(e.target)) {
                     dd.style.display = 'none';
@@ -2007,25 +2172,58 @@ const RestrictionEditor = {
         }
     },
 
-    selectFiller(gid, id) {
+    /** Pose la valeur du filler (id + type) sur la ligne, met à jour l'icône, sauvegarde.
+     *  close=true ferme le sélecteur (cas individu / sélection finale). */
+    selectFiller(gid, id, kind, close) {
         const wrap = document.getElementById(`restr-filler-${gid}`);
         if (!wrap) return;
         wrap.querySelector('.restr-filler-val').value = id;
         const lbl = wrap.querySelector('.restr-filler-lbl');
-        lbl.textContent = id || '— class —';
+        const prow = wrap.closest('.restr-child-row');
+        lbl.textContent = id || _fillerPlaceholder(prow?.dataset.prop, prow?.querySelector('.restr-type-sel')?.value);
         lbl.style.flex = '0 1 auto';
         const btn = wrap.querySelector('.restr-filler-btn');
-        // Update the dot
-        const old = btn.querySelector('.cls-dot, .restr-filler-ph');
+        // Met à jour le dot (rond marron = classe, losange = individu)
+        const old = btn.querySelector('.cls-dot, .xsd-dot, .restr-filler-ph');
         if (old) old.remove();
         const dot = document.createElement('span');
-        dot.className = id ? 'cls-dot tree-cls-dot' : 'restr-filler-ph';
+        dot.className = !id ? 'restr-filler-ph'
+                      : kind === 'ind' ? 'xsd-dot'
+                      : 'cls-dot tree-cls-dot';
+        if (kind === 'ind') dot.style.cssText = 'flex-shrink:0;margin:0';
         const leaf = btn.querySelector('.tree-leaf');
         leaf ? leaf.after(dot) : btn.insertBefore(dot, btn.firstChild);
-        wrap.querySelectorAll('.tree-item').forEach(item =>
-            item.classList.toggle('selected', item.dataset.id === id));
-        wrap.querySelector('.restr-filler-dropdown').style.display = 'none';
+        if (close) wrap.querySelector('.restr-filler-dropdown').style.display = 'none';
         if (ClassEditor._editingId !== null) ClassEditor.autoSave();
+    },
+
+    /** Mode 'ind' — clic sur une classe à gauche : charge ses individus à droite (navigation). */
+    _fillerNavClass(gid, classId) {
+        const rfs = document.getElementById(`restr-filler-${gid}`)?.querySelector('.rfs');
+        if (!rfs) return;
+        rfs.dataset.active = classId;
+        const q = (rfs.querySelector('.rfs-filter-inp')?.value || '').trim().toLowerCase();
+        rfs.querySelector('.rfs-ind-list').innerHTML = _fillerIndRows(gid, classId, '', q);
+        const lbl = rfs.querySelector('.rfs-active-lbl');
+        if (lbl) lbl.textContent = classId || '';
+        rfs.querySelectorAll('.rfs-cls-list .rfs-row').forEach(r =>
+            r.classList.toggle('rfs-active', r.dataset.cls === classId));
+    },
+
+    /** Filtre en direct, selon le mode du sélecteur. */
+    _fillerFilter(gid, value) {
+        const rfs = document.getElementById(`restr-filler-${gid}`)?.querySelector('.rfs');
+        if (!rfs) return;
+        const q    = (value || '').trim().toLowerCase();
+        const mode = rfs.dataset.mode || 'class';
+        if (mode === 'class') {
+            const sel = document.getElementById(`restr-filler-${gid}`)?.querySelector('.restr-filler-val')?.value || '';
+            rfs.querySelector('.rfs-cls-list').innerHTML = _fillerClassRows(gid, sel, '', q, 'class');
+        } else {
+            const active = rfs.dataset.active || '';
+            rfs.querySelector('.rfs-cls-list').innerHTML = _fillerClassRows(gid, '', active, q, 'ind');
+            rfs.querySelector('.rfs-ind-list').innerHTML = _fillerIndRows(gid, active, '', q);
+        }
     },
 
     // ── Collecting for save ──────────────────────────────

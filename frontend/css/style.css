@@ -1029,11 +1029,57 @@ body.h-resizing * {
 }
 .restr-filler-arrow { color: var(--text-dim); font-size: 8px; flex-shrink: 0; }
 .restr-filler-dropdown {
-  /* position:fixed + coordinates set by JS in toggleFillerPicker() */
+  /* position:fixed + coordinates + max-height set by JS in toggleFillerPicker() */
   width: max-content; z-index: 9000;
-  max-height: 260px; overflow-y: auto;
-  background: var(--bg2); border: 1px solid var(--border2); border-radius: 4px;
-  box-shadow: 0 6px 20px rgba(0,0,0,.45);
+  display: flex; flex-direction: column; overflow: hidden;
+  max-height: 70vh;
+  background: var(--bg2); border: 1px solid var(--border2); border-radius: 6px;
+  box-shadow: 0 8px 30px rgba(0,0,0,.5);
+}
+
+/* ── Restriction filler — two-pane selector (classes | individuals) ── */
+.rfs { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.rfs-mode-ind   { width: 440px; }
+.rfs-mode-class { width: 300px; }
+.rfs-filter { padding: 8px 9px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.rfs-filter-inp {
+  width: 100%; box-sizing: border-box;
+  background: var(--bg); border: 1px solid var(--border); border-radius: 5px;
+  color: var(--text); font-family: var(--font-mono); font-size: 12px;
+  padding: 5px 9px;
+}
+.rfs-filter-inp:focus { outline: none; border-color: var(--accent); }
+.rfs-panes { display: flex; flex: 1; min-height: 0; }
+.rfs-mode-class .rfs-list { min-height: 120px; }
+.rfs-pane { flex: 1; min-width: 0; display: flex; flex-direction: column; min-height: 0; }
+.rfs-pane:first-child { border-right: 1px solid var(--border); }
+.rfs-pane-hdr {
+  display: flex; align-items: center; gap: 6px; flex-shrink: 0;
+  padding: 7px 10px; border-bottom: 1px solid var(--border);
+  font-size: 10px; text-transform: uppercase; letter-spacing: .05em;
+  color: var(--text-dim); white-space: nowrap; overflow: hidden;
+}
+.rfs-active-lbl { color: var(--text); text-transform: none; letter-spacing: 0;
+  overflow: hidden; text-overflow: ellipsis; }
+.rfs-list { flex: 1; min-height: 0; overflow-y: auto; padding: 6px 5px; }
+.rfs-row { white-space: nowrap; }
+.rfs-row.rfs-active { background: var(--bg3); }
+.rfs-cnt { margin-left: auto; padding-left: 8px; font-size: 9px; color: var(--text-faint); }
+.rfs-ind-dot { width: 9px; height: 9px; flex-shrink: 0; transform: rotate(45deg); }
+.rfs-empty { padding: 14px 10px; text-align: center; color: var(--text-faint);
+  font-size: 11px; font-style: italic; }
+.rfs-hl { background: var(--accent); color: #fff; border-radius: 2px; }
+/* Champ littéral (hasValue + DatatypeProperty) */
+.restr-literal-inp {
+  flex: 1; min-width: 0; box-sizing: border-box;
+  background: var(--bg); border: 1px solid var(--border); border-radius: 4px;
+  color: var(--text); font-family: var(--font-mono); font-size: 11px;
+  padding: 2px 6px; height: 22px;
+}
+.restr-literal-inp:focus { outline: none; border-color: var(--accent); }
+.restr-literal-type {
+  flex-shrink: 0; font-size: 10px; color: var(--text-dim);
+  font-family: var(--font-mono); padding: 0 4px;
 }
 .restr-card-inp { font-size: 11px; }
 
