@@ -689,9 +689,31 @@ class TripleStore:
                         ind.differentFrom.append(dl)
             onto.individuals.append(ind)
 
+        # ── Extraction des owl:imports déclarés dans le RDF ──────
+        imp_uris: list = []
+        for onto_subj in g.subjects(RDF.type, OWL.Ontology):
+            for imp in g.objects(onto_subj, OWL.imports):
+                u = str(imp)
+                if u not in imp_uris:
+                    imp_uris.append(u)
+        onto.imports = imp_uris
+
         self._ontology = onto
         # Enregistrer dans le registre et sauver le fichier
         self.register(name, host_path, uri, prefix)
+        # Recopier les imports dans l'entrée de registre + instantané préfixe/nom
+        entry = self._registry.get(name)
+        if entry is not None:
+            entry.imports = imp_uris
+            labels: dict = {}
+            for u in imp_uris:
+                for e in self._registry.values():
+                    if e.uri == u or e.uri.rstrip("#/") == u.rstrip("#/"):
+                        labels[u] = {"prefix": e.prefix, "name": e.name}
+                        break
+            entry.import_labels = labels
+            onto.import_labels = labels
+            self._save_registry()
         self._save_onto(onto, host_path)
         # Connecter automatiquement
         self.connect(name)
