@@ -727,7 +727,7 @@ const APP = {
                     <span class="${entry ? 'onto-import-link' : 'onto-import-missing'}"
                           ${entry ? `onclick="event.stopPropagation();APP._scrollToRegistryRow('${safeN}')" title="Go to ${name}"` : ''}>
                         <code${missing ? '' : ` style="color:var(--text2)"`}>${prefix ? prefix + ':' : ''}</code>
-                        <span style="font-style:italic">${_escapeHtml(name)}</span>
+                        <span style="font-style:italic">${_escapeHtml(uri)}</span>
                     </span>
                     ${missing ? `<span class="onto-import-warn" title="Cette ontologie importée n'est pas dans le registre">⚠ Not in the registry</span>` : ''}
                 </td>

@@ -805,6 +805,7 @@ const ClassEditor = {
                 <div id="cls-super-picker" class="cls-tree-picker" style="display:none"></div>`;
             return;
         }
+        const isImp = !!cls._imported;
         const superClasses = [...new Set((cls.subClassOf || []).filter(s => typeof s === 'string'))];
 
         // Build a map id→class for ancestor traversal
@@ -840,11 +841,15 @@ const ClassEditor = {
                     </div>`;
                 }
                 const isDirect = i === 0;
-                return `<div class="cls-list-item${isDirect ? '' : ' cls-ancestor'}" ${isDirect ? `data-id="${id}"` : `data-ancestor-id="${id}"`} style="padding-left:${indent}px${isDirect ? '' : ';opacity:0.75'}">
+                const idCls   = classMap[id];
+                const dispId  = idCls ? _displayId(idCls) : id;
+                const impCls  = idCls?._imported ? ' imported-entity' : '';
+                const anc     = (!isDirect && !impCls) ? ';opacity:0.75' : '';
+                return `<div class="cls-list-item${isDirect ? '' : ' cls-ancestor'}${impCls}" ${isDirect ? `data-id="${id}"` : `data-ancestor-id="${id}"`} style="padding-left:${indent}px${anc}">
                     <span class="cls-dot tree-cls-dot"></span>
                     <span class="cls-list-lbl" style="cursor:pointer"
-                          onclick="APP.navigateTo('classes','${id}')">${id}</span>
-                    ${isDirect ? `<button class="btn-frame-del" onclick="ClassEditor.removeSuperClass('${id}')">✕</button>` : ''}
+                          onclick="APP.navigateTo('classes','${id}')">${_escapeHtml(dispId)}</span>
+                    ${isDirect && !isImp ? `<button class="btn-frame-del" onclick="ClassEditor.removeSuperClass('${id}')">✕</button>` : ''}
                 </div>`;
             }).join('');
             return chainHtml;
@@ -852,9 +857,9 @@ const ClassEditor = {
 
         panel.innerHTML = `
             ${superRows || '<div class="cls-list-item cls-ancestor" style="opacity:0.55;font-style:italic"><span class="cls-dot tree-cls-dot tree-thing-dot"></span><span class="cls-list-lbl">owl:Thing</span></div>'}
-            <div id="cls-super-picker" class="cls-tree-picker" style="display:none">
+            ${isImp ? '' : `<div id="cls-super-picker" class="cls-tree-picker" style="display:none">
                 ${_classTreePickerItems('ClassEditor.addSuperClass', [cls.id, ...superClasses])}
-            </div>`;
+            </div>`}`;
     },
 
     async selectOwlThing() {
@@ -925,7 +930,7 @@ const ClassEditor = {
             const cls = (APP.state.classes || []).find(c => c.id === id);
             const isImp = _applyImportedView(detail, cls, cls ? this.renderForm(cls) : this.renderForm(null));
             _initHResizers('class-detail');
-            this._updateSuperPanel(isImp ? null : (cls || null));
+            this._updateSuperPanel(cls || null);   // affiche aussi les super-classes des classes importées (lecture seule)
             _markImportedRefs(detail);
             _markImportedRefs(document.getElementById('cls-supers-list'));
         } else {
@@ -2871,6 +2876,7 @@ const OPEditor = {
                 <div id="op-sub-picker" class="cls-tree-picker" style="display:none"></div>`;
             return;
         }
+        const isImp = !!prop._imported;
         const superProps = [...new Set((prop.subPropertyOf || []).filter(s => typeof s === 'string'))];
 
         const propMap = {};
@@ -2903,21 +2909,24 @@ const OPEditor = {
                     </div>`;
                 }
                 const isDirect = i === 0;
-                return `<div class="cls-list-item${isDirect ? '' : ' cls-ancestor'}" ${isDirect ? `data-id="${id}"` : `data-ancestor-id="${id}"`} style="padding-left:${indent}px${isDirect ? '' : ';opacity:0.75'}">
+                const idP    = propMap[id];
+                const dispId = idP ? _displayId(idP) : id;
+                const impP   = idP?._imported ? ' imported-entity' : '';
+                const anc    = (!isDirect && !impP) ? ';opacity:0.75' : '';
+                return `<div class="cls-list-item${isDirect ? '' : ' cls-ancestor'}${impP}" ${isDirect ? `data-id="${id}"` : `data-ancestor-id="${id}"`} style="padding-left:${indent}px${anc}">
                     <span class="op-prop-dot tree-op-dot"></span>
                     <span class="cls-list-lbl" style="cursor:pointer"
-                          onclick="APP.navigateTo('object-properties','${id}')">${id}</span>
-                    ${isDirect ? `<button class="btn-frame-del" onclick="OPEditor.removeSubProp('${id}')">✕</button>` : ''}
+                          onclick="APP.navigateTo('object-properties','${id}')">${_escapeHtml(dispId)}</span>
+                    ${isDirect && !isImp ? `<button class="btn-frame-del" onclick="OPEditor.removeSubProp('${id}')">✕</button>` : ''}
                 </div>`;
             }).join('');
         }).join('');
 
-        const superPropTree = _opTreePickerItems('OPEditor.addSubProp(this.dataset.id)', [prop.id]);
         panel.innerHTML = `
             ${superPropRows || '<div class="cls-list-item cls-ancestor" style="opacity:0.55;font-style:italic;cursor:pointer" onclick="OPEditor.selectTopProp()"><span class="op-prop-dot tree-op-dot tree-op-top-dot"></span><span class="cls-list-lbl">owl:topObjectProperty</span></div>'}
-            <div id="op-sub-picker" class="cls-tree-picker" style="display:none">
-                ${superPropTree}
-            </div>`;
+            ${isImp ? '' : `<div id="op-sub-picker" class="cls-tree-picker" style="display:none">
+                ${_opTreePickerItems('OPEditor.addSubProp(this.dataset.id)', [prop.id])}
+            </div>`}`;
     },
 
     selectTopProp() {
@@ -2983,7 +2992,7 @@ const OPEditor = {
             const prop = (APP.state.object_properties || []).find(p => p.id === id);
             const isImp = _applyImportedView(detail, prop, this.renderForm(prop));
             _initHResizers('op-detail');
-            this._updateSuperPanel(isImp ? null : (prop || null));
+            this._updateSuperPanel(prop || null);
             if (!isImp) this._loadInferredInverse(id);
             _markImportedRefs(detail);
             _markImportedRefs(document.getElementById('op-supers-list'));
@@ -3744,6 +3753,7 @@ const DPEditor = {
                 </select>`;
             return;
         }
+        const isImp = !!prop._imported;
         const superProps = [...new Set((prop.subPropertyOf || []).filter(s => typeof s === 'string'))];
 
         const propMap = {};
@@ -3776,11 +3786,15 @@ const DPEditor = {
                     </div>`;
                 }
                 const isDirect = i === 0;
-                return `<div class="cls-list-item${isDirect ? '' : ' cls-ancestor'}" ${isDirect ? `data-id="${id}"` : `data-ancestor-id="${id}"`} style="padding-left:${indent}px${isDirect ? '' : ';opacity:0.75'}">
+                const idP    = propMap[id];
+                const dispId = idP ? _displayId(idP) : id;
+                const impP   = idP?._imported ? ' imported-entity' : '';
+                const anc    = (!isDirect && !impP) ? ';opacity:0.75' : '';
+                return `<div class="cls-list-item${isDirect ? '' : ' cls-ancestor'}${impP}" ${isDirect ? `data-id="${id}"` : `data-ancestor-id="${id}"`} style="padding-left:${indent}px${anc}">
                     <span class="dp-prop-dot tree-dp-dot"></span>
                     <span class="cls-list-lbl" style="cursor:pointer"
-                          onclick="APP.navigateTo('datatype-properties','${id}')">${id}</span>
-                    ${isDirect ? `<button class="btn-frame-del" onclick="DPEditor.removeSubProp('${id}')">✕</button>` : ''}
+                          onclick="APP.navigateTo('datatype-properties','${id}')">${_escapeHtml(dispId)}</span>
+                    ${isDirect && !isImp ? `<button class="btn-frame-del" onclick="DPEditor.removeSubProp('${id}')">✕</button>` : ''}
                 </div>`;
             }).join('');
         }).join('');
@@ -3790,10 +3804,10 @@ const DPEditor = {
             .map(q => `<option value="${q.id}">${q.id}</option>`).join('');
         panel.innerHTML = `
             ${subRows || '<div class="cls-list-item cls-ancestor" style="opacity:0.55;font-style:italic;cursor:pointer" onclick="DPEditor.selectTopProp()"><span class="dp-prop-dot tree-dp-dot tree-dp-top-dot"></span><span class="cls-list-lbl">owl:topDatatypeProperty</span></div>'}
-            <select id="dp-sub-picker" class="cls-picker" style="display:none"
+            ${isImp ? '' : `<select id="dp-sub-picker" class="cls-picker" style="display:none"
                     onchange="DPEditor.addSubProp(this.value)">
                 <option value="">— choose —</option>${availSub}
-            </select>`;
+            </select>`}`;
     },
 
     selectTopProp() {
@@ -3857,7 +3871,7 @@ const DPEditor = {
             const prop = (APP.state.datatype_properties || []).find(p => p.id === id);
             const isImp = _applyImportedView(detail, prop, this.renderForm(prop));
             _initHResizers('dp-detail');
-            this._updateSuperPanel(isImp ? null : (prop || null));
+            this._updateSuperPanel(prop || null);
             _markImportedRefs(detail);
             _markImportedRefs(document.getElementById('dp-supers-list'));
         } else {
@@ -6660,7 +6674,7 @@ const APEditor = {
         } else {
             const prop = (APP.state.annotation_properties || []).find(p => p.id === id);
             const isImp = _applyImportedView(detail, prop, prop ? this._renderForm(prop) : '');
-            this._updateSuperPanel(isImp ? null : id);
+            this._updateSuperPanel(id);   // affiche aussi les super-propriétés des AP importées (lecture seule)
             _markImportedRefs(detail);
             _markImportedRefs(document.getElementById('ap-supers-list'));
         }
@@ -6948,11 +6962,15 @@ const APEditor = {
                         <span class="cls-list-lbl">${id}</span>
                     </div>`;
                 }
-                return `<div class="cls-list-item${isDirect ? '' : ' cls-ancestor'}"
-                             style="padding-left:${indent}px${isDirect ? '' : ';opacity:0.75'}">
+                const idP    = allPropsMap[id];
+                const dispId = (idP && !isBuiltin) ? _displayId(idP) : id;
+                const impP   = idP?._imported ? ' imported-entity' : '';
+                const anc    = (!isDirect && !impP) ? ';opacity:0.75' : '';
+                return `<div class="cls-list-item${isDirect ? '' : ' cls-ancestor'}${impP}"
+                             style="padding-left:${indent}px${anc}">
                     <span class="anno-prop-dot" style="flex-shrink:0;margin-right:4px"></span>
                     <span class="cls-list-lbl nav-link"
-                          onclick="APP.navigateTo('annotation-properties','${id}')">${id}</span>
+                          onclick="APP.navigateTo('annotation-properties','${id}')">${_escapeHtml(dispId)}</span>
                     ${isBuiltin ? '<span style="font-size:10px;color:var(--text-faint);font-style:italic;margin-left:4px">built-in</span>' : ''}
                 </div>`;
             }).join('');
