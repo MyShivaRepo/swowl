@@ -41,7 +41,7 @@ docker compose up --build
 
 ## Persistance
 
-Les ontologies sont des fichiers **JSON** référencés dans `~/.swowl/registry.json`.
+Les ontologies complètes (OWL + SWRL) sont stockées dans des fichiers **JSON** référencés dans `~/.swowl/registry.json`.
 Elles sont relues à chaque démarrage et restent sur l'hôte (hors conteneur).
 
 ## Structure
