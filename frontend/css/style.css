@@ -436,6 +436,12 @@ button, .btn-primary, .btn-secondary, .btn-sm {
   border: 1px solid var(--border);
 }
 .btn-sm:hover { background: var(--bg4); }
+.btn-sm.ind-eye-on { color: var(--accent); border-color: var(--accent); }
+/* Boutons carrés identiques dans l'en-tête Class Hierarchy (œil + Display options) */
+.btn-sm.ind-hdr-btn {
+  width: 26px; height: 26px; padding: 0; box-sizing: border-box;
+  display: inline-flex; align-items: center; justify-content: center;
+}
 .btn-edit   { color: var(--accent); }
 .btn-del    { color: var(--danger); }
 .btn-danger {
@@ -844,10 +850,23 @@ body.h-resizing * {
   border: 1px solid var(--border2);
   border-radius: 4px;
   background: var(--bg2);
-  max-height: 160px;
-  overflow-y: auto;
+  max-height: 220px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   margin-top: 2px;
 }
+.cls-picker-filter {
+  flex-shrink: 0;
+  box-sizing: border-box;
+  margin: 5px 5px 4px;
+  width: calc(100% - 10px);
+  background: var(--bg); border: 1px solid var(--border); border-radius: 4px;
+  color: var(--text); font-family: var(--font-mono); font-size: 11px;
+  padding: 4px 8px;
+}
+.cls-picker-filter:focus { outline: none; border-color: var(--accent); }
+.cls-picker-list { overflow-y: auto; min-height: 0; padding-bottom: 3px; }
 
 /* ── Frames bas (Superclasses | Disjoints) ────────────────── */
 .cls-frames-row {

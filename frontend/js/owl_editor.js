@@ -742,10 +742,7 @@ const ClassEditor = {
                     </div>
                     <div class="left-col-bottom-body" id="cls-supers-list">
                         <div class="cls-list-empty">— select a class —</div>
-                        <select id="cls-super-picker" class="cls-picker" style="display:none"
-                                onchange="ClassEditor.addSuperClass(this.value)">
-                            <option value="">— choose —</option>
-                        </select>
+                        <div id="cls-super-picker" class="cls-tree-picker" style="display:none"></div>
                     </div>
                 </div>
 
@@ -805,10 +802,7 @@ const ClassEditor = {
         if (!cls) {
             panel.innerHTML = `
                 <div class="cls-list-empty">— select a class —</div>
-                <select id="cls-super-picker" class="cls-picker" style="display:none"
-                        onchange="ClassEditor.addSuperClass(this.value)">
-                    <option value="">— choose —</option>
-                </select>`;
+                <div id="cls-super-picker" class="cls-tree-picker" style="display:none"></div>`;
             return;
         }
         const superClasses = [...new Set((cls.subClassOf || []).filter(s => typeof s === 'string'))];
@@ -856,15 +850,11 @@ const ClassEditor = {
             return chainHtml;
         }).join('');
 
-        const availSupers = (APP.state.classes || [])
-            .filter(c2 => c2.id !== cls.id && !superClasses.includes(c2.id))
-            .map(c2 => `<option value="${c2.id}">${c2.id}</option>`).join('');
         panel.innerHTML = `
             ${superRows || '<div class="cls-list-item cls-ancestor" style="opacity:0.55;font-style:italic"><span class="cls-dot tree-cls-dot tree-thing-dot"></span><span class="cls-list-lbl">owl:Thing</span></div>'}
-            <select id="cls-super-picker" class="cls-picker" style="display:none"
-                    onchange="ClassEditor.addSuperClass(this.value)">
-                <option value="">— choose —</option>${availSupers}
-            </select>`;
+            <div id="cls-super-picker" class="cls-tree-picker" style="display:none">
+                ${_classTreePickerItems('ClassEditor.addSuperClass', [cls.id, ...superClasses])}
+            </div>`;
     },
 
     async selectOwlThing() {
@@ -1395,6 +1385,7 @@ const ClassEditor = {
         const visible = el.style.display !== 'none';
         el.style.display = visible ? 'none' : '';
         if (!visible) {
+            _decoratePickerWithFilter(el);
             el.focus();
             const close = (e) => {
                 if (!el.contains(e.target) && !e.target.closest('[onclick*="showPicker"]')) {
@@ -2471,12 +2462,50 @@ function _removeListItem(id, listId, placeholder = '') {
 }
 
 /** Toggles the visibility of a select picker */
+/** Masque/affiche les items d'un picker selon le texte du champ filtre. */
+function _filterPicker(input) {
+    const list = input.parentElement?.querySelector('.cls-picker-list');
+    if (!list) return;
+    const q = (input.value || '').trim().toLowerCase();
+    list.querySelectorAll('.tree-item[data-id]').forEach(it => {
+        const id  = (it.dataset.id   || '').toLowerCase();
+        const txt = (it.textContent  || '').toLowerCase();
+        it.style.display = (!q || id.includes(q) || txt.includes(q)) ? '' : 'none';
+    });
+}
+
+/** Ajoute (à la première ouverture) un champ filtre en tête d'un .cls-tree-picker,
+ *  enveloppe les items dans une zone scrollable, puis remet à zéro et focus le filtre. */
+function _decoratePickerWithFilter(el) {
+    if (!el || !el.classList.contains('cls-tree-picker')) return;
+    let filter = el.querySelector(':scope > .cls-picker-filter');
+    if (!filter) {
+        const list = document.createElement('div');
+        list.className = 'cls-picker-list';
+        while (el.firstChild) list.appendChild(el.firstChild);
+        filter = document.createElement('input');
+        filter.type = 'text';
+        filter.className = 'cls-picker-filter';
+        filter.placeholder = 'Filter…';
+        filter.setAttribute('autocomplete', 'off');
+        filter.setAttribute('spellcheck', 'false');
+        filter.addEventListener('input', () => _filterPicker(filter));
+        filter.addEventListener('mousedown', e => e.stopPropagation());
+        el.appendChild(filter);
+        el.appendChild(list);
+    }
+    filter.value = '';
+    _filterPicker(filter);
+    setTimeout(() => filter.focus(), 0);
+}
+
 function _togglePicker(id) {
     const el = document.getElementById(id);
     if (!el) return;
     const visible = el.style.display !== 'none';
     el.style.display = visible ? 'none' : '';
     if (!visible) {
+        _decoratePickerWithFilter(el);
         el.focus();
         const close = (e) => {
             if (!el.contains(e.target) && !e.target.closest('[onclick*="_togglePicker"],[onclick*="showPicker"]')) {
@@ -4302,6 +4331,39 @@ const IndividualEditor = {
     _displayProps:      {},     // classId → propId  (simple rule)
     _displayPropsMulti: {},     // classId → [{sep, propId}, ...]  (composite rule)
 
+    // ── Portée d'affichage des individus (réglage GLOBAL, partagé avec les pickers) ──
+    // true  = classe + toutes ses sous-classes (transitif)
+    // false = uniquement les individus typés directement sur la classe
+    get _includeSubclasses() {
+        return localStorage.getItem('swowl_ind_include_subclasses') !== 'false';
+    },
+    set _includeSubclasses(v) {
+        localStorage.setItem('swowl_ind_include_subclasses', v ? 'true' : 'false');
+    },
+
+    /** SVG œil (ouvert = inclut les sous-classes, barré = classe seule) + bouton de bascule. */
+    _subclassToggleHtml() {
+        const on = this._includeSubclasses;
+        const eye = on
+            ? `<svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M1 8s2.5-4.5 7-4.5S15 8 15 8s-2.5 4.5-7 4.5S1 8 1 8z"/><circle cx="8" cy="8" r="2"/></svg>`
+            : `<svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4.5C1.6 5.6 1 8 1 8s2.5 4.5 7 4.5c1.2 0 2.2-.3 3.1-.7M6.2 3.7C6.8 3.6 7.4 3.5 8 3.5c4.5 0 7 4.5 7 4.5s-.7 1.3-2 2.5"/><path d="M2 2l12 12"/></svg>`;
+        const title = on ? 'Showing this class + its sub-classes — click for this class only'
+                         : 'Showing this class only — click to include sub-classes';
+        return `<button id="ind-subclass-toggle" class="btn-sm ind-hdr-btn${on ? ' ind-eye-on' : ''}"
+                    onclick="IndividualEditor.toggleSubclasses()" title="${title}">${eye}</button>`;
+    },
+
+    /** Bascule la portée (classe seule ↔ + sous-classes), persiste, et re-rend la liste. */
+    toggleSubclasses() {
+        this._includeSubclasses = !this._includeSubclasses;
+        // Met à jour le bouton
+        const wrap = document.getElementById('ind-subclass-toggle');
+        if (wrap) wrap.outerHTML = this._subclassToggleHtml();
+        // Re-rend la liste des individus
+        const listScroll = document.getElementById('ind-list-scroll');
+        if (listScroll) listScroll.innerHTML = this._renderIndList(APP.state.individuals);
+    },
+
     // ── 3-column layout ────────────────────────────────────────
 
     renderSplit(individuals) {
@@ -4312,12 +4374,15 @@ const IndividualEditor = {
             <div class="tree-panel" id="ind-tree-panel">
                 <div class="tree-panel-header">
                     <h3>Class Hierarchy</h3>
+                    <div style="display:flex;gap:4px;align-items:center;flex-shrink:0">
+                    ${this._subclassToggleHtml()}
                     <div style="position:relative;flex-shrink:0">
-                        <button class="btn-sm" onclick="IndividualEditor._toggleDisplayMenu(event)" title="Display options"><span style="font-size:15px;line-height:1">▾</span></button>
+                        <button class="btn-sm ind-hdr-btn" onclick="IndividualEditor._toggleDisplayMenu(event)" title="Display options"><span style="font-size:15px;line-height:1">▾</span></button>
                         <div id="ind-display-menu" class="ctx-menu" style="display:none;position:absolute;top:100%;right:0;min-width:180px;z-index:200">
                             <div class="ctx-item" onclick="IndividualEditor._openDisplayPropModal();IndividualEditor._toggleDisplayMenu()">Set Display Property</div>
                             <div class="ctx-item" onclick="IndividualEditor._openDisplayPropsMultiModal();IndividualEditor._toggleDisplayMenu()">Set Display Properties</div>
                         </div>
+                    </div>
                     </div>
                 </div>
                 <div class="tree-scroll" id="ind-class-tree">${treeContent}</div>
@@ -4327,8 +4392,8 @@ const IndividualEditor = {
                 <div class="tree-panel-header">
                     <h3 id="ind-list-title">${this._selectedClassId || 'All Individuals'}</h3>
                     <div style="display:flex;gap:4px;flex-shrink:0;align-items:center">
-                        <button class="btn-sm" onclick="IndividualEditor.newIndividual()" title="New individual">➕</button>
-                        <button id="ind-del-btn" class="btn-icon btn-icon-danger" ${this._selectedIndId ? '' : 'disabled'}
+                        <button class="btn-sm ind-hdr-btn" onclick="IndividualEditor.newIndividual()" title="New individual">➕</button>
+                        <button id="ind-del-btn" class="btn-sm ind-hdr-btn btn-del" ${this._selectedIndId ? '' : 'disabled'}
                                 onclick="IndividualEditor.deleteSelected()" title="Delete selected individual">${ClassEditor._svgDelete}</button>
                     </div>
                 </div>
@@ -4483,14 +4548,23 @@ const IndividualEditor = {
         const classId = this._selectedClassId;
         const inds    = individuals || APP.state.individuals || [];
 
+        // Classe effective : owl:Thing quand rien n'est sélectionné (racine)
+        const effClass = classId || 'owl:Thing';
         let filtered;
-        if (!classId) {
-            filtered = inds; // owl:Thing → tous
+        if (!this._includeSubclasses) {
+            // Portée « cette classe seule » → individus typés directement sur effClass.
+            // Pour owl:Thing, on inclut aussi les individus SANS type (implicitement owl:Thing).
+            filtered = effClass === 'owl:Thing'
+                ? inds.filter(x => !(x.types || []).length || (x.types || []).includes('owl:Thing'))
+                : inds.filter(x => (x.types || []).includes(effClass));
+        } else if (effClass === 'owl:Thing') {
+            // owl:Thing + sous-classes = tous les individus
+            filtered = inds;
         } else {
-            // Transitive filter: individuals of classId AND all its sub-classes
+            // Portée « + sous-classes » → individus de effClass ET de toutes ses sous-classes
             const { childrenOf } = ClassEditor.buildTree(APP.state.classes || []);
-            const accepted = new Set([classId]);
-            const queue = [...(childrenOf[classId] || [])];
+            const accepted = new Set([effClass]);
+            const queue = [...(childrenOf[effClass] || [])];
             while (queue.length) {
                 const c = queue.shift();
                 if (!accepted.has(c)) {
@@ -5476,6 +5550,7 @@ const IndividualEditor = {
             roots = allRoots;
         }
         const clsHtml = renderClsTree(roots, clsIds);
+        this._picker.clsIds = clsIds;   // classes autorisées (range + descendants), pour la recherche globale
 
         const modal = document.createElement('div');
         modal.id = 'ind-picker-overlay';
@@ -5489,11 +5564,17 @@ const IndividualEditor = {
             <div class="ind-picker-body">
                 <div class="ind-picker-classes" id="ind-picker-cls-panel">
                     <div class="tree-panel-header" style="padding:4px 8px"><h3>Allowed Classes</h3></div>
+                    <input type="text" class="cls-picker-filter" id="ind-picker-cls-filter"
+                           placeholder="Filter classes…" autocomplete="off" spellcheck="false"
+                           oninput="IndividualEditor._pickerFilter('cls')">
                     <div id="ind-picker-cls-tree">${clsHtml}</div>
                 </div>
                 <div class="ind-picker-inds">
                     <div class="tree-panel-header" style="padding:4px 8px"><h3 id="ind-picker-cls-title">— select a class —</h3></div>
-                    <div id="ind-picker-ind-list"><div class="cls-list-empty" style="padding:8px;font-style:italic">Select a class</div></div>
+                    <input type="text" class="cls-picker-filter" id="ind-picker-ind-filter"
+                           placeholder="Filter individuals…" autocomplete="off" spellcheck="false"
+                           oninput="IndividualEditor._pickerFilter('ind')">
+                    <div id="ind-picker-ind-list"><div class="cls-list-empty" style="padding:8px;font-style:italic">Select a class or type to search</div></div>
                 </div>
             </div>
             <div class="ind-picker-ftr">
@@ -5508,6 +5589,8 @@ const IndividualEditor = {
 
         // Select the first class by default if only one range
         if (effectiveRange.length === 1) this.pickerSelectClass(effectiveRange[0]);
+        // Le filtre individus est actif dès l'ouverture (recherche globale)
+        setTimeout(() => document.getElementById('ind-picker-ind-filter')?.focus(), 0);
     },
 
     pickerSelectClass(classId) {
@@ -5522,38 +5605,78 @@ const IndividualEditor = {
         const title = document.getElementById('ind-picker-cls-title');
         if (title) title.textContent = classId;
 
-        // Lister les individuals de cette classe (et sous-classes)
-        const { childrenOf } = ClassEditor.buildTree(APP.state.classes || []);
-        const accepted = new Set();
-        const addDesc = (id) => { accepted.add(id); (childrenOf[id]||[]).forEach(c => { if(!accepted.has(c)) addDesc(c); }); };
-        addDesc(classId);
+        this._renderPickerIndList();
+    },
 
-        const matching = (APP.state.individuals || [])
-            .filter(x => x.id !== this._editingId && (x.types||[]).some(t => accepted.has(t)));
+    /** Une ligne d'individu dans le volet droit du picker (avec, en option, sa classe). */
+    _pickerIndRow(x, ctxClass, showClass) {
+        const lbl = this._resolveDisplayLabel(x, ctxClass);
+        const sub = lbl ? `<span style="font-size:10px;color:var(--text-faint);display:block">${x.id}</span>` : '';
+        const cls = showClass ? (x.types || []).find(t => this._picker.clsIds?.has(t)) : '';
+        const clsTag = cls ? `<span style="margin-left:auto;font-size:10px;color:var(--text-faint);padding-left:8px;flex-shrink:0">${cls}</span>` : '';
+        return `<div class="tree-item ind-picker-ind" data-id="${x.id}"
+                 style="padding:4px 10px;cursor:pointer;align-items:center"
+                 onclick="IndividualEditor.pickerSelectInd('${x.id}')"
+                 ondblclick="IndividualEditor.pickerSelectInd('${x.id}');IndividualEditor.confirmPicker()">
+                <span class="xsd-dot" style="margin:0 6px 0 0;flex-shrink:0"></span>
+                <span class="tree-label" style="flex:0 1 auto">${lbl || x.id}${sub}</span>${clsTag}
+            </div>`;
+    },
 
-        const listHtml = matching.length
-            ? matching.map(x => {
-                const lbl = this._resolveDisplayLabel(x, classId);
-                const sub = lbl ? `<span style="font-size:10px;color:var(--text-faint);display:block">${x.id}</span>` : '';
-                return `
-                <div class="tree-item ind-picker-ind" data-id="${x.id}"
-                     style="padding:4px 10px;cursor:pointer"
-                     onclick="IndividualEditor.pickerSelectInd('${x.id}')"
-                     ondblclick="IndividualEditor.pickerSelectInd('${x.id}');IndividualEditor.confirmPicker()">
-                    <span class="xsd-dot" style="margin:0 6px 0 0;flex-shrink:0"></span>
-                    <span class="tree-label">${lbl || x.id}${sub}</span>
-                </div>`;
-            }).join('')
-            : '<div class="cls-list-empty" style="padding:8px;font-style:italic">No individuals</div>';
-
+    /** Rend le volet droit du picker :
+     *  - filtre non vide → recherche GLOBALE sur tous les individus autorisés (toutes classes)
+     *  - filtre vide + classe sélectionnée → individus de cette classe (et sous-classes)
+     *  - sinon → invite à sélectionner/filtrer */
+    _renderPickerIndList() {
         const listEl = document.getElementById('ind-picker-ind-list');
-        if (listEl) listEl.innerHTML = listHtml;
+        if (!listEl) return;
+        const q        = (document.getElementById('ind-picker-ind-filter')?.value || '').trim().toLowerCase();
+        const clsIds   = this._picker.clsIds || new Set();
+        const selClass = this._picker.selectedClass;
+        const allInds  = (APP.state.individuals || []).filter(x => x.id !== this._editingId);
+        const matchTxt = (x) => x.id.toLowerCase().includes(q)
+            || (this._resolveDisplayLabel(x, null) || '').toLowerCase().includes(q);
 
-        // Disable OK, enable "New"
+        let html, eligible = true;
+        if (q) {
+            // Recherche globale parmi tous les individus dont la classe est autorisée
+            const found = allInds.filter(x => (x.types || []).some(t => clsIds.has(t)) && matchTxt(x));
+            html = found.length
+                ? found.map(x => this._pickerIndRow(x, null, true)).join('')
+                : '<div class="cls-list-empty" style="padding:8px;font-style:italic">No matching individual</div>';
+        } else if (selClass) {
+            const { childrenOf } = ClassEditor.buildTree(APP.state.classes || []);
+            const accepted = new Set();
+            const addDesc = (id) => { accepted.add(id); (childrenOf[id]||[]).forEach(c => { if(!accepted.has(c)) addDesc(c); }); };
+            addDesc(selClass);
+            const found = allInds.filter(x => (x.types || []).some(t => accepted.has(t)));
+            html = found.length
+                ? found.map(x => this._pickerIndRow(x, selClass, false)).join('')
+                : '<div class="cls-list-empty" style="padding:8px;font-style:italic">No individuals</div>';
+        } else {
+            html = '<div class="cls-list-empty" style="padding:8px;font-style:italic">Select a class or type to search</div>';
+            eligible = false;
+        }
+        listEl.innerHTML = html;
+        this._picker.selectedInd = null;
         const ok = document.getElementById('ind-picker-ok');
         if (ok) ok.disabled = true;
         const newBtn = document.getElementById('ind-picker-new');
-        if (newBtn) newBtn.disabled = false;
+        if (newBtn) newBtn.disabled = !selClass;
+    },
+
+    /** Filtre en direct : 'cls' masque/affiche l'arbre des classes ; 'ind' rerend la liste globale. */
+    _pickerFilter(which) {
+        if (which === 'ind') { this._renderPickerIndList(); return; }
+        const inp  = document.getElementById('ind-picker-cls-filter');
+        const list = document.getElementById('ind-picker-cls-tree');
+        if (!inp || !list) return;
+        const q = (inp.value || '').trim().toLowerCase();
+        list.querySelectorAll('.ind-picker-cls').forEach(it => {
+            const id  = (it.dataset.id  || '').toLowerCase();
+            const txt = (it.textContent || '').toLowerCase();
+            it.style.display = (!q || id.includes(q) || txt.includes(q)) ? '' : 'none';
+        });
     },
 
     pickerSelectInd(indId) {
