@@ -1787,6 +1787,8 @@ const RestrictionEditor = {
                             : '<span class="cls-dot tree-cls-dot"></span>')
                         : '<span class="restr-filler-ph"></span>'}
                     <span class="restr-filler-lbl" style="flex:0 1 auto"
+                        oncontextmenu="event.preventDefault();event.stopPropagation();RestrictionEditor.toggleFillerPicker('${gid}')"
+                        title="Right-click to pick a class"
                         ${isNavClass ? `
                             onclick="event.stopPropagation();APP.navigateTo('classes','${fv}')"
                             onmouseover="this.style.textDecoration='underline';this.style.color='var(--accent,#5f8dd3)';this.style.cursor='pointer'"

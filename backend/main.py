@@ -309,7 +309,34 @@ def update_ontology_imports(name: str, req: ImportsUpdateRequest):
     if not entry:
         raise HTTPException(404, f"Ontologie '{name}' introuvable dans le registre.")
     entry.imports = req.imports
+
+    # Instantané préfixe+nom de chaque URI importée, résolu depuis le registre
+    # courant. Permet de réafficher "plm:RoHS_Ontology" même si l'ontologie
+    # importée quitte le registre par la suite. Les anciens labels d'URIs encore
+    # importées sont conservés ; ceux des URIs retirées sont oubliés.
+    def _resolve_entry(uri: str):
+        for e in store._registry.values():
+            if e.uri == uri or e.uri.rstrip('#') == uri.rstrip('#'):
+                return e
+        return None
+
+    labels: dict = {}
+    for uri in req.imports:
+        imp = _resolve_entry(uri)
+        if imp is not None:
+            labels[uri] = {"prefix": imp.prefix, "name": imp.name}
+        elif uri in entry.import_labels:
+            labels[uri] = entry.import_labels[uri]   # conserver l'instantané existant
+    entry.import_labels = labels
+
     store._save_registry()
+    # Persister aussi dans le fichier .json si c'est l'ontologie connectée,
+    # afin que la déclaration d'import voyage avec le fichier (owl:imports).
+    onto = store.get()
+    if entry.connected and onto is not None:
+        onto.imports = list(req.imports)
+        onto.import_labels = dict(labels)
+        store.save()
     return entry.to_dict()
 
 

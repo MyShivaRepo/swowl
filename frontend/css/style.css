@@ -1697,6 +1697,22 @@ small { color: var(--text-faint); font-size: 10px; }
   text-decoration: underline;
 }
 
+/* Import non résolu dans le registre */
+.onto-import-missing code,
+.onto-import-missing span {
+  color: var(--red, #ef4444) !important;
+}
+.onto-import-warn {
+  margin-left: 6px;
+  padding: 1px 6px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--red, #ef4444);
+  border: 1px solid var(--red, #ef4444);
+  border-radius: 8px;
+  white-space: nowrap;
+}
+
 /* Badges statut connexion */
 .onto-badge {
   display: inline-flex; align-items: center; gap: 4px;
@@ -2025,6 +2041,9 @@ small { color: var(--text-faint); font-size: 10px; }
   padding: 3px 0;
 }
 .sq-dropdown.sq-dd-open .sq-dd-list { display: block; }
+/* Items du dropdown sur une seule ligne — la liste (absolute) s'élargit au contenu */
+.sq-dd-list .tree-item,
+.sq-dd-list .tree-label { white-space: nowrap; }
 .sq-dd-grp {
   padding: 5px 10px 2px;
   font-size: 10px;

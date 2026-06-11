@@ -870,15 +870,19 @@ const SparqlEditor = {
 
     // Délégation d'événement depuis la liste — trouve l'item [data-value] cliqué
     _ddListClick(ddId, event, cbName, idx) {
-        const item = event.target.closest('[data-value]');
-        if (!item) return;
-        const val = item.dataset.value;
-        document.getElementById(ddId)?.classList.remove('sq-dd-open');
-        if (cbName === 'pred') {
-            this._onPredicateChange(idx, val);          // already calls _renderDetail
-        } else if (cbName === 'obj') {
-            this._onPatField(idx, 'object', val);
-            this._renderDetail();                       // met à jour la face du dropdown
+        try {
+            const item = event.target.closest('[data-value]');
+            if (!item) return;
+            const val = item.dataset.value;
+            document.getElementById(ddId)?.classList.remove('sq-dd-open');
+            if (cbName === 'pred') {
+                this._onPredicateChange(idx, val);          // already calls _renderDetail
+            } else if (cbName === 'obj') {
+                this._onPatField(idx, 'object', val);
+                this._renderDetail();                       // met à jour la face du dropdown
+            }
+        } catch (err) {
+            console.error('[SPARQL] _ddListClick ERROR', err);
         }
     },
 
@@ -1056,9 +1060,11 @@ const SparqlEditor = {
         const editor = document.getElementById(edId);
         if (chip)   chip.style.display   = '';
         if (editor) editor.style.display = 'none';
-        // Update chip content with new input value
+        // Update chip content with new input value.
+        // For text fields, `editor` IS the <input> (edId points to it directly);
+        // for other editors the input is a descendant.
         if (chip && editor) {
-            const inp = editor.querySelector('input');
+            const inp = editor.tagName === 'INPUT' ? editor : editor.querySelector('input');
             if (inp) {
                 // Re-render chip content in-place
                 chip.innerHTML = this._atomChipHtml(inp.value);

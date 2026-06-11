@@ -270,6 +270,8 @@ class OWLOntology(BaseModel):
     id: str                    # IRI base ex: "https://example.org/my-ontology"
     name: str = ""             # Nom lisible choisi par l'utilisateur
     prefix: str = "onto"       # préfixe local
+    imports: List[str] = []    # URIs des ontologies importées (owl:imports) — voyage avec le fichier
+    import_labels: dict = Field(default_factory=dict)  # {uri: {"prefix", "name"}} instantané à la déclaration
     annotations: EntityAnnotations = Field(default_factory=EntityAnnotations)
     classes: List[OWLClass] = []
     object_properties: List[OWLObjectProperty] = []

@@ -67,7 +67,7 @@ def container_to_host(path: str) -> str:
 class RegistryEntry:
     def __init__(self, name: str, path: str, uri: str, prefix: str,
                  connected: bool = False, readonly: bool = False,
-                 imports: list = None):
+                 imports: list = None, import_labels: dict = None):
         self.name = name
         self.path = path        # chemin hôte (affiché à l'utilisateur)
         self.uri = uri
@@ -75,16 +75,20 @@ class RegistryEntry:
         self.connected = connected
         self.readonly = readonly   # True for built-in W3C ontologies
         self.imports = imports or []  # list of imported ontology URIs
+        # Instantané {uri: {"prefix", "name"}} capturé à la déclaration de l'import,
+        # pour réafficher préfixe:nom même si l'ontologie importée quitte le registre.
+        self.import_labels = import_labels or {}
 
     def to_dict(self) -> dict:
         return {
-            "name":      self.name,
-            "path":      self.path,
-            "uri":       self.uri,
-            "prefix":    self.prefix,
-            "connected": self.connected,
-            "readonly":  self.readonly,
-            "imports":   self.imports,
+            "name":          self.name,
+            "path":          self.path,
+            "uri":           self.uri,
+            "prefix":        self.prefix,
+            "connected":     self.connected,
+            "readonly":      self.readonly,
+            "imports":       self.imports,
+            "import_labels": self.import_labels,
         }
 
     @staticmethod
@@ -97,6 +101,7 @@ class RegistryEntry:
             connected=d.get("connected", False),
             readonly=d.get("readonly", False),
             imports=d.get("imports", []),
+            import_labels=d.get("import_labels", {}),
         )
 
 
@@ -240,6 +245,14 @@ class TripleStore:
             try:
                 data = json.loads(p.read_text(encoding="utf-8"))
                 self._ontology = OWLOntology.model_validate(data)
+                # Restauration : si le fichier déclare des imports mais que l'entrée
+                # registre est vide (fichier déplacé, registre réinitialisé), on
+                # repeuple le registre depuis le fichier (source de vérité portable).
+                if self._ontology.imports and not entry.imports:
+                    entry.imports = list(self._ontology.imports)
+                    if self._ontology.import_labels and not entry.import_labels:
+                        entry.import_labels = dict(self._ontology.import_labels)
+                    self._save_registry()
                 return self._ontology
             except Exception:
                 pass
@@ -270,6 +283,10 @@ class TripleStore:
         # Trouver l'entrée connectée pour connaître le path
         for entry in self._registry.values():
             if entry.connected:
+                # Le registre est la source de vérité des imports pendant l'édition :
+                # on le recopie dans l'ontologie pour qu'il soit écrit dans le .json.
+                self._ontology.imports = list(entry.imports)
+                self._ontology.import_labels = dict(entry.import_labels)
                 self._save_onto(self._ontology, entry.path)
                 return
 

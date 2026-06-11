@@ -695,13 +695,17 @@ const APP = {
             return hasOwl ? declared : [...declared, OWL_URI];
         };
 
-        // Recursively render import sub-rows with collapsible toggle
-        const renderImportRows = (uri, depth, parentPath, visited = new Set()) => {
+        // Recursively render import sub-rows with collapsible toggle.
+        // labelMap = import_labels of the parent entry (snapshot of prefix/name per uri),
+        // used as a fallback when the imported ontology is no longer in the registry.
+        const renderImportRows = (uri, depth, parentPath, labelMap = {}, visited = new Set()) => {
             if (visited.has(uri)) return '';
             visited = new Set([...visited, uri]);
             const entry      = resolveImport(uri);
-            const name       = entry ? entry.name   : uri;
-            const prefix     = entry ? entry.prefix : '';
+            const missing    = !entry;
+            const snap        = labelMap?.[uri] || null;   // {prefix, name} mémorisé
+            const name       = entry ? entry.name   : (snap ? snap.name   : uri);
+            const prefix     = entry ? entry.prefix : (snap ? snap.prefix : '');
             const subImports = effectiveImportsOf(entry);
             const hasKids    = subImports.length > 0;
             const path       = parentPath + '/' + name;
@@ -720,16 +724,17 @@ const APP = {
                 <td></td>
                 <td colspan="4" style="padding-left:${indent}px;font-size:11px;color:var(--text-dim)">
                     ${toggle}
-                    <span class="${entry ? 'onto-import-link' : ''}"
+                    <span class="${entry ? 'onto-import-link' : 'onto-import-missing'}"
                           ${entry ? `onclick="event.stopPropagation();APP._scrollToRegistryRow('${safeN}')" title="Go to ${name}"` : ''}>
-                        <code style="color:var(--text2)">${prefix ? prefix + ':' : ''}</code>
-                        <span style="font-style:italic">${name}</span>
+                        <code${missing ? '' : ` style="color:var(--text2)"`}>${prefix ? prefix + ':' : ''}</code>
+                        <span style="font-style:italic">${_escapeHtml(name)}</span>
                     </span>
+                    ${missing ? `<span class="onto-import-warn" title="Cette ontologie importée n'est pas dans le registre">⚠ Not in the registry</span>` : ''}
                 </td>
                 <td></td>
             </tr>`;
             const children = hasKids && isExpanded
-                ? subImports.map(u => renderImportRows(u, depth + 1, path, visited)).join('')
+                ? subImports.map(u => renderImportRows(u, depth + 1, path, (entry?.import_labels || {}), visited)).join('')
                 : '';
             return row + children;
         };
@@ -754,7 +759,7 @@ const APP = {
                    <button class="btn-sm" onclick="APP._ontoExportDropdown(this,'${safe}','rules')" title="Export rules">↓ Rules</button>
                    <button class="btn-sm btn-del" onclick="APP.doUnregister('${safe}')" title="Remove from registry">✕</button>`;
             // Every user ontology implicitly imports OWL (unless already declared or readonly)
-            const importRows = effectiveImportsOf(o).map(u => renderImportRows(u, 1, o.name)).join('');
+            const importRows = effectiveImportsOf(o).map(u => renderImportRows(u, 1, o.name, o.import_labels || {})).join('');
             const isSel = o.name === this._selectedOntoName;
             return `<tr data-name="${o.name}" onclick="APP.selectOntoRow('${safe}')" style="cursor:pointer"
                 class="${isConn ? 'onto-current-row' : ''}${isReadonly ? ' onto-readonly-row' : ''}${isSel ? ' onto-selected-row' : ''}">
