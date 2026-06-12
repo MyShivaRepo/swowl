@@ -415,7 +415,7 @@ Dans les deux cas, la modification est sauvegardée automatiquement si la classe
 
 Dans tous les cas, la modification est sauvegardée automatiquement.
 
-**Code source :** `owl_editor.js` → `ClassEditor` (rendu du panneau « WHERE USED IN RANGE ») — Parcourt `APP.state.objectProperties` pour collecter celles dont le `range` contient l'identifiant de la classe courante, affiche chaque propriété avec un bouton de retrait (retire la classe du `range` de la propriété via `API.updateObjectProperty()`), un bouton `+` pour ajouter une ObjectProperty existante (ajout de la classe à son `range`) et un bouton `OP` pour créer une nouvelle ObjectProperty avec `range: [classId]`.
+**Code source :** `owl_editor.js` → `ClassEditor._renderRangeUsagePanel()` (panneau « WHERE USED IN RANGE ») — Parcourt `APP.state.object_properties` pour collecter celles dont le `range` contient l'identifiant de la classe courante. Le bouton de retrait appelle `removeRangeUsage()` qui retire la classe du `range` via `API.updateOP()`. Le bouton `+` ouvre un picker (items générés par `_opTreePickerItems()`) dont la sélection appelle `addRangeUsage()` (ajout de la classe au `range` d'une OP existante via `API.updateOP()`). Le bouton `OP` appelle `createOPForClassRange()` qui crée une nouvelle ObjectProperty avec `range: [classId]` via `API.createOP()`.
 
 ---
 
@@ -425,4 +425,4 @@ Dans tous les cas, la modification est sauvegardée automatiquement.
 |---|---|
 | **Alors** | le sélecteur présente un champ `Filter` en tête et affiche les `propriétés` en mode arbre, organisées en deux sections successives — d'abord une section `ObjectProperties`, puis une section `DatatypeProperties` — chacune respectant la hiérarchie `subPropertyOf`, conformément aux sélecteurs homogènes (filtre + arbre) utilisés dans l'ensemble de l'application. |
 
-**Code source :** `owl_editor.js` → `RestrictionEditor` (rendu du picker `#restr-prop-picker`) — Construit le sélecteur avec un champ `Filter` filtrant les entrées en temps réel, et génère deux sections en arbre « ObjectProperties » puis « DatatypeProperties », chacune respectant la hiérarchie `subPropertyOf` des propriétés de l'ontologie.
+**Code source :** `owl_editor.js` → `_assertedPropPickerItems()` (contenu du picker `#restr-prop-picker`) + `RestrictionEditor.showPropPicker()` — `_assertedPropPickerItems()` génère deux sections en arbre « ObjectProperties » puis « DatatypeProperties » (chacune construite par `_propTreeLines()` selon la hiérarchie `subPropertyOf`) ; à l'ouverture, `showPropPicker()` ajoute le champ `Filter` en tête via `_decoratePickerWithFilter()`.

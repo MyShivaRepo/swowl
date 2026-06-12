@@ -274,7 +274,7 @@
 
 ---
 
-**Code source :** `sparql_editor.js` → `_objectField()` — Pour `rdf:type` : affiche un menu déroulant d'arborescence de classes via `_buildClsDd()`. Pour `rdfs:label`, `rdfs:comment` ou une Datatype Property : affiche un champ texte pleine largeur avec le placeholder `?var ou valeur littérale`. Pour les Object Properties, annotation properties ou valeurs inconnues : affiche un champ texte de 95px avec le placeholder `?var ou IRI`.
+**Code source :** `sparql_editor.js` → `_objectField()` — Pour `rdf:type` : affiche un « chip » cliquable ouvrant un picker `.cls-tree-picker` (arborescence de classes + filtre) via `_toggleClsPicker()` / `_pickType()`. Pour `rdfs:label`, `rdfs:comment` ou une Datatype Property : affiche un champ texte pleine largeur avec le placeholder `?var ou valeur littérale`. Pour les Object Properties, annotation properties ou valeurs inconnues : affiche un champ texte de 95px avec le placeholder `?var ou IRI`.
 
 ### REQ-QRY-018 — Prévisualisation SPARQL générée
 
@@ -354,4 +354,4 @@
 
 ---
 
-**Code source :** `sparql_editor.js` → `_buildClsDd()` — Le sélecteur de classe utilisé pour l'objet d'un patron `rdf:type` reprend le composant de sélection homogène : un champ `Filter` en tête et une liste de classes en mode arborescence, cohérent avec le reste de l'application.
+**Code source :** `sparql_editor.js` → `_objectField()` (branche `rdf:type`) — Affiche un « chip » cliquable suivi d'un picker `.cls-tree-picker` dont les items sont générés par `_classTreePickerItems('SparqlEditor._pickType')`. `_toggleClsPicker()` ouvre le picker et lui ajoute le champ `Filter` en tête via `_decoratePickerWithFilter()` (liste de classes en mode arborescence) ; `_pickType()` applique la classe choisie à l'objet du patron. Composant cohérent avec le reste de l'application.
