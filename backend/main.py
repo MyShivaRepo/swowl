@@ -612,6 +612,9 @@ def export_ontology_by_name(name: str, fmt: str = Query("owl", enum=["owl", "ttl
         target = current
     else:
         target = store._load_from_entry(entry)
+        # _load_from_entry a pour effet de bord d'écraser store._ontology : on restaure
+        # immédiatement l'ontologie connectée pour ne pas désynchroniser l'état.
+        store._ontology = current
         if not target:
             raise HTTPException(404, f"Fichier introuvable pour '{name}'.")
     # Export SWRL JSON
@@ -1194,6 +1197,21 @@ def get_subclass_closure():
 @app.get("/api/swrl-rules", tags=["SWRL"])
 def list_swrl_rules():
     return require_onto().swrl_rules
+
+
+class SwordImportRequest(PydanticModel):
+    text: str
+
+@app.post("/api/swrl-rules/parse-sword", tags=["SWRL"])
+def parse_sword_rules(req: SwordImportRequest):
+    """Parse un fichier SWORD et renvoie les règles SANS les sauvegarder.
+    Le frontend décide quoi créer/remplacer (gestion des collisions d'id)."""
+    from sword_parser import parse_sword
+    try:
+        rules = parse_sword(req.text)
+    except Exception as e:
+        raise HTTPException(400, f"SWORD parse error: {e}")
+    return {"rules": [r.model_dump() for r in rules]}
 
 
 @app.post("/api/swrl-rules", tags=["SWRL"], status_code=201)

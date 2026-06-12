@@ -346,12 +346,25 @@ const SparqlEditor = {
         const delBtn = `
             <button class="btn-icon btn-icon-danger" style="flex-shrink:0;padding:2px 5px;margin-left:2px"
                     onclick="SparqlEditor.deletePattern(${JSON.stringify(idx)})"
-                    title="Delete">${ClassEditor._svgDelete}</button>`;
+                    title="Delete">✕</button>`;
+
+        // Poignée de réordonnancement (comme les atomes SWRL)
+        const _isNested = Array.isArray(idx);
+        const _listKey  = _isNested ? `opt-${idx[0]}` : 'root';
+        const _pos      = _isNested ? idx[1] : idx;
+        const handle    = `<span class="sparql-drag-handle" title="Drag to reorder" draggable="true"
+                ondragstart="event.stopPropagation();SparqlEditor._patDragStart(event,'${_listKey}',${_pos})"
+                ondragend="SparqlEditor._patDragEnd()">⠿</span>`;
+        const dragAttrs = `data-patkey="${_listKey}-${_pos}"
+                ondragover="SparqlEditor._patDragOver(event,this,'${_listKey}')"
+                ondragleave="SparqlEditor._patDragLeave(this)"
+                ondrop="event.preventDefault();event.stopPropagation();SparqlEditor._patDrop(event,'${_listKey}',${_pos})"`;
 
         // ── FILTER ──
         if (p.type === 'filter') {
             return `
-            <div class="sparql-pat-row">
+            <div class="sparql-pat-row" ${dragAttrs}>
+                ${handle}
                 <span class="sparql-pat-keyword">FILTER</span>
                 <span style="color:var(--text-dim);font-size:13px;flex-shrink:0">(</span>
                 <input type="text" class="cls-id-inp sparql-filter-expr"
@@ -370,8 +383,9 @@ const SparqlEditor = {
                 this._renderPattern(ip, [idx, ii])
             ).join('');
             return `
-            <div class="sparql-pat-optional">
+            <div class="sparql-pat-optional" ${dragAttrs}>
                 <div class="sparql-opt-header">
+                    ${handle}
                     <span class="sparql-pat-keyword" style="color:var(--purple)">OPTIONAL</span>
                     <div style="display:flex;gap:4px;margin-left:auto">
                         <button class="btn-sm" style="font-size:10px"
@@ -408,7 +422,8 @@ const SparqlEditor = {
         const objField = this._objectField(p, idx);
 
         return `
-        <div class="sparql-pat-row">
+        <div class="sparql-pat-row" ${dragAttrs}>
+            ${handle}
             ${subjectField}
             <span class="sparql-pat-dot">·</span>
             ${predField}
@@ -424,12 +439,15 @@ const SparqlEditor = {
         const _objChip = 'sqchip-o-' + _idxKey;
         const _objEd   = 'sqed-o-'   + _idxKey;
 
-        // rdf:type → class tree dropdown
+        // rdf:type → picker de classe homogène (.cls-tree-picker + filtre, comme SWRL & autres onglets)
         if (p.predicate === 'rdf:type') {
-            const classes  = APP.state?.classes || [];
-            const _clsDdId = 'sqdd-o-' + _idxKey;
-            const clsDd    = this._buildClsDd(_clsDdId, p.object, classes, JSON.stringify(idx));
-            return this._atomFieldDd(p.object, _objChip, _objEd, _clsDdId, clsDd);
+            const _pickId = 'sqclspick-' + _idxKey;
+            return `<span class="sq-atom-chip" style="cursor:pointer"
+                          title="Click to select a class"
+                          onclick="event.stopPropagation();SparqlEditor._toggleClsPicker('${_pickId}',${JSON.stringify(idx)},this)">${this._atomChipHtml(p.object)}</span
+                   ><div id="${_pickId}" class="cls-tree-picker" style="display:none">
+                        ${_classTreePickerItems('SparqlEditor._pickType')}
+                   </div>`;
         }
 
         // rdfs:label / rdfs:comment / DP → littéral ou variable, pleine largeur
@@ -487,6 +505,60 @@ const SparqlEditor = {
         }
         this._saveEditing();
         this._renderDetail();
+    },
+
+    // ── Réordonnancement des triples par glisser-déposer ───────────────
+    _dragPat: { listKey: null, fromIdx: null },
+
+    /** Liste de patterns ciblée par une clé : 'root' = q.patterns ; 'opt-N' = OPTIONAL N. */
+    _patternList(listKey) {
+        const q = this._editingQuery;
+        if (!q) return null;
+        if (listKey === 'root') return q.patterns;
+        const m = /^opt-(\d+)$/.exec(listKey);
+        if (m) return q.patterns[parseInt(m[1])]?.patterns || null;
+        return null;
+    },
+
+    _patDragStart(event, listKey, pos) {
+        this._dragPat = { listKey, fromIdx: parseInt(pos) };
+        event.dataTransfer.effectAllowed = 'move';
+        const row = event.target.closest('[data-patkey]');
+        if (row) {
+            event.dataTransfer.setDragImage(row, 0, 0);
+            setTimeout(() => row.classList.add('sparql-pat-dragging'), 0);
+        }
+    },
+
+    _patDragOver(event, el, listKey) {
+        if (!this._dragPat?.listKey || this._dragPat.listKey !== listKey) return;
+        event.preventDefault();
+        event.dataTransfer.dropEffect = 'move';
+        document.querySelectorAll('.sparql-pat-drag-target').forEach(e => e.classList.remove('sparql-pat-drag-target'));
+        el.classList.add('sparql-pat-drag-target');
+    },
+
+    _patDragLeave(el) { el.classList.remove('sparql-pat-drag-target'); },
+
+    _patDrop(event, listKey, toPos) {
+        document.querySelectorAll('.sparql-pat-drag-target').forEach(e => e.classList.remove('sparql-pat-drag-target'));
+        const { listKey: fromKey, fromIdx } = this._dragPat;
+        this._dragPat = { listKey: null, fromIdx: null };
+        if (fromKey == null || fromKey !== listKey) return;
+        toPos = parseInt(toPos);
+        if (fromIdx === toPos) return;
+        const arr = this._patternList(listKey);
+        if (!Array.isArray(arr)) return;
+        const [item] = arr.splice(fromIdx, 1);
+        arr.splice(toPos, 0, item);
+        this._saveEditing();
+        this._renderDetail();
+    },
+
+    _patDragEnd() {
+        this._dragPat = { listKey: null, fromIdx: null };
+        document.querySelectorAll('.sparql-pat-drag-target').forEach(e => e.classList.remove('sparql-pat-drag-target'));
+        document.querySelectorAll('.sparql-pat-dragging').forEach(e => e.classList.remove('sparql-pat-dragging'));
     },
 
     // ── Field change handlers ──────────────────────────────────────────
@@ -849,6 +921,43 @@ const SparqlEditor = {
                         ${rows.join('')}
                     </div>
                 </div>`;
+    },
+
+    // ── Picker de classe homogène (.cls-tree-picker + filtre) pour rdf:type ─────
+    _toggleClsPicker(pickerId, idx, btn) {
+        this._clsPickIdx = idx;
+        document.querySelectorAll('[id^="sqclspick-"]').forEach(p => { if (p.id !== pickerId) p.style.display = 'none'; });
+        const el = document.getElementById(pickerId);
+        if (!el) return;
+        if (el.style.display !== 'none') { el.style.display = 'none'; return; }
+        const r = btn.getBoundingClientRect();
+        el.style.position  = 'fixed';
+        el.style.left      = Math.max(8, Math.min(r.left, window.innerWidth - 300)) + 'px';
+        el.style.top       = (r.bottom + 2) + 'px';
+        el.style.maxHeight = Math.max(160, window.innerHeight - r.bottom - 12) + 'px';
+        el.style.minWidth  = '200px';
+        el.style.maxWidth  = '440px';
+        el.style.zIndex    = '9000';
+        el.style.display   = '';
+        _decoratePickerWithFilter(el);   // filtre + liste scrollable
+        setTimeout(() => document.addEventListener('click', function close(e) {
+            if (!el.contains(e.target) && e.target !== btn) {
+                el.style.display = 'none';
+                document.removeEventListener('click', close, true);
+            }
+        }, true), 0);
+    },
+
+    /** Sélection d'une classe dans le picker rdf:type. */
+    _pickType(classId) {
+        const idx = this._clsPickIdx;
+        document.querySelectorAll('[id^="sqclspick-"]').forEach(p => p.style.display = 'none');
+        this._clsPickIdx = null;
+        if (idx == null) return;
+        const p = this._getPat(idx);
+        if (p) p.object = classId;
+        this._saveEditing();
+        this._renderDetail();
     },
 
     _ddToggle(id) {

@@ -79,6 +79,7 @@ const API = {
     createSWRLRule:   (r)     => API._fetch('POST',   '/swrl-rules', r),
     updateSWRLRule:   (id, r) => API._fetch('PUT',    `/swrl-rules/${id}`, r),
     deleteSWRLRule:   (id)    => API._fetch('DELETE', `/swrl-rules/${id}`),
+    parseSwordRules:  (text)  => API._fetch('POST',   '/swrl-rules/parse-sword', { text }),
 
     // ── Queries ────────────────────────────────────────
     createQuery:   (q)     => API._fetch('POST',   '/queries', q),

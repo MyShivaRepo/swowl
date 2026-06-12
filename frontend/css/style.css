@@ -963,7 +963,8 @@ body.h-resizing * {
 }
 /* alignment placeholder when no class (same size as cls-dot) */
 .restr-filler-ph { width: 12px; height: 12px; display: inline-block; flex-shrink: 0; }
-.cls-list-lbl { flex: 1; cursor: pointer; }
+.cls-list-lbl { flex: 0 1 auto; min-width: 0; cursor: pointer;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cls-list-lbl:hover { color: var(--accent); text-decoration: underline; }
 .cls-list-empty { font-size: 11px; color: var(--text-dim); font-style: italic; padding: 3px 4px; }
 .cls-picker { width: 100%; font-size: 11px; margin-top: 4px; }
@@ -988,17 +989,18 @@ body.h-resizing * {
 .btn-ftool:hover { background: var(--accent,#5f8dd3); color: #fff; border-color: var(--accent,#5f8dd3); }
 .btn-ftool svg   { display: block; }
 .btn-frame-del {
-  width: 14px; height: 14px;
+  width: 16px; height: 16px;
   padding: 0;
   border: none;
+  border-radius: 3px;
   background: transparent;
-  color: var(--text-dim);
+  color: #ff4455;
   cursor: pointer;
-  font-size: 10px;
+  font-size: 12px;
   line-height: 1;
   flex-shrink: 0;
 }
-.btn-frame-del:hover { color: #dc3545; }
+.btn-frame-del:hover { background: rgba(255, 68, 85, .15); }
 
 /* ── RestrictionEditor — Protégé-style tree ──────────────── */
 .restr-panel { display: flex; flex-direction: column; }
@@ -2041,6 +2043,19 @@ small { color: var(--text-faint); font-size: 10px; }
 .sparql-pat-row:hover {
   border-color: var(--border2);
 }
+/* Poignée de réordonnancement des triples (comme les atomes SWRL) */
+.sparql-drag-handle {
+  cursor: grab; color: var(--text-faint); font-size: 12px;
+  flex-shrink: 0; padding: 0 2px; user-select: none; line-height: 1;
+}
+.sparql-drag-handle:active { cursor: grabbing; }
+.sparql-pat-row.sparql-pat-drag-target,
+.sparql-pat-optional.sparql-pat-drag-target {
+  border-color: var(--accent, #5f8dd3) !important;
+  background: rgba(95,141,211,.10);
+  outline: 1px dashed var(--accent, #5f8dd3); outline-offset: 1px;
+}
+.sparql-pat-dragging { opacity: 0.4; outline: 1px dashed var(--accent, #5f8dd3); outline-offset: 1px; }
 .sparql-pat-optional {
   border-radius: 5px;
   overflow: hidden;

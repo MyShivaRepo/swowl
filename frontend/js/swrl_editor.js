@@ -51,7 +51,10 @@ const SWRLEditor = {
             <div class="tree-panel" id="swrl-list-panel" style="display:flex;flex-direction:column">
                 <div class="tree-panel-header">
                     <h3>SWRL Rules</h3>
-                    <button class="btn-sm" onclick="SWRLEditor.newRule()" title="New SWRL rule">➕</button>
+                    <div style="display:flex;gap:4px;align-items:center;flex-shrink:0">
+                        <button class="btn-sm" onclick="SWRLEditor.importRules()" title="Import rules from a .sword file">📥</button>
+                        <button class="btn-sm" onclick="SWRLEditor.newRule()" title="New SWRL rule">➕</button>
+                    </div>
                 </div>
                 <div class="tree-scroll" id="swrl-list" style="flex:1">${this.renderList(rules)}</div>
                 <div style="padding:6px 8px;border-top:1px solid var(--border);flex-shrink:0">
@@ -200,6 +203,70 @@ const SWRLEditor = {
         } catch (e) { UI.error(e.message); }
     },
 
+    // ── Import de règles depuis un fichier .sword ─────────────────
+    importRules() {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.sword,text/plain';
+        input.onchange = async () => {
+            const file = input.files && input.files[0];
+            if (!file) return;
+            let rules;
+            try {
+                const text = await file.text();
+                const res  = await API.parseSwordRules(text);
+                rules = (res && res.rules) || [];
+            } catch (e) { UI.error('Import failed: ' + e.message); return; }
+            if (!rules.length) { UI.warn('No SWRL rule found in this file.'); return; }
+
+            const existing = new Set((APP.state.swrl_rules || []).map(r => r.id));
+            let added = 0, replaced = 0, kept = 0, cancelled = false;
+            for (const rule of rules) {
+                if (existing.has(rule.id)) {
+                    const choice = await this._askRuleCollision(rule.id);
+                    if (choice === 'cancel') { cancelled = true; break; }
+                    if (choice === 'keep')   { kept++; continue; }
+                    try { await API.updateSWRLRule(rule.id, rule); replaced++; } catch (_) {}
+                } else {
+                    try { await API.createSWRLRule(rule); existing.add(rule.id); added++; } catch (_) {}
+                }
+            }
+            await APP.refresh();
+            APP.renderSection('swrl-rules');
+            const parts = [];
+            if (added)    parts.push(`${added} added`);
+            if (replaced) parts.push(`${replaced} replaced`);
+            if (kept)     parts.push(`${kept} kept`);
+            UI.success(`Import ${cancelled ? '(cancelled) ' : ''}: ${parts.join(', ') || 'nothing changed'}.`);
+        };
+        input.click();
+    },
+
+    /** Dialogue de collision d'id : 'replace' | 'keep' | 'cancel'. */
+    _askRuleCollision(ruleId) {
+        return new Promise(resolve => {
+            document.getElementById('ui-modal-overlay')?.remove();
+            const overlay = document.createElement('div');
+            overlay.id = 'ui-modal-overlay';
+            overlay.innerHTML = `
+                <div class="ui-modal">
+                    <div class="ui-modal-body">A rule named <strong>${_escapeHtml(ruleId)}</strong> already exists.<br>
+                        <small style="color:var(--text-dim)">Import the new rule (replace) or keep the existing one?</small></div>
+                    <div class="ui-modal-actions">
+                        <button class="btn-edit"      id="rc-import">Import new</button>
+                        <button class="btn-secondary" id="rc-keep">Keep existing</button>
+                        <button class="btn-secondary" id="rc-cancel">Cancel</button>
+                    </div>
+                </div>`;
+            document.body.appendChild(overlay);
+            const close = (r) => { overlay.remove(); resolve(r); };
+            document.getElementById('rc-import').onclick = () => close('replace');
+            document.getElementById('rc-keep').onclick   = () => close('keep');
+            document.getElementById('rc-cancel').onclick = () => close('cancel');
+            overlay.addEventListener('mousedown', e => { if (e.target === overlay) close('cancel'); });
+        });
+    },
+
     _renderDetail() {
         const detail = document.getElementById('swrl-detail');
         if (!detail) return;
@@ -317,7 +384,7 @@ const SWRLEditor = {
                   ondragstart="event.stopPropagation();SWRLEditor.onDragStart(event,'${listPath}',${idx})"
                   ondragend="SWRLEditor.onDragEnd()">⠿</span>` : '';
 
-        const del = `<button class="btn-frame-del" style="flex-shrink:0;margin-left:auto"
+        const del = `<button class="btn-icon btn-icon-danger" style="flex-shrink:0;margin-left:2px;padding:2px 5px"
                              onclick="SWRLEditor.removeAtom('${path}')">✕</button>`;
         const chg = `onchange="SWRLEditor.updateField('${path}',this.dataset.field,this.value)"`;
 
@@ -333,8 +400,8 @@ const SWRLEditor = {
                     <input class="swrl-var" value="${atom.var||''}" placeholder="?var"
                            data-field="var" ${chg}>
                     <span class="swrl-kw">is a</span>
-                    <div style="position:relative;flex:1;min-width:0">
-                        <div class="tree-item restr-filler-btn" style="margin:0;padding:2px 6px;cursor:pointer"
+                    <div style="position:relative;flex:0 1 auto;min-width:80px">
+                        <div class="tree-item restr-filler-btn" style="margin:0;padding:2px 6px;cursor:pointer;width:max-content;max-width:200px"
                              title="${clsId ? 'Left-click: navigate · Right-click: change class' : 'Click to select a class'}"
                              onclick="${clsId && clsExists ? '' : `SWRLEditor.toggleClassPicker('${pickerId}','${path}',this)`}"
                              oncontextmenu="event.preventDefault();SWRLEditor.toggleClassPicker('${pickerId}','${path}',this)">
@@ -389,7 +456,7 @@ const SWRLEditor = {
                         <div id="${propPickId}" class="cls-tree-picker" style="display:none"></div>
                     </div>
                     <input class="swrl-inp" value="${atom.object||''}" placeholder="?obj / ?_"
-                           data-field="object" ${chg} style="width:60px;flex-shrink:0">
+                           data-field="object" ${chg} style="width:70px;flex:none">
                     ${del}
                 </div>`;
             }
@@ -404,7 +471,7 @@ const SWRLEditor = {
 
                 // Champ valeur : si individu connu → pill navigable, sinon input texte
                 const valueField = isInd
-                    ? `<div class="tree-item restr-filler-btn" style="flex:1;min-width:0;margin:0;padding:2px 6px;cursor:default"
+                    ? `<div class="tree-item restr-filler-btn" style="width:180px;flex-shrink:0;margin:0;padding:2px 6px;cursor:default"
                             title="Left-click: navigate · Right-click: open picker"
                             oncontextmenu="event.preventDefault();SWRLEditor.openIndPicker('${path}')">
                            <span class="xsd-dot" style="flex-shrink:0;margin-right:4px"></span>
@@ -415,7 +482,7 @@ const SWRLEditor = {
                                  title="${atom.value}">${IndividualEditor._labelForId(atom.value)}</span>
                        </div>`
                     : `<input class="swrl-inp" value="${atom.value||''}" placeholder="individual, variable or value"
-                              data-field="value" ${chg} style="flex:1;min-width:0">`;
+                              data-field="value" ${chg} style="width:180px;flex:none">`;
 
                 return `<div class="swrl-atom" data-path="${path}" ${dragAttrs}>
                     ${handle}
@@ -426,9 +493,9 @@ const SWRLEditor = {
                             style="width:46px;flex-shrink:0;background:var(--bg3);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:1px 2px;font-size:11px;font-family:var(--font-mono);height:20px">
                         ${opSel}
                     </select>
-                    <div style="flex:1;min-width:0;display:flex;gap:2px">
+                    <div style="flex:0 1 auto;display:flex;gap:2px">
                         ${valueField}
-                        <button class="btn-frame-del" style="flex-shrink:0;padding:1px 4px;background:var(--bg3);border-color:var(--border)"
+                        <button class="btn-icon" style="flex-shrink:0;padding:1px 4px;background:var(--bg3);border:1px solid var(--border);border-radius:3px"
                                 title="Pick an individual"
                                 onclick="SWRLEditor.openIndPicker('${path}')">
                             <span class="xsd-dot" style="pointer-events:none"></span>
@@ -452,7 +519,7 @@ const SWRLEditor = {
                                     onclick="SWRLEditor.addAtom('${path},atoms','property_atom')">${ico}&thinsp;Property</button>
                             <button class="btn-ftool" style="font-size:9px" title="Add equality"
                                     onclick="SWRLEditor.addAtom('${path},atoms','equality_atom')">${ico}&thinsp;=</button>
-                            <button class="btn-frame-del" style="flex-shrink:0;margin-left:4px"
+                            <button class="btn-icon btn-icon-danger" style="flex-shrink:0;margin-left:4px;padding:2px 5px"
                                     onclick="SWRLEditor.removeAtom('${path}')">✕</button>
                         </div>
                     </div>
@@ -555,6 +622,9 @@ const SWRLEditor = {
 
         this._positionDropdown(el, btn);
         el.style.display = '';
+        _decoratePickerWithFilter(el);   // champ filtre + liste scrollable (comme les autres onglets)
+        // Le picker se dimensionne au contenu (IDs complets) ; scroll interne via .cls-picker-list
+        el.style.width = ''; el.style.minWidth = '200px'; el.style.maxWidth = '440px'; el.style.overflowY = '';
 
         const close = (e) => {
             if (!el.contains(e.target) && e.target !== btn) {
@@ -624,29 +694,27 @@ const SWRLEditor = {
         const visible = el.style.display !== 'none';
         if (visible) { el.style.display = 'none'; return; }
 
-        // Build the picker content with icons
+        // Picker en arbre : section ObjectProperties puis DatatypeProperties (homogène)
         const ops = APP.state.object_properties  || [];
         const dps = APP.state.datatype_properties || [];
-        const alpha = (a, b) => a.id.localeCompare(b.id);
-        const opItems = [...ops].sort(alpha).map(p =>
-            `<div class="tree-item" data-id="${p.id}" style="padding:3px 8px"
-                  onclick="SWRLEditor.onPropPickerSelect('${p.id}')">
-                <span class="op-prop-dot" style="flex-shrink:0;margin-right:5px"></span>
-                <span class="tree-label">${p.id}</span>
-             </div>`).join('');
-        const dpItems = [...dps].sort(alpha).map(p =>
-            `<div class="tree-item" data-id="${p.id}" style="padding:3px 8px"
-                  onclick="SWRLEditor.onPropPickerSelect('${p.id}')">
-                <span class="dp-prop-dot" style="flex-shrink:0;margin-right:5px"></span>
-                <span class="tree-label">${p.id}</span>
-             </div>`).join('');
-        const sep = (opItems && dpItems)
-            ? `<div style="border-top:1px solid var(--border);margin:2px 0"></div>` : '';
-        el.innerHTML = opItems + sep + dpItems ||
-            '<div class="cls-list-empty" style="padding:6px">No properties</div>';
+        const noExcl = new Set();
+        const hdr = (txt, dot) => `<div class="picker-section-hdr"
+            style="padding:5px 8px 2px;font-size:10px;font-weight:600;color:var(--text-dim);
+                   letter-spacing:.05em;user-select:none;display:flex;align-items:center;gap:5px">
+            <span class="${dot}" style="flex-shrink:0"></span>${txt}</div>`;
+        const empty = '<div class="cls-list-empty" style="padding:3px 8px;font-size:11px;font-style:italic;color:var(--text-faint)">—</div>';
+        const opLines = _propTreeLines(ops, noExcl, 'op-prop-dot', 'SWRLEditor.onPropPickerSelect');
+        const dpLines = _propTreeLines(dps, noExcl, 'dp-prop-dot', 'SWRLEditor.onPropPickerSelect');
+        el.innerHTML = (ops.length || dps.length)
+            ? hdr('ObjectProperties', 'op-prop-dot') + (opLines || empty)
+            + hdr('DatatypeProperties', 'dp-prop-dot') + (dpLines || empty)
+            : '<div class="cls-list-empty" style="padding:6px">No properties</div>';
 
         this._positionDropdown(el, btn);
         el.style.display = '';
+        _decoratePickerWithFilter(el);   // champ filtre + liste scrollable (comme les autres onglets)
+        // Le picker se dimensionne au contenu (IDs complets) ; scroll interne via .cls-picker-list
+        el.style.width = ''; el.style.minWidth = '200px'; el.style.maxWidth = '440px'; el.style.overflowY = '';
 
         const close = (e) => {
             if (!el.contains(e.target) && e.target !== btn) {

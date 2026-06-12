@@ -123,6 +123,53 @@ function _opTreePickerItems(onSelectExpr, excludeIds = []) {
     return lines.join('') || '<div class="cls-list-empty" style="padding:4px 8px">—</div>';
 }
 
+/** Lignes d'arbre pour une liste de propriétés (OP ou DP), via subPropertyOf.
+ *  Les éléments exclus ne sont pas affichés mais leurs enfants le sont. */
+function _propTreeLines(props, excluded, dotCls, callExpr) {
+    const allIds     = new Set(props.map(p => p.id));
+    const childrenOf = {};
+    props.forEach(p => { childrenOf[p.id] = []; });
+    const hasParent = new Set();
+    props.forEach(p => {
+        [...new Set((p.subPropertyOf || []).filter(s => typeof s === 'string' && allIds.has(s)))]
+            .forEach(par => { childrenOf[par].push(p.id); hasParent.add(p.id); });
+    });
+    const alpha = (a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' });
+    const roots = props.filter(p => !hasParent.has(p.id)).map(p => p.id).sort(alpha);
+    Object.keys(childrenOf).forEach(id => childrenOf[id].sort(alpha));
+    const lines = [];
+    const visit = (id, depth) => {
+        if (!excluded.has(id)) {
+            const pl = depth * 16 + 6;
+            lines.push(`<div class="tree-item restr-prop-item" data-id="${id}"
+                style="padding:3px 8px;padding-left:${pl}px" onclick="${callExpr}('${id}')">
+                <span class="${dotCls}" style="flex-shrink:0"></span>
+                <span class="tree-label" style="margin-left:4px">${id}</span>
+            </div>`);
+        }
+        (childrenOf[id] || []).forEach(c => visit(c, depth + 1));
+    };
+    roots.forEach(id => visit(id, 1));
+    return lines.join('');
+}
+
+/** Picker "Asserted Properties" : section ObjectProperties (arbre) puis
+ *  section DatatypeProperties (arbre). excludeIds = propriétés déjà posées. */
+function _assertedPropPickerItems(excludeIds = []) {
+    const excluded = new Set(excludeIds);
+    const ops = APP.state.object_properties   || [];
+    const dps = APP.state.datatype_properties || [];
+    const hdr = (txt, dot) => `<div class="picker-section-hdr"
+        style="padding:5px 8px 2px;font-size:10px;font-weight:600;color:var(--text-dim);
+               letter-spacing:.05em;user-select:none;display:flex;align-items:center;gap:5px">
+        <span class="${dot}" style="flex-shrink:0"></span>${txt}</div>`;
+    const empty = '<div class="cls-list-empty" style="padding:3px 8px;font-size:11px;font-style:italic;color:var(--text-faint)">—</div>';
+    const opLines = _propTreeLines(ops, excluded, 'op-prop-dot', 'RestrictionEditor.addProperty');
+    const dpLines = _propTreeLines(dps, excluded, 'dp-prop-dot', 'RestrictionEditor.addProperty');
+    return hdr('ObjectProperties', 'op-prop-dot') + (opLines || empty)
+         + hdr('DatatypeProperties', 'dp-prop-dot') + (dpLines || empty);
+}
+
 /** Class picker items — same structure as the Asserted Hierarchy */
 /** Individus dont la classe (en propre, types directs) contient classId. */
 function _individualsOfClass(classId) {
@@ -1739,21 +1786,8 @@ const RestrictionEditor = {
         // ── "Asserted" section ────────────────────────────────
         const groups  = this._group(restrictions);
         const propIds = Object.keys(groups).sort(alpha);
-        const _allProps = [
-            ...(APP.state.object_properties   || []),
-            ...(APP.state.datatype_properties || []),
-        ].sort((a, b) => alpha(a.id, b.id));
-        const opIds     = new Set((APP.state.object_properties || []).map(p => p.id));
-        const availProps = _allProps
-            .filter(p => !propIds.includes(p.id))
-            .map(p => {
-                const dotCls = opIds.has(p.id) ? 'op-prop-dot' : 'dp-prop-dot';
-                return `<div class="tree-item restr-prop-item" data-id="${p.id}"
-                    style="padding:3px 8px" onclick="RestrictionEditor.addProperty('${p.id}')">
-                    <span class="${dotCls}" style="flex-shrink:0"></span>
-                    <span class="tree-label" style="margin-left:4px">${p.id}</span>
-                </div>`;
-            }).join('');
+        // Picker en arbre : section ObjectProperties puis DatatypeProperties (+ filtre à l'ouverture)
+        const availProps = _assertedPropPickerItems(propIds);
 
         // ── "Inherited" section ───────────────────────────────
         const inherited  = cls ? this._computeInherited(cls) : [];
@@ -2013,7 +2047,7 @@ const RestrictionEditor = {
                       onclick="event.stopPropagation();APP.navigateTo('${navSection}','${prop}')">${prop}</span>
                 ${rangeChip}
                 ${summary ? `<span class="restr-prop-summary">(${summary})</span>` : ''}
-                <button class="btn-frame-del" style="margin-left:auto"
+                <button class="btn-frame-del" style="margin-left:2px"
                         onclick="event.stopPropagation();RestrictionEditor.deleteProp('${prop}')">✕</button>
             </div>
             <div class="restr-children">
@@ -2055,7 +2089,7 @@ const RestrictionEditor = {
         const v = el.style.display !== 'none';
         el.style.display = v ? 'none' : '';
         if (!v) {
-            el.focus();
+            _decoratePickerWithFilter(el);   // champ filtre + liste scrollable (homogène)
             // Fermer si clic en dehors du picker
             const _close = (e) => {
                 if (!el.contains(e.target) && !e.target.closest('[onclick*="showPropPicker"]')) {
@@ -5270,7 +5304,7 @@ const IndividualEditor = {
                 return `
                 <div class="ind-prop-row" data-id="${a.target}" style="display:flex;align-items:center;gap:4px;padding:2px 4px">
                     <span class="xsd-dot" style="flex-shrink:0;margin:0"></span>
-                    <span class="ind-op-label" style="flex:1;font-size:12px;font-family:var(--font-mono);cursor:pointer"
+                    <span class="ind-op-label" style="flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;font-family:var(--font-mono);cursor:pointer"
                           onclick="APP.navigateTo('individuals','${a.target}')"
                           onmouseover="this.style.textDecoration='underline';this.style.color='var(--accent,#5f8dd3)'"
                           onmouseout="this.style.textDecoration='';this.style.color=''">${lbl}${sub}</span>
@@ -5830,7 +5864,7 @@ const IndividualEditor = {
             const selSub = selLbl !== selectedInd ? `<span style="font-size:10px;color:var(--text-dim);display:block">${selectedInd}</span>` : '';
             row.innerHTML = `
                 <span class="xsd-dot" style="flex-shrink:0;margin:0"></span>
-                <span class="ind-op-label" style="flex:1;font-size:12px;font-family:var(--font-mono);cursor:pointer"
+                <span class="ind-op-label" style="flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;font-family:var(--font-mono);cursor:pointer"
                       onclick="APP.navigateTo('individuals','${selectedInd}')"
                       onmouseover="this.style.textDecoration='underline';this.style.color='var(--accent,#5f8dd3)'"
                       onmouseout="this.style.textDecoration='';this.style.color=''">${selLbl}${selSub}</span>
