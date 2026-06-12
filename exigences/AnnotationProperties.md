@@ -19,6 +19,7 @@
 - [REQ-AP-012 — Suppression d'une propriété utilisateur avec confirmation](#req-ap-012--suppression-dune-propriété-utilisateur-avec-confirmation)
 - [REQ-AP-013 — Collecte des annotations (labels, commentaires, autres)](#req-ap-013--collecte-des-annotations-labels-commentaires-autres)
 - [REQ-AP-014 — Picker de sélection de `AnnotationProperty`](#req-ap-014--picker-de-sélection-de-propriété-dannotation)
+- [REQ-AP-028 — Définition des `AnnotationProperty` SKOS intégrées (built-ins)](#req-ap-028--définition-des-propriétés-dannotation-skos-intégrées-built-ins)
 
 ### Forme
 - [REQ-AP-015 — Rendu des nœuds built-in dans l'arbre](#req-ap-015--rendu-des-nœuds-built-in-dans-larbre)
@@ -34,6 +35,7 @@
 - [REQ-AP-025 — Formulaire d'édition d'une propriété utilisateur](#req-ap-025--formulaire-dédition-dune-propriété-utilisateur)
 - [REQ-AP-026 — Ajout d'une ligne d'annotation dans le formulaire](#req-ap-026--ajout-dune-ligne-dannotation-dans-le-formulaire)
 - [REQ-AP-027 — Panneau des super-propriétés avec chaîne d'héritage](#req-ap-027--panneau-des-super-propriétés-avec-chaîne-dhéritage)
+- [REQ-AP-029 — Picker groupé par namespace avec filtre](#req-ap-029--picker-groupé-par-namespace-avec-filtre)
 
 ---
 
@@ -182,6 +184,16 @@
 
 **Code source :** `owl_editor.js` → `_annoPickerItems(editorName)` — Génère un arbre HTML cliquable composé des propriétés `AP_BUILTINS` et des propriétés utilisateur issues de `APEditor._buildUserTree()`. Un clic sur un élément déclenche `<editorName>.addOtherAnnotRow(id)`.
 
+### REQ-AP-028 — Définition des `AnnotationProperty` SKOS intégrées (built-ins)
+
+| **Si** | l'ontologiste exploite des `AnnotationProperty` SKOS dans son `ontologie`, |
+|---|---|
+| **Alors** | l'application reconnaît nativement, aux côtés des groupes `rdfs:` et `owl:`, un troisième groupe de `AnnotationProperty` prédéfinies en lecture seule :<br>- le groupe `skos:` : `skos:prefLabel`, `skos:altLabel`, `skos:hiddenLabel`, `skos:definition`, `skos:note`, `skos:scopeNote`, `skos:example`, `skos:editorialNote`, `skos:historyNote`, `skos:changeNote`<br>chacune accompagnée d'une description en anglais accessible à l'utilisateur. Ces `AnnotationProperty` se comportent comme les autres built-ins : elles apparaissent dans l'arbre, peuvent être utilisées pour annoter des entités, et leurs valeurs sont importées depuis les `ontologies` qui les emploient. |
+
+---
+
+**Code source :** `owl_editor.js` → `AP_BUILTINS` (constante objet) — Définit un troisième tableau indexé par le namespace `'skos:'`, chaque entrée portant un champ `id` (IRI courte) et un champ `comment` (description textuelle). Pris en compte au même titre que `'rdfs:'` et `'owl:'` par `_isBuiltin()`, `_renderBuiltinNode()`, `_renderRootDetail()`, `_renderBuiltinDetail()` et `_annoPickerItems()`.
+
 ## 2. Forme — Présentation et interface utilisateur
 
 > Exigences relatives à l'affichage : layout, composants visuels, interactions, navigation, styles.
@@ -314,4 +326,14 @@
 
 ---
 
-**Code source :** `owl_editor.js` → `APEditor._updateSuperPanel()` — Met à jour le conteneur `ap-super-list`. Pour chaque parent direct, appelle `buildChain(id)` qui remonte récursivement les `subPropertyOf` jusqu'à la racine, ajoute la racine de namespace (`'rdfs:'` ou `'owl:'`) en fin de chaîne, et rend chaque ancêtre avec `padding-left` croissant et un lien `onclick="APP.navigateTo()"`.
+**Code source :** `owl_editor.js` → `APEditor._updateSuperPanel()` — Met à jour le conteneur `ap-super-list`. Pour chaque parent direct, appelle `buildChain(id)` qui remonte récursivement les `subPropertyOf` jusqu'à la racine, ajoute la racine de namespace (`'rdfs:'`, `'owl:'` ou `'skos:'`) en fin de chaîne, et rend chaque ancêtre avec `padding-left` croissant et un lien `onclick="APP.navigateTo()"`.
+
+### REQ-AP-029 — Picker groupé par namespace avec filtre
+
+| **Si** | l'ontologiste ouvre le sélecteur pour ajouter une annotation à l'aide d'une `AnnotationProperty`, |
+|---|---|
+| **Alors** | le picker présente les `AnnotationProperty` intégrées regroupées par namespace (`rdfs:`, `owl:`, `skos:`) sous forme d'arbre, surmonté d'un champ `Filter` permettant de restreindre la liste affichée — de façon cohérente avec les pickers homogènes utilisés dans l'ensemble de l'application. |
+
+---
+
+**Code source :** `owl_editor.js` → `_annoPickerItems(editorName)` — Construit l'arbre cliquable des `AnnotationProperty` intégrées (`AP_BUILTINS`) regroupées par racine de namespace (`rdfs:`, `owl:`, `skos:`) puis des propriétés utilisateur, et expose un champ `Filter` en tête du picker pour filtrer dynamiquement les éléments affichés.

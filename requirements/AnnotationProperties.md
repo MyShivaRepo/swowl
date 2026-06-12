@@ -19,6 +19,7 @@
 - [REQ-AP-012 — Deletion of a user property with confirmation](#req-ap-012--deletion-of-a-user-property-with-confirmation)
 - [REQ-AP-013 — Collection of annotations (labels, comments, others)](#req-ap-013--collection-of-annotations-labels-comments-others)
 - [REQ-AP-014 — Annotation property selection picker](#req-ap-014--annotation-property-selection-picker)
+- [REQ-AP-028 — Definition of built-in SKOS annotation properties](#req-ap-028--definition-of-built-in-skos-annotation-properties)
 
 ### Form
 - [REQ-AP-015 — Rendering of built-in nodes in the tree](#req-ap-015--rendering-of-built-in-nodes-in-the-tree)
@@ -34,6 +35,7 @@
 - [REQ-AP-025 — Edit form for a user-defined property](#req-ap-025--edit-form-for-a-user-defined-property)
 - [REQ-AP-026 — Adding an annotation row in the form](#req-ap-026--adding-an-annotation-row-in-the-form)
 - [REQ-AP-027 — Super-properties panel with inheritance chain](#req-ap-027--super-properties-panel-with-inheritance-chain)
+- [REQ-AP-029 — Namespace-grouped picker with filter](#req-ap-029--namespace-grouped-picker-with-filter)
 
 ---
 
@@ -182,6 +184,16 @@
 
 **Source code:** `owl_editor.js` → `_annoPickerItems(editorName)` — Generates a clickable HTML tree composed of `AP_BUILTINS` properties and user properties from `APEditor._buildUserTree()`. A click on an item triggers `<editorName>.addOtherAnnotRow(id)`.
 
+### REQ-AP-028 — Definition of built-in SKOS annotation properties
+
+| **If** | the ontologist uses SKOS `annotation `AnnotationProperties` in their `ontology`, |
+|---|---|
+| **Then** | the application natively recognizes, alongside the `rdfs:` and `owl:` groups, a third group of predefined read-only `annotation `AnnotationProperties`:<br>- the `skos:` group: `skos:prefLabel`, `skos:altLabel`, `skos:hiddenLabel`, `skos:definition`, `skos:note`, `skos:scopeNote`, `skos:example`, `skos:editorialNote`, `skos:historyNote`, `skos:changeNote`<br>each accompanied by an English description accessible to the user. These `AnnotationProperties` behave like the other built-ins: they appear in the tree, can be used to annotate entities, and their values are imported from `ontologies` that use them. |
+
+---
+
+**Source code:** `owl_editor.js` → `AP_BUILTINS` (object constant) — Defines a third array indexed by the namespace `'skos:'`, each entry carrying an `id` field (short IRI) and a `comment` field (textual description). Handled on the same footing as `'rdfs:'` and `'owl:'` by `_isBuiltin()`, `_renderBuiltinNode()`, `_renderRootDetail()`, `_renderBuiltinDetail()` and `_annoPickerItems()`.
+
 ## 2. Form — Presentation and UI
 
 > Requirements relating to display: layout, visual components, interactions, navigation, styles.
@@ -314,4 +326,14 @@
 
 ---
 
-**Source code:** `owl_editor.js` → `APEditor._updateSuperPanel()` — Updates the `ap-super-list` container. For each direct parent, calls `buildChain(id)` which recursively traverses `subPropertyOf` up to the root, appends the namespace root (`'rdfs:'` or `'owl:'`) at the end of the chain, and renders each ancestor with increasing `padding-left` and an `onclick="APP.navigateTo()"` link.
+**Source code:** `owl_editor.js` → `APEditor._updateSuperPanel()` — Updates the `ap-super-list` container. For each direct parent, calls `buildChain(id)` which recursively traverses `subPropertyOf` up to the root, appends the namespace root (`'rdfs:'`, `'owl:'` or `'skos:'`) at the end of the chain, and renders each ancestor with increasing `padding-left` and an `onclick="APP.navigateTo()"` link.
+
+### REQ-AP-029 — Namespace-grouped picker with filter
+
+| **If** | the ontologist opens the selector to add an annotation using an `annotation `AnnotationProperty`, |
+|---|---|
+| **Then** | the picker presents the built-in `annotation `AnnotationProperties` grouped by namespace (`rdfs:`, `owl:`, `skos:`) as a tree, topped by a `Filter` field allowing the displayed list to be narrowed down — consistent with the homogeneous pickers used across the application. |
+
+---
+
+**Source code:** `owl_editor.js` → `_annoPickerItems(editorName)` — Builds the clickable tree of built-in `annotation `AnnotationProperties` (`AP_BUILTINS`) grouped by namespace root (`rdfs:`, `owl:`, `skos:`) followed by user properties, and exposes a `Filter` field at the top of the picker to dynamically filter the displayed items.

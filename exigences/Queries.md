@@ -33,6 +33,9 @@
 - [REQ-QRY-023 — Navigation vers une entité depuis les résultats](#req-qry-023--navigation-vers-une-entité-depuis-les-résultats)
 - [REQ-QRY-024 — Lien externe pour les URIs non reconnues dans les résultats](#req-qry-024--lien-externe-pour-les-uris-non-reconnues-dans-les-résultats)
 - [REQ-QRY-025 — Redimensionnement du panneau liste](#req-qry-025--redimensionnement-du-panneau-liste)
+- [REQ-QRY-027 — Suppression d'un patron via une croix rouge](#req-qry-027--suppression-dun-patron-via-une-croix-rouge)
+- [REQ-QRY-028 — Réordonnancement des patrons par glisser-déposer](#req-qry-028--réordonnancement-des-patrons-par-glisser-déposer)
+- [REQ-QRY-029 — Sélecteur de classe homogène pour les objets `rdf:type`](#req-qry-029--sélecteur-de-classe-homogène-pour-les-objets-rdftype)
 
 ---
 
@@ -322,3 +325,33 @@
 ---
 
 **Code source :** `sparql_editor.js` → `_initSplitHandle()` — Contraint la largeur du panneau `sparql-list-panel` entre 120 px et 400 px, ajoute la classe CSS `resizing` au `body` pendant toute la durée du glissement et la supprime à la fin ; les écouteurs `mousedown`/`mousemove`/`mouseup` ne sont attachés qu'une seule fois (flag `_bound`).
+
+### REQ-QRY-027 — Suppression d'un patron via une croix rouge
+
+| **Si** | l'utilisateur souhaite supprimer un patron triple, FILTER ou OPTIONAL (racine ou imbriqué), |
+|---|---|
+| **Alors** | il dispose d'un contrôle de suppression sous la forme d'une **croix rouge ✕**, positionné juste après l'élément qu'il supprime ; ce contrôle remplace l'ancienne icône de corbeille et est homogène avec le reste de l'application. |
+
+---
+
+**Code source :** `sparql_editor.js` → `_renderPattern()`, `deletePattern()` — Chaque ligne de patron affiche un bouton de suppression en croix rouge `✕` placé après l'élément qu'il supprime, déclenchant `deletePattern()` sur l'index correspondant (entier pour un patron racine, tableau `[oi, ii]` pour un patron imbriqué dans un bloc OPTIONAL). Le style croix rouge est partagé à l'échelle de l'application.
+
+### REQ-QRY-028 — Réordonnancement des patrons par glisser-déposer
+
+| **Si** | l'utilisateur souhaite modifier l'ordre des patrons d'une `requête`, |
+|---|---|
+| **Alors** | chaque ligne de patron présente une **poignée de glissement « ⠿ »** sur son côté gauche, lui permettant de réordonner les patrons vers le haut ou le bas par glisser-déposer, exactement comme le réordonnancement des atomes dans les règles SWRL ; le réordonnancement fonctionne au sein de la liste de patrons racine comme à l'intérieur des blocs OPTIONAL. |
+
+---
+
+**Code source :** `sparql_editor.js` → `_renderPattern()` — Chaque ligne de patron est dotée d'une poignée de glissement `⠿` à gauche activant le glisser-déposer ; le déplacement réordonne les patrons au sein de la liste racine (`_editingQuery.patterns`) ou au sein du tableau `patterns` d'un bloc OPTIONAL, puis sauvegarde et re-rend le panneau. Le mécanisme est identique à celui du réordonnancement des atomes des règles SWRL.
+
+### REQ-QRY-029 — Sélecteur de classe homogène pour les objets `rdf:type`
+
+| **Si** | l'utilisateur sélectionne une `classe` comme objet d'un patron dont le prédicat est `rdf:type`, |
+|---|---|
+| **Alors** | le sélecteur de classe présente, en haut, un champ **Filtre** ainsi qu'une liste de `classes` en **mode arborescence**, de façon homogène avec les autres sélecteurs de classe de l'application. |
+
+---
+
+**Code source :** `sparql_editor.js` → `_buildClsDd()` — Le sélecteur de classe utilisé pour l'objet d'un patron `rdf:type` reprend le composant de sélection homogène : un champ `Filter` en tête et une liste de classes en mode arborescence, cohérent avec le reste de l'application.

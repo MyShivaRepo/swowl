@@ -24,6 +24,8 @@
 - [REQ-SWR-031 — Confirming the selection of an individual](#req-swr-031--confirming-the-selection-of-an-individual)
 - [REQ-SWR-032 — Closing the individual picker](#req-swr-032--closing-the-individual-picker)
 - [REQ-SWR-034 — Drag-and-drop to reorder atoms](#req-swr-034--drag-and-drop-to-reorder-atoms)
+- [REQ-SWR-036 — Importing rules from a `.sword` file](#req-swr-036--importing-rules-from-a-sword-file)
+- [REQ-SWR-037 — Resolving an identifier collision on import](#req-swr-037--resolving-an-identifier-collision-on-import)
 
 ### Form
 - [REQ-SWR-001 — Two-panel interface display](#req-swr-001--two-panel-interface-display)
@@ -42,6 +44,8 @@
 - [REQ-SWR-028 — Two-panel individual picker (modal)](#req-swr-028--two-panel-individual-picker-modal)
 - [REQ-SWR-033 — Dynamic dropdown positioning](#req-swr-033--dynamic-dropdown-positioning)
 - [REQ-SWR-035 — Navigating to a referenced entity from an atom](#req-swr-035--navigating-to-a-referenced-entity-from-an-atom)
+- [REQ-SWR-038 — Import button in the rule list panel](#req-swr-038--import-button-in-the-rule-list-panel)
+- [REQ-SWR-039 — Homogeneous class and property pickers](#req-swr-039--homogeneous-class-and-property-pickers)
 
 ---
 
@@ -248,6 +252,28 @@
 
 **Source code:** `swrl_editor.js` → `onDragStart()`, `onDragOver()`, `onDragLeave()`, `onDrop()`, `onDragEnd()` — `onDragStart()` stores the source index and `listPath`; `onDragOver()` allows the drop only if the target `listPath` is identical; `onDrop()` reorders atoms via `splice()` in `_editingRule`, re-renders the form and calls `save(false)`.
 
+### REQ-SWR-036 — Importing rules from a `.sword` file
+
+| **If** | the ontologist imports `SWRL rules` from a `.sword` file (the project's human-readable rule format), |
+|---|---|
+| **Then** | the rules contained in the file are added to the `ontology` as-is — even when an atom references an empty or undefined class — and the ontologist receives a summary indicating how many rules were added, replaced or kept. |
+
+The import is the exact inverse of the `.sword` export: a round-trip preserves NAF negation, conditional sub-rules, equality atoms and empty-class atoms.
+
+---
+
+**Source code:** `swrl_editor.js` → `importRules()` — Opens a file input restricted to `.sword`/`text/plain`, reads the file text, parses it via `API.parseSwordRules(text)`, then iterates over the returned rules; each rule is persisted via `API.createSWRLRule()` (new id) or `API.updateSWRLRule()` (collision resolved as `replace`); no validation is performed against `APP.state.classes`, so atoms referencing missing classes are kept; refreshes `APP.state`, re-renders the section and reports the counts via `UI.success()`.
+
+### REQ-SWR-037 — Resolving an identifier collision on import
+
+| **If** | an imported rule has an identifier that already exists in the `ontology`, |
+|---|---|
+| **Then** | a dialog asks the ontologist to choose between **Import new** (replace the existing rule), **Keep existing** (skip the imported rule) or **Cancel** (stop the whole import), and the chosen action is applied. |
+
+---
+
+**Source code:** `swrl_editor.js` → `importRules()` and `_askRuleCollision()` — When the rule `id` is present in the set of existing rule ids, `_askRuleCollision()` displays a modal returning `replace`, `keep` or `cancel`; `replace` calls `API.updateSWRLRule(rule.id, rule)`, `keep` skips the rule, `cancel` breaks out of the import loop.
+
 ---
 
 ## 2. Form — Presentation and UI
@@ -425,3 +451,23 @@
 ---
 
 **Source code:** `swrl_editor.js` → `_renderAtom()` (branches `type_atom`, `property_atom`, `equality_atom`) — Generates a clickable element with an `onclick` handler calling `APP.navigateTo(tab, id)` where `tab` is `'classes'`, `'object-properties'`, `'datatype-properties'` or `'individuals'` depending on the entity type; applies the styles `text-decoration: underline` and `color: var(--accent)` on hover via CSS.
+
+### REQ-SWR-038 — Import button in the rule list panel
+
+| **If** | the SWRL Rules list panel is displayed, |
+|---|---|
+| **Then** | an **Import rules** button is shown to the left of the **+** (add rule) button in the panel header, allowing the ontologist to import `SWRL rules` from a `.sword` file. |
+
+---
+
+**Source code:** `swrl_editor.js` → `renderSplit()` — Renders, in the `tree-panel-header`, an import button (`📥`, `title="Import rules from a .sword file"`) calling `SWRLEditor.importRules()` immediately before the new-rule button (`➕`) calling `SWRLEditor.newRule()`.
+
+### REQ-SWR-039 — Homogeneous class and property pickers
+
+| **If** | the ontologist opens the class picker (`type_atom`) or the property picker (`property_atom`, middle column) of an atom, |
+|---|---|
+| **Then** | the picker uses the same presentation as the rest of the application — a **Filter** field at the top and a **tree-mode** display; the property picker shows two tree sections, first `ObjectProperties`, then `DatatypeProperties`. |
+
+---
+
+**Source code:** `swrl_editor.js` → `toggleClassPicker()` and `togglePropPicker()` — Both build a tree-mode dropdown decorated by `_decoratePickerWithFilter()`, which adds a filter field and a scrollable list consistent with the other tabs; `toggleClassPicker()` populates the tree via `_classTreePickerItems()`; `togglePropPicker()` renders an `ObjectProperties` section (dot `op-prop-dot`) followed by a `DatatypeProperties` section (dot `dp-prop-dot`).

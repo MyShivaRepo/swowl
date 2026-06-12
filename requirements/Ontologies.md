@@ -33,6 +33,7 @@
 - [REQ-ONT-024 — Navigating to a registry entry from the import tree](#req-ont-024--navigating-to-a-registry-entry-from-the-import-tree)
 - [REQ-ONT-025 — Opening the directory in Finder](#req-ont-025--opening-the-directory-in-finder)
 - [REQ-ONT-026 — Toggleable wizard panel (open/close)](#req-ont-026--toggleable-wizard-panel-openclose)
+- [REQ-ONT-027 — Splitting the registry into User and System sections](#req-ont-027--splitting-the-registry-into-user-and-system-sections)
 
 ---
 
@@ -45,11 +46,11 @@
 
 | **If** | the `ontology` registry is consulted, |
 |---|---|
-| **Then** | the user's `ontologies` appear first, sorted alphabetically, followed by the read-only W3C `ontologies`, presented in a logical dependency order (OWL, then RDFS, then RDF). |
+| **Then** | the user's `ontologies` appear first, sorted alphabetically, followed by the read-only W3C `ontologies`, which are also sorted alphabetically (`owl`, `rdf`, `rdfs`, `skos`). |
 
 ---
 
-**Source code:** `app.js` → `_refreshOntoTable()` — Sorts user ontologies alphabetically (`localeCompare`), then concatenates the `readonly` W3C ontologies in the fixed order defined by the `BUILTIN_ORDER` constant (`owl` → `rdfs` → `rdf`).
+**Source code:** `app.js` → `_refreshOntoTable()` — Sorts user ontologies alphabetically (`localeCompare`), then concatenates the `readonly` W3C ontologies sorted alphabetically (`owl` → `rdf` → `rdfs` → `skos`).
 
 ### REQ-ONT-002 — Auto-selection of the connected ontology
 
@@ -137,23 +138,23 @@
 
 ### REQ-ONT-010 — Unregistering an ontology
 
-| **If** | the ontologist wishes to remove an `ontology` from the registry and confirms the operation after being informed that the file on disk will not be deleted, |
+| **If** | the ontologist wishes to remove an `ontology` from the registry and confirms the operation, |
 |---|---|
-| **Then** | the `ontology` disappears from the registry without any physical file being deleted. |
+| **Then** | the `ontology` disappears from the registry; a "delete file" checkbox lets the ontologist additionally request deletion of the underlying `.json` file on disk; if that checkbox is left unchecked, the physical file is preserved. |
 
 ---
 
-**Source code:** `app.js` → `doUnregister()` — Displays a confirmation dialog explicitly stating that the file on disk is preserved, then calls `API.unregisterOntology(name)` to remove the entry from the registry.
+**Source code:** `app.js` → `doUnregister()` — Displays a confirmation dialog containing a "delete file" checkbox; calls `API.unregisterOntology(name)` to remove the entry from the registry and, if the checkbox is checked, requests deletion of the underlying `.json` file on disk.
 
 ### REQ-ONT-011 — Downloading built-in W3C ontologies
 
-| **If** | the ontologist wishes to have the W3C reference `ontologies` (RDF, RDFS, OWL) available in the local registry, |
+| **If** | the ontologist wishes to have the W3C reference `ontologies` (RDF, RDFS, OWL, and SKOS) available in the local registry, |
 |---|---|
-| **Then** | the system downloads and registers these `ontologies` from the official sources (`w3.org`) and informs the ontologist of the number of `ontologies` actually retrieved. |
+| **Then** | the system downloads and registers these `ontologies` from the official sources (`w3.org`) and informs the ontologist of the number of `ontologies` actually retrieved. The SKOS `ontology` (prefix `skos`, URI `http://www.w3.org/2004/02/skos/core#`) imports the reference OWL `ontology`. |
 
 ---
 
-**Source code:** `app.js` → `_fetchBuiltins()` — Disables the button during the operation, calls `API.fetchBuiltins()`, counts the entries whose status contains `'fetched'` to build the result message, and re-enables the button in the `finally` block.
+**Source code:** `app.js` → `_fetchBuiltins()` — Disables the button during the operation, calls `API.fetchBuiltins()`, counts the entries whose status contains `'fetched'` to build the result message, and re-enables the button in the `finally` block. The "Fetch W3C Ontologies" button downloads RDF, RDFS, OWL, and SKOS from `w3.org`; SKOS forces an import of OWL.
 
 ### REQ-ONT-012 — Exporting an ontology by name (OWL/TTL/SWRL/SWORD)
 
@@ -287,13 +288,17 @@
 
 ### REQ-ONT-024 — Navigating to a registry entry from the import tree
 
-| **If** | the ontologist clicks on the name of an `ontology` in the import tree, |
+| **If** | in an `ontology`'s import tree, the ontologist clicks on the **prefix** of an imported `ontology`, |
 |---|---|
-| **Then** | the corresponding row in the registry table is visually highlighted and scrolled into `view`, so the ontologist can locate it easily. |
+| **Then** | the corresponding row in the registry table is selected, visually highlighted, and scrolled into `view`, so the ontologist can locate it easily. |
+
+| **If** | in an `ontology`'s import tree, the ontologist clicks on the **URI** of an imported `ontology`, |
+|---|---|
+| **Then** | the corresponding web page is opened in a new browser tab. |
 
 ---
 
-**Source code:** `app.js` → `_scrollToRegistryRow()` — Locates the matching `tr[data-name]` row, calls `scrollIntoView()` and applies a `var(--accent)` colored outline to it for 1.5 seconds.
+**Source code:** `app.js` → `_scrollToRegistryRow()` — Each import-tree link is split into two clickable parts: the **prefix** calls `_scrollToRegistryRow()`, which locates the matching `tr[data-name]` row, selects it, calls `scrollIntoView()` and applies a `var(--accent)` colored outline to it for 1.5 seconds; the **URI** opens the corresponding web page in a new tab (`target="_blank"`).
 
 ### REQ-ONT-025 — Opening the directory in Finder
 
@@ -318,3 +323,17 @@
 ---
 
 **Source code:** `app.js` → `_openWizard()` and `_closeWizard()` — `_openWizard()` compares the requested type with `panel.dataset.type`: if identical, calls `_closeWizard()`; otherwise, sets `panel.dataset.type`, makes the panel visible, and injects the form HTML via `_wizardNew()`, `_wizardImport()`, or `_wizardLoad()`. `_closeWizard()` hides the panel and resets `panel.dataset.type`.
+
+### REQ-ONT-027 — Splitting the registry into User and System sections
+
+| **If** | the `ontology` registry is displayed, |
+|---|---|
+| **Then** | it is divided into two sections: a "USER REGISTRY" section grouping the `ontologies` loaded or created by the user, and a "SYSTEM REGISTRY" section grouping the built-in W3C `ontologies` (`rdf`, `rdfs`, `owl`, `skos`). |
+
+| **If** | the ontologist clicks the "SYSTEM REGISTRY" section header, |
+|---|---|
+| **Then** | that section folds or unfolds (toggle behavior), with a caret indicating its state; a counter shows the number of system `ontologies` it contains. |
+
+---
+
+**Source code:** `app.js` → `_refreshOntoTable()` — Splits the rows into two distinct sections: "USER REGISTRY" for ontologies whose `readonly` flag is false, "SYSTEM REGISTRY" for the `readonly` W3C ontologies. The system section header is collapsible via a caret and displays a count of the number of system entries.

@@ -39,6 +39,8 @@
 - [REQ-CLS-030 — Selecting the filler (target class) of a restriction](#req-cls-030--selecting-the-filler-target-class-of-a-restriction)
 - [REQ-CLS-031 — Displaying the full IRI of the class](#req-cls-031--displaying-the-full-iri-of-the-class)
 - [REQ-CLS-032 — Superclass panel with ancestor hierarchy](#req-cls-032--superclass-panel-with-ancestor-hierarchy)
+- [REQ-CLS-033 — "WHERE USED IN RANGE" panel of properties targeting the class](#req-cls-033--where-used-in-range-panel-of-properties-targeting-the-class)
+- [REQ-CLS-034 — Homogeneous (filter + tree) asserted-properties picker](#req-cls-034--homogeneous-filter--tree-asserted-properties-picker)
 
 ---
 
@@ -394,3 +396,33 @@ In both cases, the change is saved automatically if the class is being edited.
 | **Then** | the side panel displays the complete specialisation chain: direct superclasses (with the ability to remove them), then indirect ancestors up to `owl:Thing` (displayed with attenuated styling to distinguish them, and clickable to navigate to them). Indirect ancestors cannot be deleted from this panel. |
 
 **Source code:** `owl_editor.js` → `ClassEditor.renderSplit()` (internal `_renderSupersPanel()` section) — Displays direct superclasses with a `✕` button, then indirect ancestors in italics at opacity 0.75 up to `owl:Thing`, each clickable via `APP.navigateTo('classes', id)` with no delete button.
+
+---
+
+### REQ-CLS-033 — "WHERE USED IN RANGE" panel of properties targeting the class
+
+| **If** | a class is selected in the tree, |
+|---|---|
+| **Then** | a "`WHERE USED IN RANGE`" panel, placed below the "`Properties` and `Restrictions`" (asserted properties) panel, lists all `object properties` whose `Range` includes the current class, complementing the domain-oriented views by showing where the class is used as a target (range). Each listed `property` has a remove control to take the current class out of that `property`'s `Range`. |
+
+| **If** | the ontologist uses the panel's `+` button, |
+|---|---|
+| **Then** | they can add an existing `object property`, whose `Range` is then extended with the current class. |
+
+| **If** | the ontologist uses the panel's `OP` button, |
+|---|---|
+| **Then** | a brand-new `object property` is created on the fly with its `Range` pre-set to the current class. |
+
+In all cases, the change is saved automatically.
+
+**Source code:** `owl_editor.js` → `ClassEditor` (rendering of the "WHERE USED IN RANGE" panel) — Iterates over `APP.state.objectProperties` to collect those whose `range` contains the current class identifier, displays each property with a remove button (removes the class from the property's `range` via `API.updateObjectProperty()`), a `+` button to add an existing ObjectProperty (adding the class to its `range`) and an `OP` button to create a new ObjectProperty with `range: [classId]`.
+
+---
+
+### REQ-CLS-034 — Homogeneous (filter + tree) asserted-properties picker
+
+| **If** | the ontologist opens the `property` picker (the "property" button) to add a `property` to the `restrictions` / asserted-properties panel, |
+|---|---|
+| **Then** | the picker presents a `Filter` field at the top and displays the `properties` in tree mode, organised into two successive sections — first an `ObjectProperties` section, then a `DatatypeProperties` section — each respecting the `subPropertyOf` hierarchy, consistent with the homogeneous (filter + tree) pickers used throughout the application. |
+
+**Source code:** `owl_editor.js` → `RestrictionEditor` (rendering of the `#restr-prop-picker` picker) — Builds the picker with a `Filter` field that filters entries in real time, and generates two tree sections "ObjectProperties" then "DatatypeProperties", each respecting the `subPropertyOf` hierarchy of the ontology's properties.

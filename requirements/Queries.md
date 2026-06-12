@@ -33,6 +33,9 @@
 - [REQ-QRY-023 — Navigating to an entity from the results](#req-qry-023--navigating-to-an-entity-from-the-results)
 - [REQ-QRY-024 — External link for unrecognized URIs in results](#req-qry-024--external-link-for-unrecognized-uris-in-results)
 - [REQ-QRY-025 — Resizing the list panel](#req-qry-025--resizing-the-list-panel)
+- [REQ-QRY-027 — Deleting a pattern via a red cross](#req-qry-027--deleting-a-pattern-via-a-red-cross)
+- [REQ-QRY-028 — Reordering patterns by drag-and-drop](#req-qry-028--reordering-patterns-by-drag-and-drop)
+- [REQ-QRY-029 — Homogeneous class picker for `rdf:type` objects](#req-qry-029--homogeneous-class-picker-for-rdftype-objects)
 
 ---
 
@@ -322,3 +325,33 @@
 ---
 
 **Source code:** `sparql_editor.js` → `_initSplitHandle()` — Constrains the width of the `sparql-list-panel` panel between 120 px and 400 px, adds the CSS class `resizing` to the `body` for the entire duration of the drag and removes it at the end; the `mousedown`/`mousemove`/`mouseup` listeners are attached only once (flag `_bound`).
+
+### REQ-QRY-027 — Deleting a pattern via a red cross
+
+| **If** | the user wishes to delete a triple, FILTER or OPTIONAL pattern (root or nested), |
+|---|---|
+| **Then** | they are provided with a delete control in the form of a **red cross ✕**, positioned right after the element it deletes; this control replaces the former trash-can icon and is consistent with the rest of the application. |
+
+---
+
+**Source code:** `sparql_editor.js` → `_renderPattern()`, `deletePattern()` — Each pattern row displays a red-cross `✕` delete button placed after the element it deletes, triggering `deletePattern()` on the corresponding index (integer for a root pattern, array `[oi, ii]` for a pattern nested in an OPTIONAL block). The red-cross style is shared app-wide.
+
+### REQ-QRY-028 — Reordering patterns by drag-and-drop
+
+| **If** | the user wishes to change the order of the patterns of a `query`, |
+|---|---|
+| **Then** | each pattern row presents a **drag handle "⠿"** on its left side, allowing them to reorder patterns up or down by drag-and-drop, exactly like reordering atoms in SWRL rules; reordering works both within the root pattern list and inside OPTIONAL blocks. |
+
+---
+
+**Source code:** `sparql_editor.js` → `_renderPattern()` — Each pattern row is equipped with a `⠿` drag handle on the left enabling drag-and-drop; dragging reorders patterns within the root list (`_editingQuery.patterns`) or within an OPTIONAL block's `patterns` array, then saves and re-renders the panel. The mechanism is identical to that used for reordering SWRL rule atoms.
+
+### REQ-QRY-029 — Homogeneous class picker for `rdf:type` objects
+
+| **If** | the user selects a class as the object of a pattern whose predicate is `rdf:type`, |
+|---|---|
+| **Then** | the class picker presents, at the top, a **Filter** field as well as a class list in **tree mode**, consistently with the other class pickers of the application. |
+
+---
+
+**Source code:** `sparql_editor.js` → `_buildClsDd()` — The class picker used for the object of an `rdf:type` pattern reuses the homogeneous selection component: a `Filter` field at the top and a tree-mode class list, consistent with the rest of the application.

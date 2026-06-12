@@ -10,6 +10,7 @@
 - [REQ-IMP-003 — Héritage des règles de nommage (display_rules)](#req-imp-003--héritage-des-règles-de-nommage-display_rules)
 - [REQ-IMP-004 — Persistance : les entités importées ne sont pas sauvegardées localement](#req-imp-004--persistance--les-entités-importées-ne-sont-pas-sauvegardées-localement)
 - [REQ-IMP-005 — Lecture seule : modification et suppression impossibles](#req-imp-005--lecture-seule--modification-et-suppression-impossibles)
+- [REQ-IMP-011 — Import des annotations SKOS et autres propriétés d'annotation](#req-imp-011--import-des-annotations-skos-et-autres-propriétés-dannotation)
 
 ### Forme
 - [REQ-IMP-006 — Style visuel atténué dans les listes et arbres](#req-imp-006--style-visuel-atténué-dans-les-listes-et-arbres)
@@ -72,6 +73,16 @@
 | **Alors** | l'action est bloquée : les champs du formulaire sont désactivés, le bouton de suppression est masqué dans la liste, et toute tentative programmatique de suppression affiche un message d'erreur. |
 
 **Code source :** `owl_editor.js` → `_applyReadOnly(detail)` — désactive tous les `input, select, textarea, button` du panneau de détail. `SWRLEditor.delete()` et `SparqlEditor.deleteQuery()` — vérifient `entity._imported` et appellent `UI.error()` si vrai. `renderList()` de chaque éditeur — masque le bouton de suppression si `isImported`.
+
+---
+
+### REQ-IMP-011 — Import des annotations SKOS et autres propriétés d'annotation
+
+| **Si** | une ontologie est importée (ex. un fichier Turtle/`.ttl`) et que ses entités portent des assertions de propriétés d'annotation au-delà de `rdfs:label` et `rdfs:comment`, |
+|---|---|
+| **Alors** | SWOWL importe également ces annotations supplémentaires et les rattache à chaque entité concernée. Sont reconnues notamment : les annotations **SKOS** (`skos:prefLabel`, `skos:altLabel`, `skos:hiddenLabel`, `skos:definition`, `skos:note`, `skos:scopeNote`, `skos:example`, `skos:editorialNote`, `skos:historyNote`, `skos:changeNote`), ainsi que `rdfs:seeAlso` (et les autres prédicats d'annotation reconnus). Ces annotations sont collectées par entité — `classes`, `object_properties`, `datatype_properties`, `annotation_properties`, `individuals` — dans le champ **« autres annotations »** de l'entité (`annotations.other`), chacune sous la forme d'un couple `{property, value}`, et sont affichées dans la section « annotations » du formulaire de l'entité. Les annotations **multi-valuées** (ex. plusieurs `skos:altLabel`) sont toutes conservées. |
+
+**Note :** à titre d'exemple, l'import de l'ontologie « capital » fait désormais apparaître **53** annotations « other » qui étaient auparavant ignorées.
 
 ---
 

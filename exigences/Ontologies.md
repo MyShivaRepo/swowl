@@ -33,6 +33,7 @@
 - [REQ-ONT-024 — Navigation vers une entrée du registre depuis l'arbre des imports](#req-ont-024--navigation-vers-une-entrée-du-registre-depuis-larbre-des-imports)
 - [REQ-ONT-025 — Ouverture du répertoire dans le Finder](#req-ont-025--ouverture-du-répertoire-dans-le-finder)
 - [REQ-ONT-026 — Panneau wizard commutable (ouverture/fermeture)](#req-ont-026--panneau-wizard-commutable-ouverturefermeture)
+- [REQ-ONT-027 — Découpage du registre en sections Utilisateur et Système](#req-ont-027--découpage-du-registre-en-sections-utilisateur-et-système)
 
 ---
 
@@ -45,11 +46,11 @@
 
 | **Si** | le registre des `ontologies` est consulté, |
 |---|---|
-| **Alors** | les `ontologies` de l'utilisateur apparaissent en premier, triées alphabétiquement, suivies des `ontologies` W3C en lecture seule, présentées dans un ordre de dépendance logique (OWL, puis RDFS, puis RDF). |
+| **Alors** | les `ontologies` de l'utilisateur apparaissent en premier, triées alphabétiquement, suivies des `ontologies` W3C en lecture seule, elles aussi triées par ordre alphabétique (`owl`, `rdf`, `rdfs`, `skos`). |
 
 ---
 
-**Code source :** `app.js` → `_refreshOntoTable()` — Trie les ontologies utilisateur par ordre alphabétique (`localeCompare`), puis concatène les ontologies W3C `readonly` dans l'ordre fixe défini par la constante `BUILTIN_ORDER` (`owl` → `rdfs` → `rdf`).
+**Code source :** `app.js` → `_refreshOntoTable()` — Trie les ontologies utilisateur par ordre alphabétique (`localeCompare`), puis concatène les ontologies W3C `readonly` triées alphabétiquement (`owl` → `rdf` → `rdfs` → `skos`).
 
 ### REQ-ONT-002 — Auto-sélection de l'ontologie connectée
 
@@ -137,23 +138,23 @@
 
 ### REQ-ONT-010 — Désenregistrement d'une ontologie
 
-| **Si** | l'ontologiste souhaite retirer une `ontologie` du registre et confirme l'opération après avoir été informé que le fichier sur disque ne sera pas supprimé, |
+| **Si** | l'ontologiste souhaite retirer une `ontologie` du registre et confirme l'opération, |
 |---|---|
-| **Alors** | l'`ontologie` disparaît du registre sans qu'aucun fichier physique ne soit effacé. |
+| **Alors** | l'`ontologie` disparaît du registre ; une case à cocher « supprimer le fichier » permet à l'ontologiste de demander en outre la suppression du fichier `.json` sous-jacent sur le disque ; si cette case n'est pas cochée, le fichier physique est conservé. |
 
 ---
 
-**Code source :** `app.js` → `doUnregister()` — Affiche une boîte de dialogue de confirmation précisant explicitement que le fichier sur disque est conservé, puis appelle `API.unregisterOntology(name)` pour retirer l'entrée du registre.
+**Code source :** `app.js` → `doUnregister()` — Affiche une boîte de dialogue de confirmation comportant une case à cocher « delete file » ; appelle `API.unregisterOntology(name)` pour retirer l'entrée du registre, et, si la case est cochée, demande la suppression du fichier `.json` sous-jacent sur le disque.
 
 ### REQ-ONT-011 — Téléchargement des ontologies W3C intégrées
 
-| **Si** | l'ontologiste souhaite disposer des `ontologies` de référence W3C (RDF, RDFS, OWL) dans le registre local, |
+| **Si** | l'ontologiste souhaite disposer des `ontologies` de référence W3C (RDF, RDFS, OWL et SKOS) dans le registre local, |
 |---|---|
-| **Alors** | le système télécharge et enregistre ces `ontologies` depuis les sources officielles (`w3.org`) et informe l'ontologiste du nombre d'`ontologies` effectivement récupérées. |
+| **Alors** | le système télécharge et enregistre ces `ontologies` depuis les sources officielles (`w3.org`) et informe l'ontologiste du nombre d'`ontologies` effectivement récupérées. L'`ontologie` SKOS (préfixe `skos`, URI `http://www.w3.org/2004/02/skos/core#`) importe l'`ontologie` OWL de référence. |
 
 ---
 
-**Code source :** `app.js` → `_fetchBuiltins()` — Désactive le bouton pendant l'opération, appelle `API.fetchBuiltins()`, compte les entrées dont le statut contient `'fetched'` pour construire le message de résultat, et réactive le bouton dans le bloc `finally`.
+**Code source :** `app.js` → `_fetchBuiltins()` — Désactive le bouton pendant l'opération, appelle `API.fetchBuiltins()`, compte les entrées dont le statut contient `'fetched'` pour construire le message de résultat, et réactive le bouton dans le bloc `finally`. Le bouton « Fetch W3C Ontologies » télécharge RDF, RDFS, OWL et SKOS depuis `w3.org` ; SKOS force un import de OWL.
 
 ### REQ-ONT-012 — Export d'une ontologie par nom (OWL/TTL/SWRL/SWORD)
 
@@ -287,13 +288,17 @@
 
 ### REQ-ONT-024 — Navigation vers une entrée du registre depuis l'arbre des imports
 
-| **Si** | l'ontologiste clique sur le nom d'une `ontologie` dans l'arbre des imports, |
+| **Si** | dans l'arbre des imports d'une `ontologie`, l'ontologiste clique sur le **préfixe** d'une `ontologie` importée, |
 |---|---|
-| **Alors** | la ligne correspondante dans le tableau du registre est mise en évidence visuellement et défilée en `vue`, afin que l'ontologiste puisse la retrouver facilement. |
+| **Alors** | la ligne correspondante dans le tableau du registre est sélectionnée, mise en évidence visuellement et défilée en `vue`, afin que l'ontologiste puisse la retrouver facilement. |
+
+| **Si** | dans l'arbre des imports d'une `ontologie`, l'ontologiste clique sur l'**URI** d'une `ontologie` importée, |
+|---|---|
+| **Alors** | la page web correspondante est ouverte dans un nouvel onglet du navigateur. |
 
 ---
 
-**Code source :** `app.js` → `_scrollToRegistryRow()` — Localise la ligne `tr[data-name]` correspondante, appelle `scrollIntoView()` et lui applique pendant 1,5 seconde un contour de couleur `var(--accent)`.
+**Code source :** `app.js` → `_scrollToRegistryRow()` — Chaque lien de l'arbre des imports est scindé en deux parties cliquables : le **préfixe** appelle `_scrollToRegistryRow()`, qui localise la ligne `tr[data-name]` correspondante, la sélectionne, appelle `scrollIntoView()` et lui applique pendant 1,5 seconde un contour de couleur `var(--accent)` ; l'**URI** ouvre la page web correspondante dans un nouvel onglet (`target="_blank"`).
 
 ### REQ-ONT-025 — Ouverture du répertoire dans le Finder
 
@@ -318,3 +323,17 @@
 ---
 
 **Code source :** `app.js` → `_openWizard()` et `_closeWizard()` — `_openWizard()` compare le type demandé avec `panel.dataset.type` : si identique, appelle `_closeWizard()` ; sinon, définit `panel.dataset.type`, rend le panneau visible et injecte le HTML du formulaire via `_wizardNew()`, `_wizardImport()` ou `_wizardLoad()`. `_closeWizard()` masque le panneau et réinitialise `panel.dataset.type`.
+
+### REQ-ONT-027 — Découpage du registre en sections Utilisateur et Système
+
+| **Si** | le registre des `ontologies` est affiché, |
+|---|---|
+| **Alors** | il est divisé en deux sections : une section « USER REGISTRY » regroupant les `ontologies` chargées ou créées par l'utilisateur, et une section « SYSTEM REGISTRY » regroupant les `ontologies` W3C intégrées (`rdf`, `rdfs`, `owl`, `skos`). |
+
+| **Si** | l'ontologiste clique sur l'en-tête de la section « SYSTEM REGISTRY », |
+|---|---|
+| **Alors** | cette section se replie ou se déploie (comportement bascule), un chevron indiquant son état ; un compteur affiche le nombre d'`ontologies` système qu'elle contient. |
+
+---
+
+**Code source :** `app.js` → `_refreshOntoTable()` — Répartit les lignes en deux sections distinctes : « USER REGISTRY » pour les ontologies dont `readonly` est faux, « SYSTEM REGISTRY » pour les ontologies W3C `readonly`. L'en-tête de la section système est repliable via un chevron et affiche un compteur du nombre d'entrées système.

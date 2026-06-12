@@ -39,6 +39,8 @@
 - [REQ-CLS-030 — Sélection du filler (classe cible) d'une restriction](#req-cls-030--sélection-du-filler-classe-cible-dune-restriction)
 - [REQ-CLS-031 — Affichage de l'IRI complète de la classe](#req-cls-031--affichage-de-liri-complète-de-la-classe)
 - [REQ-CLS-032 — Panneau des super-classes avec hiérarchie ancêtres](#req-cls-032--panneau-des-super-classes-avec-hiérarchie-ancêtres)
+- [REQ-CLS-033 — Panneau « WHERE USED IN RANGE » des propriétés ciblant la classe](#req-cls-033--panneau--where-used-in-range--des-propriétés-ciblant-la-classe)
+- [REQ-CLS-034 — Sélecteur homogène (filtre + arbre) des propriétés assertées](#req-cls-034--sélecteur-homogène-filtre--arbre-des-propriétés-assertées)
 
 ---
 
@@ -394,3 +396,33 @@ Dans les deux cas, la modification est sauvegardée automatiquement si la classe
 | **Alors** | le panneau latéral affiche l'intégralité de la chaîne de spécialisation : les super-`classes` directes (avec possibilité de les retirer), puis les ancêtres indirects jusqu'à `owl:Thing` (affichés avec une mise en forme atténuée pour les distinguer, et cliquables pour naviguer vers eux). Les ancêtres indirects ne peuvent pas être supprimés depuis ce panneau. |
 
 **Code source :** `owl_editor.js` → `ClassEditor.renderSplit()` (section `_renderSupersPanel()` interne) — Affiche les super-classes directes avec bouton `✕`, puis les ancêtres indirects en italique et opacité 0.75 jusqu'à `owl:Thing`, chacun cliquable via `APP.navigateTo('classes', id)` sans bouton de suppression.
+
+---
+
+### REQ-CLS-033 — Panneau « WHERE USED IN RANGE » des propriétés ciblant la classe
+
+| **Si** | une `classe` est sélectionnée dans l'arbre, |
+|---|---|
+| **Alors** | un panneau « `WHERE USED IN RANGE` », placé sous le panneau « `Properties` and `Restrictions` » (propriétés assertées), liste toutes les `ObjectProperties` dont le `Range` inclut la `classe` courante, complétant ainsi les vues orientées domaine en montrant où la `classe` est utilisée comme cible (range). Chaque `propriété` listée dispose d'un contrôle de retrait permettant d'enlever la `classe` du `Range` de cette `propriété`. |
+
+| **Si** | l'ontologiste utilise le bouton `+` du panneau, |
+|---|---|
+| **Alors** | il peut ajouter une `ObjectProperty` existante, dont le `Range` se voit alors enrichi de la `classe` courante. |
+
+| **Si** | l'ontologiste utilise le bouton `OP` du panneau, |
+|---|---|
+| **Alors** | une nouvelle `ObjectProperty` est créée à la volée avec son `Range` pré-renseigné sur la `classe` courante. |
+
+Dans tous les cas, la modification est sauvegardée automatiquement.
+
+**Code source :** `owl_editor.js` → `ClassEditor` (rendu du panneau « WHERE USED IN RANGE ») — Parcourt `APP.state.objectProperties` pour collecter celles dont le `range` contient l'identifiant de la classe courante, affiche chaque propriété avec un bouton de retrait (retire la classe du `range` de la propriété via `API.updateObjectProperty()`), un bouton `+` pour ajouter une ObjectProperty existante (ajout de la classe à son `range`) et un bouton `OP` pour créer une nouvelle ObjectProperty avec `range: [classId]`.
+
+---
+
+### REQ-CLS-034 — Sélecteur homogène (filtre + arbre) des propriétés assertées
+
+| **Si** | l'ontologiste ouvre le sélecteur de `propriété` (bouton « property ») pour ajouter une `propriété` au panneau des `restrictions` / propriétés assertées, |
+|---|---|
+| **Alors** | le sélecteur présente un champ `Filter` en tête et affiche les `propriétés` en mode arbre, organisées en deux sections successives — d'abord une section `ObjectProperties`, puis une section `DatatypeProperties` — chacune respectant la hiérarchie `subPropertyOf`, conformément aux sélecteurs homogènes (filtre + arbre) utilisés dans l'ensemble de l'application. |
+
+**Code source :** `owl_editor.js` → `RestrictionEditor` (rendu du picker `#restr-prop-picker`) — Construit le sélecteur avec un champ `Filter` filtrant les entrées en temps réel, et génère deux sections en arbre « ObjectProperties » puis « DatatypeProperties », chacune respectant la hiérarchie `subPropertyOf` des propriétés de l'ontologie.
