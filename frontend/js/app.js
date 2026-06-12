@@ -528,7 +528,7 @@ const APP = {
                 break;
             case 'views':
                 main.innerHTML = APP.renderViews();
-                if (APP._viewsTab === 'ontology')       setTimeout(() => APP._initHyperbolicGraph(), 80);
+                if (APP._viewsTab === 'ontology2')       setTimeout(() => APP._initOntology2(), 80);
                 if (APP._viewsTab === 'treemap')         setTimeout(() => APP._initTreemap(), 80);
                 if (APP._viewsTab === 'knowledge-base')  setTimeout(() => APP._initKnowledgeBase(), 80);
                 break;
@@ -2169,7 +2169,34 @@ APP._renderSparqlResults = function(container, data) {
 
 // ── Views UI ──────────────────────────────────────────────────
 
-APP._viewsTab = APP._viewsTab || 'ontology';
+APP._viewsTab = APP._viewsTab || 'ontology2';
+APP._viewsSidebarW = APP._viewsSidebarW || 210;   // largeur (px) de la sidebar Views, redimensionnable
+
+/** Démarre le glisser-redimensionner de la sidebar Views. */
+APP._viewsSidebarDragStart = function(e) {
+    e.preventDefault();
+    const bar = document.getElementById('views-sidebar');
+    if (!bar) return;
+    const startX = e.clientX, startW = bar.offsetWidth;
+    const onMove = ev => {
+        const w = Math.max(140, Math.min(440, startW + (ev.clientX - startX)));
+        bar.style.width = w + 'px';
+        APP._viewsSidebarW = w;
+    };
+    const onUp = () => {
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+        document.body.style.userSelect = '';
+        // Réajuste la visualisation active à la nouvelle largeur
+        const t = APP._viewsTab;
+        if (t === 'treemap')             APP._initTreemap();
+        else if (t === 'ontology2')      APP._initOntology2();
+        else if (t === 'knowledge-base') APP._initKnowledgeBase();
+    };
+    document.body.style.userSelect = 'none';
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+};
 
 APP.renderViews = function() {
     const tab = APP._viewsTab;
@@ -2186,11 +2213,15 @@ APP.renderViews = function() {
         </div>`;
 
     const sidebar = `
-        <div style="width:160px;flex-shrink:0;border-right:1px solid var(--border);padding:8px 0">
-            ${tabBtn('ontology',       '🗂 Ontology')}
-            ${tabBtn('treemap',        '🟦 Treemap')}
+        <div id="views-sidebar" style="width:${APP._viewsSidebarW}px;flex-shrink:0;border-right:1px solid var(--border);padding:8px 0;overflow-x:hidden">
+            ${tabBtn('ontology2',      '🌐 Ontology (Hyperbolic)')}
+            ${tabBtn('treemap',        '🌐 Ontology (TreeMap)')}
             ${tabBtn('knowledge-base', '🧩 Knowledge Base')}
-        </div>`;
+        </div>
+        <div id="views-sidebar-resizer" onmousedown="APP._viewsSidebarDragStart(event)"
+             title="Glisser pour redimensionner"
+             style="width:5px;flex-shrink:0;cursor:col-resize;background:transparent;transition:background .12s"
+             onmouseenter="this.style.background='var(--accent)'" onmouseleave="this.style.background='transparent'"></div>`;
 
     let tabContent = '';
     if (tab === 'treemap') {
@@ -2204,25 +2235,15 @@ APP.renderViews = function() {
             </div>
             <div id="cy-treemap" style="flex:1;min-height:0;background:#0d1117;overflow:hidden;position:relative"></div>
         </div>`;
-    } else if (tab === 'ontology') {
+    } else if (tab === 'ontology2') {
         tabContent = `
         <div style="display:flex;flex-direction:column;height:100%">
             <div style="display:flex;align-items:center;gap:8px;padding:8px 14px;border-bottom:1px solid var(--border);flex-shrink:0;background:var(--bg2)">
-                <button class="btn-sm" onclick="APP._hypZoomUp()" id="hyp-up-btn" disabled title="Go up one level">⬆ Up</button>
-                <span id="hyp-breadcrumb" style="font-size:11px;color:var(--text-dim);font-family:var(--font-mono);max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">owl:Thing</span>
-                <button class="btn-sm" onclick="APP._hypReset()" title="Reset view">⟳ Reset</button>
-                <div style="position:relative;margin-left:4px">
-                    <input id="hyp-filter-input" type="text" placeholder="Filter classes…"
-                           style="background:var(--bg3);border:1px solid var(--border2);color:var(--text1);
-                                  border-radius:4px;padding:3px 8px;font-size:12px;width:180px"
-                           oninput="APP._hypFilter(this.value)">
-                </div>
-                <span style="font-size:10px;color:var(--text-dim);margin-left:4px">
-                    Click → center · 2nd click → edit · Double-click → zoom
-                </span>
-                <span id="cy-node-count" style="margin-left:auto;font-size:11px;color:var(--text-dim)"></span>
+                <span style="font-size:11px;color:var(--text-dim);font-family:var(--font-mono)">Disque de Poincaré · hyperbolique</span>
+                <span style="font-size:10px;color:var(--text-dim);margin-left:8px">Glisser → déplacer · Clic nœud → recentrer · Double-clic → éditer · Survol → sous-branche</span>
+                <span id="cy-ontology2-count" style="margin-left:auto;font-size:11px;color:var(--text-dim)"></span>
             </div>
-            <div id="cy-ontology" style="flex:1;min-height:0;background:#12161f;overflow:hidden"></div>
+            <div id="cy-ontology2" style="flex:1;min-height:0;background:#12161f;overflow:hidden;position:relative"></div>
         </div>`;
     } else {
         tabContent = `
@@ -2565,6 +2586,196 @@ APP._hypFilter = function(q) {
     });
 };
 
+// ── Ontology 2 (d3-hypertree — disque de Poincaré animé) ─────────────────────
+
+APP._onto2Resize = null;   // handler resize courant (disque de Poincaré)
+APP._onto2Tap    = null;   // timer tap (distingue clic/double-clic)
+
+/** Construit l'arbre de données {name, id, children}
+ *  à partir de APP.state.classes (hiérarchie subClassOf, racine owl:Thing). */
+APP._buildOntologyTreeData = function() {
+    const classes = APP.state.classes || [];
+    const classMap = {};
+    classes.forEach(c => { classMap[c.id] = c; });
+    const allIds = new Set(classes.map(c => c.id));
+    const childrenOf = {};
+    const hasInternalParent = new Set();
+    classes.forEach(cls => {
+        (cls.subClassOf || []).filter(s => typeof s === 'string' && allIds.has(s)).forEach(p => {
+            hasInternalParent.add(cls.id);
+            (childrenOf[p] = childrenOf[p] || []).push(cls.id);
+        });
+    });
+    const roots = classes.filter(c => !hasInternalParent.has(c.id)).map(c => c.id);
+
+    let count = 0;
+    const buildNode = (id, ancestors) => {
+        if (!classMap[id] || ancestors.has(id)) return null;   // anti-cycle
+        const next = new Set(ancestors); next.add(id);
+        count++;
+        const kids = (childrenOf[id] || []).map(cid => buildNode(cid, next)).filter(Boolean);
+        const node = { name: id, id };
+        if (kids.length) node.children = kids;
+        return node;
+    };
+    const tree = { name: 'owl:Thing', id: 'owl:Thing',
+        children: roots.map(r => buildNode(r, new Set())).filter(Boolean) };
+    count++; // owl:Thing
+    return { tree, count };
+};
+
+APP._initOntology2 = function() {
+    const container = document.getElementById('cy-ontology2');
+    if (!container || APP._viewsTab !== 'ontology2') return;
+
+    if (APP._onto2Resize) { window.removeEventListener('resize', APP._onto2Resize); APP._onto2Resize = null; }
+    if (APP._onto2Tap) { clearTimeout(APP._onto2Tap); APP._onto2Tap = null; }
+    container.innerHTML = '';
+
+    const classes = APP.state.classes || [];
+    if (!classes.length) {
+        container.innerHTML = '<p style="padding:24px;color:var(--text-dim);font-style:italic">Aucune classe dans cette ontologie.</p>';
+        return;
+    }
+
+    const { tree, count } = APP._buildOntologyTreeData();
+    const cntEl = document.getElementById('cy-ontology2-count');
+    if (cntEl) cntEl.textContent = count + ' classes';
+
+    if (container.offsetHeight < 20) container.style.height = (window.innerHeight - 170) + 'px';
+
+    const cv = document.createElement('canvas');
+    cv.style.cssText = 'width:100%;height:100%;display:block;cursor:grab';
+    container.appendChild(cv);
+    const ctx = cv.getContext('2d');
+    const DPR = window.devicePixelRatio || 1;
+    let W, H, R, CX, CY;
+    const fit = () => {
+        const w = container.clientWidth, h = container.clientHeight;
+        cv.width = w * DPR; cv.height = h * DPR; ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+        W = w; H = h; R = Math.min(w, h) * 0.46; CX = w / 2; CY = h / 2;
+    };
+
+    // ── Nombres complexes / Möbius ────────────────────────────
+    const cadd = (a, b) => [a[0] + b[0], a[1] + b[1]];
+    const cmul = (a, b) => [a[0] * b[0] - a[1] * b[1], a[0] * b[1] + a[1] * b[0]];
+    const cconj = a => [a[0], -a[1]];
+    const cdiv = (a, b) => { const d = b[0] * b[0] + b[1] * b[1]; return [(a[0] * b[0] + a[1] * b[1]) / d, (a[1] * b[0] - a[0] * b[1]) / d]; };
+    const polar = (r, t) => [r * Math.cos(t), r * Math.sin(t)];
+    const mob = (z, a) => cdiv(cadd(z, a), cadd([1, 0], cmul(cconj(a), z)));
+    const cabs = a => Math.hypot(a[0], a[1]);
+
+    // ── Layout hyperbolique ───────────────────────────────────
+    const palette = ['#7F77DD', '#1D9E75', '#D85A30', '#378ADD', '#D4537E', '#EF9F27', '#5DCAA5', '#F0997B'];
+    const nodes = [];
+    const STEP = Math.tanh(0.36);
+    (function layout(n, pos, ang, wedge, depth, color, parent) {
+        n.disp = pos.slice(); n.depth = depth; n.color = color; n.parent = parent;
+        nodes.push(n);
+        const ch = n.children || []; if (!ch.length) return;
+        const w = Math.min(2 * Math.PI / Math.max(1, ch.length), wedge);
+        const start = ang - (w * ch.length) / 2;
+        ch.forEach((c, i) => {
+            const a = start + (i + 0.5) * w;
+            const col = depth === 0 ? palette[i % palette.length] : color;
+            layout(c, mob(polar(STEP, a), pos), a, w * 0.86, depth + 1, col, n);
+        });
+    })(tree, [0, 0], -Math.PI / 2, 2 * Math.PI, 0, '#9aa6bd', null);
+
+    const applyT = delta => { for (let i = 0; i < nodes.length; i++) nodes[i].disp = mob(nodes[i].disp, delta); };
+    const descendants = n => { const s = new Set(); (function w(x){ s.add(x); (x.children || []).forEach(w); })(n); return s; };
+    let hoverSet = null;
+
+    const S = p => [CX + p[0] * R, CY + p[1] * R];
+    const draw = () => {
+        ctx.clearRect(0, 0, W, H);
+        ctx.beginPath(); ctx.arc(CX, CY, R, 0, 2 * Math.PI);
+        ctx.fillStyle = '#0e1219'; ctx.fill();
+        ctx.strokeStyle = '#2a3347'; ctx.lineWidth = 1; ctx.stroke();
+        [0.82, 0.6, 0.33].forEach(f => { ctx.beginPath(); ctx.arc(CX, CY, R * f, 0, 2 * Math.PI); ctx.strokeStyle = 'rgba(40,50,70,0.6)'; ctx.lineWidth = 0.5; ctx.stroke(); });
+        // arêtes (géodésiques approchées)
+        for (let i = 0; i < nodes.length; i++) {
+            const n = nodes[i]; if (!n.parent) continue;
+            const a = S(n.parent.disp), b = S(n.disp);
+            const mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2;
+            const cxp = mx + (CX - mx) * 0.18, cyp = my + (CY - my) * 0.18;
+            const dim = hoverSet && !hoverSet.has(n) ? 0.18 : 1;
+            ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.quadraticCurveTo(cxp, cyp, b[0], b[1]);
+            ctx.strokeStyle = n.color; ctx.globalAlpha = Math.max(0.12, 0.85 - cabs(n.disp) * 0.8) * dim;
+            ctx.lineWidth = 1.3; ctx.stroke(); ctx.globalAlpha = 1;
+        }
+        // nœuds
+        for (let i = 0; i < nodes.length; i++) {
+            const n = nodes[i]; const p = S(n.disp); const sc = 1 - cabs(n.disp) * cabs(n.disp);
+            const rad = Math.max(2.2, (n.depth === 0 ? 9 : n.depth === 1 ? 7 : 5) * sc + 1.5);
+            const dim = hoverSet && !hoverSet.has(n) ? 0.22 : 1;
+            ctx.globalAlpha = dim;
+            ctx.beginPath(); ctx.arc(p[0], p[1], rad, 0, 2 * Math.PI);
+            ctx.fillStyle = n.depth === 0 ? '#cdd6e6' : n.color; ctx.fill();
+            ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(255,255,255,0.25)'; ctx.stroke();
+            ctx.globalAlpha = 1;
+            n._sr = rad; n._sx = p[0]; n._sy = p[1];
+            if (cabs(n.disp) < 0.55 && sc > 0.32) {
+                ctx.globalAlpha = Math.min(1, sc * 1.6) * dim;
+                ctx.fillStyle = '#e2e8f0'; ctx.font = '11px sans-serif'; ctx.textBaseline = 'middle';
+                ctx.fillText(n.name, p[0] + rad + 3, p[1]); ctx.globalAlpha = 1;
+            }
+        }
+    };
+
+    // ── Recentrage animé (glide) ──────────────────────────────
+    let anim = null;
+    const glide = target => {
+        if (anim) cancelAnimationFrame(anim);
+        let i = 0;
+        (function step() {
+            i++; applyT([-target.disp[0] * 0.16, -target.disp[1] * 0.16]); draw();
+            if (i < 24 && cabs(target.disp) > 0.004) anim = requestAnimationFrame(step);
+        })();
+    };
+
+    const pt = e => {
+        const r = cv.getBoundingClientRect();
+        let x = (e.clientX - r.left - CX) / R, y = (e.clientY - r.top - CY) / R;
+        const d = Math.hypot(x, y); if (d > 0.98) { x = x / d * 0.98; y = y / d * 0.98; }
+        return [x, y];
+    };
+    const nodeAt = e => {
+        const r = cv.getBoundingClientRect();
+        const mx = e.clientX - r.left, my = e.clientY - r.top;
+        let best = null, bd = 14;
+        for (let i = 0; i < nodes.length; i++) {
+            const n = nodes[i], dd = Math.hypot(mx - n._sx, my - n._sy);
+            if (dd < Math.max(bd, n._sr + 5) && dd < bd) { bd = dd; best = n; }
+        }
+        return best;
+    };
+
+    let dragging = false, last = null, moved = 0;
+    cv.addEventListener('pointerdown', e => { dragging = true; moved = 0; last = pt(e); cv.style.cursor = 'grabbing'; cv.setPointerCapture(e.pointerId); });
+    cv.addEventListener('pointermove', e => {
+        if (dragging) { const p = pt(e); applyT([p[0] - last[0], p[1] - last[1]]); last = p; moved += 1; draw(); return; }
+        const n = nodeAt(e); const set = n && n.depth > 0 ? descendants(n) : null;
+        if (set !== hoverSet) { hoverSet = set; cv.style.cursor = n ? 'pointer' : 'grab'; draw(); }
+    });
+    cv.addEventListener('pointerup', e => {
+        dragging = false; cv.style.cursor = 'grab';
+        if (moved < 3) {
+            const n = nodeAt(e);
+            if (n) { if (APP._onto2Tap) clearTimeout(APP._onto2Tap); APP._onto2Tap = setTimeout(() => glide(n), 230); }
+        }
+    });
+    cv.addEventListener('dblclick', e => {
+        if (APP._onto2Tap) { clearTimeout(APP._onto2Tap); APP._onto2Tap = null; }
+        const n = nodeAt(e);
+        if (n && n.id && n.id !== 'owl:Thing') APP.navigateTo('classes', n.id);
+    });
+
+    APP._onto2Resize = () => { fit(); draw(); };
+    window.addEventListener('resize', APP._onto2Resize);
+    fit(); draw();
+};
+
 // ── Treemap (D3 v7) ──────────────────────────────────────────
 
 APP._tmRoot       = null;   // d3.hierarchy root complet
@@ -2573,12 +2784,20 @@ APP._tmSvg        = null;   // sélection SVG D3
 APP._tmW          = 0;
 APP._tmH          = 0;
 
-// Palette de couleurs par branche racine (fond sombre)
+// Palette vibrante par branche racine (fond sombre)
 APP._tmPalette = [
-    '#1d3557','#1b4332','#3d1f6e','#7b2d00','#004e64',
-    '#3a0ca3','#023047','#6a0572','#0a3622','#1c2b3a',
-    '#4a1942','#2b4141',
+    '#534AB7','#1D9E75','#D85A30','#185FA5','#D4537E',
+    '#BA7517','#0F6E56','#993C1D','#7F77DD','#3B6D11',
+    '#A32D2D','#0C447C',
 ];
+
+// Mélange une couleur hex vers le noir (k<0) ou le blanc (k>0), |k| ∈ [0,1]
+APP._tmMix = function(c, k) {
+    c = c.replace('#', '');
+    const r = parseInt(c.slice(0, 2), 16), g = parseInt(c.slice(2, 4), 16), b = parseInt(c.slice(4, 6), 16);
+    const t = k < 0 ? [13, 17, 23] : [255, 255, 255], a = Math.abs(k);
+    return `rgb(${Math.round(r + (t[0] - r) * a)},${Math.round(g + (t[1] - g) * a)},${Math.round(b + (t[2] - b) * a)})`;
+};
 
 APP._tmBuildHierarchy = function() {
     const classes = APP.state.classes || [];
@@ -2646,9 +2865,9 @@ APP._tmRender = function(node) {
 
     d3.treemap()
         .size([W, H])
-        .padding(1)
-        .paddingTop(d => d.depth === 0 ? 0 : 20)
-        .paddingInner(1)
+        .paddingOuter(3)
+        .paddingTop(d => d.depth === 0 ? 0 : 22)
+        .paddingInner(3)
         .round(true)
     (subtree);
 
@@ -2666,25 +2885,32 @@ APP._tmRender = function(node) {
         .join('g')
         .attr('transform', d => `translate(${d.x0},${d.y0})`);
 
+    // Couleur de base (branche de premier niveau), robuste en drill-down
+    const baseColorOf = d => {
+        let n = d;
+        while (n.parent && n.parent.depth > 0) n = n.parent;
+        const globalChild = (APP._tmRoot.children || []).find(c => c.data.id === n.data.id);
+        return globalChild ? (branchPalette.get(globalChild.data.id) || '#1e2a3a') : '#1e2a3a';
+    };
+    const fillOf  = d => d.children ? APP._tmMix(baseColorOf(d), -0.18 + d.depth * 0.04) : APP._tmMix(baseColorOf(d), 0.16);
+    const hoverOf = d => d.children ? APP._tmMix(baseColorOf(d), 0.02) : APP._tmMix(baseColorOf(d), 0.34);
+
     // Rectangle de fond
     cell.append('rect')
         .attr('width',  cellW)
         .attr('height', cellH)
-        .attr('rx', 2)
-        .attr('fill', d => {
-            if (d.depth === 0) return '#0d1117';
-            let n = d;
-            while (n.parent && n.parent.depth > 0) n = n.parent;
-            const globalChild = (APP._tmRoot.children || []).find(c => c.data.id === n.data.id);
-            const base = globalChild
-                ? (branchPalette.get(globalChild.data.id) || '#1e2a3a')
-                : '#1e2a3a';
-            return d.children ? base : base + 'cc';
-        })
-        .attr('stroke', '#0d1117')
-        .attr('stroke-width', 1)
-        .attr('fill-opacity', d => d.depth === 0 ? 1 : d.children ? 0.9 : 0.65)
+        .attr('rx', 4)
+        .attr('fill', d => d.depth === 0 ? '#0d1117' : fillOf(d))
+        .attr('stroke', d => d.depth === 0 ? 'none' : 'rgba(13,17,23,0.9)')
+        .attr('stroke-width', 1.5)
         .style('cursor', d => (d.depth > 0) ? 'pointer' : 'default')
+        .style('transition', 'fill .12s')
+        .on('mouseover', function (event, d) {
+            if (d.depth > 0) d3.select(this).attr('fill', hoverOf(d)).attr('stroke', 'rgba(255,255,255,0.55)');
+        })
+        .on('mouseout', function (event, d) {
+            if (d.depth > 0) d3.select(this).attr('fill', fillOf(d)).attr('stroke', 'rgba(13,17,23,0.9)');
+        })
         .on('click', (event, d) => {
             if (d.depth === 0) return;
             event.stopPropagation();
@@ -2702,52 +2928,53 @@ APP._tmRender = function(node) {
             setTimeout(() => { if (typeof ClassEditor !== 'undefined') ClassEditor.restoreSelection(); }, 80);
         });
 
-    // Étiquette des nœuds parents
+    // En-tête des nœuds parents
     cell.filter(d => d.depth > 0 && d.children)
         .append('text')
-        .attr('x', 4)
-        .attr('y', 14)
-        .attr('font-size', d => { const w = cellW(d); return w > 60 ? '11px' : w > 30 ? '9px' : '0px'; })
-        .attr('font-weight', '600')
-        .attr('fill', '#c8d6f0')
+        .attr('x', 7)
+        .attr('y', 15)
+        .attr('font-size', d => { const w = cellW(d); return w > 50 ? '12px' : w > 30 ? '10px' : '0px'; })
+        .attr('font-weight', '500')
+        .attr('fill', '#eef2fb')
         .attr('pointer-events', 'none')
         .text(d => {
             const w = cellW(d);
-            if (w < 20) return '';
-            const maxCh = Math.max(2, Math.floor(w / 7));
+            if (w < 34) return '';
+            const maxCh = Math.max(2, Math.floor(w / 7.5));
             const name = d.data.name || d.data.id;
             return name.length > maxCh ? name.slice(0, maxCh - 1) + '…' : name;
         });
 
-    // Nombre d'enfants pour les parents
+    // Compteur d'enfants, aligné à droite de l'en-tête
     cell.filter(d => d.depth > 0 && d.children)
         .append('text')
-        .attr('x', 4).attr('y', 25)
-        .attr('font-size', '9px')
-        .attr('fill', '#7a8faa')
+        .attr('x', d => cellW(d) - 7).attr('y', 15)
+        .attr('text-anchor', 'end')
+        .attr('font-size', '10px')
+        .attr('fill', 'rgba(255,255,255,0.55)')
         .attr('pointer-events', 'none')
         .text(d => {
-            if (cellW(d) < 50 || cellH(d) < 32) return '';
-            const n = d.leaves().length;
-            return `${n} classe${n > 1 ? 's' : ''}`;
+            if (cellW(d) < 70 || cellH(d) < 30) return '';
+            return d.leaves().length;
         });
 
     // Étiquette des feuilles
     cell.filter(d => !d.children)
         .append('text')
-        .attr('x', 4)
-        .attr('y', d => Math.min(14, cellH(d) - 3))
+        .attr('x', 7)
+        .attr('y', d => Math.min(16, cellH(d) - 3))
         .attr('font-size', d => {
             const w = cellW(d), h = cellH(d), area = w * h;
-            if (area < 400) return '0px';
-            return Math.min(12, Math.max(8, Math.sqrt(area) / 8)) + 'px';
+            if (area < 360) return '0px';
+            return Math.min(13, Math.max(9, Math.sqrt(area) / 8)) + 'px';
         })
-        .attr('fill', '#dde2ee')
+        .attr('font-weight', '500')
+        .attr('fill', '#ffffff')
         .attr('pointer-events', 'none')
         .text(d => {
             const w = cellW(d), h = cellH(d);
-            if (w * h < 400) return '';
-            const maxCh = Math.max(2, Math.floor(w / 6.5));
+            if (w * h < 360) return '';
+            const maxCh = Math.max(2, Math.floor(w / 6.8));
             const name = d.data.name || d.data.id;
             return name.length > maxCh ? name.slice(0, maxCh - 1) + '…' : name;
         });
