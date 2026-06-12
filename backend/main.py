@@ -1384,6 +1384,15 @@ def fetch_builtins():
             "url":    "http://www.w3.org/2002/07/owl",
             "file":   "owl.ttl",
         },
+        {
+            "name":   "skos",
+            "prefix": "skos",
+            "uri":    "http://www.w3.org/2004/02/skos/core#",
+            "url":    "http://www.w3.org/2004/02/skos/core",
+            "file":   "skos.ttl",
+            # SKOS s'appuie sur OWL (qui chaîne vers RDFS → RDF) — pas d'owl:imports formel dans le fichier W3C
+            "forced_imports": ["http://www.w3.org/2002/07/owl"],
+        },
     ]
 
     # Store builtins in ~/.swowl/builtins/ — correctly mapped via container_to_host()

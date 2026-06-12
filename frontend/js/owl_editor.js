@@ -8,6 +8,9 @@ const ALL_ANNO_PROPS = [
     'rdfs:label', 'rdfs:comment', 'rdfs:seeAlso', 'rdfs:isDefinedBy',
     'owl:versionInfo', 'owl:deprecated', 'owl:priorVersion',
     'owl:backwardCompatibleWith', 'owl:incompatibleWith',
+    'skos:prefLabel', 'skos:altLabel', 'skos:hiddenLabel', 'skos:definition',
+    'skos:note', 'skos:scopeNote', 'skos:example', 'skos:editorialNote',
+    'skos:historyNote', 'skos:changeNote',
 ];
 
 // ── OWL ID validation ───────────────────────────────────────
@@ -1114,6 +1117,90 @@ const ClassEditor = {
         } catch (e) { UI.error(e.message); }
     },
 
+    // ── Where Used in Range ───────────────────────────────────
+    /** Panneau listant les ObjectProperties dont le range contient la classe. */
+    _renderRangeUsagePanel(c) {
+        const icoAdd  = `<svg width="9" height="9" viewBox="0 0 9 9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><line x1="4.5" y1="0.5" x2="4.5" y2="8.5"/><line x1="0.5" y1="4.5" x2="8.5" y2="4.5"/></svg>`;
+        const ops     = (APP.state.object_properties || []).filter(p => (p.range || []).includes(c.id));
+        const usedIds = ops.map(p => p.id);
+        const rows = ops.length
+            ? ops.map(p => {
+                const isImp = !!p._imported;
+                const disp  = _displayId(p);
+                return `<div class="cls-list-item${isImp ? ' imported-entity' : ''}" data-id="${p.id}">
+                    <span class="op-prop-dot"></span>
+                    <span class="cls-list-lbl" style="cursor:pointer"
+                          onclick="APP.navigateTo('object-properties','${p.id}')">${_escapeHtml(disp)}</span>
+                    ${isImp ? '' : `<button class="btn-frame-del" onclick="ClassEditor.removeRangeUsage('${p.id}')" title="Remove this class from the property range">✕</button>`}
+                </div>`;
+            }).join('')
+            : '<div class="cls-list-empty" style="padding:6px 8px;font-size:11px;font-style:italic">No property has this class as range</div>';
+        return `
+            <div class="cls-frame">
+                <div class="cls-frame-bar">
+                    <span class="cls-frame-tag cls-frame-tag-blue">Where Used in Range</span>
+                    <span class="nav-count" style="margin-left:6px">${ops.length}</span>
+                    <span style="display:flex;gap:2px;margin-left:auto;flex-shrink:0">
+                        <button class="btn-ftool" title="Add an existing ObjectProperty (set its range to this class)"
+                                onclick="ClassEditor.showPicker('cls-range-picker')">${icoAdd}&thinsp;property</button>
+                        <button class="btn-ftool" title="Create a new ObjectProperty with range = ${c.id}"
+                                onclick="ClassEditor.createOPForClassRange()">
+                            <span class="op-prop-dot" style="width:9px;height:9px;display:inline-block;vertical-align:middle;flex-shrink:0"></span>&thinsp;OP</button>
+                    </span>
+                </div>
+                <div class="cls-frame-body" id="cls-range-list">
+                    ${rows}
+                    <div id="cls-range-picker" class="cls-tree-picker" style="display:none">
+                        ${_opTreePickerItems('ClassEditor.addRangeUsage(this.dataset.id)', usedIds)}
+                    </div>
+                </div>
+            </div>`;
+    },
+
+    /** Ajoute la classe courante au range de l'OP opId. */
+    async addRangeUsage(opId) {
+        const classId = this._selectedId;
+        if (!classId || !opId) return;
+        const op = (APP.state.object_properties || []).find(p => p.id === opId);
+        if (!op || (op.range || []).includes(classId)) return;
+        try {
+            await API.updateOP(opId, { ...op, range: [...(op.range || []), classId] });
+            await APP.refresh();
+            this.selectClass(classId, false);
+        } catch (e) { UI.error(e.message); }
+    },
+
+    /** Retire la classe courante du range de l'OP opId. */
+    async removeRangeUsage(opId) {
+        const classId = this._selectedId;
+        const op = (APP.state.object_properties || []).find(p => p.id === opId);
+        if (!op || !classId) return;
+        try {
+            await API.updateOP(opId, { ...op, range: (op.range || []).filter(r => r !== classId) });
+            await APP.refresh();
+            this.selectClass(classId, false);
+        } catch (e) { UI.error(e.message); }
+    },
+
+    /** Crée une ObjectProperty avec range = classe sélectionnée, puis navigue vers l'onglet OPs. */
+    async createOPForClassRange() {
+        const classId = this._selectedId;
+        if (!classId) return UI.error('Select a class first');
+        const id = OPEditor._generatePropName();
+        const prop = {
+            id, annotations: { labels: [], comments: [] },
+            domain: [], range: [classId], subPropertyOf: [],
+            inverseOf: null, characteristics: {}, propertyChainAxiom: [],
+        };
+        try {
+            await API.createOP(prop);
+            OPEditor._selectedId = id;
+            OPEditor._editingId  = id;
+            await APP.refresh();
+            APP.renderSection('object-properties');
+        } catch (e) { UI.error(e.message); }
+    },
+
     // ── Context menu ──────────────────────────────────────────
 
     showContextMenu(event, id) {
@@ -1336,6 +1423,11 @@ const ClassEditor = {
                     ${RestrictionEditor.renderPanel(restrictions, c)}
                 </div>
             </div>
+
+            <div class="h-resizer"></div>
+
+            <!-- ── Frame : Where Used in Range ── -->
+            ${this._renderRangeUsagePanel(c)}
 
             <div class="h-resizer"></div>
 
@@ -2580,7 +2672,7 @@ function _annoPickerItems(editorName) {
         }).join('');
         // user props under this namespace with no parent
         const allUserIds  = new Set(userProps.map(q => q.id));
-        const allBuiltins = new Set([...AP_BUILTINS['rdfs:'], ...AP_BUILTINS['owl:']].map(q => q.id));
+        const allBuiltins = new Set(Object.values(AP_BUILTINS).flat().map(q => q.id));
         const hasParent   = new Set(Object.values(childrenOf).flat().concat(Object.values(builtinChildrenOf).flat()));
         const nsRoots = userProps
             .filter(q => !hasParent.has(q.id) && q.id.startsWith(ns.replace(':', ':')))
@@ -2589,7 +2681,7 @@ function _annoPickerItems(editorName) {
     };
 
     // Orphan user props (no namespace match, no parent)
-    const allBuiltinIds = new Set([...AP_BUILTINS['rdfs:'], ...AP_BUILTINS['owl:']].map(q => q.id));
+    const allBuiltinIds = new Set(Object.values(AP_BUILTINS).flat().map(q => q.id));
     const hasParent     = new Set(Object.values(childrenOf).flat().concat(Object.values(builtinChildrenOf).flat()));
     const orphans = userProps
         .filter(q => !hasParent.has(q.id) && !q.id.startsWith('rdfs:') && !q.id.startsWith('owl:'))
@@ -6364,6 +6456,18 @@ const AP_BUILTINS = {
         { id: 'owl:backwardCompatibleWith', comment: 'Prior version backward compatible' },
         { id: 'owl:incompatibleWith',       comment: 'Prior version incompatible' },
     ],
+    'skos:': [
+        { id: 'skos:prefLabel',     comment: 'Preferred lexical label' },
+        { id: 'skos:altLabel',      comment: 'Alternative lexical label' },
+        { id: 'skos:hiddenLabel',   comment: 'Hidden lexical label (for search)' },
+        { id: 'skos:definition',    comment: 'Complete explanation of the concept' },
+        { id: 'skos:note',          comment: 'General note' },
+        { id: 'skos:scopeNote',     comment: 'Note clarifying the scope of a concept' },
+        { id: 'skos:example',       comment: 'Example of the use of a concept' },
+        { id: 'skos:editorialNote', comment: 'Editorial note (for editors)' },
+        { id: 'skos:historyNote',   comment: 'Note about changes to a concept' },
+        { id: 'skos:changeNote',    comment: 'Note about a fine-grained change' },
+    ],
 };
 
 const APEditor = {
@@ -6384,7 +6488,7 @@ const APEditor = {
     _anchorId:     null,              // anchor for Shift+Click range selection
     _deselectListener: null,          // document-level mousedown listener
     _editingId:    null,              // original id being edited (null = new)
-    _expanded:     new Set(['rdfs:', 'owl:']),
+    _expanded:     new Set(Object.keys(AP_BUILTINS)),
 
     // ── Shared SVG icons ──────────────────────────────────────
     _svgChild:  ClassEditor._svgChild,
@@ -6396,26 +6500,20 @@ const APEditor = {
     // ── Helpers ───────────────────────────────────────────────
 
     _isBuiltin(id) {
-        return AP_BUILTINS['rdfs:'].some(p => p.id === id)
-            || AP_BUILTINS['owl:'].some(p => p.id === id);
+        return Object.values(AP_BUILTINS).some(arr => arr.some(p => p.id === id));
     },
 
-    _isRoot(id) { return id === 'rdfs:' || id === 'owl:'; },
+    _isRoot(id) { return Object.prototype.hasOwnProperty.call(AP_BUILTINS, id); },
 
     /** Namespace root of a prop id ('rdfs:label' → 'rdfs:', 'myProp' → null) */
     _rootOf(id) {
-        if (id.startsWith('rdfs:')) return 'rdfs:';
-        if (id.startsWith('owl:'))  return 'owl:';
-        return null;
+        return Object.keys(AP_BUILTINS).find(ns => id.startsWith(ns)) || null;
     },
 
     // ── Tree construction ─────────────────────────────────────
 
     _allBuiltinIds() {
-        return new Set([
-            ...AP_BUILTINS['rdfs:'].map(p => p.id),
-            ...AP_BUILTINS['owl:'].map(p => p.id),
-        ]);
+        return new Set(Object.values(AP_BUILTINS).flatMap(arr => arr.map(p => p.id)));
     },
 
     /** Build tree maps for user-defined props.
@@ -6546,8 +6644,7 @@ const APEditor = {
         const orphans = roots.filter(id => !this._rootOf(id));
 
         return `
-        ${renderNsRoot('rdfs:')}
-        ${renderNsRoot('owl:')}
+        ${Object.keys(AP_BUILTINS).map(ns => renderNsRoot(ns)).join('')}
         ${orphans.map(id => this._renderUserNode(id, childrenOf, 1, props)).join('')}`;
     },
 
@@ -6759,7 +6856,7 @@ const APEditor = {
     },
 
     _renderBuiltinDetail(id) {
-        const p = [...AP_BUILTINS['rdfs:'], ...AP_BUILTINS['owl:']].find(x => x.id === id);
+        const p = Object.values(AP_BUILTINS).flat().find(x => x.id === id);
         if (!p) return '';
         return `
         <div class="cls-editor">
@@ -6779,7 +6876,7 @@ const APEditor = {
         const ac         = `onchange="APEditor.autoSave()"`;
         const baseIri    = (APP.state.ontology?.id || '').replace(/#$/, '');
         const propIri    = (p.id && baseIri) ? `${baseIri}#${p.id}` : '';
-        const allBuiltins = [...AP_BUILTINS['rdfs:'], ...AP_BUILTINS['owl:']];
+        const allBuiltins = Object.values(AP_BUILTINS).flat();
         const userProps   = (APP.state.annotation_properties || []).filter(q => q.id !== p.id);
         const currentParents = p.subPropertyOf || [];
         const ico = `<svg width="9" height="9" viewBox="0 0 9 9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><line x1="4.5" y1=".5" x2="4.5" y2="8.5"/><line x1=".5" y1="4.5" x2="8.5" y2="4.5"/></svg>`;
@@ -6921,7 +7018,7 @@ const APEditor = {
             return;
         }
 
-        const allBuiltins = [...AP_BUILTINS['rdfs:'], ...AP_BUILTINS['owl:']];
+        const allBuiltins = Object.values(AP_BUILTINS).flat();
         const userProps   = APP.state.annotation_properties || [];
         const allPropsMap = {};
         allBuiltins.forEach(p => { allPropsMap[p.id] = { id: p.id, subPropertyOf: [] }; });

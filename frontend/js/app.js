@@ -629,7 +629,7 @@ const APP = {
                 <button class="btn-onto-action" onclick="APP._fetchBuiltins()" id="btn-fetch-builtins">
                     <span class="btn-onto-w3c-badge">W3C</span>
                     <span class="btn-onto-label">Fetch W3C Ontologies</span>
-                    <span class="btn-onto-desc">Download RDF, RDFS, OWL from w3.org</span>
+                    <span class="btn-onto-desc">Download RDF, RDFS, OWL, SKOS from w3.org</span>
                 </button>
             </div>
 
@@ -671,13 +671,11 @@ const APP = {
             return;
         }
         // Sort: user ontologies first (alphabetical), then W3C builtins last in dependency order
-        const BUILTIN_ORDER = { 'owl': 1, 'rdfs': 2, 'rdf': 3 };
+        // Ontologies utilisateur d'abord (alphabétique), puis les built-in W3C
+        // (readonly) à la fin, eux aussi par ordre alphabétique → owl, rdf, rdfs, skos.
         list = [...list].sort((a, b) => {
-            const aB = a.readonly ? (BUILTIN_ORDER[a.name] ?? 0) : -1;
-            const bB = b.readonly ? (BUILTIN_ORDER[b.name] ?? 0) : -1;
             if (a.readonly !== b.readonly) return a.readonly ? 1 : -1;
-            if (a.readonly && b.readonly) return aB - bB;
-            return a.name.localeCompare(b.name);
+            return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
         });
         // Resolve URI → registry entry (handles trailing # or not)
         const resolveImport = (uri) =>
@@ -711,6 +709,7 @@ const APP = {
             const path       = parentPath + '/' + name;
             const safeP      = path.replace(/'/g, "\\'");
             const safeN      = name.replace(/'/g, "\\'");
+            const safeU      = uri.replace(/'/g, "\\'");
             const isExpanded = this._ontoImportExpanded.has(path);
             const indent     = depth * 20 + 12;
             const toggle     = hasKids
@@ -724,10 +723,11 @@ const APP = {
                 <td></td>
                 <td colspan="4" style="padding-left:${indent}px;font-size:11px;color:var(--text-dim)">
                     ${toggle}
-                    <span class="${entry ? 'onto-import-link' : 'onto-import-missing'}"
-                          ${entry ? `onclick="event.stopPropagation();APP._scrollToRegistryRow('${safeN}')" title="Go to ${name}"` : ''}>
-                        <code${missing ? '' : ` style="color:var(--text2)"`}>${prefix ? prefix + ':' : ''}</code>
-                        <span style="font-style:italic">${_escapeHtml(uri)}</span>
+                    <span class="${entry ? 'onto-import-link' : 'onto-import-missing'}">
+                        <code ${entry ? `onclick="event.stopPropagation();APP._scrollToRegistryRow('${safeN}')" title="Go to ${name} in registry" style="cursor:pointer${missing ? '' : ';color:var(--text2)'}"` : (missing ? '' : 'style="color:var(--text2)"')}>${prefix ? prefix + ':' : ''}</code><span
+                              style="font-style:italic;cursor:pointer"
+                              onclick="event.stopPropagation();window.open('${safeU}','_blank','noopener')"
+                              title="Open ${_escapeHtml(uri)} in browser">${_escapeHtml(uri)}</span>
                     </span>
                     ${missing ? `<span class="onto-import-warn" title="Cette ontologie importée n'est pas dans le registre">⚠ Not in the registry</span>` : ''}
                 </td>
@@ -739,7 +739,8 @@ const APP = {
             return row + children;
         };
 
-        tbody.innerHTML = list.map(o => {
+        this._ontoList = list;   // mémorisé pour re-render au repli/dépli de la section système
+        const renderRow = (o) => {
             const isConn     = o.connected;
             const isReadonly = o.readonly;
             const safe       = o.name.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
@@ -779,7 +780,30 @@ const APP = {
                     </div>
                 </td>
             </tr>${importRows}`;
-        }).join('');
+        };
+
+        const userList = list.filter(o => !o.readonly);
+        const sysList  = list.filter(o =>  o.readonly);
+        const sysCollapsed = !!this._sysRegistryCollapsed;
+
+        let html = '';
+        if (userList.length) {
+            html += `<tr class="onto-section-hdr"><td colspan="6">USER REGISTRY</td></tr>`;
+            html += userList.map(renderRow).join('');
+        }
+        if (sysList.length) {
+            html += `<tr class="onto-section-hdr onto-section-toggle" onclick="APP.toggleSysRegistry()">
+                <td colspan="6"><span class="onto-section-caret">${sysCollapsed ? '▶' : '▼'}</span> SYSTEM REGISTRY
+                    <span class="onto-section-count">(${sysList.length})</span></td></tr>`;
+            if (!sysCollapsed) html += sysList.map(renderRow).join('');
+        }
+        tbody.innerHTML = html;
+    },
+
+    /** Replie/déplie la section SYSTEM REGISTRY (ontologies W3C). */
+    toggleSysRegistry() {
+        this._sysRegistryCollapsed = !this._sysRegistryCollapsed;
+        if (this._ontoList) this._refreshOntoTable(this._ontoList);
     },
 
     // ── Wizard ────────────────────────────────────────────────

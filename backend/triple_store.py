@@ -16,6 +16,7 @@ from rdflib.namespace import SKOS
 from owl_model import (
     OWLOntology, OWLClass, OWLObjectProperty, OWLDatatypeProperty,
     OWLIndividual, ObjectPropertyAssertion, DataPropertyAssertion,
+    OtherAnnotation,
     SomeValuesFrom, AllValuesFrom, HasValue,
     ExactCardinality, MinCardinality, MaxCardinality,
     UnionOf, IntersectionOf, ComplementOf,
@@ -30,7 +31,21 @@ ANNO_PROP_MAP = {
     'owl:priorVersion':           OWL.priorVersion,
     'owl:backwardCompatibleWith': OWL.backwardCompatibleWith,
     'owl:incompatibleWith':       OWL.incompatibleWith,
+    # SKOS annotation properties
+    'skos:prefLabel':             SKOS.prefLabel,
+    'skos:altLabel':              SKOS.altLabel,
+    'skos:hiddenLabel':           SKOS.hiddenLabel,
+    'skos:definition':            SKOS.definition,
+    'skos:note':                  SKOS.note,
+    'skos:scopeNote':             SKOS.scopeNote,
+    'skos:example':               SKOS.example,
+    'skos:editorialNote':         SKOS.editorialNote,
+    'skos:historyNote':           SKOS.historyNote,
+    'skos:changeNote':            SKOS.changeNote,
 }
+
+# Table inverse {predicate URIRef: id préfixé} — pour capturer les annotations « other » à l'import.
+ANNO_PRED_TO_ID = {pred: pid for pid, pred in ANNO_PROP_MAP.items()}
 
 # Répertoire de configuration utilisateur (persistant, indépendant du volume projet)
 SWOWL_DIR = Path(os.environ.get("SWOWL_DIR", "/host/Users/bernard/.swowl"))
@@ -354,6 +369,14 @@ class TripleStore:
                 comments.append({"lang": cmt.language or "en", "value": str(cmt)})
             return labels, comments
 
+        # ── Helper: collect "other" annotations (rdfs:seeAlso, skos:*, owl:*…) ───
+        def _collect_other(uri_ref):
+            other = []
+            for pred, pid in ANNO_PRED_TO_ID.items():
+                for obj in g.objects(uri_ref, pred):
+                    other.append(OtherAnnotation(property=pid, value=str(obj)))
+            return other
+
         # ── Helper: extract local name with prefix fallback ──────
         def _lid(uri_str_val):
             """Return a prefixed local id — e.g. 'rdf:type', 'rdfs:label', or bare 'MyClass'."""
@@ -446,6 +469,7 @@ class TripleStore:
                 owl_cls = OWLClass(id=local)
                 owl_cls.annotations.labels   = labels
                 owl_cls.annotations.comments = comments
+                owl_cls.annotations.other    = _collect_other(cls_uri)
                 for sup in g.objects(cls_uri, RDFS.subClassOf):
                     if isinstance(sup, URIRef):
                         sup_local = _lid(str(sup))
@@ -475,6 +499,7 @@ class TripleStore:
             prop = OWLObjectProperty(id=local)
             prop.annotations.labels   = labels
             prop.annotations.comments = comments
+            prop.annotations.other    = _collect_other(prop_uri)
             for d in g.objects(prop_uri, RDFS.domain):
                 if isinstance(d, URIRef):
                     dl = _lid(str(d))
@@ -517,6 +542,7 @@ class TripleStore:
             prop = OWLDatatypeProperty(id=local)
             prop.annotations.labels   = labels
             prop.annotations.comments = comments
+            prop.annotations.other    = _collect_other(prop_uri)
             for d in g.objects(prop_uri, RDFS.domain):
                 if isinstance(d, URIRef):
                     dl = _lid(str(d))
@@ -547,6 +573,7 @@ class TripleStore:
                 prop = OWLDatatypeProperty(id=local)
                 prop.annotations.labels   = labels
                 prop.annotations.comments = comments
+                prop.annotations.other    = _collect_other(prop_uri)
                 for d in g.objects(prop_uri, RDFS.domain):
                     if isinstance(d, URIRef):
                         dl = _lid(str(d))
@@ -563,6 +590,7 @@ class TripleStore:
                 prop = OWLObjectProperty(id=local)
                 prop.annotations.labels   = labels
                 prop.annotations.comments = comments
+                prop.annotations.other    = _collect_other(prop_uri)
                 for d in g.objects(prop_uri, RDFS.domain):
                     if isinstance(d, URIRef):
                         dl = _lid(str(d))
@@ -651,6 +679,7 @@ class TripleStore:
             ind = OWLIndividual(id=local)
             ind.annotations.labels   = labels
             ind.annotations.comments = comments
+            ind.annotations.other    = _collect_other(ind_uri)
             # rdf:type assertions (class memberships, skip owl:NamedIndividual itself)
             for t in g.objects(ind_uri, RDF.type):
                 if isinstance(t, URIRef) and t != OWL.NamedIndividual:

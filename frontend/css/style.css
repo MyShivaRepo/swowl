@@ -1742,6 +1742,19 @@ small { color: var(--text-faint); font-size: 10px; }
 }
 .onto-current-row strong { color: var(--accent); }
 .onto-current-row code  { color: var(--accent); font-weight: 600; }
+/* Section headers : USER REGISTRY / SYSTEM REGISTRY */
+.onto-section-hdr td {
+  background: var(--bg3);
+  border-top: 1px solid var(--border);
+  padding: 5px 10px;
+  font-size: 10px; font-weight: 700; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--text-dim);
+  user-select: none;
+}
+.onto-section-toggle td { cursor: pointer; }
+.onto-section-toggle:hover td { background: var(--bg4); }
+.onto-section-caret { display: inline-block; width: 12px; font-size: 9px; }
+.onto-section-count { color: var(--text-faint); font-weight: 400; }
 /* Read-only W3C ontology row */
 .onto-readonly-row td { opacity: 0.75; }
 .onto-readonly-row strong { font-weight: 500; }
