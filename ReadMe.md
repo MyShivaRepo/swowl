@@ -1,7 +1,11 @@
 # 🦉 SWOWL — OWL/SWRL Editor
 
+![version](https://img.shields.io/badge/version-1.0.0-blue)
+
 Web editor for **OWL 2 DL** ontologies: classes, properties, individuals,
 **SWRL** rules, visual **SPARQL** queries, and a real-time inference engine.
+
+> **Current version: 1.0.0** — see the [CHANGELOG](CHANGELOG.md) for the full feature list.
 
 Architecture: Nginx frontend (vanilla JS) + FastAPI backend + rdflib triple store,
 all running in Docker.
@@ -35,9 +39,12 @@ docker compose up --build
   with their prefix.
 - **SWRL** — visual rule editor with live preview.
 - **SPARQL** — visual query builder (VizQ).
+- **SKOS** — `skos:` annotations (prefLabel, altLabel, definition…) imported and editable.
 - **Real-time inference** — transitivity, restriction inheritance, types via
   domain/range, inverse, property chains, violation detection…
-- **Import / Export** — OWL/XML, Turtle, JSON-LD, SWORD.
+- **Import / Export** — OWL/XML, Turtle, JSON-LD, SWORD (rules import/export).
+- **Consistent UX** — homogeneous filter+tree pickers everywhere, global search,
+  undo/redo, USER/SYSTEM ontology registry.
 
 ## Persistence
 
