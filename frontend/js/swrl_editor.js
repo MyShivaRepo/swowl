@@ -207,7 +207,8 @@ const SWRLEditor = {
     importRules() {
         const input = document.createElement('input');
         input.type = 'file';
-        input.accept = '.sword,text/plain';
+        // Pas de filtre d'extension : macOS/WebKit grise les .sword (extension inconnue).
+        // Le contenu est de toute façon validé par le parseur SWORD côté backend.
         input.onchange = async () => {
             const file = input.files && input.files[0];
             if (!file) return;

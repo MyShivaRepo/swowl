@@ -484,6 +484,16 @@ class TripleStore:
                         dj_local = _lid(str(dj))
                         if dj_local:
                             owl_cls.disjointWith.append(dj_local)
+                # equivalentClass : classe nommée OU restriction anonyme (ex. ≡ ∃hasPart.Part)
+                for eq in g.objects(cls_uri, OWL.equivalentClass):
+                    if isinstance(eq, URIRef):
+                        eq_local = _lid(str(eq))
+                        if eq_local:
+                            owl_cls.equivalentClass.append(eq_local)
+                    elif isinstance(eq, BNode):
+                        restr = _parse_restriction(eq)
+                        if restr is not None:
+                            owl_cls.equivalentClass.append(restr)
                 onto.classes.append(owl_cls)
 
         # ── Object Properties: owl:ObjectProperty ───────────────
@@ -548,8 +558,11 @@ class TripleStore:
                     dl = _lid(str(d))
                     if dl: prop.domain.append(dl)
             for r in g.objects(prop_uri, RDFS.range):
-                rl = _lid(str(r)) if isinstance(r, URIRef) else str(r).replace(base, "").replace(str(XSD), "xsd:")
-                if rl: prop.range.append(rl)
+                if isinstance(r, URIRef):
+                    rl = _lid(str(r))
+                    if rl: prop.range.append(rl)
+                # else : owl:DataRange/oneOf (datatype énuméré) — non modélisé,
+                #        on ignore le nœud anonyme (évitait un id illisible 'Nxxxx')
             for sp in g.objects(prop_uri, RDFS.subPropertyOf):
                 if isinstance(sp, URIRef):
                     sl = _lid(str(sp))
@@ -667,6 +680,20 @@ class TripleStore:
             types_of = set(g.objects(ind_uri, RDF.type))
             if not (types_of & _owl_structural):
                 ind_candidates.add(ind_uri)
+        # + Individus typés par une classe utilisateur (style OWL 1 / Protégé :
+        #   <MyClass rdf:ID="x"/>  →  x rdf:type :MyClass, sans owl:NamedIndividual)
+        class_uris = set(g.subjects(RDF.type, OWL.Class)) | set(g.subjects(RDF.type, RDFS.Class))
+        for cls_uri in class_uris:
+            if not isinstance(cls_uri, URIRef):
+                continue
+            for subj in g.subjects(RDF.type, cls_uri):
+                if not isinstance(subj, URIRef):
+                    continue
+                types_of = set(g.objects(subj, RDF.type))
+                # Exclure ce qui est lui-même une entité structurelle (classe, propriété…)
+                if types_of & _owl_structural:
+                    continue
+                ind_candidates.add(subj)
         seen_ind = set()
         for ind_uri in ind_candidates:
             if not isinstance(ind_uri, URIRef) or str(ind_uri) in seen_ind:

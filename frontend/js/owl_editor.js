@@ -447,9 +447,17 @@ function _applyReadOnly(detail) {
     detail.querySelectorAll('input, select, textarea, button').forEach(el => { el.disabled = true; });
 }
 
-/** Display id of an entity: prefixed with its import prefix when imported. */
+/** Display id of an entity, préfixé :
+ *  - entité importée → préfixe d'import,
+ *  - entité propre   → préfixe de l'ontologie connectée (APP.state.ontology.prefix),
+ *  - id déjà namespacé (contient ':') ou builtin → inchangé. */
 function _displayId(entity) {
-    return entity?._imported ? `${entity._importPrefix}:${entity.id}` : (entity?.id ?? '');
+    if (!entity) return '';
+    if (entity._imported) return `${entity._importPrefix}:${entity.id}`;
+    const id = entity.id ?? '';
+    if (!id || id.includes(':')) return id;            // owl:Thing, xsd:…, rdfs:label
+    const p = (typeof APP !== 'undefined') ? APP.state?.ontology?.prefix : '';
+    return p ? `${p}:${id}` : id;
 }
 
 /** True if the entity with this id in APP.state[stateKey] is imported. */
@@ -4744,12 +4752,12 @@ const IndividualEditor = {
 
         return filtered.map(ind => {
             const isImported = !!ind._imported;
-            const prefix    = isImported ? `${ind._importPrefix}:` : '';
+            const dispId    = _displayId(ind);   // préfixé : import OU ontologie connectée
             const dispLabel = this._resolveDisplayLabel(ind, this._selectedClassId);
-            // Display Name présent → libellé en haut + ID (préfixé si importé) en dessous ;
-            // sinon → juste l'ID (préfixé si importé) en taille normale.
-            const mainText  = dispLabel ? dispLabel : `${prefix}${ind.id}`;
-            const subText   = dispLabel ? `${prefix}${ind.id}` : '';
+            // Display Name présent → libellé en haut + ID préfixé en dessous ;
+            // sinon → juste l'ID préfixé en taille normale.
+            const mainText  = dispLabel ? dispLabel : dispId;
+            const subText   = dispLabel ? dispId : '';
             const importedClass = isImported ? ' imported-entity' : '';
             const dragAttrs = isImported ? '' :
                 `draggable="true"
@@ -4910,6 +4918,23 @@ const IndividualEditor = {
                 <span><strong>${n}</strong> individuals selected</span>
             </div>`;
         }
+    },
+
+    /** Sélectionne un individu ET sa classe : surligne la classe (col 1),
+     *  reconstruit la liste de cette classe (col 2), sélectionne l'individu
+     *  (col 2 + col 3) et le fait défiler à la vue. Utilisé par les navigations
+     *  externes (résultats SPARQL, recherche globale, historique). */
+    focusIndividual(id, _hist = true) {
+        const ind = (APP.state.individuals || []).find(x => x.id === id);
+        if (!ind) { this.selectIndividual(id, false, _hist); return; }
+        // Classe représentative : 1er type "réel" (hors owl:NamedIndividual), sinon « All »
+        const cls = (ind.types || []).find(t => t && t !== 'owl:NamedIndividual') || null;
+        this.selectClass(cls);              // col 1 (surligne la classe) + col 2 (liste filtrée)
+        this.selectIndividual(id, false, _hist);  // col 2 (surligne l'individu) + col 3 (formulaire)
+        // Défile l'individu à la vue dans la colonne 2
+        const sel = (window.CSS && CSS.escape) ? CSS.escape(id) : id.replace(/"/g, '\\"');
+        document.querySelector(`#ind-list-scroll .tree-item[data-id="${sel}"]`)
+            ?.scrollIntoView({ block: 'nearest' });
     },
 
     newIndividual() {

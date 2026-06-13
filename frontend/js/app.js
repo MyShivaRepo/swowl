@@ -400,7 +400,7 @@ const APP = {
         this._applyEntityId(state.section, state.entityId);
         this.renderSection(state.section);
         if (state.section === 'individuals' && state.entityId) {
-            IndividualEditor.selectIndividual(state.entityId, false, false);
+            IndividualEditor.focusIndividual(state.entityId, false);
         }
         this._historyRestoring = false;
         this._updateNavButtons();
@@ -444,7 +444,7 @@ const APP = {
         this._applyEntityId(section, entityId);
         this.renderSection(section);
         if (section === 'individuals') {
-            IndividualEditor.selectIndividual(entityId, false, false);
+            IndividualEditor.focusIndividual(entityId, false);
         }
         this._updateNavButtons();
     },
@@ -534,7 +534,6 @@ const APP = {
                 break;
             case 'queries':
                 main.innerHTML = APP.renderQueries();
-                if (APP._queriesTab === 'sparnatural') setTimeout(() => APP._initSparnatural(), 80);
                 if (APP._queriesTab === 'vizq')        SparqlEditor.restoreSelection();
                 break;
             case 'inferences':
@@ -1294,7 +1293,7 @@ const APP = {
             top:${rect.bottom+2}px;left:${rect.left}px;overflow:hidden`;
         const items = kind === 'onto'
             ? [{ label: '↓ OWL (.owl)', fmt: 'owl' }, { label: '↓ Turtle (.ttl)', fmt: 'ttl' }]
-            : [{ label: '↓ SWRL (.json)', fmt: 'swrl' }, { label: '↓ SWORD (.sword)', fmt: 'sword' }];
+            : [{ label: '↓ SWRL (.json)', fmt: 'swrl' }, { label: '↓ SWORD (.swd)', fmt: 'sword' }];
         items.forEach(({ label, fmt }) => {
             const item = document.createElement('div');
             item.textContent = label;
@@ -1316,7 +1315,7 @@ const APP = {
     async exportOntologyByName(name, fmt) {
         try {
             const blob = await API.exportOntologyByName(name, fmt);
-            const ext  = fmt === 'owl' ? 'owl' : fmt === 'ttl' ? 'ttl' : fmt === 'swrl' ? 'json' : fmt === 'sword' ? 'sword' : 'jsonld';
+            const ext  = fmt === 'owl' ? 'owl' : fmt === 'ttl' ? 'ttl' : fmt === 'swrl' ? 'json' : fmt === 'sword' ? 'swd' : 'jsonld';
             const url  = URL.createObjectURL(blob);
             const a    = document.createElement('a');
             a.href     = url;
@@ -1667,7 +1666,7 @@ const UndoRedo = {
             APP._applyEntityId(snap.section, snap.entityId);
             APP.renderSection(snap.section);
             if (snap.section === 'individuals' && snap.entityId) {
-                IndividualEditor.selectIndividual(snap.entityId, false, false);
+                IndividualEditor.focusIndividual(snap.entityId, false);
             }
             APP._historyRestoring = false;
         } else {
@@ -2019,29 +2018,10 @@ APP.renderQueries = function() {
     const sidebar = `
         <div style="width:160px;flex-shrink:0;border-right:1px solid var(--border);padding:8px 0">
             ${tabBtn('vizq',        '🎯', 'SPARQL VizQ')}
-            ${tabBtn('sparnatural', '🔎', 'Sparnatural')}
         </div>`;
 
     // ── Tab content ───────────────────────────────────────────────
-    let content = '';
-
-    if (tab === 'sparnatural') {
-        content = `
-        <div style="display:flex;flex-direction:column;height:100%;overflow:hidden">
-            <div id="sparnatural-wrap"
-                 style="flex-shrink:0;padding:16px;border-bottom:1px solid var(--border);
-                        background:var(--bg2)">
-                <p style="color:var(--text-dim);font-style:italic;font-size:13px">
-                    Chargement de Sparnatural…
-                </p>
-            </div>
-            <div style="flex:1;overflow-y:auto">
-                <div id="sparnatural-results" style="padding:16px"></div>
-            </div>
-        </div>`;
-    } else if (tab === 'vizq') {
-        content = SparqlEditor.renderSplit();
-    }
+    const content = SparqlEditor.renderSplit();
 
     return `
     <div style="height:100%;display:flex;overflow:hidden">
@@ -2050,121 +2030,6 @@ APP.renderQueries = function() {
             ${content}
         </div>
     </div>`;
-};
-
-APP._initSparnatural = function() {
-    const wrap = document.getElementById('sparnatural-wrap');
-    if (!wrap) return;
-
-    // Attendre que le custom element soit enregistré (max 5s)
-    const maxWait = 5000;
-    const start   = Date.now();
-    const tryInit = () => {
-        if (customElements.get('spar-natural')) {
-            APP._doInitSparnatural(wrap);
-        } else if (Date.now() - start < maxWait) {
-            setTimeout(tryInit, 200);
-        } else {
-            wrap.innerHTML = `<p style="color:#f87171;font-size:13px">
-                ⚠ Sparnatural could not be loaded from
-                <a href="https://cdn.jsdelivr.net/npm/sparnatural@9.1.6/dist/sparnatural.js"
-                   target="_blank" style="color:#60a5fa">jsdelivr.net</a> —
-                please check your network connection.
-            </p>`;
-        }
-    };
-    tryInit();
-};
-
-APP._doInitSparnatural = function(wrap) {
-
-    wrap.innerHTML = `
-        <spar-natural
-            id="sparnatural-widget"
-            src="/api/sparnatural-config"
-            endpoint="/api/sparql"
-            language="${(typeof Settings !== 'undefined' && Settings.preferredLang) || 'en'}"
-            defaultlang="${(typeof Settings !== 'undefined' && Settings.preferredLang) || 'en'}"
-            limit="1000"
-            style="--sparnatural-primary-color:#3b82f6;
-                   --sparnatural-secondary-color:#1d2535;
-                   --sparnatural-background-color:#161b24;
-                   --sparnatural-text-color:#e2e8f0;
-                   --sparnatural-border-color:#2a3347;">
-        </spar-natural>`;
-
-    // Écouter les événements Sparnatural
-    const widget = document.getElementById('sparnatural-widget');
-    if (!widget) return;
-
-    widget.addEventListener('queryUpdated', async (e) => {
-        const sparql = e.detail.queryString;
-        if (!sparql) return;
-        await APP._runSparqlQuery(sparql);
-    });
-
-    widget.addEventListener('submit', async (e) => {
-        const sparql = e.detail.queryString;
-        if (!sparql) return;
-        await APP._runSparqlQuery(sparql);
-    });
-};
-
-APP._runSparqlQuery = async function(sparql) {
-    const resultsDiv = document.getElementById('sparnatural-results');
-    if (!resultsDiv) return;
-    resultsDiv.innerHTML = '<p style="color:var(--text-dim);font-style:italic;font-size:12px">Running…</p>';
-    try {
-        const res = await fetch('/api/sparql', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: 'query=' + encodeURIComponent(sparql),
-        });
-        if (!res.ok) throw new Error(await res.text());
-        const data = await res.json();
-        APP._renderSparqlResults(resultsDiv, data);
-    } catch (e) {
-        resultsDiv.innerHTML = `<p style="color:#f87171;font-size:12px">⚠ Error: ${_escapeHtml(e.message)}</p>`;
-    }
-};
-
-APP._renderSparqlResults = function(container, data) {
-    const vars = data.head?.vars || [];
-    const rows = data.results?.bindings || [];
-
-    if (!vars.length) {
-        container.innerHTML = '<p style="color:var(--text-dim);font-size:12px;font-style:italic">No results.</p>';
-        return;
-    }
-
-    const shortVal = (binding) => {
-        if (!binding) return '';
-        const v = binding.value || '';
-        if (binding.type === 'uri') {
-            // Raccourcir les URIs longues
-            const hash = v.lastIndexOf('#');
-            const slash = v.lastIndexOf('/');
-            const local = v.substring(Math.max(hash, slash) + 1);
-            return `<span title="${v}" style="color:var(--accent);cursor:default">${local || v}</span>`;
-        }
-        return `<span style="color:var(--text1)">${v}</span>`;
-    };
-
-    const thead = `<tr>${vars.map(v => `<th style="padding:6px 12px;text-align:left;border-bottom:1px solid var(--border2);color:var(--text-dim);font-size:11px;font-weight:600;text-transform:uppercase">${v}</th>`).join('')}</tr>`;
-    const tbody = rows.map(row =>
-        `<tr style="border-bottom:1px solid var(--border)">${vars.map(v => `<td style="padding:5px 12px;font-size:12px">${shortVal(row[v])}</td>`).join('')}</tr>`
-    ).join('');
-
-    container.innerHTML = `
-        <div style="font-size:11px;color:var(--text-dim);margin-bottom:8px">
-            ${rows.length} result${rows.length > 1 ? 's' : ''}
-        </div>
-        <div style="overflow-x:auto">
-            <table style="width:100%;border-collapse:collapse;background:var(--bg3);border-radius:4px;overflow:hidden">
-                <thead style="background:var(--bg2)">${thead}</thead>
-                <tbody>${tbody}</tbody>
-            </table>
-        </div>`;
 };
 
 // ── Views UI ──────────────────────────────────────────────────

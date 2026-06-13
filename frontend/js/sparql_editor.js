@@ -800,7 +800,7 @@ const SparqlEditor = {
                 !Object.keys(IndividualEditor._displayPropsMulti || {}).length)
                 IndividualEditor._loadDisplayRules?.();
             const dispName = IndividualEditor._resolveDisplayLabel(e, null) || null;
-            return { section: 'individuals',           fn: () => IndividualEditor.selectIndividual(local), dot: 'xsd-dot',       displayName: dispName !== local ? dispName : null, entityId: local };
+            return { section: 'individuals',           fn: () => IndividualEditor.focusIndividual(local),  dot: 'xsd-dot',       displayName: dispName !== local ? dispName : null, entityId: local };
         }
         if ((e = (s.object_properties || []).find(x => x.id === local)))
             return { section: 'object-properties',     fn: () => OPEditor.selectProp(local),               dot: 'op-prop-dot',   displayName: _dispLabel(e), entityId: local };
