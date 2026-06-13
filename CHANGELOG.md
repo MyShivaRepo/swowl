@@ -21,18 +21,33 @@ First stable release. A complete web editor for **OWL 2 DL** ontologies with
 
 ### SWRL
 - Visual rule editor with live preview and atom reordering (drag handle).
-- **Import / export `.sword`** (human-readable rule format), with round-trip
+- **Import / export `.swd`** (SWORD human-readable rule format), with round-trip
   preservation of NAF negation, conditional sub-rules, equality and empty-class
-  atoms; ID-collision dialog on import (replace / keep / cancel).
+  atoms; ID-collision dialog on import (replace / keep / cancel). The import file
+  picker accepts any file (content validated by the parser).
 
 ### SPARQL (VizQ)
 - Visual query builder; triple deletion via a red `✕` and drag-handle reordering
   of patterns (root list and OPTIONAL blocks).
+- Clicking an individual in the results selects it completely (class tree +
+  individual list + form).
+
+### Views
+- **Ontology (Hyperbolic)** — animated Poincaré-disk hyperbolic tree on canvas
+  (Möbius transforms): drag to pan, click to re-centre, double-click to edit,
+  hover to highlight a sub-branch.
+- **Ontology (TreeMap)** — restyled treemap: vibrant per-branch palette, depth
+  shading, rounded tiles, hover highlight, drill-down.
+- **Knowledge Base** — force-directed individuals graph.
+- Resizable sub-tab sidebar.
 
 ### Import / Export
 - OWL/XML, Turtle, JSON-LD, SWORD.
 - Import of **SKOS annotations** (prefLabel, altLabel, definition, note…) and
   `rdfs:seeAlso` into each entity's annotations.
+- Robust import: individuals typed by a user class (Protégé `<Class rdf:ID>`),
+  `owl:equivalentClass` (named or restriction), anonymous `owl:DataRange` ranges
+  ignored.
 - W3C built-in ontologies (RDF, RDFS, OWL, **SKOS**) fetchable from w3.org.
 
 ### Ontologies registry
@@ -50,6 +65,8 @@ First stable release. A complete web editor for **OWL 2 DL** ontologies with
 - Homogeneous pickers across the whole app — a **Filter** field on top and a
   **tree-mode** presentation everywhere.
 - Consistent red `✕` delete controls, positioned right after the element they remove.
+- Entity display prefix driven by the registry prefix (defined → `rohs:Part`;
+  empty → bare local id).
 - Global search, undo/redo, navigation history, hideable tabs.
 
 ### Tech
