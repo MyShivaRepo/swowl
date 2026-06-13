@@ -772,7 +772,13 @@ const APP = {
                     onclick="API.revealInFinder('${o.path.replace(/'/g,"\\'")}').catch(e=>UI.warn('Start host_agent.py to enable Finder reveal.'))"
                     style="font-size:11px;color:var(--text-dim);cursor:pointer">${dirPath}</td>
                 <td><code>${o.prefix}</code></td>
-                <td class="onto-iri-cell"><code style="font-size:11px">${o.uri}</code></td>
+                <td class="onto-iri-cell">${o.uri
+                    ? `<code class="onto-ns-link" title="Ouvrir le namespace dans le navigateur"
+                            style="font-size:11px;color:var(--accent);cursor:pointer;text-decoration:underline;text-decoration-style:dotted"
+                            onclick="event.stopPropagation();window.open('${o.uri.replace(/'/g,"\\'")}','_blank','noopener')"
+                            onmouseover="this.style.textDecorationStyle='solid'"
+                            onmouseout="this.style.textDecorationStyle='dotted'">${o.uri}</code>`
+                    : `<code style="font-size:11px;color:var(--text-faint)">—</code>`}</td>
                 <td style="white-space:nowrap">
                     <div style="display:flex;gap:4px;align-items:center;justify-content:flex-end">
                         ${actions}
