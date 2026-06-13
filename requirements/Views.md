@@ -7,11 +7,12 @@
 ### Substance
 - [REQ-VW-003 — Building the class hierarchy tree](#req-vw-003--building-the-class-hierarchy-tree)
 - [REQ-VW-004 — Resolving the best class label](#req-vw-004--resolving-the-best-class-label)
-- [REQ-VW-005 — Hyperbolic layout algorithm (Poincaré disk)](#req-vw-005--hyperbolic-layout-algorithm-poincaré-disk)
-- [REQ-VW-007 — Click on a node: centering via Möbius transformation](#req-vw-007--click-on-a-node-centering-via-möbius-transformation)
-- [REQ-VW-008 — Double-click (second click at center): navigation to the class editor](#req-vw-008--double-click-second-click-at-center-navigation-to-the-class-editor)
-- [REQ-VW-009 — Resetting focus to the root](#req-vw-009--resetting-focus-to-the-root)
-- [REQ-VW-010 — Filtering classes by text in the hyperbolic graph](#req-vw-010--filtering-classes-by-text-in-the-hyperbolic-graph)
+- [REQ-VW-005 — Hyperbolic layout on a Poincaré disk (canvas)](#req-vw-005--hyperbolic-layout-on-a-poincaré-disk-canvas)
+- [REQ-VW-007 — Click on a node: animated re-centering via Möbius transformation](#req-vw-007--click-on-a-node-animated-re-centering-via-möbius-transformation)
+- [REQ-VW-008 — Double-click on a node: navigation to the class editor](#req-vw-008--double-click-on-a-node-navigation-to-the-class-editor)
+- [REQ-VW-009 — Drag to pan the hyperbolic plane](#req-vw-009--drag-to-pan-the-hyperbolic-plane)
+- [REQ-VW-010 — Node hover: highlighting the sub-branch](#req-vw-010--node-hover-highlighting-the-sub-branch)
+- [REQ-VW-030 — Building the Ontology tree for the visualizations](#req-vw-030--building-the-ontology-tree-for-the-visualizations)
 - [REQ-VW-013 — Building nodes (individuals) and links (assertions)](#req-vw-013--building-nodes-individuals-and-links-assertions)
 - [REQ-VW-014 — Color palette by class](#req-vw-014--color-palette-by-class)
 - [REQ-VW-015 — Resolving the best individual label](#req-vw-015--resolving-the-best-individual-label)
@@ -25,8 +26,8 @@
 
 ### Form
 - [REQ-VW-001 — Rendering the Views tab with sub-tabs](#req-vw-001--rendering-the-views-tab-with-sub-tabs)
-- [REQ-VW-002 — "Ontology" sub-tab: D3 hyperbolic tree](#req-vw-002--ontology-sub-tab-d3-hyperbolic-tree)
-- [REQ-VW-006 — SVG drawing of nodes and edges with proportional opacity and size](#req-vw-006--svg-drawing-of-nodes-and-edges-with-proportional-opacity-and-size)
+- [REQ-VW-002 — "Ontology (Hyperbolic)" sub-tab: canvas hyperbolic tree](#req-vw-002--ontology-hyperbolic-sub-tab-canvas-hyperbolic-tree)
+- [REQ-VW-006 — Canvas rendering: focus+context and curved edges colored by branch](#req-vw-006--canvas-rendering-focuscontext-and-curved-edges-colored-by-branch)
 - [REQ-VW-011 — Class counter displayed in the toolbar](#req-vw-011--class-counter-displayed-in-the-toolbar)
 - [REQ-VW-012 — "Knowledge Base" sub-tab: D3 force graph](#req-vw-012--knowledge-base-sub-tab-d3-force-graph)
 - [REQ-VW-016 — Class legend in the Knowledge Base graph](#req-vw-016--class-legend-in-the-knowledge-base-graph)
@@ -35,6 +36,8 @@
 - [REQ-VW-019 — Property labels on edges](#req-vw-019--property-labels-on-edges)
 - [REQ-VW-021 — Node hover: connection highlighting](#req-vw-021--node-hover-connection-highlighting)
 - [REQ-VW-026 — Individual and connection counter](#req-vw-026--individual-and-connection-counter)
+- [REQ-VW-031 — "Ontology (TreeMap)" sub-tab: restyled proportional map](#req-vw-031--ontology-treemap-sub-tab-restyled-proportional-map)
+- [REQ-VW-032 — Resizable Views sidebar](#req-vw-032--resizable-views-sidebar)
 
 ---
 
@@ -51,7 +54,7 @@
 
 ---
 
-**Source code:** `app.js` → `APP._initHyperbolicGraph()` — Builds a `classMap` indexed by `id`, computes parents via `subClassOf`, elevates classes with no internal parent under a virtual `owl:Thing` node, and recursively builds the hierarchy via `buildNode(id, depth)`, each node exposing `{ id, depth, label, hpos, basePos, children }`.
+**Source code:** `app.js` → `APP._buildOntologyTreeData()` — Builds a `classMap` indexed by `id`, computes parents via `subClassOf`, elevates classes with no internal parent under a virtual root node `owl:Thing`, and recursively builds the hierarchy, each node exposing its `id`, its `depth`, its `label`, and its `children`. This tree feeds both the hyperbolic visualization and the TreeMap visualization.
 
 ### REQ-VW-004 — Resolving the best class label
 
@@ -63,59 +66,69 @@
 
 **Source code:** `app.js` → `APP._hypBestLabel(cls)` — Searches in `cls.annotations` for an `rdfs:label` or `label` annotation matching `Settings.preferredLang`, takes the first available annotation if no match is found, and returns `cls.id` if no annotation exists.
 
-### REQ-VW-005 — Hyperbolic layout algorithm (Poincaré disk)
+### REQ-VW-005 — Hyperbolic layout on a Poincaré disk (canvas)
 
-| **If** | the ontologist visualizes the class tree in the hyperbolic graph, |
+| **If** | the ontologist visualizes the class tree in the "Ontology (Hyperbolic)" sub-tab, |
 |---|---|
-| **Then** | `classes` are arranged in a hyperbolic space of the Poincaré disk type: each hierarchy level is evenly spaced, the children of a node are distributed in equal angular sectors around their parent, and translations between levels respect hyperbolic geometry. |
+| **Then** | `classes` are arranged in a hyperbolic space of the Poincaré disk type: each hierarchy level is evenly spaced, the children of a node are distributed in equal angular sectors around their parent, and translations between levels respect hyperbolic geometry (Möbius transformations). |
 
 ---
 
-**Source code:** `app.js` → `APP._initHyperbolicGraph()` (internal functions `layoutNode`, `cadd`, `csub`, `cmul`, `cconj`, `cabs`, `cdiv`, `polar`, `mobiusFocus`, `mobiusTranslate`) — Uses `STEP_R = Math.tanh(0.4)` for inter-level spacing, distributes children via `layoutNode(node, pos, angle, wedge)`, and performs hyperbolic translations via `mobiusTranslate(z, a)`.
+**Source code:** `app.js` → `APP._initOntology2()` — Builds the tree via `APP._buildOntologyTreeData()` (root `owl:Thing`, hierarchy derived from `subClassOf`), then recursively places each node on the Poincaré disk using complex arithmetic and Möbius transformations, distributing children in equal angular sectors and evenly spacing the levels. Rendering is performed on an HTML5 `<canvas>` element, with no external library (pure canvas).
 
-### REQ-VW-007 — Click on a node: centering via Möbius transformation
+### REQ-VW-007 — Click on a node: animated re-centering via Möbius transformation
 
 | **If** | the ontologist clicks on a class in the hyperbolic graph to explore it, |
 |---|---|
-| **Then** | the selected class moves to the center of the disk, allowing it to be brought into focus and its nearby neighbors to be visualized with more detail. |
+| **Then** | the selected class glides to the center of the disk via a smooth animation, allowing it to be brought into focus and its nearby neighbors to be visualized with more detail. |
 
 ---
 
-**Source code:** `app.js` → `APP._hypClick(node)` — If the distance from the node to the center is greater than 0.02, computes `mobiusFocus(n.hpos, a)` for each node to recenter the clicked node, then calls `APP._hypDraw(true)` to animate the transition.
+**Source code:** `app.js` → `APP._initOntology2()` — On a node click (a `pointerup` with `moved < 3`), calls the internal `glide(n)` function, which re-centers the node at the center of the disk through successive Möbius translations (`applyT`) animated via `requestAnimationFrame`, redrawing the canvas on each frame.
 
-### REQ-VW-008 — Double-click (second click at center): navigation to the class editor
+### REQ-VW-008 — Double-click on a node: navigation to the class editor
 
-| **If** | the ontologist double-clicks on a class at the center of the hyperbolic graph to edit it, |
+| **If** | the ontologist double-clicks on a class in the hyperbolic graph to edit it, |
 |---|---|
-| **Then** | the application automatically navigates to the editing form of that class, without any additional interaction. |
+| **Then** | the application automatically navigates to the editing form of that class (Classes tab), without any additional interaction. |
 
 ---
 
-**Source code:** `app.js` → `APP._hypClick(node)` — If the distance from the node to the center is less than 0.10 and the `id` is not `'owl:Thing'`, calls `APP.navigate('classes')`, then after 80 ms sets `ClassEditor._selectedId = node.id` and calls `ClassEditor.restoreSelection()`.
+**Source code:** `app.js` → `APP._initOntology2()` — On the `dblclick` event, if the targeted node has an `id` distinct from the `owl:Thing` root, calls `APP.navigateTo('classes', n.id)`, which navigates to the Classes tab and selects the corresponding class.
 
-### REQ-VW-009 — Resetting focus to the root
+### REQ-VW-009 — Drag to pan the hyperbolic plane
 
-| **If** | the ontologist wishes to return to the overview of the `ontology` after navigating in the hyperbolic graph, |
+| **If** | the ontologist drags within the hyperbolic graph, |
 |---|---|
-| **Then** | the graph returns to its initial layout, with all `classes` repositioned to their starting location, accompanied by a return animation. |
+| **Then** | the entire hyperbolic plane is panned to follow the cursor movement, allowing free exploration of the tree without re-centering on a particular node. |
 
 ---
 
-**Source code:** `app.js` → `APP._hypReset()` — Copies `basePos` into `hpos` for all nodes in `APP._hypNodes`, then calls `APP._hypDraw(true)` to animate the return.
+**Source code:** `app.js` → `APP._initOntology2()` — The pointer handlers (`pointerdown` / `pointermove` / `pointerup`) track a `dragging` state and apply to the hyperbolic plane a translation (`applyT`) proportional to the cursor displacement, redrawing the canvas during the drag (`grabbing` cursor).
 
-### REQ-VW-010 — Filtering classes by text in the hyperbolic graph
+### REQ-VW-010 — Node hover: highlighting the sub-branch
 
-| **If** | the ontologist types a term to search for a class in the hyperbolic graph, |
+| **If** | the ontologist hovers over a class in the hyperbolic graph, |
 |---|---|
-| **Then** | `classes` whose name or identifier matches the entered term are visually highlighted, while other `classes` remain visible but without highlighting. |
+| **Then** | the sub-branch rooted at that node (the node and its descendants) is highlighted, while the other `classes` are dimmed, allowing focus on the relevant portion of the hierarchy. |
 
-| **If** | the ontologist clears the search term, |
+| **If** | the ontologist leaves the node, |
 |---|---|
-| **Then** | all `classes` return to their normal appearance and the graph is redrawn without highlighting. |
+| **Then** | all `classes` return to their normal appearance. |
 
 ---
 
-**Source code:** `app.js` → `APP._hypFilter(q)` — Matching nodes (label or id, case-insensitive) receive a green stroke `#10b981` and a label colored in `#6ee7b7`; non-matching nodes have their highlighting attributes removed. If the query is empty, all attributes are removed and `APP._hypDraw(false)` is called.
+**Source code:** `app.js` → `APP._initOntology2()` — On a `pointermove` event without dragging, detects the node under the cursor and builds a `hoverSet` (node and descendants); during drawing, elements outside `hoverSet` are dimmed (opacity reduced to ~0.18–0.22), then the canvas is redrawn.
+
+### REQ-VW-030 — Building the Ontology tree for the visualizations
+
+| **If** | the `ontology` is loaded and contains `classes` organized via `subClassOf`, |
+|---|---|
+| **Then** | a single hierarchy tree is built from the universal root `owl:Thing` and shared by both ontology visualization sub-tabs (Hyperbolic and TreeMap), ensuring a consistent representation of the hierarchy. |
+
+---
+
+**Source code:** `app.js` → `APP._buildOntologyTreeData()` — Indexes `classes` by `id`, infers parents via `subClassOf`, attaches orphan `classes` to the `owl:Thing` root, and recursively builds the `{ id, depth, label, children }` tree consumed by `APP._initOntology2()` (Hyperbolic) and by the TreeMap rendering.
 
 ### REQ-VW-013 — Building nodes (individuals) and links (assertions)
 
@@ -231,7 +244,7 @@
 
 ---
 
-**Source code:** `app.js` → `APP.renderSection(section)` — Waits 80 ms via `setTimeout` before calling `APP._initHyperbolicGraph()` if the active tab is `'ontology'`, or `APP._initKnowledgeBase()` if the active tab is `'knowledge-base'`. This delay ensures that the SVG container is present in the DOM before D3 initialization.
+**Source code:** `app.js` → `APP.renderSection(section)` — Waits 80 ms via `setTimeout` before calling the initialization function matching the active tab: `APP._initOntology2()` for `'ontology2'` (Hyperbolic), `APP._initTreemap()` for `'treemap'`, or `APP._initKnowledgeBase()` for `'knowledge-base'`. This delay ensures that the container (canvas or SVG) is present in the DOM before initialization.
 
 ---
 
@@ -245,39 +258,35 @@
 
 | **If** | the ontologist navigates to the `Views` tab, |
 |---|---|
-| **Then** | the application displays two visualization sub-tabs — "`Ontology`" for exploring the class hierarchy, and "Knowledge Base" for exploring `individuals` and their relationships — the active tab being remembered between navigations. |
+| **Then** | the application displays three visualization sub-tabs — "🌐 Ontology (Hyperbolic)" and "🌐 Ontology (TreeMap)" for exploring the class hierarchy through two representations, and "🧩 Knowledge Base" for exploring `individuals` and their relationships — the active tab being remembered between navigations. The two ontology sub-tabs share the same 🌐 globe icon. |
 
 | **If** | the ontologist selects a sub-tab, |
 |---|---|
-| **Then** | the `view` refreshes to display the corresponding graph. |
+| **Then** | the `view` refreshes to display the corresponding visualization. |
 
 ---
 
-**Source code:** `app.js` → `APP.renderViews()` — Generates a sidebar with two clickable sub-tabs: `'ontology'` (label "🗂 Ontology") and `'knowledge-base'` (label "🧩 Knowledge Base"), the active tab being stored in `APP._viewsTab` (initialized to `'ontology'`). A click updates `APP._viewsTab` and calls `APP.renderSection('views')` again.
+**Source code:** `app.js` → `APP.renderViews()` — Generates a sidebar with three clickable sub-tabs: `'ontology2'` (label "🌐 Ontology (Hyperbolic)"), `'treemap'` (label "🌐 Ontology (TreeMap)"), and `'knowledge-base'` (label "🧩 Knowledge Base"), the active tab being stored in `APP._viewsTab` (initialized to `'ontology2'`). A click updates `APP._viewsTab` and calls `APP.renderSection('views')` again.
 
-### REQ-VW-002 — "Ontology" sub-tab: D3 hyperbolic tree
+### REQ-VW-002 — "Ontology (Hyperbolic)" sub-tab: canvas hyperbolic tree
 
-| **If** | the ontologist opens the "`Ontology`" sub-tab, |
+| **If** | the ontologist opens the "Ontology (Hyperbolic)" sub-tab, |
 |---|---|
-| **Then** | the application displays an interactive hyperbolic graph of the class tree, along with a `view` reset button, a search field for filtering `classes`, contextual help on available interactions, a class counter, and the visualization area. |
+| **Then** | the application displays an interactive hyperbolic tree of the `classes` on a Poincaré disk, rendered on an HTML5 `<canvas>`, along with contextual help on the available interactions (drag, click, double-click, hover), a class counter, and the visualization area. |
 
 ---
 
-**Source code:** `app.js` → `APP.renderViews()` — Generates a panel containing: a "⟳ Reset" button (calling `APP._hypReset()`), an input field bound to `APP._hypFilter(this.value)`, textual help "Clic → focus · Double-clic → éditer", a `#cy-node-count` counter, and an SVG container `#cy-ontology`.
+**Source code:** `app.js` → `APP.renderViews()` and `APP._initOntology2()` — Generates a panel containing a `#cy-ontology2` canvas container, a `#cy-ontology2-count` counter, and textual help, then initializes the hyperbolic visualization via `APP._initOntology2()`. The old "Ontology" sub-tab based on a hand-rolled D3/SVG rendering of the Poincaré disk has been removed and replaced by this canvas rendering.
 
-### REQ-VW-006 — SVG drawing of nodes and edges with proportional opacity and size
+### REQ-VW-006 — Canvas rendering: focus+context and curved edges colored by branch
 
-| **If** | the hyperbolic graph is displayed, |
+| **If** | the hyperbolic tree is displayed, |
 |---|---|
-| **Then** | `classes` close to the center are represented by larger, more opaque nodes with more readable labels, while `classes` far from the center appear smaller and more transparent, their labels being hidden beyond a certain distance threshold. |
-
-| **If** | an animation is triggered on a focus change, |
-|---|---|
-| **Then** | nodes move with a smooth transition. |
+| **Then** | `classes` close to the center are represented by larger, more readable nodes, while `classes` near the rim of the disk appear smaller (true focus+context inherent to hyperbolic geometry), the edges linking the nodes are curved and colored according to their top-level branch, and any focus change is smoothly animated. |
 
 ---
 
-**Source code:** `app.js` → `APP._hypDraw(animated)` — For each node, computes `dist = cabs(node.hpos)` and derives: radius `Math.max(3.5, 10 * (1 - dist*0.65))`, opacity `Math.max(0.12, 1 - dist*0.55)`, font size `Math.max(8, 13 * (1 - dist*0.82))`, label hidden if `dist >= 0.78`. If `animated === true`, applies a CSS transition `transform 0.42s cubic-bezier(0.33,1,0.68,1)`. Edges are rendered as `<line>` elements.
+**Source code:** `app.js` → `APP._initOntology2()` — Draws on the `<canvas>` each node with a size decreasing from the center toward the rim of the disk (hyperbolic focus+context), curved edges whose color depends on the node's top-level branch, and animates focus transitions frame by frame. No external library is used (pure canvas).
 
 ### REQ-VW-011 — Class counter displayed in the toolbar
 
@@ -287,7 +296,7 @@
 
 ---
 
-**Source code:** `app.js` → `APP._initHyperbolicGraph()` — Updates the `#cy-node-count` element with the text `"N class(es)"` (plural if N > 1).
+**Source code:** `app.js` → `APP._initOntology2()` — Updates the `#cy-ontology2-count` element with the text `"N classes"`, where `N` comes from the `count` returned by `APP._buildOntologyTreeData()`.
 
 ### REQ-VW-012 — "Knowledge Base" sub-tab: D3 force graph
 
@@ -361,6 +370,36 @@
 
 ---
 
-*Document generated on 2026-06-06 — claude-sonnet-4-6*
-
 **Source code:** `app.js` → `APP._initKnowledgeBase()` — Updates the `#kb-count` element with the text `"N individual(s) · M connection(s)"` (conditional plural for each value).
+
+### REQ-VW-031 — "Ontology (TreeMap)" sub-tab: restyled proportional map
+
+| **If** | the ontologist opens the "Ontology (TreeMap)" sub-tab, |
+|---|---|
+| **Then** | the application displays the class hierarchy as a proportional map (treemap) with an enriched style: a vibrant per-branch palette, depth-based shading, rounded tiles, hover highlighting, and branch headers showing the class name with a right-aligned child count. |
+
+| **If** | the ontologist clicks on a tile, double-clicks, uses the breadcrumb or the "Up" button, |
+|---|---|
+| **Then** | the navigation behaviors remain unchanged: a click performs a drill-down (or edits the leaf class), a double-click opens the class editor, and both the breadcrumb and the "Up" button allow moving back up the hierarchy. |
+
+---
+
+**Source code:** `app.js` → `APP._initTreemap()` (based on the tree from `APP._buildOntologyTreeData()`) — Applies a vibrant per-branch palette and depth-based shading computed via the `APP._tmMix(c, k)` helper (color mixing; `fillOf` / `hoverOf` modulate the hue according to `d.depth` and whether the node has children), draws rounded tiles with hover highlighting, and shows for each branch header the class label followed by a right-aligned child count. Interactions (click = drill-down / edit, double-click = edit, breadcrumb, "Up" button) are preserved.
+
+### REQ-VW-032 — Resizable Views sidebar
+
+| **If** | the ontologist wishes to adjust the width of the sub-tab column of the `Views` tab, |
+|---|---|
+| **Then** | a drag handle (`col-resize` cursor) located between the sub-tab column and the content area lets the user resize the sidebar, the width being clamped between 140 px and 440 px (default 210 px). |
+
+| **If** | the ontologist releases the drag handle, |
+|---|---|
+| **Then** | the active visualization re-fits to the newly available width. |
+
+---
+
+**Source code:** `app.js` → `APP._viewsSidebarDragStart` — Installs a drag handle (`col-resize`) between the sub-tab sidebar and the content; during the drag, updates the sidebar width clamping it between 140 px and 440 px (default 210 px), and on release re-fits the active visualization to the available area.
+
+---
+
+*Document generated on 2026-06-06 — claude-sonnet-4-6*

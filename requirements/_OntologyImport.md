@@ -11,6 +11,9 @@
 - [REQ-IMP-004 — Persistence: imported entities are not saved locally](#req-imp-004--persistence-imported-entities-are-not-saved-locally)
 - [REQ-IMP-005 — Read-only: editing and deletion are impossible](#req-imp-005--read-only-editing-and-deletion-are-impossible)
 - [REQ-IMP-011 — Importing SKOS annotations and other annotation properties](#req-imp-011--importing-skos-annotations-and-other-annotation-properties)
+- [REQ-IMP-012 — Detecting Individuals typed by a user-defined class (OWL 1 / Protégé style)](#req-imp-012--detecting-individuals-typed-by-a-user-defined-class-owl-1--protégé-style)
+- [REQ-IMP-013 — Reading owl:equivalentClass on import](#req-imp-013--reading-owlequivalentclass-on-import)
+- [REQ-IMP-014 — Ignoring anonymous DataRange ranges on DatatypeProperties](#req-imp-014--ignoring-anonymous-datarange-ranges-on-datatypeproperties)
 
 ### Form
 - [REQ-IMP-006 — Dimmed visual style in lists and trees](#req-imp-006--dimmed-visual-style-in-lists-and-trees)
@@ -83,6 +86,38 @@
 | **Then** | SWOWL also imports these additional annotations and attaches them to each entity concerned. Recognized in particular are: **SKOS** annotations (`skos:prefLabel`, `skos:altLabel`, `skos:hiddenLabel`, `skos:definition`, `skos:note`, `skos:scopeNote`, `skos:example`, `skos:editorialNote`, `skos:historyNote`, `skos:changeNote`), as well as `rdfs:seeAlso` (and the other recognized annotation predicates). These annotations are collected per entity — `classes`, `object_properties`, `datatype_properties`, `annotation_properties`, `individuals` — into the entity's **"other annotations"** field (`annotations.other`), each as a `{property, value}` pair, and are displayed in the "annotations" section of the entity form. **Multi-valued** annotations (e.g. several `skos:altLabel`) are all preserved. |
 
 **Note:** as an example, importing the "capital" ontology now surfaces **53** "other" annotations that were previously dropped.
+
+---
+
+### REQ-IMP-012 — Detecting Individuals typed by a user-defined class (OWL 1 / Protégé style)
+
+| **If** | an imported ontology declares individuals in the OWL 1 / Protégé style, i.e. `<MyClass rdf:ID="x"/>` (i.e. `x rdf:type :MyClass`), **without** `owl:NamedIndividual` and **without** `owl:Thing`, |
+|---|---|
+| **Then** | these subjects are now recognized as `Individual`s. In addition to `owl:NamedIndividual` and `owl:Thing` subjects, the importer collects every URI subject whose `rdf:type` is a user-defined class (a subject of `owl:Class` / `rdfs:Class`), excluding subjects that are themselves structural OWL entities (classes, properties, etc.). The individual is imported with its type and its data assertions. |
+
+**Note:** as an example, importing the RoHS ontology now surfaces its **7** `Substance` instances (chromium, mercury, lead…) with their type and data assertions (`toleratesMaximumPercentage`).
+
+**Source code:** `backend/triple_store.py` → `import_from_rdf` — in addition to `owl:NamedIndividual` and `owl:Thing` subjects, collects every URI subject whose `rdf:type` is a subject of `owl:Class` / `rdfs:Class`, excluding subjects that are themselves structural OWL entities (classes, properties, etc.).
+
+---
+
+### REQ-IMP-013 — Reading owl:equivalentClass on import
+
+| **If** | a class of an imported ontology declares one or more `owl:equivalentClass` assertions, |
+|---|---|
+| **Then** | the importer now reads `owl:equivalentClass` for each class (previously `equivalentClass` was only written on export and never read back). A named class becomes an id; an anonymous `owl:Restriction` becomes a restriction object (e.g. `Assembly ≡ ∃ hasPart . Part` → a `someValuesFrom` restriction in the class's `equivalentClass` list), parsed the same way as `subClassOf` restrictions. |
+
+**Source code:** `backend/triple_store.py` → `import_from_rdf` — reads `owl:equivalentClass` for each class: a named class is added as an id, an anonymous `owl:Restriction` is parsed into a restriction object (same logic as `subClassOf`) and added to the class's `equivalentClass` list.
+
+---
+
+### REQ-IMP-014 — Ignoring anonymous DataRange ranges on DatatypeProperties
+
+| **If** | a `DatatypeProperty` of an imported ontology declares an `rdfs:range` that is an anonymous `owl:DataRange` / `owl:oneOf` (enumerated datatype, e.g. `{compliant, suspect, failed}`), |
+|---|---|
+| **Then** | the importer now keeps only `URIRef` ranges (datatype URIs) and **ignores** anonymous `DataRange` nodes (previously a meaningless blank-node id appeared in the range). The enumerated datatype itself is not modelled in SWOWL's range, which holds datatype URIs only. |
+
+**Source code:** `backend/triple_store.py` → `import_from_rdf` — keeps only `URIRef` `rdfs:range` values and ignores anonymous `owl:DataRange` / `owl:oneOf` nodes.
 
 ---
 

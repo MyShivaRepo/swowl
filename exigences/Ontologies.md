@@ -21,6 +21,7 @@
 - [REQ-ONT-014 — Blocage des onglets d'édition en l'absence d'ontologie connectée](#req-ont-014--blocage-des-onglets-dédition-en-labsence-dontologie-connectée)
 - [REQ-ONT-015 — Calcul des racines virtuelles selon le préfixe de l'ontologie](#req-ont-015--calcul-des-racines-virtuelles-selon-le-préfixe-de-lontologie)
 - [REQ-ONT-016 — Import implicite de OWL pour les ontologies utilisateur](#req-ont-016--import-implicite-de-owl-pour-les-ontologies-utilisateur)
+- [REQ-ONT-028 — Préfixe d'affichage des entités piloté par le préfixe du registre](#req-ont-028--préfixe-daffichage-des-entités-piloté-par-le-préfixe-du-registre)
 
 ### Forme
 - [REQ-ONT-017 — Affichage de l'onglet Ontologies](#req-ont-017--affichage-de-longlet-ontologies)
@@ -34,6 +35,7 @@
 - [REQ-ONT-025 — Ouverture du répertoire dans le Finder](#req-ont-025--ouverture-du-répertoire-dans-le-finder)
 - [REQ-ONT-026 — Panneau wizard commutable (ouverture/fermeture)](#req-ont-026--panneau-wizard-commutable-ouverturefermeture)
 - [REQ-ONT-027 — Découpage du registre en sections Utilisateur et Système](#req-ont-027--découpage-du-registre-en-sections-utilisateur-et-système)
+- [REQ-ONT-029 — Export des règles au format SWORD (.swd)](#req-ont-029--export-des-règles-au-format-sword-swd)
 
 ---
 
@@ -164,7 +166,7 @@
 
 ---
 
-**Code source :** `app.js` → `exportOntologyByName()` — Appelle `API.exportOntologyByName(name, fmt)` et déclenche le téléchargement du blob avec le nom `<name>.<ext>` ; l'extension est déterminée par la correspondance : `owl` → `.owl`, `ttl` → `.ttl`, `swrl` → `.json`, `sword` → `.sword`.
+**Code source :** `app.js` → `exportOntologyByName()` — Appelle `API.exportOntologyByName(name, fmt)` et déclenche le téléchargement du blob avec le nom `<name>.<ext>` ; l'extension est déterminée par la correspondance : `owl` → `.owl`, `ttl` → `.ttl`, `swrl` → `.json`, `sword` → `.swd`.
 
 ### REQ-ONT-013 — Export de l'ontologie couramment connectée
 
@@ -209,6 +211,26 @@
 ---
 
 **Code source :** `app.js` → `_refreshOntoTable()` — Pour toute ontologie dont `readonly` est faux et dont le tableau `imports` est vide, substitue `['http://www.w3.org/2002/07/owl#']` comme liste d'imports pour le rendu de l'arbre.
+
+### REQ-ONT-028 — Préfixe d'affichage des entités piloté par le préfixe du registre
+
+| **Si** | une `ontologie` est connectée et que son préfixe est défini dans le registre (par exemple `rohs`), |
+|---|---|
+| **Alors** | ses entités (`classes`, `propriétés d'objet`, `propriétés de données`, `propriétés d'annotation` et `individus`) sont affichées préfixées par le préfixe du registre de l'`ontologie` connectée (celle affichée ou éditée dans l'onglet `Ontologies`), par exemple `rohs:Part`, `rohs:chromium`. |
+
+| **Si** | le préfixe de registre de l'`ontologie` connectée est vide, |
+|---|---|
+| **Alors** | ses entités sont affichées sans aucun préfixe (identifiant local nu). |
+
+| **Si** | un identifiant est déjà qualifié par un espace de nommage (`owl:Thing`, `xsd:decimal`, `rdfs:label`) ou correspond à une entité importée (affichée avec son propre préfixe d'import), |
+|---|---|
+| **Alors** | son affichage n'est pas affecté par le préfixe du registre. |
+
+Le préfixe est purement une préoccupation d'affichage : le champ `id` éditable et l'attribut interne `data-id` conservent l'identifiant local nu.
+
+---
+
+**Code source :** `owl_editor.js` → `_displayId(entity)` — Lit `APP.state.ontology.prefix` pour préfixer l'identifiant local affiché des entités non qualifiées et non importées ; si le préfixe est vide, retourne l'identifiant local nu ; les identifiants déjà namespacés et les entités importées sont laissés inchangés. `main.py` → `get_current_ontology` — Rend le préfixe de l'entrée du registre faisant autorité (`onto.prefix = entry.prefix or ""`), écrasant la valeur figée au moment de l'import (qui pouvait différer, par exemple `model_rohs`).
 
 ---
 
@@ -274,7 +296,7 @@
 
 ---
 
-**Code source :** `app.js` → `_ontoExportDropdown()` — Construit et positionne dynamiquement un menu contextuel en `position:fixed` ancré sous le bouton ; les options dépendent du paramètre `kind` : `'onto'` → OWL (`.owl`) et Turtle (`.ttl`) ; `'rules'` → SWRL (`.json`) et SWORD (`.sword`) ; un listener `click` sur `document` ferme le menu lors d'un clic extérieur.
+**Code source :** `app.js` → `_ontoExportDropdown()` — Construit et positionne dynamiquement un menu contextuel en `position:fixed` ancré sous le bouton ; les options dépendent du paramètre `kind` : `'onto'` → OWL (`.owl`) et Turtle (`.ttl`) ; `'rules'` → SWRL (`.json`) et SWORD (`.swd`) ; un listener `click` sur `document` ferme le menu lors d'un clic extérieur.
 
 ### REQ-ONT-023 — Affichage de l'arbre des imports avec expansion/repli
 
@@ -337,3 +359,15 @@
 ---
 
 **Code source :** `app.js` → `_refreshOntoTable()` — Répartit les lignes en deux sections distinctes : « USER REGISTRY » pour les ontologies dont `readonly` est faux, « SYSTEM REGISTRY » pour les ontologies W3C `readonly`. L'en-tête de la section système est repliable via un chevron et affiche un compteur du nombre d'entrées système.
+
+### REQ-ONT-029 — Export des règles au format SWORD (.swd)
+
+| **Si** | l'ontologiste ouvre le menu d'export « Rules » dans l'onglet `Ontologies`, |
+|---|---|
+| **Alors** | le menu propose l'option `↓ SWORD (.swd)` et le fichier exporté utilise l'extension `.swd`. |
+
+L'identifiant interne du format d'export (`fmt: 'sword'`) reste inchangé ; seules l'étiquette du menu et l'extension du fichier généré passent de `.sword` à `.swd`.
+
+---
+
+**Code source :** `app.js` → menu déroulant d'export (`_ontoExportDropdown()`) et `exportOntologyByName()` — L'option de règles affiche désormais `↓ SWORD (.swd)` et le téléchargement utilise l'extension `.swd` ; le format interne transmis à l'API (`fmt: 'sword'`) est conservé.

@@ -24,7 +24,7 @@
 - [REQ-SWR-031 — Confirming the selection of an individual](#req-swr-031--confirming-the-selection-of-an-individual)
 - [REQ-SWR-032 — Closing the individual picker](#req-swr-032--closing-the-individual-picker)
 - [REQ-SWR-034 — Drag-and-drop to reorder atoms](#req-swr-034--drag-and-drop-to-reorder-atoms)
-- [REQ-SWR-036 — Importing rules from a `.sword` file](#req-swr-036--importing-rules-from-a-sword-file)
+- [REQ-SWR-036 — Importing rules from a `.swd` file](#req-swr-036--importing-rules-from-a-swd-file)
 - [REQ-SWR-037 — Resolving an identifier collision on import](#req-swr-037--resolving-an-identifier-collision-on-import)
 
 ### Form
@@ -252,17 +252,17 @@
 
 **Source code:** `swrl_editor.js` → `onDragStart()`, `onDragOver()`, `onDragLeave()`, `onDrop()`, `onDragEnd()` — `onDragStart()` stores the source index and `listPath`; `onDragOver()` allows the drop only if the target `listPath` is identical; `onDrop()` reorders atoms via `splice()` in `_editingRule`, re-renders the form and calls `save(false)`.
 
-### REQ-SWR-036 — Importing rules from a `.sword` file
+### REQ-SWR-036 — Importing rules from a `.swd` file
 
-| **If** | the ontologist imports `SWRL rules` from a `.sword` file (the project's human-readable rule format), |
+| **If** | the ontologist imports `SWRL rules` from a file in the **SWORD** format (the project's human-readable rule format, exported with the `.swd` extension), |
 |---|---|
 | **Then** | the rules contained in the file are added to the `ontology` as-is — even when an atom references an empty or undefined class — and the ontologist receives a summary indicating how many rules were added, replaced or kept. |
 
-The import is the exact inverse of the `.sword` export: a round-trip preserves NAF negation, conditional sub-rules, equality atoms and empty-class atoms.
+The import is the exact inverse of the `.swd` export: a round-trip preserves NAF negation, conditional sub-rules, equality atoms and empty-class atoms. The file picker imposes no extension restriction: any file can be selected (including legacy `.sword` files), its content being validated by the backend SWORD parser regardless of extension.
 
 ---
 
-**Source code:** `swrl_editor.js` → `importRules()` — Opens a file input restricted to `.sword`/`text/plain`, reads the file text, parses it via `API.parseSwordRules(text)`, then iterates over the returned rules; each rule is persisted via `API.createSWRLRule()` (new id) or `API.updateSWRLRule()` (collision resolved as `replace`); no validation is performed against `APP.state.classes`, so atoms referencing missing classes are kept; refreshes `APP.state`, re-renders the section and reports the counts via `UI.success()`.
+**Source code:** `swrl_editor.js` → `importRules()` — Opens a file input with no extension filter (the `accept` attribute was removed, so that `.swd` files are no longer greyed out and remain selectable on macOS/WebKit), reads the file text, parses it via `API.parseSwordRules(text)`, then iterates over the returned rules; each rule is persisted via `API.createSWRLRule()` (new id) or `API.updateSWRLRule()` (collision resolved as `replace`); no validation is performed against `APP.state.classes`, so atoms referencing missing classes are kept; refreshes `APP.state`, re-renders the section and reports the counts via `UI.success()`.
 
 ### REQ-SWR-037 — Resolving an identifier collision on import
 
@@ -456,11 +456,11 @@ The import is the exact inverse of the `.sword` export: a round-trip preserves N
 
 | **If** | the SWRL Rules list panel is displayed, |
 |---|---|
-| **Then** | an **Import rules** button is shown to the left of the **+** (add rule) button in the panel header, allowing the ontologist to import `SWRL rules` from a `.sword` file. |
+| **Then** | an **Import rules** button is shown to the left of the **+** (add rule) button in the panel header, allowing the ontologist to import `SWRL rules` from a SWORD-format file (`.swd`). |
 
 ---
 
-**Source code:** `swrl_editor.js` → `renderSplit()` — Renders, in the `tree-panel-header`, an import button (`📥`, `title="Import rules from a .sword file"`) calling `SWRLEditor.importRules()` immediately before the new-rule button (`➕`) calling `SWRLEditor.newRule()`.
+**Source code:** `swrl_editor.js` → `renderSplit()` — Renders, in the `tree-panel-header`, an import button (`📥`, `title="Import rules from a .swd file"`) calling `SWRLEditor.importRules()` immediately before the new-rule button (`➕`) calling `SWRLEditor.newRule()`.
 
 ### REQ-SWR-039 — Homogeneous class and property pickers
 

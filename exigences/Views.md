@@ -7,11 +7,12 @@
 ### Fond
 - [REQ-VW-003 — Construction de l'arbre hiérarchique des classes](#req-vw-003--construction-de-larbre-hiérarchique-des-classes)
 - [REQ-VW-004 — Résolution du meilleur label de classe](#req-vw-004--résolution-du-meilleur-label-de-classe)
-- [REQ-VW-005 — Algorithme de placement hyperbolique (disque de Poincaré)](#req-vw-005--algorithme-de-placement-hyperbolique-disque-de-poincaré)
-- [REQ-VW-007 — Clic sur un nœud : centrage par transformation de Möbius](#req-vw-007--clic-sur-un-nœud--centrage-par-transformation-de-möbius)
-- [REQ-VW-008 — Double-clic (second clic au centre) : navigation vers l'éditeur de classes](#req-vw-008--double-clic-second-clic-au-centre--navigation-vers-léditeur-de-classes)
-- [REQ-VW-009 — Réinitialisation du focus vers la racine](#req-vw-009--réinitialisation-du-focus-vers-la-racine)
-- [REQ-VW-010 — Filtrage des classes par texte dans le graphe hyperbolique](#req-vw-010--filtrage-des-classes-par-texte-dans-le-graphe-hyperbolique)
+- [REQ-VW-005 — Placement hyperbolique sur disque de Poincaré (canvas)](#req-vw-005--placement-hyperbolique-sur-disque-de-poincaré-canvas)
+- [REQ-VW-007 — Clic sur un nœud : recentrage animé par transformation de Möbius](#req-vw-007--clic-sur-un-nœud--recentrage-animé-par-transformation-de-möbius)
+- [REQ-VW-008 — Double-clic sur un nœud : navigation vers l'éditeur de classes](#req-vw-008--double-clic-sur-un-nœud--navigation-vers-léditeur-de-classes)
+- [REQ-VW-009 — Glisser pour déplacer le plan hyperbolique](#req-vw-009--glisser-pour-déplacer-le-plan-hyperbolique)
+- [REQ-VW-010 — Survol d'un nœud : mise en évidence de la sous-branche](#req-vw-010--survol-dun-nœud--mise-en-évidence-de-la-sous-branche)
+- [REQ-VW-030 — Construction de l'arbre Ontology pour les visualisations](#req-vw-030--construction-de-larbre-ontology-pour-les-visualisations)
 - [REQ-VW-013 — Construction des nœuds (individuals) et liens (assertions)](#req-vw-013--construction-des-nœuds-individuals-et-liens-assertions)
 - [REQ-VW-014 — Palette de couleurs par classe](#req-vw-014--palette-de-couleurs-par-classe)
 - [REQ-VW-015 — Résolution du meilleur label d'individual](#req-vw-015--résolution-du-meilleur-label-dindividual)
@@ -25,8 +26,8 @@
 
 ### Forme
 - [REQ-VW-001 — Rendu de l'onglet Views avec sous-onglets](#req-vw-001--rendu-de-longlet-views-avec-sous-onglets)
-- [REQ-VW-002 — Sous-onglet « Ontology » : arbre hyperbolique D3](#req-vw-002--sous-onglet-ontology--arbre-hyperbolique-d3)
-- [REQ-VW-006 — Dessin SVG des nœuds et arêtes avec opacité et taille proportionnelles](#req-vw-006--dessin-svg-des-nœuds-et-arêtes-avec-opacité-et-taille-proportionnelles)
+- [REQ-VW-002 — Sous-onglet « Ontology (Hyperbolic) » : arbre hyperbolique sur canvas](#req-vw-002--sous-onglet-ontology-hyperbolic--arbre-hyperbolique-sur-canvas)
+- [REQ-VW-006 — Rendu canvas : focus+context et arêtes courbes colorées par branche](#req-vw-006--rendu-canvas--focuscontext-et-arêtes-courbes-colorées-par-branche)
 - [REQ-VW-011 — Compteur de classes affiché dans la barre d'outils](#req-vw-011--compteur-de-classes-affiché-dans-la-barre-doutils)
 - [REQ-VW-012 — Sous-onglet « Knowledge Base » : graphe de force D3](#req-vw-012--sous-onglet-knowledge-base--graphe-de-force-d3)
 - [REQ-VW-016 — Légende des classes dans le graphe Knowledge Base](#req-vw-016--légende-des-classes-dans-le-graphe-knowledge-base)
@@ -35,6 +36,8 @@
 - [REQ-VW-019 — Labels de propriétés sur les arêtes](#req-vw-019--labels-de-propriétés-sur-les-arêtes)
 - [REQ-VW-021 — Survol d'un nœud : mise en évidence des connexions](#req-vw-021--survol-dun-nœud--mise-en-évidence-des-connexions)
 - [REQ-VW-026 — Compteur d'individuals et de connexions](#req-vw-026--compteur-dindividuals-et-de-connexions)
+- [REQ-VW-031 — Sous-onglet « Ontology (TreeMap) » : carte de proportions restylée](#req-vw-031--sous-onglet-ontology-treemap--carte-de-proportions-restylée)
+- [REQ-VW-032 — Barre latérale Views redimensionnable](#req-vw-032--barre-latérale-views-redimensionnable)
 
 ---
 
@@ -51,7 +54,7 @@
 
 ---
 
-**Code source :** `app.js` → `APP._initHyperbolicGraph()` — Construit une carte `classMap` indexée par `id`, calcule les parents via `subClassOf`, élève les classes sans parent interne sous un nœud virtuel `owl:Thing`, et construit récursivement la hiérarchie via `buildNode(id, depth)`, chaque nœud exposant `{ id, depth, label, hpos, basePos, children }`.
+**Code source :** `app.js` → `APP._buildOntologyTreeData()` — Construit une carte `classMap` indexée par `id`, calcule les parents via `subClassOf`, élève les classes sans parent interne sous un nœud virtuel racine `owl:Thing`, et construit récursivement la hiérarchie, chaque nœud exposant son `id`, son `depth`, son `label` et ses `children`. Cet arbre alimente à la fois la visualisation hyperbolique et la visualisation TreeMap.
 
 ### REQ-VW-004 — Résolution du meilleur label de classe
 
@@ -63,59 +66,69 @@
 
 **Code source :** `app.js` → `APP._hypBestLabel(cls)` — Recherche dans `cls.annotations` une annotation `rdfs:label` ou `label` correspondant à `Settings.preferredLang`, prend la première annotation disponible en l'absence de correspondance, et retourne `cls.id` si aucune annotation n'existe.
 
-### REQ-VW-005 — Algorithme de placement hyperbolique (disque de Poincaré)
+### REQ-VW-005 — Placement hyperbolique sur disque de Poincaré (canvas)
 
-| **Si** | l'ontologiste visualise l'arbre des `classes` dans le graphe hyperbolique, |
+| **Si** | l'ontologiste visualise l'arbre des `classes` dans le sous-onglet « Ontology (Hyperbolic) », |
 |---|---|
-| **Alors** | les `classes` sont disposées dans un espace hyperbolique de type disque de Poincaré : chaque niveau de hiérarchie est espacé de manière constante, les enfants d'un nœud sont distribués en secteurs angulaires égaux autour de leur parent, et les translations entre niveaux respectent la géométrie hyperbolique. |
+| **Alors** | les `classes` sont disposées dans un espace hyperbolique de type disque de Poincaré : chaque niveau de hiérarchie est espacé de manière constante, les enfants d'un nœud sont distribués en secteurs angulaires égaux autour de leur parent, et les translations entre niveaux respectent la géométrie hyperbolique (transformations de Möbius). |
 
 ---
 
-**Code source :** `app.js` → `APP._initHyperbolicGraph()` (fonctions internes `layoutNode`, `cadd`, `csub`, `cmul`, `cconj`, `cabs`, `cdiv`, `polar`, `mobiusFocus`, `mobiusTranslate`) — Utilise `STEP_R = Math.tanh(0.4)` pour l'espacement entre niveaux, distribue les enfants via `layoutNode(node, pos, angle, wedge)`, et réalise les translations hyperboliques via `mobiusTranslate(z, a)`.
+**Code source :** `app.js` → `APP._initOntology2()` — Construit l'arbre via `APP._buildOntologyTreeData()` (racine `owl:Thing`, hiérarchie issue de `subClassOf`), puis place récursivement chaque nœud dans le disque de Poincaré à l'aide de fonctions d'arithmétique complexe et de transformations de Möbius, en distribuant les enfants en secteurs angulaires égaux et en espaçant les niveaux de manière constante. Le rendu est effectué sur un élément `<canvas>` HTML5, sans bibliothèque externe (canvas pur).
 
-### REQ-VW-007 — Clic sur un nœud : centrage par transformation de Möbius
+### REQ-VW-007 — Clic sur un nœud : recentrage animé par transformation de Möbius
 
 | **Si** | l'ontologiste clique sur une `classe` dans le graphe hyperbolique pour l'explorer, |
 |---|---|
-| **Alors** | la `classe` sélectionnée se déplace vers le centre du disque, permettant de la mettre en focus et de visualiser ses voisins proches avec plus de détails. |
+| **Alors** | la `classe` sélectionnée glisse vers le centre du disque via une animation fluide (« glide »), permettant de la mettre en focus et de visualiser ses voisins proches avec plus de détails. |
 
 ---
 
-**Code source :** `app.js` → `APP._hypClick(node)` — Si la distance du nœud au centre est supérieure à 0.02, calcule `mobiusFocus(n.hpos, a)` pour chaque nœud afin de recentrer le nœud cliqué, puis appelle `APP._hypDraw(true)` pour animer la transition.
+**Code source :** `app.js` → `APP._initOntology2()` — Au clic sur un nœud (relâchement `pointerup` avec `moved < 3`), appelle la fonction interne `glide(n)` qui recentre le nœud au centre du disque par translations de Möbius successives (`applyT`) animées via `requestAnimationFrame`, avec redessin du canvas à chaque image.
 
-### REQ-VW-008 — Double-clic (second clic au centre) : navigation vers l'éditeur de classes
+### REQ-VW-008 — Double-clic sur un nœud : navigation vers l'éditeur de classes
 
-| **Si** | l'ontologiste double-clique sur une `classe` au centre du graphe hyperbolique pour l'éditer, |
+| **Si** | l'ontologiste double-clique sur une `classe` dans le graphe hyperbolique pour l'éditer, |
 |---|---|
-| **Alors** | l'application navigue automatiquement vers la fiche d'édition de cette `classe`, sans manipulation supplémentaire. |
+| **Alors** | l'application navigue automatiquement vers la fiche d'édition de cette `classe` (onglet Classes), sans manipulation supplémentaire. |
 
 ---
 
-**Code source :** `app.js` → `APP._hypClick(node)` — Si la distance du nœud au centre est inférieure à 0.10 et que l'`id` n'est pas `'owl:Thing'`, appelle `APP.navigate('classes')`, puis après 80 ms positionne `ClassEditor._selectedId = node.id` et appelle `ClassEditor.restoreSelection()`.
+**Code source :** `app.js` → `APP._initOntology2()` — Sur l'événement `dblclick`, si le nœud visé possède un `id` distinct de la racine `owl:Thing`, appelle `APP.navigateTo('classes', n.id)` qui navigue vers l'onglet Classes et sélectionne la `classe` correspondante.
 
-### REQ-VW-009 — Réinitialisation du focus vers la racine
+### REQ-VW-009 — Glisser pour déplacer le plan hyperbolique
 
-| **Si** | l'ontologiste souhaite revenir à la `vue` d'ensemble de l'`ontologie` après avoir navigué dans le graphe hyperbolique, |
+| **Si** | l'ontologiste glisse (drag) dans le graphe hyperbolique, |
 |---|---|
-| **Alors** | le graphe retrouve sa disposition initiale, avec toutes les `classes` repositionnées à leur emplacement de départ, accompagné d'une animation de retour. |
+| **Alors** | l'ensemble du plan hyperbolique se déplace (pan) en suivant le mouvement du curseur, permettant d'explorer librement l'arbre sans recentrer sur un nœud particulier. |
 
 ---
 
-**Code source :** `app.js` → `APP._hypReset()` — Recopie `basePos` dans `hpos` pour tous les nœuds de `APP._hypNodes`, puis appelle `APP._hypDraw(true)` pour animer le retour.
+**Code source :** `app.js` → `APP._initOntology2()` — Les gestionnaires de pointeur (`pointerdown` / `pointermove` / `pointerup`) suivent l'état `dragging` et appliquent au plan hyperbolique une translation (`applyT`) proportionnelle au déplacement du curseur, avec redessin du canvas pendant le glissement (curseur `grabbing`).
 
-### REQ-VW-010 — Filtrage des classes par texte dans le graphe hyperbolique
+### REQ-VW-010 — Survol d'un nœud : mise en évidence de la sous-branche
 
-| **Si** | l'ontologiste saisit un terme pour rechercher une `classe` dans le graphe hyperbolique, |
+| **Si** | l'ontologiste survole une `classe` dans le graphe hyperbolique, |
 |---|---|
-| **Alors** | les `classes` dont le nom ou l'identifiant correspond au terme saisi sont mises en évidence visuellement, tandis que les autres `classes` restent visibles mais sans surbrillance. |
+| **Alors** | la sous-branche issue de ce nœud (le nœud et ses descendants) est mise en évidence, tandis que les autres `classes` sont estompées, permettant de focaliser sur la portion concernée de la hiérarchie. |
 
-| **Si** | l'ontologiste efface le terme de recherche, |
+| **Si** | l'ontologiste quitte le nœud, |
 |---|---|
-| **Alors** | toutes les `classes` retrouvent leur apparence normale et le graphe est redessiné sans surbrillance. |
+| **Alors** | toutes les `classes` retrouvent leur apparence normale. |
 
 ---
 
-**Code source :** `app.js` → `APP._hypFilter(q)` — Les nœuds correspondants (label ou id, insensible à la casse) reçoivent un stroke vert `#10b981` et un label coloré en `#6ee7b7` ; les nœuds non correspondants voient leurs attributs de surbrillance supprimés. Si la requête est vide, tous les attributs sont supprimés et `APP._hypDraw(false)` est appelé.
+**Code source :** `app.js` → `APP._initOntology2()` — Sur l'événement `pointermove` sans glissement, détecte le nœud sous le curseur et constitue un ensemble `hoverSet` (nœud et descendants) ; lors du dessin, les éléments hors de `hoverSet` sont atténués (opacité réduite à ~0.18–0.22), puis le canvas est redessiné.
+
+### REQ-VW-030 — Construction de l'arbre Ontology pour les visualisations
+
+| **Si** | l'`ontologie` est chargée et contient des `classes` organisées via `subClassOf`, |
+|---|---|
+| **Alors** | un arbre hiérarchique unique est construit à partir de la racine universelle `owl:Thing` et partagé par les deux sous-onglets de visualisation de l'ontologie (Hyperbolic et TreeMap), garantissant une représentation cohérente de la hiérarchie. |
+
+---
+
+**Code source :** `app.js` → `APP._buildOntologyTreeData()` — Indexe les `classes` par `id`, déduit les parents via `subClassOf`, rattache les `classes` orphelines à la racine `owl:Thing`, et construit récursivement l'arbre `{ id, depth, label, children }` consommé par `APP._initOntology2()` (Hyperbolic) et par le rendu TreeMap.
 
 ### REQ-VW-013 — Construction des nœuds (individuals) et liens (assertions)
 
@@ -231,7 +244,7 @@
 
 ---
 
-**Code source :** `app.js` → `APP.renderSection(section)` — Attend 80 ms via `setTimeout` avant d'appeler `APP._initHyperbolicGraph()` si l'onglet actif est `'ontology'`, ou `APP._initKnowledgeBase()` si l'onglet actif est `'knowledge-base'`. Ce délai garantit que le conteneur SVG est présent dans le DOM avant l'initialisation D3.
+**Code source :** `app.js` → `APP.renderSection(section)` — Attend 80 ms via `setTimeout` avant d'appeler la fonction d'initialisation correspondant à l'onglet actif : `APP._initOntology2()` pour `'ontology2'` (Hyperbolic), `APP._initTreemap()` pour `'treemap'`, ou `APP._initKnowledgeBase()` pour `'knowledge-base'`. Ce délai garantit que le conteneur (canvas ou SVG) est présent dans le DOM avant l'initialisation.
 
 ---
 
@@ -245,39 +258,35 @@
 
 | **Si** | l'ontologiste navigue vers l'onglet `Views`, |
 |---|---|
-| **Alors** | l'application affiche deux sous-onglets de visualisation — « `Ontology` » pour explorer la hiérarchie des `classes`, et « Knowledge Base » pour explorer les `individuals` et leurs relations — l'onglet actif étant mémorisé entre les navigations. |
+| **Alors** | l'application affiche trois sous-onglets de visualisation — « 🌐 Ontology (Hyperbolic) » et « 🌐 Ontology (TreeMap) » pour explorer la hiérarchie des `classes` selon deux représentations, et « 🧩 Knowledge Base » pour explorer les `individuals` et leurs relations — l'onglet actif étant mémorisé entre les navigations. Les deux sous-onglets ontologiques partagent la même icône globe 🌐. |
 
 | **Si** | l'ontologiste sélectionne un sous-onglet, |
 |---|---|
-| **Alors** | la `vue` se rafraîchit pour afficher le graphe correspondant. |
+| **Alors** | la `vue` se rafraîchit pour afficher la visualisation correspondante. |
 
 ---
 
-**Code source :** `app.js` → `APP.renderViews()` — Génère une barre latérale avec deux sous-onglets cliquables : `'ontology'` (libellé « 🗂 Ontology ») et `'knowledge-base'` (libellé « 🧩 Knowledge Base »), l'onglet actif étant mémorisé dans `APP._viewsTab` (initialisé à `'ontology'`). Un clic met à jour `APP._viewsTab` et rappelle `APP.renderSection('views')`.
+**Code source :** `app.js` → `APP.renderViews()` — Génère une barre latérale avec trois sous-onglets cliquables : `'ontology2'` (libellé « 🌐 Ontology (Hyperbolic) »), `'treemap'` (libellé « 🌐 Ontology (TreeMap) ») et `'knowledge-base'` (libellé « 🧩 Knowledge Base »), l'onglet actif étant mémorisé dans `APP._viewsTab` (initialisé à `'ontology2'`). Un clic met à jour `APP._viewsTab` et rappelle `APP.renderSection('views')`.
 
-### REQ-VW-002 — Sous-onglet « Ontology » : arbre hyperbolique D3
+### REQ-VW-002 — Sous-onglet « Ontology (Hyperbolic) » : arbre hyperbolique sur canvas
 
-| **Si** | l'ontologiste ouvre le sous-onglet « `Ontology` », |
+| **Si** | l'ontologiste ouvre le sous-onglet « Ontology (Hyperbolic) », |
 |---|---|
-| **Alors** | l'application affiche un graphe hyperbolique interactif de l'arbre des `classes`, accompagné d'un bouton de réinitialisation de la `vue`, d'un champ de recherche pour filtrer les `classes`, d'une aide contextuelle sur les interactions disponibles, d'un compteur de `classes` et de la zone de visualisation. |
+| **Alors** | l'application affiche un arbre hyperbolique interactif des `classes` sur un disque de Poincaré, rendu sur un `<canvas>` HTML5, accompagné d'une aide contextuelle sur les interactions disponibles (glisser, clic, double-clic, survol), d'un compteur de `classes` et de la zone de visualisation. |
 
 ---
 
-**Code source :** `app.js` → `APP.renderViews()` — Génère un panneau contenant : un bouton « ⟳ Reset » (appel `APP._hypReset()`), un champ de saisie relié à `APP._hypFilter(this.value)`, une aide textuelle « Clic → focus · Double-clic → éditer », un compteur `#cy-node-count`, et un conteneur SVG `#cy-ontology`.
+**Code source :** `app.js` → `APP.renderViews()` et `APP._initOntology2()` — Génère un panneau contenant un conteneur canvas `#cy-ontology2`, un compteur `#cy-ontology2-count` et une aide textuelle, puis initialise la visualisation hyperbolique via `APP._initOntology2()`. L'ancien sous-onglet « Ontology » fondé sur un rendu D3/SVG manuel du disque de Poincaré a été supprimé et remplacé par ce rendu canvas.
 
-### REQ-VW-006 — Dessin SVG des nœuds et arêtes avec opacité et taille proportionnelles
+### REQ-VW-006 — Rendu canvas : focus+context et arêtes courbes colorées par branche
 
-| **Si** | le graphe hyperbolique est affiché, |
+| **Si** | l'arbre hyperbolique est affiché, |
 |---|---|
-| **Alors** | les `classes` proches du centre sont représentées par des nœuds plus grands, plus opaques et avec des labels plus lisibles, tandis que les `classes` éloignées du centre apparaissent plus petites et plus transparentes, leurs labels étant masqués au-delà d'un certain seuil d'éloignement. |
-
-| **Si** | une animation est déclenchée lors d'un changement de focus, |
-|---|---|
-| **Alors** | les nœuds se déplacent avec une transition fluide. |
+| **Alors** | les `classes` proches du centre sont représentées par des nœuds plus grands et plus lisibles, tandis que les `classes` proches du bord du disque apparaissent plus petites (effet focus+context propre à la géométrie hyperbolique), les arêtes reliant les nœuds sont courbes et colorées selon leur branche de premier niveau, et tout changement de focus est animé de manière fluide. |
 
 ---
 
-**Code source :** `app.js` → `APP._hypDraw(animated)` — Pour chaque nœud, calcule `dist = cabs(node.hpos)` et en déduit : rayon `Math.max(3.5, 10 * (1 - dist*0.65))`, opacité `Math.max(0.12, 1 - dist*0.55)`, taille de police `Math.max(8, 13 * (1 - dist*0.82))`, masquage du label si `dist >= 0.78`. Si `animated === true`, applique une transition CSS `transform 0.42s cubic-bezier(0.33,1,0.68,1)`. Les arêtes sont rendues en éléments `<line>`.
+**Code source :** `app.js` → `APP._initOntology2()` — Dessine sur le `<canvas>` chaque nœud avec une taille décroissante du centre vers le bord du disque (focus+context hyperbolique), des arêtes courbes dont la couleur dépend de la branche de premier niveau du nœud, et anime les transitions de focus image par image. Aucune bibliothèque externe n'est utilisée (canvas pur).
 
 ### REQ-VW-011 — Compteur de classes affiché dans la barre d'outils
 
@@ -287,7 +296,7 @@
 
 ---
 
-**Code source :** `app.js` → `APP._initHyperbolicGraph()` — Met à jour l'élément `#cy-node-count` avec le texte `"N classe(s)"` (pluriel si N > 1).
+**Code source :** `app.js` → `APP._initOntology2()` — Met à jour l'élément `#cy-ontology2-count` avec le texte `"N classes"`, le nombre `N` provenant du `count` retourné par `APP._buildOntologyTreeData()`.
 
 ### REQ-VW-012 — Sous-onglet « Knowledge Base » : graphe de force D3
 
@@ -361,6 +370,36 @@
 
 ---
 
-*Document généré le 2026-06-06 — claude-sonnet-4-6*
-
 **Code source :** `app.js` → `APP._initKnowledgeBase()` — Met à jour l'élément `#kb-count` avec le texte `"N individual(s) · M connexion(s)"` (pluriel conditionnel pour chaque valeur).
+
+### REQ-VW-031 — Sous-onglet « Ontology (TreeMap) » : carte de proportions restylée
+
+| **Si** | l'ontologiste ouvre le sous-onglet « Ontology (TreeMap) », |
+|---|---|
+| **Alors** | l'application affiche la hiérarchie des `classes` sous forme de carte de proportions (treemap) au style enrichi : palette vibrante propre à chaque branche de premier niveau, ombrage modulé selon la profondeur, tuiles à coins arrondis, mise en évidence au survol, et en-têtes de branche affichant le nom de la `classe` avec, aligné à droite, le compte de ses enfants. |
+
+| **Si** | l'ontologiste clique sur une tuile, double-clique, utilise le fil d'Ariane ou le bouton « Up », |
+|---|---|
+| **Alors** | les comportements de navigation restent inchangés : le clic effectue un « drill-down » (ou l'édition de la `classe` feuille), le double-clic ouvre l'éditeur de classes, et le fil d'Ariane comme le bouton « Up » permettent de remonter dans la hiérarchie. |
+
+---
+
+**Code source :** `app.js` → `APP._initTreemap()` (basé sur l'arbre de `APP._buildOntologyTreeData()`) — Applique une palette vibrante par branche de premier niveau et un ombrage par profondeur calculé via le helper `APP._tmMix(c, k)` (mélange de couleurs ; `fillOf` / `hoverOf` modulent la teinte selon `d.depth` et la présence d'enfants), dessine des tuiles à coins arrondis avec surbrillance au survol, et affiche pour chaque en-tête de branche le label de la `classe` suivi d'un compteur d'enfants aligné à droite. Les interactions (clic = drill-down / édition, double-clic = édition, fil d'Ariane, bouton « Up ») sont conservées.
+
+### REQ-VW-032 — Barre latérale Views redimensionnable
+
+| **Si** | l'ontologiste souhaite ajuster la largeur de la colonne des sous-onglets de l'onglet `Views`, |
+|---|---|
+| **Alors** | une poignée de glissement (curseur `col-resize`) située entre la colonne des sous-onglets et la zone de contenu permet de redimensionner la barre latérale, la largeur étant bornée entre 140 px et 440 px (valeur par défaut 210 px). |
+
+| **Si** | l'ontologiste relâche la poignée, |
+|---|---|
+| **Alors** | la visualisation active est réajustée (« re-fit ») à la nouvelle largeur disponible. |
+
+---
+
+**Code source :** `app.js` → `APP._viewsSidebarDragStart` — Installe une poignée de glissement (`col-resize`) entre la barre latérale des sous-onglets et le contenu ; pendant le glissement, met à jour la largeur de la barre latérale en la bornant entre 140 px et 440 px (défaut 210 px), et au relâchement réajuste la visualisation active à la zone disponible.
+
+---
+
+*Document généré le 2026-06-06 — claude-sonnet-4-6*

@@ -24,7 +24,7 @@
 - [REQ-SWR-031 — Confirmation de la sélection d'un individu](#req-swr-031--confirmation-de-la-sélection-dun-individu)
 - [REQ-SWR-032 — Fermeture du picker d'individu](#req-swr-032--fermeture-du-picker-dindividu)
 - [REQ-SWR-034 — Glisser-déposer pour réordonner les atomes](#req-swr-034--glisser-déposer-pour-réordonner-les-atomes)
-- [REQ-SWR-036 — Import de règles depuis un fichier `.sword`](#req-swr-036--import-de-règles-depuis-un-fichier-sword)
+- [REQ-SWR-036 — Import de règles depuis un fichier `.swd`](#req-swr-036--import-de-règles-depuis-un-fichier-swd)
 - [REQ-SWR-037 — Résolution d'une collision d'identifiant à l'import](#req-swr-037--résolution-dune-collision-didentifiant-à-limport)
 
 ### Forme
@@ -252,17 +252,17 @@
 
 **Code source :** `swrl_editor.js` → `onDragStart()`, `onDragOver()`, `onDragLeave()`, `onDrop()`, `onDragEnd()` — `onDragStart()` mémorise l'index source et le `listPath` ; `onDragOver()` autorise le drop uniquement si le `listPath` cible est identique ; `onDrop()` réordonne les atomes via `splice()` dans `_editingRule`, re-rend le formulaire et appelle `save(false)`.
 
-### REQ-SWR-036 — Import de règles depuis un fichier `.sword`
+### REQ-SWR-036 — Import de règles depuis un fichier `.swd`
 
-| **Si** | l'ontologiste importe des `règles SWRL` depuis un fichier `.sword` (format de règle lisible du projet), |
+| **Si** | l'ontologiste importe des `règles SWRL` depuis un fichier au format **SWORD** (format de règle lisible du projet, exporté avec l'extension `.swd`), |
 |---|---|
 | **Alors** | les règles contenues dans le fichier sont ajoutées à l'`ontologie` telles quelles — même lorsqu'un atome référence une `classe` vide ou indéfinie — et l'ontologiste reçoit un récapitulatif indiquant le nombre de règles ajoutées, remplacées ou conservées. |
 
-L'import est l'exact inverse de l'export `.sword` : un aller-retour préserve la négation NAF, les sous-règles conditionnelles, les atomes d'égalité et les atomes à `classe` vide.
+L'import est l'exact inverse de l'export `.swd` : un aller-retour préserve la négation NAF, les sous-règles conditionnelles, les atomes d'égalité et les atomes à `classe` vide. Le sélecteur de fichier n'impose aucune restriction d'extension : n'importe quel fichier peut être choisi (y compris les anciens fichiers `.sword`), son contenu étant validé par l'analyseur SWORD du backend quelle que soit son extension.
 
 ---
 
-**Code source :** `swrl_editor.js` → `importRules()` — Ouvre un sélecteur de fichier restreint à `.sword`/`text/plain`, lit le texte du fichier, le parse via `API.parseSwordRules(text)`, puis itère sur les règles retournées ; chaque règle est persistée via `API.createSWRLRule()` (nouvel identifiant) ou `API.updateSWRLRule()` (collision résolue en `replace`) ; aucune validation n'est effectuée contre `APP.state.classes`, si bien que les atomes référençant des `classes` absentes sont conservés ; rafraîchit `APP.state`, re-rend la section et rapporte les décomptes via `UI.success()`.
+**Code source :** `swrl_editor.js` → `importRules()` — Ouvre un sélecteur de fichier sans filtre d'extension (l'attribut `accept` a été retiré, afin que les fichiers `.swd` ne soient plus grisés et restent sélectionnables sous macOS/WebKit), lit le texte du fichier, le parse via `API.parseSwordRules(text)`, puis itère sur les règles retournées ; chaque règle est persistée via `API.createSWRLRule()` (nouvel identifiant) ou `API.updateSWRLRule()` (collision résolue en `replace`) ; aucune validation n'est effectuée contre `APP.state.classes`, si bien que les atomes référençant des `classes` absentes sont conservés ; rafraîchit `APP.state`, re-rend la section et rapporte les décomptes via `UI.success()`.
 
 ### REQ-SWR-037 — Résolution d'une collision d'identifiant à l'import
 
@@ -456,11 +456,11 @@ L'import est l'exact inverse de l'export `.sword` : un aller-retour préserve la
 
 | **Si** | le panneau liste des règles SWRL est affiché, |
 |---|---|
-| **Alors** | un bouton **Importer des règles** est présenté à gauche du bouton **+** (ajout de règle) dans l'en-tête du panneau, permettant à l'ontologiste d'importer des `règles SWRL` depuis un fichier `.sword`. |
+| **Alors** | un bouton **Importer des règles** est présenté à gauche du bouton **+** (ajout de règle) dans l'en-tête du panneau, permettant à l'ontologiste d'importer des `règles SWRL` depuis un fichier au format SWORD (`.swd`). |
 
 ---
 
-**Code source :** `swrl_editor.js` → `renderSplit()` — Rend, dans le `tree-panel-header`, un bouton d'import (`📥`, `title="Import rules from a .sword file"`) appelant `SWRLEditor.importRules()` immédiatement avant le bouton de création (`➕`) appelant `SWRLEditor.newRule()`.
+**Code source :** `swrl_editor.js` → `renderSplit()` — Rend, dans le `tree-panel-header`, un bouton d'import (`📥`, `title="Import rules from a .swd file"`) appelant `SWRLEditor.importRules()` immédiatement avant le bouton de création (`➕`) appelant `SWRLEditor.newRule()`.
 
 ### REQ-SWR-039 — Pickers de classe et de propriété homogènes
 

@@ -43,6 +43,7 @@
 - [REQ-IND-017 — Panneaux de propriétés dynamiques (Datatype Properties)](#req-ind-017--panneaux-de-propriétés-dynamiques-datatype-properties)
 - [REQ-IND-019 — Ouverture du sélecteur d'individual pour une Object Property](#req-ind-019--ouverture-du-sélecteur-dindividual-pour-une-object-property)
 - [REQ-IND-033 — Navigation vers un individual cible depuis une Object Property](#req-ind-033--navigation-vers-un-individual-cible-depuis-une-object-property)
+- [REQ-IND-040 — Sélection complète d'un individual lors d'une navigation inter-onglets](#req-ind-040--sélection-complète-dun-individual-lors-dune-navigation-inter-onglets)
 - [REQ-IND-034 — Lien cliquable pour les valeurs de données de type URL](#req-ind-034--lien-cliquable-pour-les-valeurs-de-données-de-type-url)
 - [REQ-IND-035 — Panneau "Where Used" dans le formulaire](#req-ind-035--panneau-where-used-dans-le-formulaire)
 - [REQ-IND-036 — Redimensionnement des colonnes par glisser-déposer](#req-ind-036--redimensionnement-des-colonnes-par-glisser-déposer)
@@ -72,7 +73,7 @@
 
 ---
 
-**Code source :** `owl_editor.js` → `_renderIndList()` — Filtre les individuals dont au moins un type appartient à la classe sélectionnée (`_selectedClassId`) ou à l'un de ses descendants (BFS transitif via `allDescendants()`). Trie la liste alphabétiquement par le label résolu via `_resolveDisplayLabel()`, ou par identifiant si aucun label n'est défini. Chaque item affiche le label principal et, si distinct, l'identifiant en sous-texte. Chaque item est rendu avec l'attribut `draggable`.
+**Code source :** `owl_editor.js` → `_renderIndList()` — Filtre les individuals dont au moins un type appartient à la classe sélectionnée (`_selectedClassId`) ou à l'un de ses descendants (BFS transitif via `allDescendants()`). Trie la liste alphabétiquement par le label résolu via `_resolveDisplayLabel()`, ou par identifiant si aucun label n'est défini. Chaque item affiche le label principal et, si distinct, l'identifiant en sous-texte ; l'identifiant est préfixé par le préfixe de registre de l'ontologie connectée lorsqu'un préfixe est défini (comportement spécifié en détail dans `Ontologies.md`). Chaque item est rendu avec l'attribut `draggable`.
 
 ### REQ-IND-007 — Création d'un nouvel individual
 
@@ -467,6 +468,16 @@
 ---
 
 **Code source :** `owl_editor.js` → `_renderPropPanel()` — Chaque valeur d'assertion d'objet est rendue avec un lien `onclick="APP.navigateTo('individuals','${a.target}')"` permettant la navigation directe. Ce lien est également généré après sélection via `confirmPicker()`.
+
+### REQ-IND-040 — Sélection complète d'un individual lors d'une navigation inter-onglets
+
+| **Si** | l'ontologiste navigue vers un `individual` depuis l'extérieur de l'onglet `Individuals` — clic sur un `individual` dans le tableau de résultats SPARQL VizQ, lien d'entité inter-onglets (`APP.navigateTo`), navigation arrière/avant de l'historique (`APP._restoreState`) ou restauration annuler/rétablir, |
+|---|---|
+| **Alors** | l'`individual` ciblé est sélectionné de bout en bout dans les trois colonnes : sa `classe` représentative est sélectionnée dans l'arbre (colonne 1), la liste filtrée des `individuals` est reconstruite (colonne 2), l'`individual` lui-même est surligné et son formulaire est affiché (colonne 3), et l'item est défilé pour être visible. |
+
+---
+
+**Code source :** `owl_editor.js` → `focusIndividual(id, _hist)` — (1) détermine la `classe` représentative de l'individual — son premier `rdf:type` réel (hors `owl:NamedIndividual`), ou « All Individuals » si aucun — et appelle `selectClass()` qui surligne la classe et reconstruit la liste filtrée (colonne 2) ; (2) appelle `selectIndividual()` pour surligner l'individual (colonne 2) et afficher son formulaire (colonne 3) ; (3) défile l'item pour le rendre visible dans la colonne 2. Auparavant, seul le formulaire de détail (colonne 3) était mis à jour : l'arbre des classes et la liste des individuals ne reflétaient pas la sélection. Le paramètre `_hist` évite de pousser deux fois dans l'historique de navigation lors des opérations de restauration.
 
 ### REQ-IND-034 — Lien cliquable pour les valeurs de données de type URL
 

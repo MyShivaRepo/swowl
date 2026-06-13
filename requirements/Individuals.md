@@ -43,6 +43,7 @@
 - [REQ-IND-017 — Dynamic property panels (Datatype Properties)](#req-ind-017--dynamic-property-panels-datatype-properties)
 - [REQ-IND-019 — Opening the individual picker for an Object Property](#req-ind-019--opening-the-individual-picker-for-an-object-property)
 - [REQ-IND-033 — Navigation to a target individual from an Object Property](#req-ind-033--navigation-to-a-target-individual-from-an-object-property)
+- [REQ-IND-040 — Complete individual selection on cross-tab navigation](#req-ind-040--complete-individual-selection-on-cross-tab-navigation)
 - [REQ-IND-034 — Clickable link for URL-type data values](#req-ind-034--clickable-link-for-url-type-data-values)
 - [REQ-IND-035 — "Where Used" panel in the form](#req-ind-035--where-used-panel-in-the-form)
 - [REQ-IND-036 — Column resizing by drag-and-drop](#req-ind-036--column-resizing-by-drag-and-drop)
@@ -72,7 +73,7 @@
 
 ---
 
-**Source code:** `owl_editor.js` → `_renderIndList()` — Filters individuals whose at least one type belongs to the selected class (`_selectedClassId`) or one of its descendants (transitive BFS via `allDescendants()`). Sorts the list alphabetically by the label resolved via `_resolveDisplayLabel()`, or by identifier if no label is defined. Each item displays the primary label and, if distinct, the identifier as sub-text. Each item is rendered with the `draggable` attribute.
+**Source code:** `owl_editor.js` → `_renderIndList()` — Filters individuals whose at least one type belongs to the selected class (`_selectedClassId`) or one of its descendants (transitive BFS via `allDescendants()`). Sorts the list alphabetically by the label resolved via `_resolveDisplayLabel()`, or by identifier if no label is defined. Each item displays the primary label and, if distinct, the identifier as sub-text; the identifier is prefixed with the connected ontology's registry prefix when one is defined (this prefix behaviour is specified in detail in `Ontologies.md`). Each item is rendered with the `draggable` attribute.
 
 ### REQ-IND-007 — Creation of a new individual
 
@@ -467,6 +468,16 @@
 ---
 
 **Source code:** `owl_editor.js` → `_renderPropPanel()` — Each object assertion value is rendered with a link `onclick="APP.navigateTo('individuals','${a.target}')"` enabling direct navigation. This link is also generated after selection via `confirmPicker()`.
+
+### REQ-IND-040 — Complete individual selection on cross-tab navigation
+
+| **If** | the ontologist navigates to an `individual` from outside the `Individuals` tab — clicking an `individual` in the SPARQL VizQ results table, a cross-tab entity link (`APP.navigateTo`), Back/Forward history navigation (`APP._restoreState`) or undo/redo restore, |
+|---|---|
+| **Then** | the target `individual` is selected end-to-end across all three columns: its representative class is selected in the tree (column 1), the filtered `individual` list is rebuilt (column 2), the `individual` itself is highlighted and its form is displayed (column 3), and the item is scrolled into view. |
+
+---
+
+**Source code:** `owl_editor.js` → `focusIndividual(id, _hist)` — (1) determines the individual's representative class — its first real `rdf:type` (excluding `owl:NamedIndividual`), or "All Individuals" if none — and calls `selectClass()`, which highlights the class and rebuilds the filtered list (column 2); (2) calls `selectIndividual()` to highlight the individual (column 2) and display its form (column 3); (3) scrolls the item into view in column 2. Previously, only the detail form (column 3) was updated: the class tree and individual list did not reflect the selection. The `_hist` parameter avoids double-pushing into the navigation history during restore operations.
 
 ### REQ-IND-034 — Clickable link for URL-type data values
 
