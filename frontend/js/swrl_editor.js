@@ -136,8 +136,9 @@ const SWRLEditor = {
         return filtered.map(r => {
             const broken     = this._ruleHasBrokenRefs(r);
             const isImported = !!r._imported;
-            // Le préfixe d'import s'applique à l'ID (pas au label)
-            const idText     = isImported ? `${r._importPrefix}:${r.id}` : r.id;
+            // Préfixe sur l'ID (pas le label) : import → préfixe contextuel ;
+            // règle native → préfixe de l'ontologie courante (via _displayId).
+            const idText     = _displayId(r);
             const mainText   = r.label || idText;
             const subText    = r.label ? idText : '';
             return `
