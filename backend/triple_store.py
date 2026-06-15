@@ -861,6 +861,13 @@ class TripleStore:
 
         onto_uri = URIRef(onto.id)
         g.add((onto_uri, RDF.type, OWL.Ontology))
+        # owl:imports — ontologies importées (avec binding de préfixe pour la lisibilité)
+        for imp_uri in (onto.imports or []):
+            g.add((onto_uri, OWL.imports, URIRef(imp_uri)))
+            lab = (onto.import_labels or {}).get(imp_uri) or {}
+            pfx = lab.get("prefix")
+            if pfx:
+                g.bind(pfx, Namespace(imp_uri.rstrip("#/") + "#"))
         for ann in onto.annotations.labels:
             g.add((onto_uri, RDFS.label, Literal(ann.value, lang=ann.lang)))
         for ann in onto.annotations.comments:
