@@ -157,6 +157,18 @@ const SWRLEditor = {
         }).join('');
     },
 
+    /** Affichage préfixé d'un id d'entité référencé dans un atome SWRL :
+     *  résout l'entité dans APP.state[kinds] et applique _displayId (préfixe
+     *  d'import pour les entités importées, préfixe de l'ontologie sinon). */
+    _dispRef(id, kinds) {
+        if (!id) return id;
+        for (const key of kinds) {
+            const e = (APP.state[key] || []).find(x => x.id === id);
+            if (e) return _displayId(e);
+        }
+        return id;   // non trouvé / déjà namespacé → tel quel
+    },
+
     restoreSelection() {
         this._initSplitHandle();
         if (this._selectedId) {
@@ -413,7 +425,7 @@ const SWRLEditor = {
                                        <span class="restr-filler-lbl" style="cursor:pointer"
                                              onclick="event.stopPropagation();APP.navigateTo('classes','${clsId}')"
                                              onmouseover="this.style.textDecoration='underline';this.style.color='var(--accent,#5f8dd3)'"
-                                             onmouseout="this.style.textDecoration='';this.style.color=''">${clsId}</span>`
+                                             onmouseout="this.style.textDecoration='';this.style.color=''">${SWRLEditor._dispRef(clsId, ['classes'])}</span>`
                                     : `<span style="color:var(--red,#ef4444);font-weight:600;font-size:11px" title="${clsId} — deleted">⚠ deleted</span>`)
                                 : `<span class="restr-filler-ph"></span>
                                    <span class="restr-filler-lbl" style="color:var(--text-faint)">— class —</span>`
@@ -449,7 +461,7 @@ const SWRLEditor = {
                                        <span style="white-space:nowrap;cursor:pointer"
                                              onclick="event.stopPropagation();APP.navigateTo('${isOP ? 'object-properties' : 'datatype-properties'}','${propId}')"
                                              onmouseover="this.style.textDecoration='underline';this.style.color='var(--accent,#5f8dd3)'"
-                                             onmouseout="this.style.textDecoration='';this.style.color=''">${propId}</span>`
+                                             onmouseout="this.style.textDecoration='';this.style.color=''">${SWRLEditor._dispRef(propId, ['object_properties','datatype_properties'])}</span>`
                                     : `<span style="color:var(--red,#ef4444);font-weight:600;font-size:11px" title="${propId} — deleted">⚠ deleted</span>`)
                                 : `<span class="restr-filler-ph"></span>
                                    <span style="color:var(--text-faint);white-space:nowrap">— property —</span>`
@@ -481,7 +493,7 @@ const SWRLEditor = {
                                  onclick="APP.navigateTo('individuals','${atom.value}')"
                                  onmouseover="this.style.textDecoration='underline';this.style.color='var(--accent)'"
                                  onmouseout="this.style.textDecoration='';this.style.color=''"
-                                 title="${atom.value}">${IndividualEditor._labelForId(atom.value)}</span>
+                                 title="${atom.value}">${SWRLEditor._dispRef(atom.value, ['individuals'])}</span>
                        </div>`
                     : `<input class="swrl-inp" value="${atom.value||''}" placeholder="individual, variable or value"
                               data-field="value" ${chg} style="width:180px;flex:none">`;
