@@ -91,7 +91,7 @@ function _classTreePickerItems(callExpr, excludeIds = []) {
             style="padding-left:${pl}px" onclick="${callExpr}('${id}')">
             <span class="tree-leaf">◦</span>
             <span class="cls-dot tree-cls-dot"></span>
-            <span class="tree-label">${id}</span>
+            <span class="tree-label">${_displayRefId(id)}</span>
         </div>`);
         (childrenOf[id] || []).forEach(child => visit(child, depth + 1));
     };
@@ -115,7 +115,7 @@ function _opTreePickerItems(onSelectExpr, excludeIds = []) {
             style="padding-left:${pl}px" onclick="${onSelectExpr}">
             <span class="tree-leaf">◦</span>
             <span class="op-prop-dot"></span>
-            <span class="tree-label">${id}</span>
+            <span class="tree-label">${_displayRefId(id)}</span>
         </div>`);
         (childrenOf[id] || []).forEach(child => visit(child, depth + 1));
     };
@@ -144,7 +144,7 @@ function _propTreeLines(props, excluded, dotCls, callExpr) {
             lines.push(`<div class="tree-item restr-prop-item" data-id="${id}"
                 style="padding:3px 8px;padding-left:${pl}px" onclick="${callExpr}('${id}')">
                 <span class="${dotCls}" style="flex-shrink:0"></span>
-                <span class="tree-label" style="margin-left:4px">${id}</span>
+                <span class="tree-label" style="margin-left:4px">${_displayRefId(id)}</span>
             </div>`);
         }
         (childrenOf[id] || []).forEach(c => visit(c, depth + 1));
@@ -212,7 +212,7 @@ function _fillerClassRows(gid, selectedId, activeId, q, mode) {
         const cnt = n ? `<span class="rfs-cnt">${n}</span>` : '';
         return `<div class="${cls.join(' ')}" style="padding-left:${pl}px" data-cls="${id}" onclick="${click}">
             <span class="cls-dot ${id === 'owl:Thing' ? 'tree-thing-dot' : 'tree-cls-dot'}"></span>
-            <span class="tree-label"${italic ? ' style="font-style:italic"' : ''}>${_fillerHl(id, q)}</span>${cnt}
+            <span class="tree-label"${italic ? ' style="font-style:italic"' : ''}>${_fillerHl(_displayRefId(id), q)}</span>${cnt}
         </div>`;
     };
 
@@ -235,7 +235,7 @@ function _fillerIndRows(gid, classId, selectedId, q) {
     return inds.map(i => `<div class="tree-item rfs-row${i.id === selectedId ? ' selected' : ''}" data-ind="${i.id}"
         onclick="RestrictionEditor.selectFiller('${gid}',this.dataset.ind,'ind',true)">
         <span class="xsd-dot rfs-ind-dot"></span>
-        <span class="tree-label">${_fillerHl(i.id, q)}</span>
+        <span class="tree-label">${_fillerHl(_displayRefId(i.id), q)}</span>
     </div>`).join('');
 }
 
@@ -2713,7 +2713,7 @@ function _annoPickerItems(editorName) {
         <div class="tree-item" style="padding:3px 8px;padding-left:${8 + depth * 14}px"
              onclick="${editorName}.addOtherAnnotRow('${id}')">
             <span class="anno-prop-dot" style="margin-right:4px;flex-shrink:0"></span>
-            <span class="tree-label" style="font-size:12px;color:var(--text2);font-family:var(--font-mono)">${id}</span>
+            <span class="tree-label" style="font-size:12px;color:var(--text2);font-family:var(--font-mono)">${_displayRefId(id)}</span>
             ${isBuiltin ? '<span style="font-size:10px;color:var(--text-faint);font-style:italic;margin-left:4px">built-in</span>' : ''}
         </div>`;
 
