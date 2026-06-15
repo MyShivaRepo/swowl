@@ -448,13 +448,18 @@ class TripleStore:
             ]:
                 if uri_str_val.startswith(ns_uri) and ns_uri != base:
                     return ns_prefix + ":" + uri_str_val[len(ns_uri):]
-            # 1bis. Namespaces référencés définis par l'utilisateur (wizard d'import)
+            # 2. Appartient à la base de l'ontologie courante → nom local nu.
+            #    PRIORITAIRE sur les namespaces utilisateur : la base peut être un
+            #    sur-ensemble d'un namespace importé (ex. base .../plm/data# vs
+            #    import .../plm) — sinon 'MyClass' deviendrait 'plm:/data#MyClass'.
+            if base and uri_str_val.startswith(base):
+                return self._local_name(uri_str_val, base)
+            # 3. Namespaces référencés définis par l'utilisateur (wizard d'import)
             for ns_uri, ns_prefix in _user_ns:
                 if ns_uri != base and uri_str_val.startswith(ns_uri):
                     return ns_prefix + ":" + uri_str_val[len(ns_uri):]
-            # 2. Belongs to current ontology base → strip base
-            local = self._local_name(uri_str_val, base)
-            return local
+            # 4. Repli : extraction du nom local
+            return self._local_name(uri_str_val, base)
 
         # ── Helper: parse an owl:Restriction BNode → Restriction object ──
         def _parse_restriction(node):
