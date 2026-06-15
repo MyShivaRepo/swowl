@@ -3159,7 +3159,7 @@ const OPEditor = {
             const isImp = _applyImportedView(detail, prop, this.renderForm(prop));
             _initHResizers('op-detail');
             this._updateSuperPanel(prop || null);
-            if (!isImp) this._loadInferredInverse(id);
+            this._loadInferredInverse(id);   // aussi pour les OPs importées (parité)
             _markImportedRefs(detail);
             _markImportedRefs(document.getElementById('op-supers-list'));
         } else {
