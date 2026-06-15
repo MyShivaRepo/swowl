@@ -257,27 +257,44 @@ def register_ontology(req: RegisterRequest):
     return entry.to_dict()
 
 
+class RegisterJsonRequest(PydanticModel):
+    path: str
+    name: str = None
+    uri: str = None
+    prefix: str = None
+    ns_prefixes: list = None   # [{prefix, namespace}] — None = ne pas toucher aux imports
+
 @app.post("/api/ontologies/register-json", tags=["Ontologie"], status_code=201)
-def register_json(path: str = Query(...), name: str = Query(None),
-                  uri: str = Query(None), prefix: str = Query(None)):
+def register_json(req: RegisterJsonRequest):
     """Register an existing .json ontology file into the registry (Load workflow)."""
     from pathlib import Path as FP
     import json as _json
-    container_path = host_to_container(path)
+    container_path = host_to_container(req.path)
     p = FP(container_path)
     if not p.exists():
-        raise HTTPException(404, f"File not found: {path}")
+        raise HTTPException(404, f"File not found: {req.path}")
     try:
         data = _json.loads(p.read_text(encoding="utf-8"))
     except Exception as e:
         raise HTTPException(400, f"Cannot read JSON: {e}")
-    resolved_name   = name   or data.get("name") or p.stem
-    resolved_uri    = uri    or data.get("id", "")
-    resolved_prefix = prefix if prefix is not None else data.get("prefix", "")
+    resolved_name   = req.name   or data.get("name") or p.stem
+    resolved_uri    = req.uri    or data.get("id", "")
+    resolved_prefix = req.prefix if req.prefix is not None else data.get("prefix", "")
     entries = store.list_registry()
     if any(e["name"] == resolved_name for e in entries):
         raise HTTPException(409, f"An ontology named '{resolved_name}' already exists in the registry.")
-    entry = store.register(resolved_name, path, resolved_uri, resolved_prefix)
+    entry = store.register(resolved_name, req.path, resolved_uri, resolved_prefix,
+                           ns_prefixes=req.ns_prefixes)
+    # Le fichier existe déjà → store.register ne le réécrit pas : on y reflète
+    # imports/import_labels (+ ns_prefixes) si l'utilisateur les a fournis/édités.
+    if req.ns_prefixes is not None:
+        try:
+            data["imports"]       = entry.imports
+            data["import_labels"] = entry.import_labels
+            data["ns_prefixes"]   = req.ns_prefixes
+            p.write_text(_json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+        except Exception:
+            pass
     return entry.to_dict()
 
 
@@ -495,12 +512,24 @@ def peek_ontology(path: str = Query(..., description="Host path to .owl / .ttl /
     try:
         if fname.endswith(".json"):
             data = _json.loads(p.read_text(encoding="utf-8"))
+            # namespaces : owl:imports déclarés (import_labels) + ns_prefixes éventuels
+            nsl, seen = [], set()
+            for uri_i in (data.get("imports") or []):
+                lab = (data.get("import_labels") or {}).get(uri_i) or {}
+                pfx = lab.get("prefix") or (
+                    uri_i.rstrip("#/").rsplit("/", 1)[-1].rsplit("#", 1)[-1][:12].lower() or "imp")
+                if uri_i not in seen:
+                    seen.add(uri_i); nsl.append({"prefix": pfx, "namespace": uri_i})
+            for d in (data.get("ns_prefixes") or []):
+                ns_d = d.get("namespace")
+                if ns_d and ns_d not in seen:
+                    seen.add(ns_d); nsl.append({"prefix": d.get("prefix", ""), "namespace": ns_d})
             return {
                 "name":   data.get("name") or name,
                 "prefix": data.get("prefix", "onto"),
                 "uri":    data.get("id", ""),
                 "path":   path,
-                "namespaces": data.get("ns_prefixes", []),
+                "namespaces": nsl,
             }
         # OWL/XML or Turtle — parse with rdflib
         import rdflib

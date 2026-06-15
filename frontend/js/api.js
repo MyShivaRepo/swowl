@@ -28,8 +28,8 @@ const API = {
 
     // ── Ontology registry ──────────────────────────────
     peekOntology:     (path)  => API._fetch('GET', `/ontologies/peek?path=${encodeURIComponent(path)}`),
-    registerJson:     (path, name, uri, prefix) =>
-        API._fetch('POST', `/ontologies/register-json?path=${encodeURIComponent(path)}&name=${encodeURIComponent(name)}&uri=${encodeURIComponent(uri)}&prefix=${encodeURIComponent(prefix)}`),
+    registerJson:     (path, name, uri, prefix, ns_prefixes = []) =>
+        API._fetch('POST', '/ontologies/register-json', { path, name, uri, prefix, ns_prefixes }),
     listOntologies:     ()           => API._fetch('GET',    '/ontologies'),
     registerOntology:   (data)       => API._fetch('POST',   '/ontologies/register', data),
     updateOntologyEntry:(name, data) => API._fetch('PUT',    `/ontologies/${encodeURIComponent(name)}`, data),

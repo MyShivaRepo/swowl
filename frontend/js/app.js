@@ -905,7 +905,7 @@ const APP = {
                            onclick="FsBrowser.open('wiz-imp-src',['.owl','.ttl','.rdf','.xml'])">
                 </div>
                 <button class="btn-secondary btn-sm" style="align-self:flex-start"
-                        onclick="APP._wizardImportPeek()">🔍 Read Prefix &amp; URI from file</button>
+                        onclick="APP._wizardImportPeek()">🔍 Read prefix, URI &amp; imports from file</button>
                 <!-- Step 2: auto-filled fields -->
                 <div style="display:flex;gap:10px;flex-wrap:wrap">
                     <div class="form-group" style="margin:0;flex:0 0 100px">
@@ -960,19 +960,17 @@ const APP = {
                 <button class="btn-frame-del" onclick="APP._closeWizard()" style="margin-left:auto">✕</button>
             </div>
             <div class="cls-frame-body" style="padding:14px;display:flex;flex-direction:column;gap:10px">
+                <!-- Step 1: source file -->
                 <div class="form-group" style="margin:0">
-                    <label>Source file (.json) <span class="form-req">*</span></label>
+                    <label>Source file <span style="font-size:10px;color:var(--text-dim)">(.json)</span> <span class="form-req">*</span></label>
                     <input type="text" id="wiz-load-src" placeholder="Choose .json file…"
                            style="width:100%;cursor:pointer" readonly
                            onclick="FsBrowser.open('wiz-load-src',['.json'])">
                 </div>
                 <button class="btn-secondary btn-sm" style="align-self:flex-start"
-                        onclick="APP._wizardLoadPeek()">🔍 Read info from file</button>
+                        onclick="APP._wizardLoadPeek()">🔍 Read prefix, URI &amp; imports from file</button>
+                <!-- Step 2: auto-filled fields -->
                 <div style="display:flex;gap:10px;flex-wrap:wrap">
-                    <div class="form-group" style="margin:0;flex:1;min-width:160px">
-                        <label>Name <span class="form-req">*</span></label>
-                        <input type="text" id="wiz-load-name" placeholder="auto-detected…" style="width:100%">
-                    </div>
                     <div class="form-group" style="margin:0;flex:0 0 100px">
                         <label>Prefix</label>
                         <input type="text" id="wiz-load-prefix" placeholder="auto-detected…" style="width:100%">
@@ -980,6 +978,21 @@ const APP = {
                     <div class="form-group" style="margin:0;flex:2;min-width:260px">
                         <label>Namespace (base URI)</label>
                         <input type="text" id="wiz-load-uri" placeholder="auto-detected…" style="width:100%">
+                    </div>
+                </div>
+                <!-- Step 2b: imported namespaces (prefix → namespace) -->
+                <div class="form-group" style="margin:0">
+                    <label>Imported namespaces
+                        <span style="font-size:10px;color:var(--text-dim)">(prefix → namespace, pour les entités issues d'autres ontologies — optionnel)</span></label>
+                    <div id="wiz-load-ns-list" style="display:flex;flex-direction:column;gap:6px"></div>
+                    <button class="btn-secondary btn-sm" style="align-self:flex-start;margin-top:6px"
+                            onclick="APP._wizImpAddNs('','','wiz-load-ns-list')">+ namespace</button>
+                </div>
+                <!-- Step 3: registry name -->
+                <div style="display:flex;gap:10px;flex-wrap:wrap">
+                    <div class="form-group" style="margin:0;flex:1;min-width:160px">
+                        <label>Name <span class="form-req">*</span></label>
+                        <input type="text" id="wiz-load-name" placeholder="auto-detected…" style="width:100%">
                     </div>
                 </div>
                 <div style="display:flex;gap:10px;align-items:center">
@@ -1095,7 +1108,13 @@ const APP = {
             set('wiz-load-name',   info.name);
             set('wiz-load-prefix', info.prefix);
             set('wiz-load-uri',    info.uri);
-            UI.success('Info read from file.');
+            const nsList = document.getElementById('wiz-load-ns-list');
+            if (nsList) {
+                nsList.innerHTML = '';
+                (info.namespaces || []).forEach(n => this._wizImpAddNs(n.prefix, n.namespace, 'wiz-load-ns-list'));
+            }
+            const nbNs = (info.namespaces || []).length;
+            UI.success(`Info read from file${nbNs ? ` — ${nbNs} namespace(s) importé(s)` : ''}.`);
         } catch (e) { UI.error(`Cannot read file: ${e.message}`); }
     },
 
@@ -1107,8 +1126,9 @@ const APP = {
         const conn   = document.getElementById('wiz-load-connect')?.checked;
         if (!src)  return UI.error('Please select a .json file.');
         if (!name) return UI.error('Name is required — use 🔍 to auto-detect.');
+        const ns_prefixes = this._wizImpCollectNs('wiz-load-ns-list');
         try {
-            await API.registerJson(src, name, uri, prefix);
+            await API.registerJson(src, name, uri, prefix, ns_prefixes);
             UI.success(`Ontology "${name}" loaded & registered.`);
             if (conn) await API.connectOntology(name);
             this._closeWizard();
