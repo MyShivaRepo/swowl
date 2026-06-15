@@ -2916,7 +2916,7 @@ const OPEditor = {
                     : `<span class="tree-leaf">◦</span>`}
                 <span class="op-prop-dot tree-op-dot"></span>
                 <span class="tree-label">${_escapeHtml(displayId)}</span>
-                ${!isImported && prop.inverseOf ? `<span class="op-inverse-tag">(↔&thinsp;<span class="op-prop-dot" style="width:9px;height:6px;flex-shrink:0;display:inline-block;vertical-align:middle"></span>&thinsp;<span class="op-inv-nav"
+                ${prop.inverseOf ? `<span class="op-inverse-tag">(↔&thinsp;<span class="op-prop-dot" style="width:9px;height:6px;flex-shrink:0;display:inline-block;vertical-align:middle"></span>&thinsp;<span class="op-inv-nav"
                       onclick="event.stopPropagation();APP.navigateTo('object-properties','${prop.inverseOf}')"
                       onmouseover="this.style.color='var(--accent)';this.style.textDecoration='underline'"
                       onmouseout="this.style.color='';this.style.textDecoration='';">${_displayRefId(prop.inverseOf)}</span>)</span>` : ''}
