@@ -454,10 +454,13 @@ class TripleStore:
             #    import .../plm) — sinon 'MyClass' deviendrait 'plm:/data#MyClass'.
             if base and uri_str_val.startswith(base):
                 return self._local_name(uri_str_val, base)
-            # 3. Namespaces référencés définis par l'utilisateur (wizard d'import)
+            # 3. Namespaces référencés définis par l'utilisateur (wizard d'import).
+            #    On retire un éventuel séparateur '#'/'/' en tête du reste : le
+            #    namespace déclaré peut ne pas inclure le '#' final (ex. ns
+            #    'http://ex.org/plm' vs entité 'http://ex.org/plm#Article').
             for ns_uri, ns_prefix in _user_ns:
                 if ns_uri != base and uri_str_val.startswith(ns_uri):
-                    return ns_prefix + ":" + uri_str_val[len(ns_uri):]
+                    return ns_prefix + ":" + uri_str_val[len(ns_uri):].lstrip("#/")
             # 4. Repli : extraction du nom local
             return self._local_name(uri_str_val, base)
 

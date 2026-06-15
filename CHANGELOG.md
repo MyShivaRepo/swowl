@@ -89,5 +89,8 @@ First stable release. A complete web editor for **OWL 2 DL** ontologies with
 - Frontend: Nginx + vanilla HTML/CSS/JS (no framework, no build).
 - Backend: Python 3.11, FastAPI + Uvicorn, rdflib, Pydantic.
 - Bilingual user specifications under `exigences/` (FR) and `requirements/` (EN).
+- Backend test suite (`backend/tests`, pytest) — isolated registry: import/export
+  round-trip, `_lid` prefixing & base priority, SWORD round-trip, typed-by-class
+  individuals, equivalentClass, DataRange, owl:imports export.
 
 [1.0.0]: https://github.com/MyShivaRepo/swowl/releases/tag/v1.0.0
