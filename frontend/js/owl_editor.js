@@ -1668,6 +1668,7 @@ const ClassEditor = {
     async _silentSave() {
         const originalId = this._editingId;
         if (originalId === null) return;
+        if ((APP.state.classes || []).find(c => c.id === originalId)?._imported) return;
         const idEl = document.getElementById('cls-id');
         if (!idEl) return;
         const id = idEl.value.trim();
@@ -3618,6 +3619,9 @@ const OPEditor = {
     async _silentSave() {
         const originalId = this._editingId;
         if (originalId === null) return;
+        // Ne jamais sauvegarder une entité importée (lecture seule) : éviterait de
+        // créer un doublon dans l'ontologie connectée et d'écraser ses tags _imported.
+        if ((APP.state.object_properties || []).find(p => p.id === originalId)?._imported) return;
         const idEl = document.getElementById('op-id');
         if (!idEl) return;
         const id = idEl.value.trim();
@@ -4434,6 +4438,7 @@ const DPEditor = {
     async _silentSave() {
         const originalId = this._editingId;
         if (originalId === null) return;
+        if ((APP.state.datatype_properties || []).find(p => p.id === originalId)?._imported) return;
         const idEl = document.getElementById('dp-id');
         if (!idEl) return;
         const id = idEl.value.trim();
@@ -7068,6 +7073,7 @@ const APEditor = {
     async _silentSave() {
         const originalId = this._editingId;
         if (originalId === null || this._isRoot(originalId) || this._isBuiltin(originalId)) return;
+        if ((APP.state.annotation_properties || []).find(p => p.id === originalId)?._imported) return;
         const data = this._collectForm();
         if (!data.id) return;
         try {
