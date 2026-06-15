@@ -133,6 +133,20 @@ def test_ns_prefixes_become_imports():
     assert onto.import_labels.get("http://ex.org/plm", {}).get("prefix") == "plm"
 
 
+# ── Import : préfixe vide accepté (l'import est tout de même déclaré) ───────────
+def test_empty_prefix_import_still_declared():
+    rdf = '''<?xml version="1.0"?>
+    <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+      xmlns:owl="http://www.w3.org/2002/07/owl#"
+      xml:base="http://ex.org/plm/data">
+      <owl:Ontology rdf:about=""/>
+    </rdf:RDF>'''
+    onto = _imp(rdf, ns_prefixes=[{"prefix": "", "namespace": "http://ex.org/plm"}],
+                uri="http://ex.org/plm/data#")
+    assert "http://ex.org/plm" in onto.imports, "import à préfixe vide non déclaré"
+    assert onto.import_labels.get("http://ex.org/plm", {}).get("prefix") == ""
+
+
 # ── Export : owl:imports émis dans le graphe RDF ───────────────────────────────
 def test_export_emits_owl_imports():
     rdf = '''<?xml version="1.0"?>

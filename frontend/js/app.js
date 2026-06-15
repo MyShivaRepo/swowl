@@ -1051,7 +1051,7 @@ const APP = {
                 prefix:    r.querySelector('.wiz-imp-ns-prefix')?.value.trim() || '',
                 namespace: r.querySelector('.wiz-imp-ns-uri')?.value.trim()    || '',
             }))
-            .filter(x => x.prefix && x.namespace);
+            .filter(x => x.namespace);   // préfixe optionnel (vide → affichage par namespace)
     },
 
     async _wizardImportPeek() {

@@ -165,8 +165,8 @@ class TripleStore:
                 continue
             ns  = (d.get("namespace") or "").strip()
             pfx = (d.get("prefix") or "").strip()
-            if not ns or not pfx:
-                continue
+            if not ns:
+                continue   # préfixe optionnel : vide → affichage par namespace complet
             if ns not in imports:
                 imports.append(ns)
             name = ""

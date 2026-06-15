@@ -408,10 +408,13 @@ def get_imported_entities():
             if p.exists():
                 try:
                     data = _json.loads(p.read_text(encoding="utf-8"))
-                    # Préfixe contextuel (choisi dans le wizard de l'ontologie qui importe)
-                    # prioritaire sur le préfixe propre de l'ontologie importée.
-                    ctx_prefix = (root_entry.import_labels.get(uri, {}) or {}).get("prefix") or imp_entry.prefix
-                    tag = {"_imported": True, "_importPrefix": ctx_prefix, "_importName": imp_entry.name}
+                    # Préfixe contextuel (choisi dans le wizard de l'ontologie qui importe).
+                    # - entrée de label présente → on respecte sa valeur (même vide → affichage par namespace) ;
+                    # - aucune entrée → repli sur le préfixe propre de l'ontologie importée.
+                    lab = root_entry.import_labels.get(uri)
+                    ctx_prefix = lab.get("prefix", "") if isinstance(lab, dict) else imp_entry.prefix
+                    tag = {"_imported": True, "_importPrefix": ctx_prefix,
+                           "_importName": imp_entry.name, "_importNamespace": uri}
                     for key in ("classes", "object_properties", "datatype_properties",
                                 "annotation_properties", "individuals", "swrl_rules", "queries"):
                         for entity in (data.get(key) or []):

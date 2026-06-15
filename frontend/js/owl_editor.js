@@ -453,7 +453,13 @@ function _applyReadOnly(detail) {
  *  - id déjà namespacé (contient ':') ou builtin → inchangé. */
 function _displayId(entity) {
     if (!entity) return '';
-    if (entity._imported) return `${entity._importPrefix}:${entity.id}`;
+    if (entity._imported) {
+        if (entity._importPrefix) return `${entity._importPrefix}:${entity.id}`;
+        // Préfixe contextuel vide → afficher le namespace complet (ex. http://examples.org/plm#Article)
+        const ns = entity._importNamespace;
+        if (ns) return (/[#/]$/.test(ns) ? ns : ns + '#') + entity.id;
+        return entity.id;
+    }
     const id = entity.id ?? '';
     if (!id || id.includes(':')) return id;            // owl:Thing, xsd:…, rdfs:label
     const p = (typeof APP !== 'undefined') ? APP.state?.ontology?.prefix : '';
