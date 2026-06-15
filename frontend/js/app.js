@@ -702,9 +702,11 @@ const APP = {
             const missing    = !entry;
             const snap        = labelMap?.[uri] || null;   // {prefix, name} mémorisé
             const name       = entry ? entry.name   : (snap ? snap.name   : uri);
-            // Le préfixe CONTEXTUEL (import_labels de l'ontologie qui importe) prime
-            // sur le préfixe propre de l'ontologie importée.
-            const prefix     = (snap && snap.prefix) ? snap.prefix : (entry ? entry.prefix : '');
+            // Le préfixe CONTEXTUEL (import_labels de l'ontologie qui importe) prime :
+            // si une entrée de label existe, on respecte sa valeur, même VIDE (→ aucun
+            // préfixe affiché). Repli sur le préfixe propre de l'importée seulement si
+            // aucune entrée de label.
+            const prefix     = snap ? (snap.prefix || '') : (entry ? entry.prefix : '');
             const subImports = effectiveImportsOf(entry);
             const hasKids    = subImports.length > 0;
             const path       = parentPath + '/' + name;
