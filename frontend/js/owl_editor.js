@@ -293,7 +293,7 @@ function _fillerInner(prop, type, fv, gid) {
                         onmouseover="this.style.textDecoration='underline';this.style.color='var(--accent,#5f8dd3)';this.style.cursor='pointer'"
                         onmouseout="this.style.textDecoration='';this.style.color=''"
                     ` : ''}
-                >${fv || fillerPh}</span>
+                >${fv ? _displayRefId(fv) : fillerPh}</span>
                 <button class="btn-frame-del restr-filler-clear" style="flex-shrink:0"
                     onclick="event.stopPropagation();RestrictionEditor.deleteChild('${gid}')">✕</button>
                 <span style="flex:1"></span>
@@ -462,6 +462,20 @@ function _displayId(entity) {
     }
     const id = entity.id ?? '';
     if (!id || id.includes(':')) return id;            // owl:Thing, xsd:…, rdfs:label
+    const p = (typeof APP !== 'undefined') ? APP.state?.ontology?.prefix : '';
+    return p ? `${p}:${id}` : id;
+}
+
+/** Display form of a referenced entity id (class, OP, DP, AP, individual) :
+ *  résout l'entité dans APP.state et applique _displayId (préfixe d'import /
+ *  d'ontologie / namespace complet). Id non trouvé : préfixe d'ontologie si nu. */
+function _displayRefId(id) {
+    if (!id) return id;
+    for (const key of ['classes','object_properties','datatype_properties','annotation_properties','individuals']) {
+        const e = (APP.state[key] || []).find(x => x.id === id);
+        if (e) return _displayId(e);
+    }
+    if (String(id).includes(':')) return id;
     const p = (typeof APP !== 'undefined') ? APP.state?.ontology?.prefix : '';
     return p ? `${p}:${id}` : id;
 }
@@ -1408,7 +1422,7 @@ const ClassEditor = {
             <div class="cls-list-item" data-id="${s}">
                 <span class="cls-dot"></span>
                 <span class="cls-list-lbl" style="cursor:pointer"
-                      onclick="APP.navigateTo('classes','${s}')">${s}</span>
+                      onclick="APP.navigateTo('classes','${s}')">${_displayRefId(s)}</span>
                 <button class="btn-frame-del" onclick="ClassEditor.removeSuperClass('${s}')">✕</button>
             </div>`).join('');
         const availSupers = (APP.state.classes || [])
@@ -1420,7 +1434,7 @@ const ClassEditor = {
             <div class="cls-list-item" data-id="${e}">
                 <span class="cls-dot"></span>
                 <span class="cls-list-lbl" style="cursor:pointer"
-                      onclick="APP.navigateTo('classes','${e}')">${e}</span>
+                      onclick="APP.navigateTo('classes','${e}')">${_displayRefId(e)}</span>
                 <button class="btn-frame-del" onclick="ClassEditor.removeEquivalent('${e}')">✕</button>
             </div>`).join('');
 
@@ -1429,7 +1443,7 @@ const ClassEditor = {
             <div class="cls-list-item" data-id="${d}">
                 <span class="cls-dot"></span>
                 <span class="cls-list-lbl" style="cursor:pointer"
-                      onclick="APP.navigateTo('classes','${d}')">${d}</span>
+                      onclick="APP.navigateTo('classes','${d}')">${_displayRefId(d)}</span>
                 <button class="btn-frame-del" onclick="ClassEditor.removeDisjoint('${d}')">✕</button>
             </div>`).join('');
         // ➕ SVG icon for toolbars
@@ -1577,7 +1591,7 @@ const ClassEditor = {
         item.className = 'cls-list-item';
         item.dataset.id = id;
         item.innerHTML = `<span class="cls-dot"></span>
-            <span class="cls-list-lbl" onclick="ClassEditor.selectClass('${id}')">${id}</span>
+            <span class="cls-list-lbl" onclick="ClassEditor.selectClass('${id}')">${_displayRefId(id)}</span>
             <button class="btn-frame-del" onclick="ClassEditor.removeSuperClass('${id}')">✕</button>`;
         list.insertBefore(item, picker);
         if (picker) { picker.style.display = 'none'; picker.value = ''; }
@@ -1608,7 +1622,7 @@ const ClassEditor = {
         item.dataset.id = id;
         item.innerHTML = `<span class="cls-dot"></span>
             <span class="cls-list-lbl" style="cursor:pointer"
-                  onclick="APP.navigateTo('classes','${id}')">${id}</span>
+                  onclick="APP.navigateTo('classes','${id}')">${_displayRefId(id)}</span>
             <button class="btn-frame-del" onclick="ClassEditor.removeEquivalent('${id}')">✕</button>`;
         list.insertBefore(item, picker);
         if (picker) picker.style.display = 'none';
@@ -1631,7 +1645,7 @@ const ClassEditor = {
         item.className = 'cls-list-item';
         item.dataset.id = id;
         item.innerHTML = `<span class="cls-dot"></span>
-            <span class="cls-list-lbl">${id}</span>
+            <span class="cls-list-lbl">${_displayRefId(id)}</span>
             <button class="btn-frame-del" onclick="ClassEditor.removeDisjoint('${id}')">✕</button>`;
         list.insertBefore(item, picker);
         if (picker) picker.style.display = 'none';          // div: no .value to reset
@@ -1931,7 +1945,7 @@ const RestrictionEditor = {
                     <span class="restr-from-nav" style="color:var(--text-dim)"
                           onclick="ClassEditor._expandAncestors('${fc}');ClassEditor._selectedId='${fc}';ClassEditor._selectedIds=new Set(['${fc}']);ClassEditor._anchorId='${fc}';ClassEditor._owlThingSelected=false;APP.renderSection('classes');setTimeout(()=>ClassEditor.restoreSelection(),50)"
                           onmouseover="this.style.color='var(--accent,#5f8dd3)';this.style.textDecoration='underline'"
-                          onmouseout="this.style.color='var(--text-dim)';this.style.textDecoration=''">${fc}</span>
+                          onmouseout="this.style.color='var(--text-dim)';this.style.textDecoration=''">${_displayRefId(fc)}</span>
                 </span>`).join('<span style="opacity:.5">,</span>')}
                 <span style="opacity:.7">)</span>
                </span>`
@@ -1967,7 +1981,7 @@ const RestrictionEditor = {
                                 border-radius:4px;padding:1px 4px;font-size:12px">
                         <span class="tree-leaf">◦</span>
                         ${dotIcon}
-                        <span ${navAttr}>${fv}</span>
+                        <span ${navAttr}>${_displayRefId(fv)}</span>
                     </div>`;
                 }
             }
@@ -1984,7 +1998,7 @@ const RestrictionEditor = {
             <div class="tree-item restr-prop-row-ro" style="padding-left:4px;cursor:default">
                 <span class="${dotCls}"></span>
                 <span class="restr-prop-name" style="cursor:pointer"
-                      onclick="APP.navigateTo('${navSection}','${prop}')">${prop}</span>
+                      onclick="APP.navigateTo('${navSection}','${prop}')">${_displayRefId(prop)}</span>
                 ${fromTag}
             </div>
             ${childRows}
@@ -2017,7 +2031,7 @@ const RestrictionEditor = {
 
     _desc(r) {
         let d = r.type || '';
-        if (r.filler)   d += ` ${r.filler}`;
+        if (r.filler)   d += ` ${_displayRefId(r.filler)}`;
         if (r.value  !== undefined) d += ` ${r.value}`;
         if (r.cardinality !== undefined) d += ` ${r.cardinality}`;
         return d;
@@ -2042,11 +2056,11 @@ const RestrictionEditor = {
         let rangeChip = '';
         if (opData && opData.range && opData.range.length > 0) {
             const mult   = opData.characteristics?.functional ? 'single' : 'multiple';
-            const ranges = opData.range.join(' or ');
+            const ranges = opData.range.map(_displayRefId).join(' or ');
             rangeChip = `<span class="restr-range-chip">(${mult} ${ranges})</span>`;
         } else if (dpData && dpData.range && dpData.range.length > 0) {
             const mult   = dpData.functional ? 'single' : 'multiple';
-            const ranges = dpData.range.join(' or ');
+            const ranges = dpData.range.map(_displayRefId).join(' or ');
             rangeChip = `<span class="restr-range-chip">(${mult} ${ranges})</span>`;
         }
 
@@ -2058,7 +2072,7 @@ const RestrictionEditor = {
                  onclick="RestrictionEditor.selectProp('${prop}')">
                 <span class="${dotCls}"></span>
                 <span class="restr-prop-name" style="cursor:pointer"
-                      onclick="event.stopPropagation();APP.navigateTo('${navSection}','${prop}')">${prop}</span>
+                      onclick="event.stopPropagation();APP.navigateTo('${navSection}','${prop}')">${_displayRefId(prop)}</span>
                 ${rangeChip}
                 ${summary ? `<span class="restr-prop-summary">(${summary})</span>` : ''}
                 <button class="btn-frame-del" style="margin-left:2px"
@@ -2571,7 +2585,7 @@ function _listRows(items, listId, removeFunc, dotClass = 'cls-dot', dotStyle = '
             : '';
         return `<div class="cls-list-item" data-id="${id}">
             ${icon}
-            <span class="cls-list-lbl"${nav}>${id}</span>
+            <span class="cls-list-lbl"${nav}>${_displayRefId(id)}</span>
             <button class="btn-frame-del" onclick="${removeFunc}('${id}')">✕</button>
         </div>`;
     }).join('');
@@ -2591,7 +2605,7 @@ function _addListItem(id, listId, pickerId, removeFunc, dotClass = 'cls-dot', do
         ? `<span class="${dotClass}">${iconText}</span>`
         : `<span class="${dotClass}"${dotStyle ? ` style="${dotStyle}"` : ''}></span>`;
     item.innerHTML = `${icon}
-        <span class="cls-list-lbl">${id}</span>
+        <span class="cls-list-lbl">${_displayRefId(id)}</span>
         <button class="btn-frame-del" onclick="${removeFunc}('${id}')">✕</button>`;
     if (navSection) {
         const lbl = item.querySelector('.cls-list-lbl');
@@ -2904,7 +2918,7 @@ const OPEditor = {
                 ${!isImported && prop.inverseOf ? `<span class="op-inverse-tag">(↔&thinsp;<span class="op-prop-dot" style="width:9px;height:6px;flex-shrink:0;display:inline-block;vertical-align:middle"></span>&thinsp;<span class="op-inv-nav"
                       onclick="event.stopPropagation();APP.navigateTo('object-properties','${prop.inverseOf}')"
                       onmouseover="this.style.color='var(--accent)';this.style.textDecoration='underline'"
-                      onmouseout="this.style.color='';this.style.textDecoration='';">${prop.inverseOf}</span>)</span>` : ''}
+                      onmouseout="this.style.color='';this.style.textDecoration='';">${_displayRefId(prop.inverseOf)}</span>)</span>` : ''}
             </div>
             <div id="op-tcn-${id}" style="display:${isOpen ? 'block' : 'none'}">
                 ${children.map(cid => this._renderNode(cid, childrenOf, depth + 1)).join('')}
@@ -3393,7 +3407,7 @@ const OPEditor = {
             ? `<div class="cls-list-item" data-id="${p.inverseOf}">
                    <span class="op-prop-dot"></span>
                    <span class="cls-list-lbl" style="cursor:pointer"
-                         onclick="APP.navigateTo('object-properties','${p.inverseOf}')">${p.inverseOf}</span>
+                         onclick="APP.navigateTo('object-properties','${p.inverseOf}')">${_displayRefId(p.inverseOf)}</span>
                    <button class="btn-frame-del" onclick="OPEditor.removeInverse()">✕</button>
                </div>`
             : '<div class="cls-list-empty">— none —</div>';
@@ -3544,7 +3558,7 @@ const OPEditor = {
             item.className = 'cls-list-item';
             item.dataset.id = id;
             item.innerHTML = `<span class="op-prop-dot"></span>
-                <span class="cls-list-lbl">${id}</span>
+                <span class="cls-list-lbl">${_displayRefId(id)}</span>
                 <button class="btn-frame-del" onclick="OPEditor.removeInverse()">✕</button>`;
             body.insertBefore(item, body.querySelector('input'));
         } else {
@@ -5314,7 +5328,7 @@ const IndividualEditor = {
             ? (opData?.characteristics?.functional ? 'single' : 'multiple')
             : (dpData?.functional ? 'single' : 'multiple');
         const rangeChip = effectiveRange.length > 0
-            ? `<span class="restr-range-chip">(${mult} ${effectiveRange.join(' or ')})</span>`
+            ? `<span class="restr-range-chip">(${mult} ${effectiveRange.map(_displayRefId).join(' or ')})</span>`
             : '';
 
         // Lignes courantes
@@ -5330,8 +5344,10 @@ const IndividualEditor = {
             const current = (ind?.objectAssertions || []).filter(a => a.property === propId);
             const ctxClass = effectiveRange[0] || null;
             rows = current.map(a => {
-                const lbl = this._labelForId(a.target, ctxClass);
-                const sub = lbl !== a.target ? `<span style="font-size:10px;color:var(--text-dim);display:block">${a.target}</span>` : '';
+                const rawLbl = this._labelForId(a.target, ctxClass);
+                const dispTarget = _displayRefId(a.target);
+                const lbl = rawLbl !== a.target ? rawLbl : dispTarget;
+                const sub = rawLbl !== a.target ? `<span style="font-size:10px;color:var(--text-dim);display:block">${dispTarget}</span>` : '';
                 return `
                 <div class="ind-prop-row" data-id="${a.target}" style="display:flex;align-items:center;gap:4px;padding:2px 4px">
                     <span class="xsd-dot" style="flex-shrink:0;margin:0"></span>
@@ -5383,7 +5399,7 @@ const IndividualEditor = {
                       onclick="APP.navigateTo('${kind === 'op' ? 'object-properties' : 'datatype-properties'}','${propId}')"
                       onmouseover="this.style.textDecoration='underline'"
                       onmouseout="this.style.textDecoration=''"
-                      title="Navigate to ${propId}">${propId}</span>
+                      title="Navigate to ${propId}">${_displayRefId(propId)}</span>
                 ${rangeChip}
                 <button id="ind-prop-add-${safeId}" class="btn-ftool" style="margin-left:auto${addBtnHidden ? ';display:none' : ''}"
                         onclick="${addOnclick}">${ico}</button>
@@ -5458,7 +5474,7 @@ const IndividualEditor = {
 
         const rows = assertions.map(a => {
             const value = kind === 'op' ? a.target : a.value;
-            const lbl   = kind === 'op' ? (this._labelForId(a.target, null) || a.target) : a.value;
+            const lbl   = kind === 'op' ? ((this._labelForId(a.target, null) !== a.target ? this._labelForId(a.target, null) : null) || _displayRefId(a.target)) : a.value;
             const dtype = kind === 'dp' ? `<span style="font-size:10px;color:var(--text-dim);margin-left:4px">${a.datatype || ''}</span>` : '';
             const navClick = kind === 'op'
                 ? `onclick="APP.navigateTo('individuals','${value}')"
@@ -5472,7 +5488,7 @@ const IndividualEditor = {
                 <span ${navClick}>${(lbl+'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</span>
                 ${dtype}
                 <span style="font-size:10px;color:var(--text-faint);font-style:italic;flex-shrink:0"
-                      title="Inféré via subPropertyOf">⊢ via ${a.inferredFrom}</span>
+                      title="Inféré via subPropertyOf">⊢ via ${_displayRefId(a.inferredFrom)}</span>
             </div>`;
         }).join('');
 
@@ -5484,7 +5500,7 @@ const IndividualEditor = {
                       onclick="APP.navigateTo('${navSection}','${propId}')"
                       onmouseover="this.style.textDecoration='underline'"
                       onmouseout="this.style.textDecoration=''"
-                      title="Navigate to ${propId}">${propId}</span>
+                      title="Navigate to ${propId}">${_displayRefId(propId)}</span>
                 <span style="margin-left:6px;font-size:10px;color:var(--text-faint)">🧠 inferred</span>
             </div>
             <div class="cls-frame-body">${rows}</div>
@@ -5520,7 +5536,7 @@ const IndividualEditor = {
             .map(c => `<div class="tree-item" data-id="${c.id}" style="padding:3px 8px"
                 onclick="IndividualEditor.addType(this.dataset.id)">
                 <span class="cls-dot tree-cls-dot"></span>
-                <span class="tree-label" style="margin-left:4px">${c.id}</span>
+                <span class="tree-label" style="margin-left:4px">${_displayRefId(c.id)}</span>
             </div>`).join('') || '<div class="cls-list-empty" style="padding:4px 8px">No classes</div>';
 
         // Panels dynamiques : inherited d'abord (alpha), puis asserted (alpha)
@@ -5711,7 +5727,7 @@ const IndividualEditor = {
                 lines.push(`<div class="tree-item ind-picker-cls" data-id="${id}"
                     style="padding-left:${pl}px" onclick="IndividualEditor.pickerSelectClass('${id}')">
                     <span class="cls-dot tree-cls-dot"></span>
-                    <span class="tree-label" style="flex:1">${id}</span>
+                    <span class="tree-label" style="flex:1">${_displayRefId(id)}</span>
                     ${n ? `<span class="nav-count" style="margin-right:6px">${n}</span>` : ''}
                 </div>`);
                 (childrenOf[id]||[]).forEach(c => { if (clsIds.has(c)) visit(c, depth+1); });
@@ -5743,7 +5759,7 @@ const IndividualEditor = {
         modal.innerHTML = `
         <div class="ind-picker-modal">
             <div class="ind-picker-hdr">
-                <span style="font-weight:600">Select Resource — <code style="font-size:11px">${propId}</code></span>
+                <span style="font-weight:600">Select Resource — <code style="font-size:11px">${_displayRefId(propId)}</code></span>
                 <button class="btn-sm" onclick="IndividualEditor.closePicker()">✕</button>
             </div>
             <div class="ind-picker-body">
@@ -5788,7 +5804,7 @@ const IndividualEditor = {
 
         // Update the title
         const title = document.getElementById('ind-picker-cls-title');
-        if (title) title.textContent = classId;
+        if (title) title.textContent = _displayRefId(classId);
 
         this._renderPickerIndList();
     },
@@ -5798,7 +5814,7 @@ const IndividualEditor = {
         const lbl = this._resolveDisplayLabel(x, ctxClass);
         const sub = lbl ? `<span style="font-size:10px;color:var(--text-dim);display:block">${x.id}</span>` : '';
         const cls = showClass ? (x.types || []).find(t => this._picker.clsIds?.has(t)) : '';
-        const clsTag = cls ? `<span style="margin-left:auto;font-size:10px;color:var(--text-faint);padding-left:8px;flex-shrink:0">${cls}</span>` : '';
+        const clsTag = cls ? `<span style="margin-left:auto;font-size:10px;color:var(--text-faint);padding-left:8px;flex-shrink:0">${_displayRefId(cls)}</span>` : '';
         return `<div class="tree-item ind-picker-ind" data-id="${x.id}"
                  style="padding:4px 10px;cursor:pointer;align-items:center"
                  onclick="IndividualEditor.pickerSelectInd('${x.id}')"
@@ -5891,8 +5907,10 @@ const IndividualEditor = {
             row.className = 'ind-prop-row';
             row.style.cssText = 'display:flex;align-items:center;gap:4px;padding:2px 4px';
             const selIndObj = (APP.state.individuals || []).find(x => x.id === selectedInd);
-            const selLbl = selIndObj ? (this._resolveDisplayLabel(selIndObj, this._picker.selectedClass) || selectedInd) : selectedInd;
-            const selSub = selLbl !== selectedInd ? `<span style="font-size:10px;color:var(--text-dim);display:block">${selectedInd}</span>` : '';
+            const selDisp = _displayRefId(selectedInd);
+            const selRawLbl = selIndObj ? this._resolveDisplayLabel(selIndObj, this._picker.selectedClass) : null;
+            const selLbl = selRawLbl || selDisp;
+            const selSub = selRawLbl ? `<span style="font-size:10px;color:var(--text-dim);display:block">${selDisp}</span>` : '';
             row.innerHTML = `
                 <span class="xsd-dot" style="flex-shrink:0;margin:0"></span>
                 <span class="ind-op-label" style="flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;font-family:var(--font-mono);cursor:pointer"
@@ -6347,7 +6365,7 @@ const IndividualEditor = {
             <div class="tree-item${isOwn ? ' selected' : ''}" style="padding:4px 12px;cursor:pointer"
                  onclick="IndividualEditor.setDisplayProp('${id}')">
                 <span class="${dotFor(kind)}" style="flex-shrink:0;margin-right:6px"></span>
-                <span class="tree-label">${label || id}</span>
+                <span class="tree-label">${label || _displayRefId(id)}</span>
                 ${isOwn      ? '<span style="margin-left:auto;color:var(--accent)">✓</span>' : ''}
                 ${isInherited ? '<span style="margin-left:auto;font-size:10px;color:var(--text-faint)">(inherited)</span>' : ''}
             </div>`;
