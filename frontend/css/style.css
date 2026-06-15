@@ -2307,6 +2307,10 @@ small { color: var(--text-faint); font-size: 10px; }
 .is-imported-view > *:not(.imported-detail-banner) {
   opacity: 0.55;
 }
+/* Le formulaire est déjà atténué à 0.55 : ne PAS recumuler l'opacité 0.5 des
+   items .imported-entity à l'intérieur (sinon ~0.27 → quasi invisible, ex. l'item
+   "Inverse Of"). On les remet à pleine opacité relative. */
+.is-imported-view .imported-entity { opacity: 1; }
 
 /* ── Import picker modal ────────────────────────────────────── */
 .onto-import-picker-overlay {
