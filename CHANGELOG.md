@@ -4,7 +4,7 @@ All notable changes to **SWOWL** are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [1.0.0] — 2026-06-12
+## [1.0.0] — 2026-06-15
 
 First stable release. A complete web editor for **OWL 2 DL** ontologies with
 **SWRL** rules, visual **SPARQL** queries, and a real-time inference engine.
@@ -25,6 +25,9 @@ First stable release. A complete web editor for **OWL 2 DL** ontologies with
   preservation of NAF negation, conditional sub-rules, equality and empty-class
   atoms; ID-collision dialog on import (replace / keep / cancel). The import file
   picker accepts any file (content validated by the parser).
+- Rule IDs and the entities referenced in atoms (classes, OPs, DPs, individuals)
+  are displayed with their prefix — contextual import prefix for imported items,
+  ontology prefix for native ones (prefix on the ID, never the label).
 
 ### SPARQL (VizQ)
 - Visual query builder; triple deletion via a red `✕` and drag-handle reordering
@@ -48,7 +51,20 @@ First stable release. A complete web editor for **OWL 2 DL** ontologies with
 - Robust import: individuals typed by a user class (Protégé `<Class rdf:ID>`),
   `owl:equivalentClass` (named or restriction), anonymous `owl:DataRange` ranges
   ignored.
+- **owl:imports** emitted on RDF export; `peek` ("Read prefix, URI & imports from
+  file") detects declared `owl:imports` and referenced namespaces.
 - W3C built-in ontologies (RDF, RDFS, OWL, **SKOS**) fetchable from w3.org.
+
+### Imported ontologies & namespaces
+- **"Imported namespaces" section** in the New / Import / Edit / Load wizards
+  (homogenised): declare each imported ontology as `owl:imports` with a
+  **contextual prefix** (prefix → namespace), editable, pre-filled by `peek`.
+- The contextual prefix is **authoritative** for displaying imported entities
+  (classes, OPs, DPs, individuals, SWRL rules) — it overrides the imported
+  ontology's own registry prefix. The base namespace takes priority over imported
+  ones when resolving native ids.
+- Registry import sub-rows show the contextual prefix; the namespace (URI) column
+  is clickable (opens the URI in a new tab).
 
 ### Ontologies registry
 - Split into **USER REGISTRY** and a collapsible **SYSTEM REGISTRY** (W3C built-ins,
