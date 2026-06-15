@@ -136,9 +136,10 @@ const SWRLEditor = {
         return filtered.map(r => {
             const broken     = this._ruleHasBrokenRefs(r);
             const isImported = !!r._imported;
-            const mainText   = r.label || r.id;
-            const subText    = r.label ? r.id : '';
-            const importedPrefix = isImported ? `${r._importPrefix}:` : '';
+            // Le préfixe d'import s'applique à l'ID (pas au label)
+            const idText     = isImported ? `${r._importPrefix}:${r.id}` : r.id;
+            const mainText   = r.label || idText;
+            const subText    = r.label ? idText : '';
             return `
             <div class="tree-item${r.id === sel ? ' selected' : ''}${isImported ? ' imported-entity' : ''}" data-id="${r.id}"
                  style="align-items:center${broken ? ';color:var(--red,#ef4444)' : ''}"
@@ -146,7 +147,7 @@ const SWRLEditor = {
                  oncontextmenu="event.preventDefault();SWRLEditor.showContextMenu(event,'${r.id}')">
                 <span style="font-size:13px;flex-shrink:0;line-height:1;${broken ? 'color:var(--red,#ef4444)' : 'color:var(--text-dim)'}">⚙️</span>
                 <span style="flex:1;overflow:hidden;min-width:0">
-                    <span class="tree-label" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block${broken ? ';color:var(--red,#ef4444)' : ''}">${importedPrefix}${mainText}</span>
+                    <span class="tree-label" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block${broken ? ';color:var(--red,#ef4444)' : ''}">${mainText}</span>
                     ${subText ? `<span style="font-size:10px;color:${broken ? 'var(--red,#ef4444)' : 'var(--text-faint)'};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block">${subText}</span>` : ''}
                 </span>
                 ${!isImported ? `<button class="btn-icon btn-icon-danger" style="flex-shrink:0;padding:2px 4px"
