@@ -46,6 +46,8 @@
 - [REQ-SWR-035 — Navigating to a referenced entity from an atom](#req-swr-035--navigating-to-a-referenced-entity-from-an-atom)
 - [REQ-SWR-038 — Import button in the rule list panel](#req-swr-038--import-button-in-the-rule-list-panel)
 - [REQ-SWR-039 — Homogeneous class and property pickers](#req-swr-039--homogeneous-class-and-property-pickers)
+- [REQ-SWR-040 — Prefixing the rule identifier in the list](#req-swr-040--prefixing-the-rule-identifier-in-the-list)
+- [REQ-SWR-041 — Prefixing entities referenced in atoms](#req-swr-041--prefixing-entities-referenced-in-atoms)
 
 ---
 
@@ -471,3 +473,23 @@ The import is the exact inverse of the `.swd` export: a round-trip preserves NAF
 ---
 
 **Source code:** `swrl_editor.js` → `toggleClassPicker()` and `togglePropPicker()` — Both build a tree-mode dropdown decorated by `_decoratePickerWithFilter()`, which adds a filter field and a scrollable list consistent with the other tabs; `toggleClassPicker()` populates the tree via `_classTreePickerItems()`; `togglePropPicker()` renders an `ObjectProperties` section (dot `op-prop-dot`) followed by a `DatatypeProperties` section (dot `dp-prop-dot`).
+
+### REQ-SWR-040 — Prefixing the rule identifier in the list
+
+| **If** | a `SWRL rule` is displayed in the list of the left panel, |
+|---|---|
+| **Then** | its identifier is shown prefixed: a native rule gets the prefix of the current `ontology` (no prefix if it is empty), whereas an imported rule gets its contextual import prefix; the prefix applies only to the **identifier** and never to the **label** — when a label exists, it remains displayed as-is and the prefixed identifier appears as subtext. |
+
+---
+
+**Source code:** `swrl_editor.js` → `renderList()` and `_displayId(rule)` — For each rule, `_displayId()` computes the identifier to display: for an imported rule it applies the contextual import prefix taken from `import_labels`, for a native rule it applies the prefix of the current `ontology` (or none if it is empty); `renderList()` applies this prefix only to the identifier, keeping the `label` unchanged and rendering the prefixed identifier in `<small>`.
+
+### REQ-SWR-041 — Prefixing entities referenced in atoms
+
+| **If** | an atom references an entity of the `ontology` — a class (`is a` atom), an `ObjectProperty` or a `DatatypeProperty` (property atom), or an `individual` (equality atom), |
+|---|---|
+| **Then** | the referenced entity is displayed with its prefix: import prefix for an imported entity, current `ontology` prefix for a native entity, and identifier unchanged if it is already prefixed (namespaced) or if the entity is not found. |
+
+---
+
+**Source code:** `swrl_editor.js` → `SWRLEditor._dispRef(id, kinds)` — Resolves the entity with identifier `id` among the indicated types (`kinds`) in `APP.state`, then applies `_displayId` to produce the prefixed display (import prefix for imported entities, current `ontology` prefix for native entities, value unchanged if already namespaced or not found); `_renderAtom()` uses `_dispRef()` for the `classes` of `type_atom` atoms, the properties of `property_atom` atoms and the `individuals` of `equality_atom` atoms.

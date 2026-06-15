@@ -22,6 +22,10 @@
 - [REQ-ONT-015 — Calcul des racines virtuelles selon le préfixe de l'ontologie](#req-ont-015--calcul-des-racines-virtuelles-selon-le-préfixe-de-lontologie)
 - [REQ-ONT-016 — Import implicite de OWL pour les ontologies utilisateur](#req-ont-016--import-implicite-de-owl-pour-les-ontologies-utilisateur)
 - [REQ-ONT-028 — Préfixe d'affichage des entités piloté par le préfixe du registre](#req-ont-028--préfixe-daffichage-des-entités-piloté-par-le-préfixe-du-registre)
+- [REQ-ONT-031 — Préfixe contextuel faisant autorité pour les entités importées](#req-ont-031--préfixe-contextuel-faisant-autorité-pour-les-entités-importées)
+- [REQ-ONT-032 — Lecture des namespaces référencés et des imports depuis un fichier](#req-ont-032--lecture-des-namespaces-référencés-et-des-imports-depuis-un-fichier)
+- [REQ-ONT-033 — Déclaration des owl:imports à l'export RDF](#req-ont-033--déclaration-des-owlimports-à-lexport-rdf)
+- [REQ-ONT-034 — Persistance des namespaces importés et dérivation des imports](#req-ont-034--persistance-des-namespaces-importés-et-dérivation-des-imports)
 
 ### Forme
 - [REQ-ONT-017 — Affichage de l'onglet Ontologies](#req-ont-017--affichage-de-longlet-ontologies)
@@ -36,6 +40,8 @@
 - [REQ-ONT-026 — Panneau wizard commutable (ouverture/fermeture)](#req-ont-026--panneau-wizard-commutable-ouverturefermeture)
 - [REQ-ONT-027 — Découpage du registre en sections Utilisateur et Système](#req-ont-027--découpage-du-registre-en-sections-utilisateur-et-système)
 - [REQ-ONT-029 — Export des règles au format SWORD (.swd)](#req-ont-029--export-des-règles-au-format-sword-swd)
+- [REQ-ONT-030 — Section « Imported namespaces » éditable dans les wizards](#req-ont-030--section--imported-namespaces--éditable-dans-les-wizards)
+- [REQ-ONT-035 — Ouverture du namespace de l'ontologie depuis le registre](#req-ont-035--ouverture-du-namespace-de-lontologie-depuis-le-registre)
 
 ---
 
@@ -88,11 +94,11 @@
 
 | **Si** | l'ontologiste sélectionne un fichier source lors d'un import et demande la lecture automatique de ses métadonnées, |
 |---|---|
-| **Alors** | le préfixe et l'URI de l'espace de nommage sont extraits du fichier et injectés dans le formulaire ; le nom de l'`ontologie` est également proposé si le champ est encore vide. |
+| **Alors** | le préfixe et l'URI de l'espace de nommage sont extraits du fichier et injectés dans le formulaire ; le nom de l'`ontologie` est également proposé si le champ est encore vide ; la section « Imported namespaces » est pré-remplie avec les namespaces référencés et les imports déclarés dans le fichier (voir REQ-ONT-032). |
 
 ---
 
-**Code source :** `app.js` → `_wizardImportPeek()` — Appelle `API.peekOntology(src)` et injecte `info.prefix` et `info.uri` inconditionnellement dans les champs du formulaire ; `info.name` n'est injecté dans `wiz-import-name` que si ce champ est actuellement vide.
+**Code source :** `app.js` → `_wizardImportPeek()` — Appelle `API.peekOntology(src)` et injecte `info.prefix` et `info.uri` inconditionnellement dans les champs du formulaire ; `info.name` n'est injecté dans `wiz-import-name` que si ce champ est actuellement vide ; pour chaque entrée de `info.namespaces`, appelle `_wizImpAddNs(prefix, namespace)` pour pré-remplir la section « Imported namespaces ».
 
 ### REQ-ONT-006 — Chargement d'une ontologie JSON
 
@@ -112,7 +118,7 @@
 
 ---
 
-**Code source :** `app.js` → `_wizardLoadPeek()` — Appelle `API.peekOntology(src)` et injecte `info.name`, `info.prefix` et `info.uri` dans les champs `wiz-load-name`, `wiz-load-prefix` et `wiz-load-uri`, en écrasant les valeurs existantes.
+**Code source :** `app.js` → `_wizardLoadPeek()` — Appelle `API.peekOntology(src)` et injecte `info.name`, `info.prefix` et `info.uri` dans les champs `wiz-load-name`, `wiz-load-prefix` et `wiz-load-uri`, en écrasant les valeurs existantes ; pour chaque entrée de `info.namespaces`, appelle `_wizImpAddNs(prefix, namespace, 'wiz-load-ns-list')` pour pré-remplir la section « Imported namespaces » (voir REQ-ONT-032).
 
 ### REQ-ONT-008 — Sauvegarde des modifications d'une ontologie
 
@@ -222,7 +228,7 @@
 |---|---|
 | **Alors** | ses entités sont affichées sans aucun préfixe (identifiant local nu). |
 
-| **Si** | un identifiant est déjà qualifié par un espace de nommage (`owl:Thing`, `xsd:decimal`, `rdfs:label`) ou correspond à une entité importée (affichée avec son propre préfixe d'import), |
+| **Si** | un identifiant est déjà qualifié par un espace de nommage (`owl:Thing`, `xsd:decimal`, `rdfs:label`) ou correspond à une entité importée (affichée avec son propre préfixe d'import — voir REQ-ONT-031), |
 |---|---|
 | **Alors** | son affichage n'est pas affecté par le préfixe du registre. |
 
@@ -231,6 +237,54 @@ Le préfixe est purement une préoccupation d'affichage : le champ `id` éditabl
 ---
 
 **Code source :** `owl_editor.js` → `_displayId(entity)` — Lit `APP.state.ontology.prefix` pour préfixer l'identifiant local affiché des entités non qualifiées et non importées ; si le préfixe est vide, retourne l'identifiant local nu ; les identifiants déjà namespacés et les entités importées sont laissés inchangés. `main.py` → `get_current_ontology` — Rend le préfixe de l'entrée du registre faisant autorité (`onto.prefix = entry.prefix or ""`), écrasant la valeur figée au moment de l'import (qui pouvait différer, par exemple `model_rohs`).
+
+### REQ-ONT-031 — Préfixe contextuel faisant autorité pour les entités importées
+
+| **Si** | une `ontologie` importe une autre `ontologie` en lui attribuant un préfixe contextuel via la section « Imported namespaces » (voir REQ-ONT-030), |
+|---|---|
+| **Alors** | les entités issues de l'`ontologie` importée (`classes`, `propriétés d'objet`, `propriétés de données`, `individus`, `règles SWRL`) sont affichées avec ce préfixe contextuel, celui-ci primant sur le préfixe propre de l'`ontologie` importée dans le registre. |
+
+| **Si** | aucun préfixe contextuel n'a été défini pour l'`ontologie` importée, |
+|---|---|
+| **Alors** | les entités importées sont affichées avec le préfixe de l'entrée de l'`ontologie` importée dans le registre. |
+
+Le préfixe contextuel est mémorisé dans `import_labels` de l'entrée importatrice (registre et fichier `.json`) et alimente le mécanisme réel d'import (`owl:imports`). Les sous-lignes d'import du registre affichent également ce préfixe contextuel.
+
+---
+
+**Code source :** `main.py` → `get_imported_entities` — Pour chaque URI importée, le préfixe d'affichage est `_importPrefix = import_labels[uri].prefix` (préfixe contextuel) s'il est défini, sinon le `prefix` de l'entrée du registre de l'`ontologie` importée (`imp_entry.prefix`). `triple_store.py` → `_imports_from_ns()` dérive `imports` et `import_labels` à partir des `ns_prefixes` saisis dans le wizard.
+
+### REQ-ONT-032 — Lecture des namespaces référencés et des imports depuis un fichier
+
+| **Si** | l'ontologiste demande la lecture des métadonnées d'un fichier (`peek`) lors d'un import ou d'un chargement, |
+|---|---|
+| **Alors** | le système retourne, en plus du nom, du préfixe et de l'URI de base, la liste des `namespaces` = les bindings `xmlns` référencés (hors standards `owl`, `rdf`, `rdfs`, `xsd` et hors URI de base) ainsi que les `owl:imports` déclarés, chacun assorti d'un préfixe. |
+
+Pour un import déclaré, le préfixe proposé est dérivé d'un binding `xmlns` correspondant, à défaut du dernier segment de l'URI.
+
+---
+
+**Code source :** `main.py` → `peek_ontology()` — Pour `.owl`/`.ttl`, parse le graphe RDF avec `bind_namespaces="none"` (aucun namespace par défaut de rdflib injecté), collecte les bindings `xmlns` non standards et les `owl:imports`. Pour `.json`, lit `imports`, `import_labels` et `ns_prefixes`. Le résultat est exposé sous la clé `namespaces`.
+
+### REQ-ONT-033 — Déclaration des owl:imports à l'export RDF
+
+| **Si** | l'ontologiste exporte une `ontologie` au format RDF (`.owl` ou `.ttl`) et que cette `ontologie` déclare des imports, |
+|---|---|
+| **Alors** | le fichier exporté contient une déclaration `<owl:imports rdf:resource="…"/>` pour chaque `ontologie` importée, accompagnée d'un binding de préfixe pour la lisibilité. |
+
+---
+
+**Code source :** `triple_store.py` → `to_rdf_graph()` — Pour chaque URI dans `onto.imports`, ajoute le triplet `(onto_uri, OWL.imports, URIRef(imp_uri))` et lie le préfixe correspondant (issu de `import_labels`) au graphe.
+
+### REQ-ONT-034 — Persistance des namespaces importés et dérivation des imports
+
+| **Si** | une `ontologie` est enregistrée, chargée depuis un JSON ou mise à jour avec une liste de namespaces importés (`ns_prefixes`), |
+|---|---|
+| **Alors** | cette liste est persistée dans le champ `ns_prefixes` de l'`ontologie`, et les `imports` ainsi que les `import_labels` en sont dérivés (chaque namespace devient un `owl:imports` portant son préfixe contextuel). |
+
+---
+
+**Code source :** `owl_model.py` → `OWLOntology.ns_prefixes` (champ persisté, `[{prefix, namespace}]`). `triple_store.py` → `register()`, `register_json` (via `update_entry`/`register`) et `update_entry()` acceptent `ns_prefixes` et appellent `_imports_from_ns()` pour dériver `imports`/`import_labels`. `main.py` → `register_json()` reçoit désormais un corps JSON (`RegisterJsonRequest`) au lieu de paramètres de requête.
 
 ---
 
@@ -371,3 +425,33 @@ L'identifiant interne du format d'export (`fmt: 'sword'`) reste inchangé ; seul
 ---
 
 **Code source :** `app.js` → menu déroulant d'export (`_ontoExportDropdown()`) et `exportOntologyByName()` — L'option de règles affiche désormais `↓ SWORD (.swd)` et le téléchargement utilise l'extension `.swd` ; le format interne transmis à l'API (`fmt: 'sword'`) est conservé.
+
+### REQ-ONT-030 — Section « Imported namespaces » éditable dans les wizards
+
+| **Si** | l'ontologiste ouvre l'un des wizards d'`ontologie` (Nouveau, Import, Édition ou Chargement), |
+|---|---|
+| **Alors** | une section « Imported namespaces » éditable est présentée sous forme d'un tableau de lignes (préfixe → namespace), avec un bouton `+ namespace` pour ajouter une ligne et un contrôle `✕` pour la retirer ; chaque ligne déclare une `ontologie` importée (`owl:imports`) assortie d'un préfixe contextuel choisi par l'ontologiste. |
+
+| **Si** | l'ontologiste utilise un wizard d'Import ou de Chargement et clique sur « Read prefix, URI &amp; imports from file », |
+|---|---|
+| **Alors** | la section « Imported namespaces » est pré-remplie à partir des namespaces lus dans le fichier (voir REQ-ONT-032). |
+
+Les wizards d'Import et de Chargement sont homogénéisés (mêmes sections, mêmes libellés, même présentation des boutons).
+
+---
+
+**Code source :** `app.js` → `_wizImpAddNs()`, `_wizImpCollectNs()` et les rendus de wizard (`_wizardNew()`, `_wizardImport()`, `_wizardLoad()`, formulaire d'édition de `doEditOntology()`) — Chaque wizard contient une liste de lignes `prefix → namespace` (`wiz-new-ns-list`, `wiz-import` par défaut, `wiz-load-ns-list`, `wiz-edit-ns-list`) avec boutons `+ namespace` / `✕` ; `_wizImpCollectNs()` collecte les lignes valides en `ns_prefixes` transmis à `registerOntology` / `importFromPath` / `registerJson` / `updateOntologyEntry`.
+
+### REQ-ONT-035 — Ouverture du namespace de l'ontologie depuis le registre
+
+| **Si** | l'ontologiste clique sur l'espace de nommage (URI, 4ᵉ colonne) d'une `ontologie` dans le tableau du registre, |
+|---|---|
+| **Alors** | l'URI du namespace est ouverte dans un nouvel onglet du navigateur. |
+
+| **Si** | l'URI de l'espace de nommage de l'`ontologie` est vide, |
+|---|---|
+| **Alors** | la cellule affiche un tiret `—` et n'est pas cliquable. |
+
+---
+
+**Code source :** `app.js` → `_refreshOntoTable()` (fonction `renderRow`) — La cellule Namespace est rendue comme un `<code class="onto-ns-link">` cliquable dont le `onclick` appelle `window.open(uri, '_blank', 'noopener')` (avec `event.stopPropagation()` pour ne pas sélectionner la ligne) ; si l'URI est vide, affiche `—`.

@@ -14,6 +14,9 @@
 - [REQ-IMP-012 — Détection des Individuals typés par une classe utilisateur (style OWL 1 / Protégé)](#req-imp-012--détection-des-individuals-typés-par-une-classe-utilisateur-style-owl-1--protégé)
 - [REQ-IMP-013 — Lecture de owl:equivalentClass à l'import](#req-imp-013--lecture-de-owlequivalentclass-à-limport)
 - [REQ-IMP-014 — Ignorer les ranges DataRange anonymes des DatatypeProperties](#req-imp-014--ignorer-les-ranges-datarange-anonymes-des-datatypeproperties)
+- [REQ-IMP-015 — Préfixage contextuel des entités issues des namespaces importés](#req-imp-015--préfixage-contextuel-des-entités-issues-des-namespaces-importés)
+- [REQ-IMP-016 — Priorité de la base de l'ontologie sur les namespaces utilisateur](#req-imp-016--priorité-de-la-base-de-lontologie-sur-les-namespaces-utilisateur)
+- [REQ-IMP-017 — Conversion des namespaces du wizard en owl:imports](#req-imp-017--conversion-des-namespaces-du-wizard-en-owlimports)
 
 ### Forme
 - [REQ-IMP-006 — Style visuel atténué dans les listes et arbres](#req-imp-006--style-visuel-atténué-dans-les-listes-et-arbres)
@@ -118,6 +121,36 @@
 | **Alors** | l'importeur ne conserve désormais que les ranges de type `URIRef` (URIs de types de données) et **ignore** les nœuds `DataRange` anonymes (auparavant un id de nœud anonyme dénué de sens apparaissait dans le range). Le type de données énuméré lui-même n'est pas modélisé dans le range de SWOWL, qui ne contient que des URIs de types de données. |
 
 **Code source :** `backend/triple_store.py` → `import_from_rdf` — ne conserve que les ranges `rdfs:range` de type `URIRef` et ignore les nœuds `owl:DataRange` / `owl:oneOf` anonymes.
+
+---
+
+### REQ-IMP-015 — Préfixage contextuel des entités issues des namespaces importés
+
+| **Si** | l'utilisateur a renseigné la table **« Imported namespaces »** d'un wizard (couples `préfixe → namespace`, ex. `plm → http://examples.org/plm`) et qu'une ontologie est importée, |
+|---|---|
+| **Alors** | cette table est transmise à l'import (paramètre `ns_prefixes`) et chaque entité dont l'URI appartient à un namespace mappé reçoit l'**identifiant local préfixé** par le préfixe contextuel choisi (ex. la classe `http://examples.org/plm#Foo` devient `plm:Foo`). Le préfixe affiché provient ainsi de la table saisie par l'utilisateur, et non d'un préfixe arbitraire du fichier source. |
+
+**Code source :** `backend/triple_store.py` → `import_from_rdf(..., ns_prefixes=...)` reçoit la table `préfixe → namespace` ; la fonction interne `_lid` préfixe l'identifiant local d'une entité par le préfixe contextuel lorsque son URI appartient à un namespace mappé (ex. `plm:Foo`).
+
+---
+
+### REQ-IMP-016 — Priorité de la base de l'ontologie sur les namespaces utilisateur
+
+| **Si** | une entité importée pourrait à la fois relever de la **base de l'ontologie** et d'un **namespace utilisateur** déclaré (cas où la base est un sur-ensemble d'un namespace importé, ex. base `http://examples.org/plm/data#` vs import `http://examples.org/plm`), |
+|---|---|
+| **Alors** | `_lid` teste l'appartenance de l'URI à la **base de l'ontologie AVANT** les namespaces déclarés par l'utilisateur. Les entités natives de la base restent donc des **identifiants locaux nus** (ex. `MyClass`) et ne sont pas préfixées à tort (ex. l'erreur `plm:/data#MyClass` est évitée). |
+
+**Code source :** `backend/triple_store.py` → `import_from_rdf` / `_lid` — l'appartenance à la base de l'ontologie est testée avant les namespaces utilisateur ; les entités de la base produisent un id local nu, les entités d'un namespace mappé un id préfixé.
+
+---
+
+### REQ-IMP-017 — Conversion des namespaces du wizard en owl:imports
+
+| **Si** | l'utilisateur déclare des namespaces via la table **« Imported namespaces »** d'un wizard, |
+|---|---|
+| **Alors** | ces namespaces sont aussi convertis en `owl:imports` accompagnés de leurs `import_labels` (préfixe contextuel), à la fois sur l'entrée de registre et dans le fichier `.json` de l'ontologie, afin que l'import soit réellement **résolu** et que les entités importées soient affichées en lecture seule (voir REQ-IMP-001 à REQ-IMP-005). |
+
+**Code source :** `backend/triple_store.py` → helper `store._imports_from_ns` — convertit la table `ns_prefixes` en entrées `owl:imports` + `import_labels` (préfixe contextuel) sur l'entrée de registre et le `.json`.
 
 ---
 

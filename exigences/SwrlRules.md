@@ -46,6 +46,8 @@
 - [REQ-SWR-035 — Navigation vers une entité référencée depuis un atome](#req-swr-035--navigation-vers-une-entité-référencée-depuis-un-atome)
 - [REQ-SWR-038 — Bouton d'import dans le panneau liste des règles](#req-swr-038--bouton-dimport-dans-le-panneau-liste-des-règles)
 - [REQ-SWR-039 — Pickers de classe et de propriété homogènes](#req-swr-039--pickers-de-classe-et-de-propriété-homogènes)
+- [REQ-SWR-040 — Préfixage de l'identifiant des règles dans la liste](#req-swr-040--préfixage-de-lidentifiant-des-règles-dans-la-liste)
+- [REQ-SWR-041 — Préfixage des éléments référencés dans les atomes](#req-swr-041--préfixage-des-éléments-référencés-dans-les-atomes)
 
 ---
 
@@ -471,3 +473,23 @@ L'import est l'exact inverse de l'export `.swd` : un aller-retour préserve la n
 ---
 
 **Code source :** `swrl_editor.js` → `toggleClassPicker()` et `togglePropPicker()` — Les deux construisent un menu déroulant en mode arbre décoré par `_decoratePickerWithFilter()`, qui ajoute un champ de filtre et une liste scrollable cohérents avec les autres onglets ; `toggleClassPicker()` peuple l'arbre via `_classTreePickerItems()` ; `togglePropPicker()` rend une section `ObjectProperties` (point `op-prop-dot`) suivie d'une section `DatatypeProperties` (point `dp-prop-dot`).
+
+### REQ-SWR-040 — Préfixage de l'identifiant des règles dans la liste
+
+| **Si** | une `règle SWRL` est affichée dans la liste du panneau de gauche, |
+|---|---|
+| **Alors** | son identifiant est présenté préfixé : une règle native reçoit le préfixe de l'`ontologie` courante (aucun préfixe si celui-ci est vide), tandis qu'une règle importée reçoit son préfixe contextuel d'import ; le préfixe s'applique uniquement à l'**identifiant** et jamais au **libellé** — lorsqu'un libellé existe, il reste affiché tel quel et l'identifiant préfixé apparaît en sous-texte. |
+
+---
+
+**Code source :** `swrl_editor.js` → `renderList()` et `_displayId(rule)` — Pour chaque règle, `_displayId()` calcule l'identifiant à afficher : pour une règle importée il applique le préfixe contextuel d'import issu de `import_labels`, pour une règle native il applique le préfixe de l'`ontologie` courante (ou aucun s'il est vide) ; `renderList()` n'applique ce préfixe qu'à l'identifiant, en conservant le `label` inchangé et en affichant l'identifiant préfixé en `<small>`.
+
+### REQ-SWR-041 — Préfixage des éléments référencés dans les atomes
+
+| **Si** | un atome référence une entité de l'`ontologie` — une `classe` (atome « is a »), une `ObjectProperty` ou une `DatatypeProperty` (atome de propriété), ou un `individu` (atome d'égalité), |
+|---|---|
+| **Alors** | l'entité référencée est affichée avec son préfixe : préfixe d'import pour une entité importée, préfixe de l'`ontologie` courante pour une entité native, et identifiant inchangé si celui-ci est déjà préfixé (namespacé) ou si l'entité est introuvable. |
+
+---
+
+**Code source :** `swrl_editor.js` → `SWRLEditor._dispRef(id, kinds)` — Résout l'entité d'identifiant `id` parmi les types indiqués (`kinds`) dans `APP.state`, puis applique `_displayId` pour produire l'affichage préfixé (préfixe d'import pour les entités importées, préfixe de l'`ontologie` courante pour les entités natives, valeur inchangée si déjà namespacée ou non trouvée) ; `_renderAtom()` utilise `_dispRef()` pour les `classes` des atomes `type_atom`, les propriétés des atomes `property_atom` et les `individus` des atomes `equality_atom`.

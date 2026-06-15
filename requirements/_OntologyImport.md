@@ -14,6 +14,9 @@
 - [REQ-IMP-012 — Detecting Individuals typed by a user-defined class (OWL 1 / Protégé style)](#req-imp-012--detecting-individuals-typed-by-a-user-defined-class-owl-1--protégé-style)
 - [REQ-IMP-013 — Reading owl:equivalentClass on import](#req-imp-013--reading-owlequivalentclass-on-import)
 - [REQ-IMP-014 — Ignoring anonymous DataRange ranges on DatatypeProperties](#req-imp-014--ignoring-anonymous-datarange-ranges-on-datatypeproperties)
+- [REQ-IMP-015 — Contextual prefixing of entities from imported namespaces](#req-imp-015--contextual-prefixing-of-entities-from-imported-namespaces)
+- [REQ-IMP-016 — Ontology base takes priority over user namespaces](#req-imp-016--ontology-base-takes-priority-over-user-namespaces)
+- [REQ-IMP-017 — Converting wizard namespaces into owl:imports](#req-imp-017--converting-wizard-namespaces-into-owlimports)
 
 ### Form
 - [REQ-IMP-006 — Dimmed visual style in lists and trees](#req-imp-006--dimmed-visual-style-in-lists-and-trees)
@@ -118,6 +121,36 @@
 | **Then** | the importer now keeps only `URIRef` ranges (datatype URIs) and **ignores** anonymous `DataRange` nodes (previously a meaningless blank-node id appeared in the range). The enumerated datatype itself is not modelled in SWOWL's range, which holds datatype URIs only. |
 
 **Source code:** `backend/triple_store.py` → `import_from_rdf` — keeps only `URIRef` `rdfs:range` values and ignores anonymous `owl:DataRange` / `owl:oneOf` nodes.
+
+---
+
+### REQ-IMP-015 — Contextual prefixing of entities from imported namespaces
+
+| **If** | the user has filled in a wizard's **"Imported namespaces"** table (`prefix → namespace` pairs, e.g. `plm → http://examples.org/plm`) and an ontology is imported, |
+|---|---|
+| **Then** | this table is passed to the import (parameter `ns_prefixes`) and every entity whose URI belongs to a mapped namespace receives a **local identifier prefixed** with the chosen contextual prefix (e.g. the class `http://examples.org/plm#Foo` becomes `plm:Foo`). The displayed prefix thus comes from the user-entered table, not from an arbitrary prefix of the source file. |
+
+**Source code:** `backend/triple_store.py` → `import_from_rdf(..., ns_prefixes=...)` receives the `prefix → namespace` table; the inner `_lid` function prefixes an entity's local identifier with the contextual prefix when its URI belongs to a mapped namespace (e.g. `plm:Foo`).
+
+---
+
+### REQ-IMP-016 — Ontology base takes priority over user namespaces
+
+| **If** | an imported entity could belong to both the **ontology base** and a declared **user namespace** (where the base is a superset of an imported namespace, e.g. base `http://examples.org/plm/data#` vs import `http://examples.org/plm`), |
+|---|---|
+| **Then** | `_lid` tests whether the URI belongs to the **ontology base BEFORE** the user-declared namespaces. Native base entities therefore remain **bare local identifiers** (e.g. `MyClass`) and are not wrongly prefixed (e.g. the erroneous `plm:/data#MyClass` is avoided). |
+
+**Source code:** `backend/triple_store.py` → `import_from_rdf` / `_lid` — base membership is tested before user namespaces; base entities yield a bare local id, mapped-namespace entities a prefixed id.
+
+---
+
+### REQ-IMP-017 — Converting wizard namespaces into owl:imports
+
+| **If** | the user declares namespaces through a wizard's **"Imported namespaces"** table, |
+|---|---|
+| **Then** | these namespaces are also converted into `owl:imports` together with their `import_labels` (contextual prefix), both on the registry entry and in the ontology's `.json` file, so that the import is actually **resolved** and the imported entities are shown read-only (see REQ-IMP-001 to REQ-IMP-005). |
+
+**Source code:** `backend/triple_store.py` → helper `store._imports_from_ns` — converts the `ns_prefixes` table into `owl:imports` + `import_labels` (contextual prefix) entries on the registry entry and the `.json`.
 
 ---
 
