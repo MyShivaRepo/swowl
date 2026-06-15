@@ -702,7 +702,9 @@ const APP = {
             const missing    = !entry;
             const snap        = labelMap?.[uri] || null;   // {prefix, name} mémorisé
             const name       = entry ? entry.name   : (snap ? snap.name   : uri);
-            const prefix     = entry ? entry.prefix : (snap ? snap.prefix : '');
+            // Le préfixe CONTEXTUEL (import_labels de l'ontologie qui importe) prime
+            // sur le préfixe propre de l'ontologie importée.
+            const prefix     = (snap && snap.prefix) ? snap.prefix : (entry ? entry.prefix : '');
             const subImports = effectiveImportsOf(entry);
             const hasKids    = subImports.length > 0;
             const path       = parentPath + '/' + name;
@@ -868,6 +870,14 @@ const APP = {
                         <input type="text" id="wiz-new-uri" placeholder="https://example.org/my-ontology" style="width:100%">
                     </div>
                 </div>
+                <!-- Imported namespaces (prefix → namespace) -->
+                <div class="form-group" style="margin:0">
+                    <label>Imported namespaces
+                        <span style="font-size:10px;color:var(--text-dim)">(prefix → namespace, pour les entités issues d'autres ontologies — optionnel)</span></label>
+                    <div id="wiz-new-ns-list" style="display:flex;flex-direction:column;gap:6px"></div>
+                    <button class="btn-secondary btn-sm" style="align-self:flex-start;margin-top:6px"
+                            onclick="APP._wizImpAddNs('','','wiz-new-ns-list')">+ namespace</button>
+                </div>
                 <div style="display:flex;gap:10px;align-items:center">
                     <button class="btn-primary btn-sm" onclick="APP._doNew()">Add to Registry</button>
                     <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer">
@@ -906,6 +916,14 @@ const APP = {
                         <label>Namespace (base URI) <span class="form-req">*</span></label>
                         <input type="text" id="wiz-imp-uri" placeholder="auto-detected…" style="width:100%">
                     </div>
+                </div>
+                <!-- Step 2b: imported namespaces (prefix → namespace) -->
+                <div class="form-group" style="margin:0">
+                    <label>Imported namespaces
+                        <span style="font-size:10px;color:var(--text-dim)">(prefix → namespace, pour les entités issues d'autres ontologies — optionnel)</span></label>
+                    <div id="wiz-imp-ns-list" style="display:flex;flex-direction:column;gap:6px"></div>
+                    <button class="btn-secondary btn-sm" style="align-self:flex-start;margin-top:6px"
+                            onclick="APP._wizImpAddNs()">+ namespace</button>
                 </div>
                 <!-- Step 3: destination -->
                 <div style="display:flex;gap:10px;flex-wrap:wrap">
@@ -987,14 +1005,40 @@ const APP = {
         if (!dir)  return UI.error('Directory is required.');
         if (!uri)  return UI.error('URI is required.');
         const path = dir.replace(/\/$/, '') + '/' + name + '.json';
+        const ns_prefixes = this._wizImpCollectNs('wiz-new-ns-list');
         try {
-            await API.registerOntology({ name, path, uri, prefix });
+            await API.registerOntology({ name, path, uri, prefix, ns_prefixes });
             UI.success(`Ontology "${name}" added to registry.`);
             if (conn) await API.connectOntology(name);
             this._closeWizard();
             await this.refresh();
             this.renderOntologies();
         } catch (e) { UI.error(e.message); }
+    },
+
+    // ── Section "Imported namespaces" du wizard d'import ──────────
+    _wizImpNsRow(prefix = '', ns = '') {
+        const pe = String(prefix).replace(/"/g, '&quot;');
+        const ne = String(ns).replace(/"/g, '&quot;');
+        return `<div class="wiz-imp-ns-row" style="display:flex;gap:6px;align-items:center">
+            <input type="text" class="wiz-imp-ns-prefix" value="${pe}" placeholder="prefix" style="flex:0 0 110px">
+            <span style="color:var(--text-dim)">→</span>
+            <input type="text" class="wiz-imp-ns-uri" value="${ne}" placeholder="http://…namespace#" style="flex:1;min-width:0">
+            <button class="btn-frame-del" title="Retirer ce namespace"
+                    onclick="this.closest('.wiz-imp-ns-row').remove()">✕</button>
+        </div>`;
+    },
+    _wizImpAddNs(prefix = '', ns = '', listId = 'wiz-imp-ns-list') {
+        const list = document.getElementById(listId);
+        if (list) list.insertAdjacentHTML('beforeend', this._wizImpNsRow(prefix, ns));
+    },
+    _wizImpCollectNs(listId = 'wiz-imp-ns-list') {
+        return [...document.querySelectorAll(`#${listId} .wiz-imp-ns-row`)]
+            .map(r => ({
+                prefix:    r.querySelector('.wiz-imp-ns-prefix')?.value.trim() || '',
+                namespace: r.querySelector('.wiz-imp-ns-uri')?.value.trim()    || '',
+            }))
+            .filter(x => x.prefix && x.namespace);
     },
 
     async _wizardImportPeek() {
@@ -1008,7 +1052,14 @@ const APP = {
             if (nameInp   && !nameInp.value)   nameInp.value   = info.name   || '';
             if (prefixInp) prefixInp.value = info.prefix || 'onto';
             if (uriInp)    uriInp.value    = info.uri    || '';
-            UI.success('Prefix & URI read from file.');
+            // Pré-remplit la section "Imported namespaces" avec les namespaces référencés
+            const nsList = document.getElementById('wiz-imp-ns-list');
+            if (nsList) {
+                nsList.innerHTML = '';
+                (info.namespaces || []).forEach(n => this._wizImpAddNs(n.prefix, n.namespace));
+            }
+            const nbNs = (info.namespaces || []).length;
+            UI.success(`Prefix & URI read from file${nbNs ? ` — ${nbNs} namespace(s) référencé(s)` : ''}.`);
         } catch (e) { UI.error(`Cannot read file: ${e.message}`); }
     },
 
@@ -1024,8 +1075,9 @@ const APP = {
         if (!dir)  return UI.error('Destination directory is required.');
         if (!uri)  return UI.error('URI is required — use 🔍 to auto-detect or enter manually.');
         const savePath = dir.replace(/\/$/, '') + '/' + name + '.json';
+        const ns_prefixes = this._wizImpCollectNs();
         try {
-            await API.importFromPath({ name, owl_path: src, save_path: savePath, uri, prefix });
+            await API.importFromPath({ name, owl_path: src, save_path: savePath, uri, prefix, ns_prefixes });
             if (!conn) await API.disconnectOntology();
             UI.success(`Ontology "${name}" imported & registered.`);
             this._closeWizard();
@@ -1103,6 +1155,17 @@ const APP = {
                             <input type="text" id="wiz-edit-uri" value="${o.uri.replace(/"/g,'&quot;')}" style="width:100%">
                         </div>
                     </div>
+                    <!-- Imported namespaces (prefix → namespace) -->
+                    <div class="form-group" style="margin:0">
+                        <label>Imported namespaces
+                            <span style="font-size:10px;color:var(--text-dim)">(prefix → namespace des ontologies importées)</span></label>
+                        <div id="wiz-edit-ns-list" style="display:flex;flex-direction:column;gap:6px">${
+                            Object.entries(o.import_labels || {})
+                                .map(([uri, lab]) => this._wizImpNsRow((lab && lab.prefix) || '', uri)).join('')
+                        }</div>
+                        <button class="btn-secondary btn-sm" style="align-self:flex-start;margin-top:6px"
+                                onclick="APP._wizImpAddNs('','','wiz-edit-ns-list')">+ namespace</button>
+                    </div>
                     <div style="display:flex;gap:8px;align-items:center">
                         <button class="btn-primary btn-sm" onclick="APP.doSaveEdit()">💾 Save changes</button>
                         <button class="btn-secondary btn-sm" onclick="APP._closeWizard()">Cancel</button>
@@ -1122,8 +1185,9 @@ const APP = {
         if (!dir)  return UI.error('Directory is required.');
         if (!uri)  return UI.error('URI is required.');
         const path = dir.replace(/\/$/, '') + '/' + name + '.json';
+        const ns_prefixes = this._wizImpCollectNs('wiz-edit-ns-list');
         try {
-            await API.updateOntologyEntry(origName, { name, path, uri, prefix });
+            await API.updateOntologyEntry(origName, { name, path, uri, prefix, ns_prefixes });
             UI.success(`Ontology "${name}" updated.`);
             this._closeWizard();
             await this.refresh();

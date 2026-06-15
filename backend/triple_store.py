@@ -154,15 +154,41 @@ class TripleStore:
 
     # ── CRUD registre ────────────────────────────────────────
 
-    def register(self, name: str, path: str, uri: str, prefix: str) -> RegistryEntry:
-        entry = RegistryEntry(name=name, path=path, uri=uri, prefix=prefix, connected=False)
+    def _imports_from_ns(self, ns_prefixes):
+        """À partir de la table [{prefix, namespace}] du wizard, construit
+        (imports, import_labels) : déclare chaque namespace comme owl:imports et
+        retient le préfixe CONTEXTUEL choisi par l'utilisateur (prioritaire à
+        l'affichage). Le nom est résolu contre le registre courant si possible."""
+        imports, labels = [], {}
+        for d in (ns_prefixes or []):
+            if not isinstance(d, dict):
+                continue
+            ns  = (d.get("namespace") or "").strip()
+            pfx = (d.get("prefix") or "").strip()
+            if not ns or not pfx:
+                continue
+            if ns not in imports:
+                imports.append(ns)
+            name = ""
+            for e in self._registry.values():
+                if e.uri == ns or e.uri.rstrip("#/") == ns.rstrip("#/"):
+                    name = e.name
+                    break
+            labels[ns] = {"prefix": pfx, "name": name}
+        return imports, labels
+
+    def register(self, name: str, path: str, uri: str, prefix: str, ns_prefixes=None) -> RegistryEntry:
+        imports, labels = self._imports_from_ns(ns_prefixes)
+        entry = RegistryEntry(name=name, path=path, uri=uri, prefix=prefix, connected=False,
+                              imports=imports, import_labels=labels)
         self._registry[name] = entry
         self._save_registry()
         # Create the .json file immediately if it doesn't exist yet
         container_path = host_to_container(path)
         p = Path(container_path)
         if not p.exists():
-            onto = OWLOntology(id=uri, name=name, prefix=prefix)
+            onto = OWLOntology(id=uri, name=name, prefix=prefix, ns_prefixes=ns_prefixes or [],
+                               imports=imports, import_labels=labels)
             self._save_onto(onto, path)
         return entry
 
@@ -176,16 +202,41 @@ class TripleStore:
         self._save_registry()
         return True
 
-    def update_entry(self, name: str, new_name: str, path: str, uri: str, prefix: str) -> Optional[RegistryEntry]:
+    def update_entry(self, name: str, new_name: str, path: str, uri: str, prefix: str,
+                     ns_prefixes=None) -> Optional[RegistryEntry]:
         if name not in self._registry:
             return None
-        was_connected = self._registry[name].connected
-        old_imports   = self._registry[name].imports
+        old = self._registry[name]
+        was_connected = old.connected
+        # ns_prefixes fourni → recalcule imports/import_labels (préfixe contextuel) ;
+        # sinon on conserve les imports existants tels quels.
+        if ns_prefixes is not None:
+            imports, labels = self._imports_from_ns(ns_prefixes)
+        else:
+            imports, labels = old.imports, old.import_labels
         del self._registry[name]
         entry = RegistryEntry(name=new_name, path=path, uri=uri, prefix=prefix,
-                              connected=was_connected, imports=old_imports)
+                              connected=was_connected, imports=imports, import_labels=labels)
         self._registry[new_name] = entry
         self._save_registry()
+        # Persiste imports/import_labels (+ ns_prefixes) dans le .json pour qu'ils voyagent
+        try:
+            p = Path(host_to_container(path))
+            if p.exists():
+                data = json.loads(p.read_text(encoding="utf-8"))
+                data["imports"] = imports
+                data["import_labels"] = labels
+                if ns_prefixes is not None:
+                    data["ns_prefixes"] = ns_prefixes
+                p.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+        except Exception:
+            pass
+        # Reflète sur l'ontologie connectée en mémoire
+        if was_connected and self._ontology is not None:
+            self._ontology.imports = imports
+            self._ontology.import_labels = labels
+            if ns_prefixes is not None:
+                self._ontology.ns_prefixes = ns_prefixes
         return entry
 
     def update_imports(self, name: str, import_uris: list) -> Optional[RegistryEntry]:
@@ -351,14 +402,22 @@ class TripleStore:
         segment = uri_str.rstrip("/").split("/")[-1]
         return segment if segment else ""
 
-    def import_from_rdf(self, content: bytes, fmt: str, name: str, host_path: str, uri: str, prefix: str = "onto") -> OWLOntology:
+    def import_from_rdf(self, content: bytes, fmt: str, name: str, host_path: str, uri: str, prefix: str = "onto", ns_prefixes=None) -> OWLOntology:
         g = Graph()
         g.parse(data=content, format=fmt)
 
         base = self._detect_base(g, uri)
+        # Préfixes des namespaces référencés/importés, fournis par le wizard
+        # → [(namespace_uri, prefix)] triés par longueur de namespace décroissante
+        # (le plus spécifique d'abord) pour le préfixage dans _lid.
+        _user_ns = sorted(
+            [(d["namespace"], d["prefix"]) for d in (ns_prefixes or [])
+             if isinstance(d, dict) and d.get("namespace") and d.get("prefix")],
+            key=lambda t: len(t[0]), reverse=True,
+        )
         onto_id = base.rstrip("#/")
 
-        onto = OWLOntology(id=onto_id, name=name, prefix=prefix)
+        onto = OWLOntology(id=onto_id, name=name, prefix=prefix, ns_prefixes=ns_prefixes or [])
 
         # ── Helper: collect labels & comments for any URI ───────
         def _collect_labels(uri_ref):
@@ -388,6 +447,10 @@ class TripleStore:
                 (str(RDF),  "rdf"),
             ]:
                 if uri_str_val.startswith(ns_uri) and ns_uri != base:
+                    return ns_prefix + ":" + uri_str_val[len(ns_uri):]
+            # 1bis. Namespaces référencés définis par l'utilisateur (wizard d'import)
+            for ns_uri, ns_prefix in _user_ns:
+                if ns_uri != base and uri_str_val.startswith(ns_uri):
                     return ns_prefix + ":" + uri_str_val[len(ns_uri):]
             # 2. Belongs to current ontology base → strip base
             local = self._local_name(uri_str_val, base)
@@ -760,14 +823,19 @@ class TripleStore:
         # Recopier les imports dans l'entrée de registre + instantané préfixe/nom
         entry = self._registry.get(name)
         if entry is not None:
-            entry.imports = imp_uris
             labels: dict = {}
             for u in imp_uris:
                 for e in self._registry.values():
                     if e.uri == u or e.uri.rstrip("#/") == u.rstrip("#/"):
                         labels[u] = {"prefix": e.prefix, "name": e.name}
                         break
+            # Fusionner les namespaces déclarés dans le wizard (préfixe contextuel prioritaire)
+            ns_imports, ns_labels = self._imports_from_ns(ns_prefixes)
+            merged = list(imp_uris) + [u for u in ns_imports if u not in imp_uris]
+            labels.update(ns_labels)   # le préfixe choisi par l'utilisateur prime
+            entry.imports = merged
             entry.import_labels = labels
+            onto.imports = merged
             onto.import_labels = labels
             self._save_registry()
         self._save_onto(onto, host_path)

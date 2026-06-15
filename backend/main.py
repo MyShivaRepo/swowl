@@ -231,12 +231,14 @@ class RegisterRequest(PydanticModel):
     path: str
     uri: str
     prefix: str = ""
+    ns_prefixes: list = []   # [{prefix, namespace}] — namespaces référencés/importés
 
 class UpdateEntryRequest(PydanticModel):
     name: str
     path: str
     uri: str
     prefix: str = ""
+    ns_prefixes: list = None   # [{prefix, namespace}] — None = ne pas toucher aux imports
 
 
 @app.get("/api/ontologies", tags=["Ontologie"])
@@ -251,7 +253,7 @@ def register_ontology(req: RegisterRequest):
     entries = store.list_registry()
     if any(e["name"] == req.name for e in entries):
         raise HTTPException(409, f"Une ontologie nommée '{req.name}' existe déjà.")
-    entry = store.register(req.name, req.path, req.uri, req.prefix)
+    entry = store.register(req.name, req.path, req.uri, req.prefix, ns_prefixes=req.ns_prefixes)
     return entry.to_dict()
 
 
@@ -282,7 +284,7 @@ def register_json(path: str = Query(...), name: str = Query(None),
 @app.put("/api/ontologies/{name}", tags=["Ontologie"])
 def update_ontology_entry(name: str, req: UpdateEntryRequest):
     """Modifie les métadonnées d'une entrée du registre."""
-    entry = store.update_entry(name, req.name, req.path, req.uri, req.prefix)
+    entry = store.update_entry(name, req.name, req.path, req.uri, req.prefix, ns_prefixes=req.ns_prefixes)
     if not entry:
         raise HTTPException(404, f"Ontologie '{name}' introuvable dans le registre.")
     return entry.to_dict()
@@ -389,7 +391,10 @@ def get_imported_entities():
             if p.exists():
                 try:
                     data = _json.loads(p.read_text(encoding="utf-8"))
-                    tag = {"_imported": True, "_importPrefix": imp_entry.prefix, "_importName": imp_entry.name}
+                    # Préfixe contextuel (choisi dans le wizard de l'ontologie qui importe)
+                    # prioritaire sur le préfixe propre de l'ontologie importée.
+                    ctx_prefix = (root_entry.import_labels.get(uri, {}) or {}).get("prefix") or imp_entry.prefix
+                    tag = {"_imported": True, "_importPrefix": ctx_prefix, "_importName": imp_entry.name}
                     for key in ("classes", "object_properties", "datatype_properties",
                                 "annotation_properties", "individuals", "swrl_rules", "queries"):
                         for entity in (data.get(key) or []):
@@ -495,11 +500,17 @@ def peek_ontology(path: str = Query(..., description="Host path to .owl / .ttl /
                 "prefix": data.get("prefix", "onto"),
                 "uri":    data.get("id", ""),
                 "path":   path,
+                "namespaces": data.get("ns_prefixes", []),
             }
         # OWL/XML or Turtle — parse with rdflib
         import rdflib
         from rdflib.namespace import OWL, RDF
-        g = rdflib.Graph()
+        # bind_namespaces="none" : ne pas injecter les namespaces par défaut de rdflib
+        # (brick, csvw, foaf…) → ne lister que ceux réellement déclarés dans le fichier.
+        try:
+            g = rdflib.Graph(bind_namespaces="none")
+        except TypeError:
+            g = rdflib.Graph()   # rdflib ancien sans ce paramètre
         fmt = "turtle" if fname.endswith(".ttl") else "xml"
         g.parse(data=p.read_bytes(), format=fmt)
         # Base URI: look for owl:Ontology declaration
@@ -541,7 +552,21 @@ def peek_ontology(path: str = Query(..., description="Host path to .owl / .ttl /
                         prefix = str(pfx)
                         break
 
-        return {"name": name, "prefix": prefix, "uri": uri, "path": path}
+        # Namespaces référencés dans le fichier (hors standards et hors base)
+        SKIP_NS = {"owl", "rdf", "rdfs", "xsd", "xml"}
+        namespaces = []
+        seen_ns = set()
+        for pfx, ns in g.namespaces():
+            pfx_s, ns_s = str(pfx), str(ns)
+            if not pfx_s or pfx_s in SKIP_NS:
+                continue
+            if base_norm and ns_s.rstrip("#/") == base_norm:
+                continue  # c'est le namespace de base de l'ontologie elle-même
+            if ns_s in seen_ns:
+                continue
+            seen_ns.add(ns_s)
+            namespaces.append({"prefix": pfx_s, "namespace": ns_s})
+        return {"name": name, "prefix": prefix, "uri": uri, "path": path, "namespaces": namespaces}
     except Exception as e:
         raise HTTPException(400, f"Cannot read file: {e}")
 
@@ -581,6 +606,7 @@ class ImportFromPathRequest(PydanticModel):
     save_path: str  # chemin hôte de sauvegarde .json
     uri: str
     prefix: str = ""
+    ns_prefixes: list = []   # [{prefix, namespace}] — préfixes des namespaces importés/référencés
 
 @app.post("/api/ontologies/import-from-path", tags=["Ontologie"])
 def import_from_path(req: ImportFromPathRequest):
@@ -599,7 +625,8 @@ def import_from_path(req: ImportFromPathRequest):
     else:
         fmt = "xml"
     try:
-        onto = store.import_from_rdf(content, fmt, req.name, req.save_path, req.uri, req.prefix)
+        onto = store.import_from_rdf(content, fmt, req.name, req.save_path, req.uri,
+                                     req.prefix, ns_prefixes=req.ns_prefixes)
         return onto
     except Exception as e:
         raise HTTPException(400, f"Erreur d'import : {e}")

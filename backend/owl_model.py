@@ -272,6 +272,7 @@ class OWLOntology(BaseModel):
     prefix: str = "onto"       # préfixe local
     imports: List[str] = []    # URIs des ontologies importées (owl:imports) — voyage avec le fichier
     import_labels: dict = Field(default_factory=dict)  # {uri: {"prefix", "name"}} instantané à la déclaration
+    ns_prefixes: list = Field(default_factory=list)     # [{prefix, namespace}] préfixes des namespaces référencés/importés
     annotations: EntityAnnotations = Field(default_factory=EntityAnnotations)
     classes: List[OWLClass] = []
     object_properties: List[OWLObjectProperty] = []
