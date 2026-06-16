@@ -3928,6 +3928,17 @@ APP._corpusDocs = function () {
 APP._corpusSave = function (arr) {
     localStorage.setItem('swowl_corpus_docs', JSON.stringify(arr));
 };
+APP._corpusPickFile = function (input) {
+    const f = input && input.files && input.files[0];
+    if (!f) return;
+    // Les navigateurs n'exposent pas le chemin absolu (sécurité) ; f.path existe sous Electron.
+    const loc = f.path || f.name;
+    const locI = document.getElementById('corpus-loc');
+    if (locI) locI.value = loc;
+    const nameI = document.getElementById('corpus-name');
+    if (nameI && !nameI.value.trim()) nameI.value = f.name.replace(/\.[^.]+$/, '');
+    input.value = '';
+};
 APP._corpusAdd = function () {
     const nameI = document.getElementById('corpus-name');
     const locI  = document.getElementById('corpus-loc');
@@ -3977,11 +3988,16 @@ APP._renderCorpus = function () {
             <input id="corpus-name" placeholder="Document name" autocomplete="off" spellcheck="false"
                    onkeydown="if(event.key==='Enter')APP._corpusAdd()"
                    style="width:200px;background:var(--bg3);border:1px solid var(--border);color:var(--text1);border-radius:6px;padding:7px 10px;font-size:13px">
-            <input id="corpus-loc" placeholder="Local path (/path/to/file) or https:// URL" autocomplete="off" spellcheck="false"
+            <input id="corpus-loc" placeholder="Paste an https:// URL, or pick a local file →" autocomplete="off" spellcheck="false"
                    onkeydown="if(event.key==='Enter')APP._corpusAdd()"
                    style="flex:1;min-width:280px;background:var(--bg3);border:1px solid var(--border);color:var(--text1);border-radius:6px;padding:7px 10px;font-size:13px;font-family:monospace">
+            <input id="corpus-file" type="file" style="display:none" onchange="APP._corpusPickFile(this)">
+            <button class="btn-sm" onclick="document.getElementById('corpus-file').click()" title="Select a local file">📂 Browse…</button>
             <button class="btn-sm" onclick="APP._corpusAdd()" title="Add document to the list">➕ Add Document</button>
         </div>
+        <p style="margin:-8px 0 16px;font-size:11px;color:var(--text-faint);font-style:italic">
+            For a local document use <b>📂 Browse…</b>; browsers expose only the file name for security, so edit the Location to the full path if needed.
+        </p>
         <table style="width:100%;border-collapse:collapse;font-size:13px">
             <thead><tr>${th('Name', 'width:200px')}${th('Location')}${th('', 'width:40px')}</tr></thead>
             <tbody>${rows}</tbody>
