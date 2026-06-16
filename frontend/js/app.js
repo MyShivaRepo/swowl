@@ -1562,6 +1562,27 @@ const APP = {
             }
         };
 
+        // ── Atomes SWRL en mode « triple » (comme l'éditeur SWOWL) ──
+        const _dpIds = new Set((s.datatype_properties || []).map(p => p.id));
+        const _propIcon = id => _dpIds.has(id) ? 'dp' : 'op';
+        const v = x => `<span class="swrl-var">${esc(x || '?')}</span>`;
+        const atomInner = (a) => {
+            if (!a) return '';
+            switch (a.type) {
+                case 'type_atom':     return `${v(a.var)} <span class="swrl-kw">is a</span> ${iconSpan('cls')}${ref(a.class_id || '?')}`;
+                case 'property_atom': return `${v(a.subject)} ${iconSpan(_propIcon(a.property_id))}${ref(a.property_id || '?')} ${v(a.object)}`;
+                case 'equality_atom': return `${v(a.var)} <span class="swrl-op">${esc(a.operator || '=')}</span> ${ALL.has(a.value) ? ref(a.value) : esc(a.value)}`;
+                case 'naf_block':     return `<span class="swrl-naf">NAF</span> ( ${(a.atoms || []).map(atomInner).join(' <span class="swrl-and">∧</span> ')} )`;
+                default: return esc(a.type || '');
+            }
+        };
+        // Liste d'atomes : un par ligne, « ∧ » en fin de ligne (sauf la dernière)
+        const atomLines = (arr) => {
+            const list = (arr || []);
+            if (!list.length) return `<div class="swrl-atom">⊤</div>`;
+            return list.map((a, i) => `<div class="swrl-atom">${atomInner(a)}${i < list.length - 1 ? ' <span class="swrl-and">∧</span>' : ''}</div>`).join('');
+        };
+
         // ── Sections ──────────────────────────────────────────
         const sections = [];
 
@@ -1635,12 +1656,10 @@ const APP = {
 
         // SWRL Rules
         sections.push({ key: 'swrl_rules', title: 'SWRL Rules', dot: 'rule', items: (s.swrl_rules || []).map(r => {
-            const bodyAtoms = (r.body || []).map(atomText).join(' ∧ ');
-            const headAtoms = (r.head || []).map(atomText).join(' ∧ ');
             const body = [
                 annoFrame({ labels: r.label ? [{ value: r.label }] : [], comments: r.comment ? [{ value: r.comment }] : [] }),
-                frame('if', `<div class="rule">${bodyAtoms || '⊤'}</div>`),
-                frame('then', `<div class="rule">${headAtoms || '⊤'}</div>`),
+                frame('if', atomLines(r.body), 'swrl-if'),
+                frame('then', atomLines(r.head), 'swrl-then'),
             ].join('');
             const stxt = [r.label, r.comment, ...(r.body || []).map(a => a.class_id || a.property_id || ''), ...(r.head || []).map(a => a.class_id || a.property_id || '')].join(' ');
             return { id: r.id, imported: !!r._imported, html: card(r.id, stxt, body, r.label || null, '(swrl:Rule)') };
@@ -1833,7 +1852,15 @@ nav.tabs{flex-shrink:0;display:flex;flex-wrap:wrap;gap:2px;background:var(--bg2)
 .an-p{color:var(--dim);font-family:monospace;white-space:nowrap;width:1%}
 .an-v{color:var(--tx)}
 .lang{color:var(--dim);font-size:11px}.ext{color:var(--dim)}.ref{color:var(--acc);cursor:pointer}
-.rule{font-family:monospace;font-size:13px;padding:4px 6px;white-space:normal}
+/* Atomes SWRL en triple (un par ligne) */
+.swrl-atom{display:flex;align-items:center;flex-wrap:wrap;gap:6px;font-family:monospace;font-size:13px;padding:3px 6px;border-radius:4px}
+.swrl-atom:hover{background:var(--bg3)}
+.swrl-var{color:#cfe0ff}
+.swrl-kw{color:var(--dim);font-style:italic}
+.swrl-op{color:var(--acc);font-weight:700}
+.swrl-and{color:#e0a96d;font-weight:700;margin-left:2px}
+.swrl-naf{color:#ef4444;font-weight:700;font-size:10px;letter-spacing:.1em}
+.cls-frame-tag.swrl-if{color:#f59e0b}.cls-frame-tag.swrl-then{color:#10b981}
 .ent.hl{outline:2px solid var(--acc);outline-offset:2px}
 </style></head><body>
 <header>
