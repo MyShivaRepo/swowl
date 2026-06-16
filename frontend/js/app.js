@@ -1471,8 +1471,8 @@ const APP = {
 
         const card = (id, searchExtra, bodyHtml) => {
             const txt = (id + ' ' + _displayRefId(id) + ' ' + (searchExtra || '')).toLowerCase();
-            return `<div class="ent" id="${enc(id)}" data-s="${esc(txt)}">
-                <div class="ent-h"><span class="ent-id">${disp(id)}</span></div>
+            return `<div class="ent" id="${enc(id)}" data-id="${esc(id)}" data-s="${esc(txt)}">
+                <div class="ent-h"><span class="ent-ic"></span><span class="ent-id">${disp(id)}</span></div>
                 ${bodyHtml ? `<div class="ent-b">${bodyHtml}</div>` : ''}
             </div>`;
         };
@@ -1568,8 +1568,22 @@ const APP = {
             return { id: r.id, imported: !!r._imported, html: card(r.id, stxt, body) };
         }) });
 
-        const dotColor = { cls: '#ff9d3c', op: '#378ADD', dp: '#1D9E75', ap: '#caa72b', ind: '#9a8cff', rule: '#888' };
         const visible = sections.filter(sec => sec.items.length);
+
+        // Icônes SWOWL (mêmes que l'éditeur) : classe = rond cuivré, OP = rect bleu,
+        // DP = rect vert, AP = rect jaune, individu = losange violet, règle = ⚙️.
+        const iconMk = {
+            classes: '<span class="ic ic-cls"></span>',
+            object_properties: '<span class="ic ic-op"></span>',
+            datatype_properties: '<span class="ic ic-dp"></span>',
+            annotation_properties: '<span class="ic ic-ap"></span>',
+            individuals: '<span class="ic ic-ind"></span>',
+            swrl_rules: '<span class="ic-gear">⚙️</span>',
+        };
+        const superLabel = {
+            classes: 'Super Classes', object_properties: 'Super Properties',
+            datatype_properties: 'Super Properties', annotation_properties: 'Super Properties',
+        };
 
         // Arbre de navigation (gauche), hiérarchique pour classes/propriétés
         const rawOf = {
@@ -1582,7 +1596,7 @@ const APP = {
             classes: subClsParents, object_properties: subPropParents, datatype_properties: subPropParents,
             annotation_properties: subPropParents, individuals: () => [], swrl_rules: () => [],
         };
-        const treeRows = (arr, getParents, dot) => {
+        const treeRows = (arr, getParents, ic) => {
             arr = arr || [];
             const ids = new Set(arr.map(e => e.id)), ch = {}, hp = new Set(), byId = {};
             arr.forEach(e => { ch[e.id] = []; byId[e.id] = e; });
@@ -1594,29 +1608,64 @@ const APP = {
             const visit = (id, depth) => {
                 if (seen.has(id)) return; seen.add(id);
                 const e = byId[id];
-                out.push(`<div class="ti${e && e._imported ? ' imp' : ''}" data-target="${enc(id)}" style="padding-left:${depth * 14 + 10}px"><span class="d" style="background:${dot}"></span><span class="tl">${disp(id)}</span></div>`);
+                out.push(`<div class="ti${e && e._imported ? ' imp' : ''}" data-target="${enc(id)}" data-id="${esc(id)}" style="padding-left:${depth * 14 + 10}px">${ic}<span class="tl">${disp(id)}</span></div>`);
                 (ch[id] || []).forEach(c => visit(c, depth + 1));
             };
             roots.forEach(r => visit(r, 0));
             return out.join('');
         };
 
-        const tabs = visible.map((sec, i) => `
-            <button class="tab${i === 0 ? ' active' : ''}" data-sec="${sec.key}">
-                <span class="d" style="background:${dotColor[sec.dot]}"></span>${sec.title}
-                <span class="cnt">${sec.items.length}</span>
-            </button>`).join('');
+        // Données embarquées : chaîne de parents (panneau « Super … ») + types stricts des individus
+        const parentMap = (arr, getP) => {
+            const ids = new Set((arr || []).map(e => e.id)), m = {};
+            (arr || []).forEach(e => { const ps = getP(e).filter(p => ids.has(p) && p !== e.id); if (ps.length) m[e.id] = ps; });
+            return m;
+        };
+        const labelMap = arr => { const m = {}; (arr || []).forEach(e => m[e.id] = _displayRefId(e.id)); return m; };
+        const META = {
+            classes: { P: parentMap(s.classes, subClsParents), L: labelMap(s.classes) },
+            object_properties: { P: parentMap(s.object_properties, subPropParents), L: labelMap(s.object_properties) },
+            datatype_properties: { P: parentMap(s.datatype_properties, subPropParents), L: labelMap(s.datatype_properties) },
+            annotation_properties: { P: parentMap(s.annotation_properties, subPropParents), L: labelMap(s.annotation_properties) },
+        };
+        const clsIds = new Set((s.classes || []).map(c => c.id));
+        const INDTYPES = {}, INDLABEL = {};
+        (s.individuals || []).forEach(i => {
+            INDTYPES[i.id] = (i.types || []).filter(t => typeof t === 'string' && clsIds.has(t));
+            INDLABEL[i.id] = _displayRefId(i.id);
+        });
 
-        const panels = visible.map((sec, i) => `
-            <div class="panel" data-sec="${sec.key}"${i === 0 ? '' : ' style="display:none"'}>
-                <div class="split">
-                    <div class="tree">${treeRows(rawOf[sec.key], parentsOf[sec.key], dotColor[sec.dot])}</div>
-                    <div class="detail">
-                        ${sec.items.map(it => it.html).join('')}
-                        <div class="placeholder">Sélectionne un élément dans l'arbre de gauche.</div>
+        const tabs = visible.map((sec, i) =>
+            `<button class="tab${i === 0 ? ' active' : ''}" data-sec="${sec.key}">${iconMk[sec.key]}${sec.title}<span class="cnt">${sec.items.length}</span></button>`
+        ).join('');
+
+        const panels = visible.map((sec, i) => {
+            const hidden = i === 0 ? '' : ' style="display:none"';
+            const cards = sec.items.map(it => it.html).join('');
+            let inner;
+            if (sec.key === 'individuals') {
+                const clsTree = treeRows(s.classes, subClsParents, iconMk.classes);
+                inner = `<div class="split">
+                    <div class="tree indcls">${clsTree || '<div class="ph2">Aucune classe.</div>'}</div>
+                    <div class="indlist"><div class="col-h">Individuals</div><div class="il-body"><div class="ph2">Sélectionne une classe.</div></div></div>
+                    <div class="detail">${cards}<div class="placeholder">Sélectionne un individu.</div></div>
+                </div>`;
+            } else if (sec.key === 'swrl_rules') {
+                inner = `<div class="split">
+                    <div class="tree">${treeRows(rawOf[sec.key], parentsOf[sec.key], iconMk[sec.key])}</div>
+                    <div class="detail">${cards}<div class="placeholder">Sélectionne une règle.</div></div>
+                </div>`;
+            } else {
+                inner = `<div class="split">
+                    <div class="leftcol">
+                        <div class="tree">${treeRows(rawOf[sec.key], parentsOf[sec.key], iconMk[sec.key])}</div>
+                        <div class="superpanel"><div class="col-h">${superLabel[sec.key] || 'Super'}</div><div class="sp-body"><div class="ph2">—</div></div></div>
                     </div>
-                </div>
-            </div>`).join('');
+                    <div class="detail">${cards}<div class="placeholder">Sélectionne un élément.</div></div>
+                </div>`;
+            }
+            return `<div class="panel" data-sec="${sec.key}"${hidden}>${inner}</div>`;
+        }).join('');
 
         const onto = s.ontology || {};
         const title = esc(onto.name || name);
@@ -1642,19 +1691,48 @@ header h1{font-size:15px;font-weight:600;margin:0}header .pfx{color:var(--dim);f
 nav.tabs{flex-shrink:0;display:flex;flex-wrap:wrap;gap:2px;background:var(--bg2);border-bottom:1px solid var(--bd);padding:0 12px}
 .tab{display:flex;align-items:center;gap:6px;background:none;border:none;border-bottom:2px solid transparent;color:var(--dim);font-size:13px;padding:9px 14px;cursor:pointer}
 .tab:hover{color:var(--tx)}.tab.active{color:var(--acc);border-bottom-color:var(--acc);font-weight:600}
-.tab .d{width:9px;height:9px;border-radius:50%;display:inline-block}
 .cnt{font-size:11px;color:var(--dim);background:var(--bg3);border-radius:10px;padding:1px 8px}
+/* Icônes SWOWL */
+.ic{flex-shrink:0;display:inline-block}
+.ic-cls{width:12px;height:12px;border-radius:50%;background:#b87333}
+.ic-op{width:12px;height:8px;border-radius:2px;background:#3b82f6}
+.ic-dp{width:12px;height:8px;border-radius:2px;background:#10b981}
+.ic-ap{width:12px;height:8px;border-radius:2px;background:#e8d400}
+.ic-ind{width:9px;height:9px;background:#8b4db8;border-radius:1px;transform:rotate(45deg);margin:0 2px}
+.ic-gear{flex-shrink:0;font-size:12px;line-height:1}
 .panels{flex:1;min-height:0;overflow:hidden}.panel{height:100%}
 .split{display:flex;height:100%}
 .tree{width:300px;flex-shrink:0;overflow:auto;border-right:1px solid var(--bd);padding:8px 4px}
 .ti{display:flex;align-items:center;gap:6px;padding:3px 8px;font-family:monospace;font-size:12px;border-radius:4px;cursor:pointer;white-space:nowrap}
 .ti:hover{background:var(--bg3)}.ti.sel{background:var(--acc);color:#fff}.ti.imp{font-style:italic;opacity:.75}
-.ti .d{width:8px;height:8px;border-radius:50%;flex-shrink:0;display:inline-block}.ti .tl{overflow:hidden;text-overflow:ellipsis}
+.ti .tl{overflow:hidden;text-overflow:ellipsis}
+/* Colonne gauche = arbre + panneau Super */
+.leftcol{width:300px;flex-shrink:0;display:flex;flex-direction:column;border-right:1px solid var(--bd)}
+.leftcol .tree{width:auto;border-right:none;flex:1;min-height:0}
+.superpanel{flex-shrink:0;max-height:40%;display:flex;flex-direction:column;border-top:1px solid var(--bd)}
+.col-h{flex-shrink:0;font-size:10px;letter-spacing:.05em;text-transform:uppercase;color:var(--dim);padding:6px 10px;background:var(--bg2);border-bottom:1px solid var(--bd)}
+.sp-body{overflow:auto;padding:4px}
+.sp-i{display:flex;align-items:center;gap:6px;padding:3px 8px;font-family:monospace;font-size:12px;border-radius:4px;cursor:pointer;white-space:nowrap}
+.sp-i:hover{background:var(--bg3)}.sp-i .tl{overflow:hidden;text-overflow:ellipsis}
+.ph2{color:var(--dim);font-style:italic;font-size:12px;padding:8px 10px}
+/* Individuals : 3 colonnes (classes | individus | détail) */
+.indcls{width:260px}
+.indlist{width:260px;flex-shrink:0;display:flex;flex-direction:column;border-right:1px solid var(--bd)}
+.il-body{flex:1;overflow:auto;padding:6px 4px}
+.ii{display:flex;align-items:center;gap:6px;padding:3px 8px;font-family:monospace;font-size:12px;border-radius:4px;cursor:pointer;white-space:nowrap}
+.ii:hover{background:var(--bg3)}.ii.sel{background:var(--acc);color:#fff}.ii .tl{overflow:hidden;text-overflow:ellipsis}
 .detail{flex:1;min-width:0;overflow:auto;padding:16px 22px}
 .detail .ent{display:none;margin:0}.detail .ent.sel{display:block}
 .placeholder{color:var(--dim);font-style:italic;padding:20px}
 .ent{background:var(--bg2);border:1px solid var(--bd);border-radius:8px;padding:12px 16px}
-.ent-h{font-family:monospace;font-weight:600;font-size:15px}.ent-id{color:#cfe0ff}
+.ent-h{display:flex;align-items:center;gap:9px;font-family:monospace;font-weight:600;font-size:15px}.ent-id{color:#cfe0ff}
+.ent-ic{flex-shrink:0;display:inline-block}
+.panel[data-sec="classes"] .ent-ic{width:13px;height:13px;border-radius:50%;background:#b87333}
+.panel[data-sec="object_properties"] .ent-ic{width:13px;height:9px;border-radius:2px;background:#3b82f6}
+.panel[data-sec="datatype_properties"] .ent-ic{width:13px;height:9px;border-radius:2px;background:#10b981}
+.panel[data-sec="annotation_properties"] .ent-ic{width:13px;height:9px;border-radius:2px;background:#e8d400}
+.panel[data-sec="individuals"] .ent-ic{width:10px;height:10px;border-radius:1px;background:#8b4db8;transform:rotate(45deg);margin:0 2px}
+.panel[data-sec="swrl_rules"] .ent-ic::before{content:"⚙️"}
 .ent-b{margin-top:8px;font-size:13px}
 .kv{display:flex;gap:8px;padding:3px 0}.kv .k{color:var(--dim);min-width:140px;flex-shrink:0;font-size:12px}.kv .v{min-width:0}
 .lang{color:var(--dim);font-size:11px}.ext{color:var(--dim)}.ref{color:var(--acc);cursor:pointer}
@@ -1674,43 +1752,103 @@ nav.tabs{flex-shrink:0;display:flex;flex-wrap:wrap;gap:2px;background:var(--bg2)
 <nav class="tabs">${tabs}</nav>
 <div class="panels">${panels || '<p style="color:var(--dim);padding:20px">Ontologie vide.</p>'}</div>
 <script>
+var META=${JSON.stringify(META).replace(/</g, '\\u003c')};
+var INDTYPES=${JSON.stringify(INDTYPES).replace(/</g, '\\u003c')};
+var INDLABEL=${JSON.stringify(INDLABEL).replace(/</g, '\\u003c')};
 (function(){
+  var ICON={classes:'<span class="ic ic-cls"></span>',object_properties:'<span class="ic ic-op"></span>',datatype_properties:'<span class="ic ic-dp"></span>',annotation_properties:'<span class="ic ic-ap"></span>',individuals:'<span class="ic ic-ind"></span>'};
+  function enc(id){return 'e_'+String(id).replace(/[^a-zA-Z0-9_-]/g,'_');}
+  function esc(t){return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;');}
+  function hlEl(el){if(el){el.classList.add('hl');setTimeout(function(){el.classList.remove('hl');},1600);}}
+
   var tabs=[].slice.call(document.querySelectorAll('.tab'));
   var panels=[].slice.call(document.querySelectorAll('.panel'));
   var panelOf={}; panels.forEach(function(p){panelOf[p.dataset.sec]=p;});
   var secTitle={};
   tabs.forEach(function(t){secTitle[t.dataset.sec]=t.textContent.replace(/\\s+/g,' ').replace(/\\s*\\d+\\s*$/,'').trim();});
 
+  // ── Panneau « Super … » : chaîne de sur-classes / sur-propriétés ──
+  function renderSuper(sec,rawId){
+    var panel=panelOf[sec]; if(!panel)return; var body=panel.querySelector('.sp-body'); if(!body)return;
+    var P=(META[sec]||{}).P||{}, L=(META[sec]||{}).L||{}, anc=[], seen={};
+    (function climb(id){(P[id]||[]).forEach(function(p){if(!seen[p]){seen[p]=1;anc.push(p);climb(p);}});})(rawId);
+    body.innerHTML=anc.length?anc.map(function(p){return '<div class="sp-i" data-target="'+enc(p)+'">'+(ICON[sec]||'')+'<span class="tl">'+esc(L[p]||p)+'</span></div>';}).join(''):'<div class="ph2">—</div>';
+  }
+  // ── Sélection standard (classes / propriétés / règles) ──
   function selectIn(sec,anchor){
     var panel=panelOf[sec]; if(!panel)return null;
     panel.querySelectorAll('.tree .ti').forEach(function(t){t.classList.toggle('sel',t.dataset.target===anchor);});
     var found=null;
     panel.querySelectorAll('.detail .ent').forEach(function(e){var m=e.id===anchor;e.classList.toggle('sel',m);if(m)found=e;});
-    var ph=panel.querySelector('.placeholder'); if(ph)ph.style.display=found?'none':'';
+    var ph=panel.querySelector('.detail .placeholder'); if(ph)ph.style.display=found?'none':'';
     var sel=panel.querySelector('.tree .ti.sel'); if(sel)sel.scrollIntoView({block:'nearest'});
+    if(META[sec])renderSuper(sec,sel?sel.dataset.id:(found?found.dataset.id:null));
     var d=panel.querySelector('.detail'); if(d)d.scrollTop=0;
     return found;
   }
-  function activate(sec,anchor){
+  // ── Individuals : 3 colonnes (classes | individus | détail) ──
+  var indP=panelOf['individuals'];
+  function renderIndList(classId){
+    if(!indP)return; var body=indP.querySelector('.il-body');
+    var ids=Object.keys(INDTYPES).filter(function(id){return INDTYPES[id].indexOf(classId)>=0;});
+    ids.sort(function(a,b){return (INDLABEL[a]||a).localeCompare(INDLABEL[b]||b,undefined,{sensitivity:'base'});});
+    body.innerHTML=ids.length?ids.map(function(id){return '<div class="ii" data-target="'+enc(id)+'"><span class="ic ic-ind"></span><span class="tl">'+esc(INDLABEL[id]||id)+'</span></div>';}).join(''):'<div class="ph2">Aucun individu.</div>';
+  }
+  function setIndClass(classId){
+    if(!indP)return; indP.querySelectorAll('.tree .ti').forEach(function(t){t.classList.toggle('sel',t.dataset.id===classId);});
+    renderIndList(classId);
+  }
+  function showInd(anchor){
+    if(!indP)return null;
+    indP.querySelectorAll('.il-body .ii').forEach(function(i){i.classList.toggle('sel',i.dataset.target===anchor);});
+    var found=null; indP.querySelectorAll('.detail .ent').forEach(function(e){var m=e.id===anchor;e.classList.toggle('sel',m);if(m)found=e;});
+    var ph=indP.querySelector('.detail .placeholder'); if(ph)ph.style.display=found?'none':'';
+    var d=indP.querySelector('.detail'); if(d)d.scrollTop=0;
+    return found;
+  }
+  function selectIndividual(anchor){
+    var el=document.getElementById(anchor), indId=el?el.dataset.id:null;
+    var cur=indP?indP.querySelector('.tree .ti.sel'):null;
+    var cls=(cur&&indId&&INDTYPES[indId]&&INDTYPES[indId].indexOf(cur.dataset.id)>=0)?cur.dataset.id:(indId&&INDTYPES[indId]?INDTYPES[indId][0]:null);
+    if(cls!=null)setIndClass(cls);
+    return showInd(anchor);
+  }
+  var indInited=false;
+  function ensureIndInit(){
+    if(indInited||!indP)return; indInited=true;
+    var first=indP.querySelector('.tree .ti'); if(!first)return;
+    setIndClass(first.dataset.id);
+    var fi=indP.querySelector('.il-body .ii'); if(fi)showInd(fi.dataset.target);
+  }
+  // ── Activation d'onglet ──
+  function activate(sec){
     tabs.forEach(function(t){t.classList.toggle('active',t.dataset.sec===sec);});
     panels.forEach(function(p){p.style.display=p.dataset.sec===sec?'':'none';});
     var panel=panelOf[sec]; if(!panel)return;
-    if(!anchor){var cur=panel.querySelector('.tree .ti.sel');anchor=cur?cur.dataset.target:((panel.querySelector('.tree .ti')||{}).dataset||{}).target;}
-    if(anchor)selectIn(sec,anchor);
+    if(sec==='individuals'){ensureIndInit();return;}
+    if(!panel.querySelector('.tree .ti.sel')){var first=panel.querySelector('.tree .ti');if(first)selectIn(sec,first.dataset.target);}
   }
   tabs.forEach(function(t){t.addEventListener('click',function(){activate(t.dataset.sec);});});
-  panels.forEach(function(p){var tr=p.querySelector('.tree');if(tr)tr.addEventListener('click',function(ev){var t=ev.target.closest('.ti');if(t)selectIn(p.dataset.sec,t.dataset.target);});});
+  panels.forEach(function(p){
+    var sec=p.dataset.sec;
+    if(sec==='individuals'){
+      var ct=p.querySelector('.tree'); if(ct)ct.addEventListener('click',function(ev){var t=ev.target.closest('.ti');if(!t)return;setIndClass(t.dataset.id);var fi=p.querySelector('.il-body .ii');showInd(fi?fi.dataset.target:null);});
+      var lb=p.querySelector('.il-body'); if(lb)lb.addEventListener('click',function(ev){var i=ev.target.closest('.ii');if(i)showInd(i.dataset.target);});
+    }else{
+      var tr=p.querySelector('.tree'); if(tr)tr.addEventListener('click',function(ev){var t=ev.target.closest('.ti');if(t)selectIn(sec,t.dataset.target);});
+      var sp=p.querySelector('.sp-body'); if(sp)sp.addEventListener('click',function(ev){var s=ev.target.closest('.sp-i');if(s)selectIn(sec,s.dataset.target);});
+    }
+  });
 
-  // Recherche full-text (index depuis le DOM)
+  // ── Recherche full-text (index depuis le DOM) ──
   var IDX=[];
   panels.forEach(function(p){[].slice.call(p.querySelectorAll('.detail .ent')).forEach(function(e){
     var lbl=(e.querySelector('.ent-id')||{}).textContent||e.id;
     IDX.push({a:e.id,sec:p.dataset.sec,l:lbl,t:e.dataset.s||''});
   });});
   var q=document.getElementById('q'), box=document.getElementById('results');
-  function esc(t){return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;');}
   function close(){box.style.display='none';box.innerHTML='';}
-  function goTo(a,sec){activate(sec);var el=selectIn(sec,a);if(el){el.classList.add('hl');setTimeout(function(){el.classList.remove('hl');},1600);}}
+  function goTo(a,sec){activate(sec);var el=sec==='individuals'?selectIndividual(a):selectIn(sec,a);hlEl(el);}
   q.addEventListener('input',function(){
     var v=q.value.trim().toLowerCase();
     if(!v){close();return;}
@@ -1725,10 +1863,9 @@ nav.tabs{flex-shrink:0;display:flex;flex-wrap:wrap;gap:2px;background:var(--bg2)
   q.addEventListener('keydown',function(e){if(e.key==='Escape')close();});
   q.addEventListener('blur',function(){setTimeout(close,150);});
 
-  // Liens internes (#ancre) → bon onglet + sélection
+  // ── Liens internes (#ancre) → bon onglet + sélection ──
   function hl(){var id=location.hash.slice(1);if(!id)return;var el=document.getElementById(id);if(!el)return;var p=el.closest('.panel');if(!p)return;goTo(id,p.dataset.sec);}
   window.addEventListener('hashchange',hl);
-  // Sélection initiale
   if(tabs.length)activate(tabs[0].dataset.sec);
   hl();
 })();
