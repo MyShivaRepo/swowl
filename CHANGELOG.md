@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Nouvel onglet **Sources** (à droite de Settings, masquable via GUI Tabs) avec
   trois sous-onglets : **LLMs**, **Corpus**, **Analysis** (contenu à venir).
 
+### Export
+- **Export HTML** (bouton « ↓ HTML » dans l'onglet Ontologies) : génère une **page
+  HTML autonome** (1 fichier) de l'ontologie connectée — Classes, ObjectProperties,
+  DatatypeProperties, AnnotationProperties, Individuals, SWRL Rules — entièrement
+  **navigable** (liens internes + sommaire) avec **recherche full-text**.
+
 [1.1.0]: https://github.com/MyShivaRepo/swowl/releases/tag/v1.1.0
 
 ## [1.0.0] — 2026-06-15

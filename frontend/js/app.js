@@ -765,6 +765,7 @@ const APP = {
                    ${connBtn}
                    <button class="btn-sm" onclick="APP._ontoExportDropdown(this,'${safe}','onto')" title="Export ontology">↓ Ontology</button>
                    <button class="btn-sm" onclick="APP._ontoExportDropdown(this,'${safe}','rules')" title="Export rules">↓ Rules</button>
+                   <button class="btn-sm" onclick="APP.exportHtmlSite('${safe}')" title="Export navigable HTML (single page)">↓ HTML</button>
                    <button class="btn-sm btn-del" onclick="APP.doUnregister('${safe}')" title="Remove from registry">✕</button>`;
             // Every user ontology implicitly imports OWL (unless already declared or readonly)
             const importRows = effectiveImportsOf(o).map(u => renderImportRows(u, 1, o.name, o.import_labels || {})).join('');
@@ -1419,6 +1420,234 @@ const APP = {
             a.click();
             URL.revokeObjectURL(url);
         } catch (e) { UI.error(`Export error: ${e.message}`); }
+    },
+
+    /** Génère une page HTML autonome (1 fichier), navigable + recherche full-text,
+     *  des onglets Classes / OPs / DPs / APs / Individuals / SWRL Rules de
+     *  l'ontologie CONNECTÉE (entités propres + importées). */
+    exportHtmlSite(name) {
+        if (!APP.state.ontology) return UI.error("Connecte une ontologie d'abord.");
+        const connected = (this._ontoList || []).find(o => o.connected);
+        if (connected && connected.name !== name) {
+            return UI.warn(`L'export HTML porte sur l'ontologie connectée — connecte d'abord « ${name} ».`);
+        }
+        const s = APP.state;
+        const esc = t => String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        const enc = id => 'e_' + String(id).replace(/[^a-zA-Z0-9_-]/g, '_');
+        const disp = id => esc(_displayRefId(id));
+        const ALL = new Set([
+            ...(s.classes || []), ...(s.object_properties || []), ...(s.datatype_properties || []),
+            ...(s.annotation_properties || []), ...(s.individuals || []),
+        ].map(e => e.id));
+        // Référence cliquable si l'entité existe, sinon texte (ex. owl:Thing, xsd:…)
+        const ref = id => ALL.has(id) ? `<a href="#${enc(id)}" class="ref">${disp(id)}</a>` : `<span class="ext">${disp(id)}</span>`;
+        const refs = (arr, link = true) => (arr || []).filter(x => typeof x === 'string').length
+            ? (arr || []).filter(x => typeof x === 'string').map(x => link ? ref(x) : disp(x)).join(', ') : '';
+
+        const restrText = (r) => {
+            const p = ref(r.property);
+            switch (r.type) {
+                case 'someValuesFrom': return `∃ ${p} . ${ref(r.filler)}`;
+                case 'allValuesFrom':  return `∀ ${p} . ${ref(r.filler)}`;
+                case 'hasValue':       return `${p} ∋ ${esc(r.value)}`;
+                case 'exactCardinality': return `${p} = ${r.cardinality}${r.filler ? ' ' + ref(r.filler) : ''}`;
+                case 'minCardinality':   return `${p} ≥ ${r.cardinality}${r.filler ? ' ' + ref(r.filler) : ''}`;
+                case 'maxCardinality':   return `${p} ≤ ${r.cardinality}${r.filler ? ' ' + ref(r.filler) : ''}`;
+                default: return r.type === '_marker' ? p : esc(JSON.stringify(r));
+            }
+        };
+        const annoRows = (a) => {
+            if (!a) return '';
+            const rows = [];
+            (a.labels || []).forEach(l => rows.push(['rdfs:label', `${esc(l.value)}${l.lang ? ` <span class="lang">@${esc(l.lang)}</span>` : ''}`]));
+            (a.comments || []).forEach(c => rows.push(['rdfs:comment', `${esc(c.value)}${c.lang ? ` <span class="lang">@${esc(c.lang)}</span>` : ''}`]));
+            (a.other || []).forEach(o => rows.push([esc(o.property), esc(o.value)]));
+            return rows.map(([k, v]) => `<div class="kv"><span class="k">${k}</span><span class="v">${v}</span></div>`).join('');
+        };
+        const row = (label, html) => html ? `<div class="kv"><span class="k">${label}</span><span class="v">${html}</span></div>` : '';
+
+        // Texte de recherche (id + labels + commentaires + références + contenu)
+        const annoTxt = a => !a ? '' : [...(a.labels || []).map(l => l.value), ...(a.comments || []).map(c => c.value), ...(a.other || []).map(o => o.property + ' ' + o.value)].join(' ');
+
+        const card = (id, searchExtra, bodyHtml) => {
+            const txt = (id + ' ' + _displayRefId(id) + ' ' + (searchExtra || '')).toLowerCase();
+            return `<div class="ent" id="${enc(id)}" data-s="${esc(txt)}">
+                <div class="ent-h"><span class="ent-id">${disp(id)}</span></div>
+                ${bodyHtml ? `<div class="ent-b">${bodyHtml}</div>` : ''}
+            </div>`;
+        };
+
+        // ── Atomes SWRL → texte lisible ───────────────────────
+        const atomText = (a) => {
+            if (!a) return '';
+            switch (a.type) {
+                case 'type_atom':     return `${ref(a.class_id || '?')}(${esc(a.var || '?')})`;
+                case 'property_atom': return `${ref(a.property_id || '?')}(${esc(a.subject || '?')}, ${esc(a.object || '?')})`;
+                case 'equality_atom': return `${esc(a.var || '?')} ${esc(a.operator || '=')} ${ALL.has(a.value) ? ref(a.value) : esc(a.value)}`;
+                case 'naf_block':     return `NAF(${(a.atoms || []).map(atomText).join(' ∧ ')})`;
+                default: return esc(a.type || '');
+            }
+        };
+
+        // ── Sections ──────────────────────────────────────────
+        const sections = [];
+
+        // Classes
+        sections.push({ key: 'classes', title: 'Classes', dot: 'cls', items: (s.classes || []).map(c => {
+            const supers = (c.subClassOf || []).filter(x => typeof x === 'string');
+            const restr  = (c.subClassOf || []).filter(x => typeof x === 'object' && x.type !== '_marker');
+            const props  = (c.subClassOf || []).filter(x => typeof x === 'object' && x.type === '_marker');
+            const body = [
+                row('subClassOf', refs(supers)),
+                row('equivalentClass', (c.equivalentClass || []).map(e => typeof e === 'string' ? ref(e) : restrText(e)).join('<br>')),
+                row('disjointWith', refs(c.disjointWith)),
+                row('restrictions', restr.map(restrText).join('<br>')),
+                row('properties', props.map(restrText).join(', ')),
+                annoRows(c.annotations),
+            ].join('');
+            const stxt = [...supers, ...(c.disjointWith || []), ...restr.map(r => r.property + ' ' + (r.filler || r.value || '')), annoTxt(c.annotations)].join(' ');
+            return { id: c.id, imported: !!c._imported, html: card(c.id, stxt, body) };
+        }) });
+
+        // ObjectProperties
+        sections.push({ key: 'object_properties', title: 'ObjectProperties', dot: 'op', items: (s.object_properties || []).map(p => {
+            const chars = Object.entries(p.characteristics || {}).filter(([, v]) => v).map(([k]) => k);
+            const body = [
+                row('domain', refs(p.domain)), row('range', refs(p.range)),
+                row('subPropertyOf', refs(p.subPropertyOf)),
+                row('inverseOf', p.inverseOf ? ref(p.inverseOf) : ''),
+                row('characteristics', chars.join(', ')),
+                annoRows(p.annotations),
+            ].join('');
+            const stxt = [...(p.domain || []), ...(p.range || []), p.inverseOf, ...chars, annoTxt(p.annotations)].join(' ');
+            return { id: p.id, imported: !!p._imported, html: card(p.id, stxt, body) };
+        }) });
+
+        // DatatypeProperties
+        sections.push({ key: 'datatype_properties', title: 'DatatypeProperties', dot: 'dp', items: (s.datatype_properties || []).map(p => {
+            const body = [
+                row('domain', refs(p.domain)), row('range', (p.range || []).map(disp).join(', ')),
+                row('subPropertyOf', refs(p.subPropertyOf)),
+                row('functional', p.functional ? 'true' : ''),
+                annoRows(p.annotations),
+            ].join('');
+            const stxt = [...(p.domain || []), ...(p.range || []), annoTxt(p.annotations)].join(' ');
+            return { id: p.id, imported: !!p._imported, html: card(p.id, stxt, body) };
+        }) });
+
+        // AnnotationProperties
+        sections.push({ key: 'annotation_properties', title: 'AnnotationProperties', dot: 'ap', items: (s.annotation_properties || []).map(p => {
+            const body = [row('subPropertyOf', refs(p.subPropertyOf)), annoRows(p.annotations)].join('');
+            return { id: p.id, imported: !!p._imported, html: card(p.id, annoTxt(p.annotations), body) };
+        }) });
+
+        // Individuals
+        sections.push({ key: 'individuals', title: 'Individuals', dot: 'ind', items: (s.individuals || []).map(i => {
+            const oa = (i.objectAssertions || []).map(a => `${ref(a.property)} → ${ref(a.target)}`).join('<br>');
+            const da = (i.dataAssertions || []).map(a => `${ref(a.property)} : ${esc(a.value)}${a.datatype ? ` <span class="lang">^^${esc(a.datatype)}</span>` : ''}`).join('<br>');
+            const body = [
+                row('types', refs(i.types)),
+                row('sameAs', refs(i.sameAs)), row('differentFrom', refs(i.differentFrom)),
+                row('object assertions', oa), row('data assertions', da),
+                annoRows(i.annotations),
+            ].join('');
+            const stxt = [...(i.types || []), ...(i.objectAssertions || []).map(a => a.property + ' ' + a.target), ...(i.dataAssertions || []).map(a => a.property + ' ' + a.value), annoTxt(i.annotations)].join(' ');
+            return { id: i.id, imported: !!i._imported, html: card(i.id, stxt, body) };
+        }) });
+
+        // SWRL Rules
+        sections.push({ key: 'swrl_rules', title: 'SWRL Rules', dot: 'rule', items: (s.swrl_rules || []).map(r => {
+            const bodyAtoms = (r.body || []).map(atomText).join(' ∧ ');
+            const headAtoms = (r.head || []).map(atomText).join(' ∧ ');
+            const body = [
+                r.label ? row('label', esc(r.label)) : '',
+                r.comment ? row('comment', esc(r.comment)) : '',
+                `<div class="rule">${bodyAtoms || '⊤'} <span class="imp">⟶</span> ${headAtoms || '⊤'}</div>`,
+            ].join('');
+            const stxt = [r.label, r.comment, ...(r.body || []).map(a => a.class_id || a.property_id || ''), ...(r.head || []).map(a => a.class_id || a.property_id || '')].join(' ');
+            return { id: r.id, imported: !!r._imported, html: card(r.id, stxt, body) };
+        }) });
+
+        const dotColor = { cls: '#ff9d3c', op: '#378ADD', dp: '#1D9E75', ap: '#caa72b', ind: '#9a8cff', rule: '#888' };
+
+        const toc = sections.filter(sec => sec.items.length).map(sec => `
+            <div class="toc-sec"><div class="toc-h">${sec.title} <span class="cnt">${sec.items.length}</span></div>
+            ${sec.items.map(it => `<a href="#${enc(it.id)}" class="toc-i${it.imported ? ' imp' : ''}"><span class="d" style="background:${dotColor[sec.dot]}"></span>${disp(it.id)}</a>`).join('')}</div>`).join('');
+
+        const main = sections.filter(sec => sec.items.length).map(sec => `
+            <section class="sec" id="sec-${sec.key}"><h2><span class="d" style="background:${dotColor[sec.dot]}"></span>${sec.title} <span class="cnt">${sec.items.length}</span></h2>
+            ${sec.items.map(it => it.html).join('')}</section>`).join('');
+
+        const onto = s.ontology || {};
+        const title = esc(onto.name || name);
+        const total = sections.reduce((n, sec) => n + sec.items.length, 0);
+
+        const html = `<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${title} — SWOWL export</title>
+<style>
+:root{--bg:#0e1219;--bg2:#161b24;--bg3:#1d2535;--bd:#2a3347;--tx:#e2e8f0;--dim:#94a3b8;--acc:#5f8dd3}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:14px/1.6 system-ui,sans-serif}
+a{color:var(--acc);text-decoration:none}a:hover{text-decoration:underline}
+header{position:sticky;top:0;z-index:5;background:var(--bg2);border-bottom:1px solid var(--bd);padding:10px 16px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+header h1{font-size:15px;font-weight:600;margin:0}header .pfx{color:var(--dim);font-size:12px;font-family:monospace}
+#q{flex:1;min-width:220px;background:var(--bg3);border:1px solid var(--bd);color:var(--tx);border-radius:6px;padding:7px 12px;font-size:13px}
+#count{color:var(--dim);font-size:12px;white-space:nowrap}
+.layout{display:flex;align-items:flex-start}
+nav.toc{width:280px;flex-shrink:0;position:sticky;top:53px;height:calc(100vh - 53px);overflow:auto;border-right:1px solid var(--bd);padding:10px 8px}
+.toc-sec{margin-bottom:12px}.toc-h{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--dim);padding:4px 8px;font-weight:600}
+.toc-i{display:flex;align-items:center;gap:6px;padding:3px 8px;font-size:12px;border-radius:4px;color:var(--tx)}
+.toc-i:hover{background:var(--bg3);text-decoration:none}.toc-i.imp{font-style:italic;opacity:.7}
+.toc-i .d,h2 .d{width:8px;height:8px;border-radius:50%;flex-shrink:0;display:inline-block}
+main{flex:1;min-width:0;padding:16px 22px;max-width:1000px}
+section.sec{margin-bottom:30px}section.sec h2{font-size:16px;border-bottom:1px solid var(--bd);padding-bottom:6px;display:flex;align-items:center;gap:8px}
+.cnt{font-size:11px;color:var(--dim);background:var(--bg3);border-radius:10px;padding:1px 8px}
+.ent{background:var(--bg2);border:1px solid var(--bd);border-radius:8px;padding:10px 14px;margin:10px 0;scroll-margin-top:64px}
+.ent-h{font-family:monospace;font-weight:600;font-size:14px}.ent-id{color:#cfe0ff}
+.ent-b{margin-top:6px;font-size:13px}
+.kv{display:flex;gap:8px;padding:2px 0}.kv .k{color:var(--dim);min-width:130px;flex-shrink:0;font-size:12px}.kv .v{min-width:0}
+.lang{color:var(--dim);font-size:11px}.ext{color:var(--dim)}
+.rule{font-family:monospace;background:var(--bg);border:1px solid var(--bd);border-radius:6px;padding:8px 10px;margin-top:4px}
+.rule .imp{color:var(--acc);font-weight:700;margin:0 6px}
+.ent.hl{outline:2px solid var(--acc);outline-offset:1px}
+</style></head><body>
+<header>
+  <h1>🦉 ${title}</h1>
+  ${onto.prefix ? `<span class="pfx">${esc(onto.prefix)}: ${esc(onto.id || '')}</span>` : `<span class="pfx">${esc(onto.id || '')}</span>`}
+  <input id="q" type="search" placeholder="Recherche full-text (id, labels, contenu)…" autocomplete="off">
+  <span id="count"></span>
+</header>
+<div class="layout">
+  <nav class="toc">${toc}</nav>
+  <main>${main || '<p style="color:var(--dim)">Ontologie vide.</p>'}</main>
+</div>
+<script>
+(function(){
+  var q=document.getElementById('q'), count=document.getElementById('count');
+  var cards=[].slice.call(document.querySelectorAll('.ent'));
+  var secs=[].slice.call(document.querySelectorAll('section.sec'));
+  var tocItems=[].slice.call(document.querySelectorAll('.toc-i'));
+  function filter(){
+    var v=q.value.trim().toLowerCase(), n=0;
+    cards.forEach(function(c){var m=!v||c.dataset.s.indexOf(v)>=0;c.style.display=m?'':'none';if(m)n++;});
+    secs.forEach(function(sec){var any=[].slice.call(sec.querySelectorAll('.ent')).some(function(e){return e.style.display!=='none';});sec.style.display=any?'':'none';});
+    tocItems.forEach(function(a){var id=a.getAttribute('href').slice(1);var el=document.getElementById(id);a.style.display=(!el||el.style.display!=='none')?'':'none';});
+    count.textContent=v?(n+' résultat'+(n>1?'s':'')):(${total}+' éléments');
+  }
+  q.addEventListener('input',filter);
+  function hl(){var id=location.hash.slice(1);if(!id)return;var el=document.getElementById(id);if(el){el.classList.add('hl');setTimeout(function(){el.classList.remove('hl');},1600);}}
+  window.addEventListener('hashchange',hl);
+  count.textContent=${total}+' éléments'; hl();
+})();
+</script>
+</body></html>`;
+
+        const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = `${name}.html`; a.click();
+        URL.revokeObjectURL(url);
+        UI.success(`Export HTML : ${total} éléments générés.`);
     },
 
     // ── Section helpers ─────────────────────────────────────
