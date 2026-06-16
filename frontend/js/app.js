@@ -1483,6 +1483,60 @@ const APP = {
         // Nom d'affichage d'un individu (1er rdfs:label), sinon null
         const dispName = e => { const l = (e.annotations && e.annotations.labels || [])[0]; return l && l.value ? l.value : null; };
 
+        // Nom d'affichage des individus selon les display_rules configurées (comme l'éditeur SWOWL)
+        const _dr = (s.ontology && s.ontology.display_rules) || {};
+        const _drSingle = _dr.single || {}, _drMulti = _dr.multi || {};
+        const _clsById = {}; (s.classes || []).forEach(c => { _clsById[c.id] = c; });
+        const _effRule = (classId, map, _v) => {
+            const key = classId || '__root__';
+            if (key in map) return map[key] || null;
+            if (!classId) return null;
+            _v = _v || new Set(); if (_v.has(classId)) return null; _v.add(classId);
+            const cls = _clsById[classId];
+            if (!cls) return map['__root__'] || null;
+            for (const parent of (cls.subClassOf || []).filter(x => typeof x === 'string')) {
+                const r = _effRule(parent, map, _v); if (r) return r;
+            }
+            return map['__root__'] || null;
+        };
+        const _labelByProp = (ind, prop) => {
+            if (!prop) return null;
+            if (prop === 'rdfs:label' || prop.indexOf('rdfs:label@') === 0) {
+                const labels = (ind.annotations && ind.annotations.labels) || [];
+                if (!labels.length) return null;
+                const lang = prop.indexOf('@') >= 0 ? prop.split('@')[1] : null;
+                if (lang) { const ex = labels.find(l => l.lang === lang); if (ex) return ex.value; }
+                return labels[0].value;
+            }
+            if (prop === 'rdfs:comment') { const c = ((ind.annotations && ind.annotations.comments) || [])[0]; return c ? c.value : null; }
+            const o = ((ind.annotations && ind.annotations.other) || []).find(a => a.property === prop); if (o) return o.value;
+            const da = (ind.dataAssertions || []).find(a => a.property === prop); if (da) return da.value;
+            const oa = (ind.objectAssertions || []).find(a => a.property === prop); if (oa) return oa.target;
+            return null;
+        };
+        const _buildMulti = (ind, rows) => {
+            if (!rows || !rows.length) return null;
+            let res = '', has = false;
+            for (const { sep, propId } of rows) {
+                if (!propId) { if (sep) { res += sep; has = true; } }
+                else { const v = _labelByProp(ind, propId); if (v) { res += (sep || '') + v; has = true; } }
+            }
+            return has ? (res || null) : null;
+        };
+        const _resolveFor = clsId => {
+            const m = _effRule(clsId, _drMulti); if (m) return { multi: m };
+            const sg = _effRule(clsId, _drSingle); if (sg) return { single: sg };
+            return null;
+        };
+        // DisplayName : règles configurées (types puis racine), repli sur rdfs:label
+        const indDispName = ind => {
+            let rule = null;
+            for (const t of (ind.types || [])) { rule = _resolveFor(t); if (rule) break; }
+            if (!rule) rule = _resolveFor(null);
+            const r = rule ? (rule.multi ? _buildMulti(ind, rule.multi) : (rule.single ? _labelByProp(ind, rule.single) : null)) : null;
+            return r || dispName(ind);
+        };
+
         // Texte de recherche (id + labels + commentaires + références + contenu)
         const annoTxt = a => !a ? '' : [...(a.labels || []).map(l => l.value), ...(a.comments || []).map(c => c.value), ...(a.other || []).map(o => o.property + ' ' + o.value)].join(' ');
 
@@ -1574,7 +1628,7 @@ const APP = {
                 frame('sameAs', liList(i.sameAs, 'ind')),
                 frame('differentFrom', liList(i.differentFrom, 'ind'), 'cls-frame-tag-orange'),
             ].join('');
-            const dn = dispName(i);
+            const dn = indDispName(i);
             const stxt = [dn, ...(i.types || []), ...(i.objectAssertions || []).map(a => a.property + ' ' + a.target), ...(i.dataAssertions || []).map(a => a.property + ' ' + a.value), annoTxt(i.annotations)].join(' ');
             return { id: i.id, imported: !!i._imported, html: card(i.id, stxt, body, dn, '(owl:NamedIndividual)') };
         }) });
@@ -1656,7 +1710,7 @@ const APP = {
         const INDTYPES = {}, INDLABEL = {};
         (s.individuals || []).forEach(i => {
             INDTYPES[i.id] = (i.types || []).filter(t => typeof t === 'string' && clsIds.has(t));
-            INDLABEL[i.id] = dispName(i) || _displayRefId(i.id);
+            INDLABEL[i.id] = indDispName(i) || _displayRefId(i.id);
         });
 
         const tabs = visible.map((sec, i) =>
