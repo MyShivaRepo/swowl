@@ -13,6 +13,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   saisie d'une **clé API** par fournisseur (stockée en `localStorage`, masquable)
   et **test** de la clé via un proxy backend `POST /api/llm/test` (évite le CORS ;
   la clé n'est ni stockée ni journalisée côté serveur).
+- **Corpus** (par ontologie) : liste de documents **Name / Location** (chemin
+  local via le **FsBrowser** → chemin absolu, ou URL Web), ajout / édition /
+  suppression. Bouton **🔬 Analyse Corpus**.
+- **Analyse Corpus → ontologie candidate** : `POST /api/corpus/analyse` parse chaque
+  document (PDF, TXT/MD, HTML/URL, DOCX) section par section et extrait via **Claude**
+  un modèle **OWL + règles SWRL** fusionnés dans l'ontologie connectée (marqués
+  `swowl:candidate`). L'onglet **Analysis** affiche la **traçabilité** : chaque
+  élément (ID navigable) et les **sections sources** (document — chapitre / page).
 
 ### Export
 - **Export HTML** (bouton « ↓ HTML » dans l'onglet Ontologies) : génère une **page

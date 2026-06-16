@@ -552,6 +552,138 @@ def test_llm_key(req: LlmTestReq):
         return {"ok": False, "message": f"Connection failed: {type(e).__name__}"}
 
 
+# ── Corpus → ontologie candidate (extraction LLM + fusion) ─────────────────
+class CorpusAnalyseReq(PydanticModel):
+    api_key: str
+    model: str = ""
+    documents: list = []
+
+
+_ID_RE = re.compile(r"[^A-Za-z0-9_]")
+
+
+def _sanitize_id(raw) -> str:
+    s = str(raw or "").strip()
+    if ":" in s:
+        s = s.split(":")[-1]            # retire un éventuel préfixe
+    s = _ID_RE.sub("", s)
+    if s and s[0].isdigit():
+        s = "_" + s
+    return s
+
+
+@app.post("/api/corpus/analyse", tags=["LLM"])
+def analyse_corpus(req: CorpusAnalyseReq):
+    """Analyse le corpus → fusionne les éléments candidats dans l'ontologie connectée,
+    et renvoie la table de provenance (élément → sections sources)."""
+    import corpus_analyzer
+
+    onto = require_onto()
+    if not req.api_key.strip():
+        raise HTTPException(400, "Missing Anthropic API key")
+
+    results, errors = corpus_analyzer.analyse(req.documents, req.api_key.strip(), req.model.strip())
+
+    cset = {c.id for c in onto.classes}
+    opset = {p.id for p in onto.object_properties}
+    dpset = {p.id for p in onto.datatype_properties}
+    iset = {i.id for i in onto.individuals}
+    rset = {r.id for r in onto.swrl_rules}
+    added = {"classes": 0, "object_properties": 0, "datatype_properties": 0,
+             "individuals": 0, "swrl_rules": 0}
+    prov: dict = {}
+
+    def _anno(label, comment):
+        a = {"labels": [], "comments": [],
+             "other": [{"property": "swowl:candidate", "value": "corpus"}]}
+        if label:
+            a["labels"].append({"lang": "en", "value": str(label)})
+        if comment:
+            a["comments"].append({"lang": "en", "value": str(comment)})
+        return a
+
+    def _record(kind, eid, label, ref):
+        key = (kind, eid)
+        entry = prov.setdefault(key, {"id": eid, "kind": kind,
+                                      "label": label or "", "sections": []})
+        sig = (ref.get("doc"), ref.get("chapter"), ref.get("page"))
+        if sig not in {(s["doc"], s["chapter"], s["page"]) for s in entry["sections"]}:
+            entry["sections"].append({"doc": ref.get("doc"), "chapter": ref.get("chapter"),
+                                      "page": ref.get("page")})
+
+    def _ids(arr):
+        return [i for i in (_sanitize_id(x) for x in (arr or [])) if i]
+
+    for res in results:
+        ref, els = res["ref"], res["elements"]
+        for c in (els.get("classes") or []):
+            cid = _sanitize_id(c.get("id"))
+            if not cid:
+                continue
+            if cid not in cset:
+                onto.classes.append(OWLClass.model_validate({
+                    "id": cid, "annotations": _anno(c.get("label"), c.get("comment")),
+                    "subClassOf": _ids(c.get("subClassOf")),
+                }))
+                cset.add(cid)
+                added["classes"] += 1
+            _record("class", cid, c.get("label"), ref)
+        for p in (els.get("object_properties") or []):
+            pid = _sanitize_id(p.get("id"))
+            if not pid:
+                continue
+            if pid not in opset:
+                onto.object_properties.append(OWLObjectProperty.model_validate({
+                    "id": pid, "annotations": _anno(p.get("label"), p.get("comment")),
+                    "domain": _ids(p.get("domain")), "range": _ids(p.get("range")),
+                }))
+                opset.add(pid)
+                added["object_properties"] += 1
+            _record("op", pid, p.get("label"), ref)
+        for p in (els.get("datatype_properties") or []):
+            pid = _sanitize_id(p.get("id"))
+            if not pid:
+                continue
+            if pid not in dpset:
+                onto.datatype_properties.append(OWLDatatypeProperty.model_validate({
+                    "id": pid, "annotations": _anno(p.get("label"), p.get("comment")),
+                    "domain": _ids(p.get("domain")), "range": (p.get("range") or ["xsd:string"]),
+                }))
+                dpset.add(pid)
+                added["datatype_properties"] += 1
+            _record("dp", pid, p.get("label"), ref)
+        for ind in (els.get("individuals") or []):
+            iid = _sanitize_id(ind.get("id"))
+            if not iid:
+                continue
+            if iid not in iset:
+                onto.individuals.append(OWLIndividual.model_validate({
+                    "id": iid, "annotations": _anno(ind.get("label"), ind.get("comment")),
+                    "types": _ids(ind.get("types")),
+                }))
+                iset.add(iid)
+                added["individuals"] += 1
+            _record("individual", iid, ind.get("label"), ref)
+        for r in (els.get("swrl_rules") or []):
+            rid = _sanitize_id(r.get("id"))
+            if not rid:
+                continue
+            if rid not in rset:
+                try:
+                    onto.swrl_rules.append(SWRLRule.model_validate({
+                        "id": rid, "label": r.get("label") or "", "comment": r.get("comment") or "",
+                        "body": r.get("body") or [], "head": r.get("head") or [],
+                    }))
+                    rset.add(rid)
+                    added["swrl_rules"] += 1
+                except Exception:  # noqa: BLE001 — règle mal formée : ignorée
+                    continue
+            _record("rule", rid, r.get("label"), ref)
+
+    store.save()
+    return {"ok": True, "added": added, "provenance": list(prov.values()), "errors": errors}
+
+
 # ── Peek (read prefix/URI without importing) ─────────────────
 
 @app.get("/api/ontologies/peek", tags=["Ontologie"])

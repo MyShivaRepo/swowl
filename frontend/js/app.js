@@ -3809,7 +3809,8 @@ APP.renderSources = function() {
 
     const titles = { llms: '🤖 LLMs', corpus: '📚 Corpus', analysis: '📊 Analysis' };
     const content = tab === 'llms'   ? APP._renderLLMs()
-        : tab === 'corpus' ? APP._renderCorpus()
+        : tab === 'corpus'   ? APP._renderCorpus()
+        : tab === 'analysis' ? APP._renderAnalysis()
         : `<div style="padding:24px;color:var(--text-dim)">
             <h3 style="margin:0 0 8px;font-size:15px;color:var(--text1)">${titles[tab] || ''}</h3>
             <p style="font-style:italic;font-size:13px">Contenu à venir.</p>
@@ -4069,16 +4070,92 @@ APP._renderCorpus = function () {
             <tbody>${rows}</tbody>
         </table>
         <div style="margin-top:14px;display:flex">
-            <button class="btn-sm" onclick="APP._corpusAnalyse()" title="Analyse the corpus documents"${docs.length ? '' : ' disabled'}>🔬 Analyse Corpus</button>
+            <button id="corpus-analyse-btn" class="btn-sm" onclick="APP._corpusAnalyse()" title="Analyse the corpus documents into a candidate ontology"${docs.length ? '' : ' disabled'}>🔬 Analyse Corpus</button>
         </div>
     </div>`;
 };
-APP._corpusAnalyse = function () {
+// ── Analyse du corpus → ontologie candidate (LLM Anthropic) ──
+APP._analysisKey = function () {
+    const n = this.state.ontology && this.state.ontology.name;
+    return n ? 'swowl_analysis::' + n : null;
+};
+APP._analysisData = function () {
+    const k = this._analysisKey();
+    if (!k) return [];
+    try { const a = JSON.parse(localStorage.getItem(k) || '[]'); return Array.isArray(a) ? a : []; }
+    catch { return []; }
+};
+APP._analysisSave = function (prov) {
+    const k = this._analysisKey();
+    if (k) localStorage.setItem(k, JSON.stringify(prov || []));
+};
+APP._corpusAnalyse = async function () {
     const docs = this._corpusDocs();
-    if (!docs.length) { if (typeof UI !== 'undefined' && UI.error) UI.error('Add at least one document first.'); return; }
-    // Bascule vers l'onglet Analysis (par ontologie) — l'analyse y sera développée
-    APP._sourcesTab = 'analysis';
-    APP.renderSection('sources');
+    if (!docs.length) { if (UI && UI.error) UI.error('Add at least one document first.'); return; }
+    const key = (this._llmKeys().anthropic || '').trim();
+    if (!key) { if (UI && UI.error) UI.error('Configure an Anthropic API key in the LLMs tab first.'); return; }
+    const btn = document.getElementById('corpus-analyse-btn');
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Analysing corpus… (this can take a while)'; }
+    try {
+        const r = await API.analyseCorpus(key, '', docs);
+        this._analysisSave(r.provenance || []);
+        await APP.refresh();                 // recharge l'ontologie (éléments candidats fusionnés)
+        const a = r.added || {};
+        const n = Object.values(a).reduce((x, y) => x + (y || 0), 0);
+        if ((r.errors || []).length) console.warn('Corpus analysis warnings:', r.errors);
+        if (UI && UI.success) UI.success(`Corpus analysed: ${n} candidate elements merged into the ontology.`);
+        APP._sourcesTab = 'analysis';
+        APP.navigate('sources');
+    } catch (e) {
+        if (btn) { btn.disabled = false; btn.textContent = '🔬 Analyse Corpus'; }
+        if (UI && UI.error) UI.error('Analysis failed: ' + (e && e.message ? e.message : e));
+    }
+};
+APP._renderAnalysis = function () {
+    const onto = this.state.ontology;
+    if (!onto) {
+        return `<div style="padding:24px;color:var(--text-dim)"><p style="font-size:13px;font-style:italic">Analysis is specific to each ontology. Connect an ontology first.</p></div>`;
+    }
+    const data = this._analysisData();
+    if (!data.length) {
+        return `<div style="padding:24px;color:var(--text-dim)"><p style="font-size:13px;font-style:italic">No analysis yet. Go to the <b>Corpus</b> tab and click <b>🔬 Analyse Corpus</b> to extract a candidate ontology from your documents.</p></div>`;
+    }
+    const KIND = {
+        class:      { sec: 'classes',              dot: 'cls-dot',      lbl: 'Class' },
+        op:         { sec: 'object-properties',    dot: 'op-prop-dot',  lbl: 'ObjectProperty' },
+        dp:         { sec: 'datatype-properties',  dot: 'dp-prop-dot',  lbl: 'DatatypeProperty' },
+        individual: { sec: 'individuals',          dot: 'xsd-dot',      lbl: 'Individual' },
+        rule:       { sec: 'swrl-rules',           dot: null,           lbl: 'SWRL Rule' },
+    };
+    const th = (l, ex = '') => `<th style="text-align:left;padding:7px 10px;border-bottom:2px solid var(--border);color:var(--text-dim);font-size:11px;text-transform:uppercase;letter-spacing:.04em;${ex}">${l}</th>`;
+    const rows = data.map(e => {
+        const k = KIND[e.kind] || { sec: 'classes', lbl: e.kind };
+        const icon = k.dot ? `<span class="${k.dot}" style="display:inline-block;margin-right:7px;vertical-align:middle"></span>` : '⚙️ ';
+        const idLink = `<span onclick="APP.navigateTo('${k.sec}','${this._escAttr(e.id)}')" style="cursor:pointer;color:var(--accent);font-family:monospace" title="Go to this ${k.lbl}">${this._esc(e.id)}</span>`;
+        const label = e.label ? ` <span style="color:var(--text-dim);font-size:11px">${this._esc(e.label)}</span>` : '';
+        const secs = (e.sections || []).map(s => {
+            const parts = [s.doc];
+            if (s.chapter) parts.push(s.chapter);
+            if (s.page != null) parts.push('p.' + s.page);
+            return `<span style="display:inline-block;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:2px 9px;margin:2px;font-size:11px">${this._esc(parts.join(' — '))}</span>`;
+        }).join('') || '<span style="color:var(--text-faint);font-size:11px">—</span>';
+        return `<tr>
+            <td style="padding:7px 10px;border-bottom:1px solid var(--border);vertical-align:top;white-space:nowrap">${icon}${idLink}${label}</td>
+            <td style="padding:7px 10px;border-bottom:1px solid var(--border);vertical-align:top;color:var(--text-dim);font-size:12px">${this._esc(k.lbl)}</td>
+            <td style="padding:7px 10px;border-bottom:1px solid var(--border);vertical-align:top">${secs}</td>
+        </tr>`;
+    }).join('');
+    return `<div style="padding:20px;max-width:1000px">
+        <p style="margin:0 0 16px;font-size:13px;color:var(--text-dim);line-height:1.6">
+            Candidate ontology elements extracted from the corpus of <b style="color:var(--text1)">${this._esc(onto.name || '')}</b>.
+            Each element ID is <b style="color:var(--text1)">navigable</b> to its ontology section; the
+            <b style="color:var(--text1)">Source sections</b> show where it was identified (document — chapter / page).
+        </p>
+        <table style="width:100%;border-collapse:collapse;font-size:13px">
+            <thead><tr>${th('Element', 'width:280px')}${th('Type', 'width:140px')}${th('Source sections')}</tr></thead>
+            <tbody>${rows}</tbody>
+        </table>
+    </div>`;
 };
 
 // ── GUI Tabs sub-tab content ──────────────────────────────────────

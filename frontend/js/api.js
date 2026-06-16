@@ -40,6 +40,7 @@ const API = {
     updateOntology:     (data)       => API._fetch('PUT',    '/ontologies/current', data),
     updateDisplayRules: (rules)      => API._fetch('PUT',    '/display-rules', rules),
     testLlmKey: (provider, api_key)  => API._fetch('POST',   '/llm/test', { provider, api_key }),
+    analyseCorpus: (api_key, model, documents) => API._fetch('POST', '/corpus/analyse', { api_key, model, documents }),
     listImportableOntologies: (exclude = '') => API._fetch('GET', `/ontologies/importable?exclude=${encodeURIComponent(exclude)}`),
     updateOntologyImports: (name, imports) => API._fetch('PUT', `/ontologies/${encodeURIComponent(name)}/imports`, { imports }),
     getImportedEntities: ()          => API._fetch('GET',    '/ontologies/current/imported-entities'),
