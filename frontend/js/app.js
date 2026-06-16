@@ -3883,6 +3883,36 @@ APP._llmTest = async function (p) {
 };
 APP._esc = function (t) { const d = document.createElement('div'); d.textContent = String(t); return d.innerHTML; };
 
+// ── Modèle Anthropic (global) ──
+APP._LLM_MODELS = [
+    { id: 'claude-opus-4-8', label: 'Opus 4.8 — best quality' },
+    { id: 'claude-sonnet-4-6', label: 'Sonnet 4.6 — balanced (default)' },
+    { id: 'claude-haiku-4-5-20251001', label: 'Haiku 4.5 — fast / cheap' },
+];
+APP._llmModel = function () { return localStorage.getItem('swowl_llm_model') || 'claude-sonnet-4-6'; };
+APP._llmSetModel = function (v) { if (v) localStorage.setItem('swowl_llm_model', v); };
+
+// ── Prompt système d'extraction (global, éditable) ──
+APP._llmPrompt = function () { return localStorage.getItem('swowl_llm_prompt') || ''; };  // '' = défaut backend
+APP._llmSavePrompt = function () {
+    const t = document.getElementById('llm-prompt');
+    const v = (t ? t.value : '').trim();
+    if (v) localStorage.setItem('swowl_llm_prompt', v); else localStorage.removeItem('swowl_llm_prompt');
+    if (UI && UI.success) UI.success('Extraction prompt saved.');
+};
+APP._llmResetPrompt = async function () {
+    localStorage.removeItem('swowl_llm_prompt');
+    const t = document.getElementById('llm-prompt');
+    if (t) { try { const r = await API.getCorpusPrompt(); t.value = (r && r.prompt) || ''; } catch { t.value = ''; } }
+    if (UI && UI.success) UI.success('Extraction prompt reset to default.');
+};
+// Charge le prompt par défaut dans le textarea si l'utilisateur n'en a pas enregistré
+APP._llmLoadDefaultPrompt = async function () {
+    const t = document.getElementById('llm-prompt');
+    if (!t || t.value.trim()) return;
+    try { const r = await API.getCorpusPrompt(); if (!t.value.trim()) t.value = (r && r.prompt) || ''; } catch { /* backend indispo */ }
+};
+
 APP._renderLLMs = function () {
     const keys = this._llmKeys();
     const card = (p) => {
@@ -3905,9 +3935,20 @@ APP._renderLLMs = function () {
                     <button class="btn-sm" onclick="APP._llmTest('${p.id}')" title="Test the key against the provider">🧪 Test</button>
                 </div>
                 <div id="llm-status-${p.id}" style="margin-top:8px;font-size:12px;min-height:16px">${has ? '<span style="color:var(--text-dim)">key saved (not tested)</span>' : ''}</div>
+                ${p.id === 'anthropic' ? `<div style="margin-top:10px;display:flex;align-items:center;gap:8px">
+                    <span style="font-size:12px;color:var(--text-dim)">Model (Corpus analysis):</span>
+                    <select id="llm-model-anthropic" onchange="APP._llmSetModel(this.value)"
+                            style="background:var(--bg3);border:1px solid var(--border);color:var(--text1);border-radius:6px;padding:5px 8px;font-size:12px">
+                        ${this._LLM_MODELS.map(m => `<option value="${m.id}"${m.id === modelSel ? ' selected' : ''}>${m.label}</option>`).join('')}
+                    </select>
+                </div>` : ''}
             </div>
         </div>`;
     };
+    // Charge le prompt par défaut dans le textarea une fois le DOM injecté
+    setTimeout(() => this._llmLoadDefaultPrompt(), 0);
+    const modelSel = this._llmModel();
+    const savedPrompt = this._llmPrompt();
     return `<div style="padding:20px;max-width:780px">
         <p style="margin:0 0 16px;font-size:13px;color:var(--text-dim);line-height:1.6">
             Configure an LLM provider and its API key. Keys are stored
@@ -3915,6 +3956,24 @@ APP._renderLLMs = function () {
             sent to the server for the duration of a test, never stored server-side.
         </p>
         ${this._LLM_PROVIDERS.map(card).join('')}
+        <div class="cls-frame" style="margin-top:18px">
+            <div class="cls-frame-bar" style="gap:8px">
+                <span style="font-size:13px;font-weight:600;color:var(--text1)">🧬 Corpus extraction prompt</span>
+                <span style="font-size:11px;color:var(--text-dim)">sent to Claude for « Analyse Corpus »</span>
+                <span style="margin-left:auto;display:flex;gap:6px">
+                    <button class="btn-sm" onclick="APP._llmSavePrompt()" title="Save your custom prompt">💾 Save</button>
+                    <button class="btn-sm" onclick="APP._llmResetPrompt()" title="Restore the default prompt">↺ Reset to default</button>
+                </span>
+            </div>
+            <div class="cls-frame-body" style="padding:12px">
+                <textarea id="llm-prompt" spellcheck="false" placeholder="Loading default prompt…"
+                          style="width:100%;min-height:200px;resize:vertical;background:var(--bg3);border:1px solid var(--border);color:var(--text1);border-radius:6px;padding:10px;font-size:12px;font-family:monospace;line-height:1.5">${this._esc(savedPrompt)}</textarea>
+                <p style="margin:8px 0 0;font-size:11px;color:var(--text-faint);font-style:italic">
+                    The model must return strict JSON ({classes, object_properties, datatype_properties, individuals, swrl_rules}).
+                    Keep that contract if you edit — the backend parses this JSON to build the candidate ontology.
+                </p>
+            </div>
+        </div>
     </div>`;
 };
 
@@ -4097,7 +4156,7 @@ APP._corpusAnalyse = async function () {
     const btn = document.getElementById('corpus-analyse-btn');
     if (btn) { btn.disabled = true; btn.textContent = '⏳ Analysing corpus… (this can take a while)'; }
     try {
-        const r = await API.analyseCorpus(key, '', docs);
+        const r = await API.analyseCorpus(key, this._llmModel(), docs, this._llmPrompt());
         this._analysisSave(r.provenance || []);
         await APP.refresh();                 // recharge l'ontologie (éléments candidats fusionnés)
         const a = r.added || {};

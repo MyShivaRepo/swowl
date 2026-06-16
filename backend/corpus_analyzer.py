@@ -187,11 +187,11 @@ def _chunks(sections, doc_name):
 
 # ── Appel LLM (Anthropic) ────────────────────────────────────────────────────
 
-def _call_anthropic(api_key: str, model: str, user_text: str) -> str:
+def _call_anthropic(api_key: str, model: str, user_text: str, system: str = "") -> str:
     body = json.dumps({
         "model": model or DEFAULT_MODEL,
         "max_tokens": 4096,
-        "system": SYSTEM_PROMPT,
+        "system": system or SYSTEM_PROMPT,
         "messages": [{"role": "user", "content": user_text}],
     }).encode("utf-8")
     req = urllib.request.Request(
@@ -231,7 +231,7 @@ def _parse_json(text: str) -> dict:
         return {}
 
 
-def analyse(documents, api_key: str, model: str = DEFAULT_MODEL):
+def analyse(documents, api_key: str, model: str = DEFAULT_MODEL, system_prompt: str = ""):
     """Analyse les documents et renvoie (results, errors).
 
     results : [{ "ref": {doc, chapter, page}, "elements": {...} }]
@@ -255,7 +255,7 @@ def analyse(documents, api_key: str, model: str = DEFAULT_MODEL):
         if not chunk["text"].strip():
             continue
         try:
-            raw = _call_anthropic(api_key, model, chunk["text"])
+            raw = _call_anthropic(api_key, model, chunk["text"], system_prompt)
             elements = _parse_json(raw)
             if elements:
                 results.append({"ref": chunk["ref"], "elements": elements})

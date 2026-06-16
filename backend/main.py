@@ -557,6 +557,14 @@ class CorpusAnalyseReq(PydanticModel):
     api_key: str
     model: str = ""
     documents: list = []
+    system_prompt: str = ""
+
+
+@app.get("/api/corpus/prompt", tags=["LLM"])
+def get_corpus_prompt():
+    """Renvoie le prompt système d'extraction par défaut (pour affichage/édition)."""
+    import corpus_analyzer
+    return {"prompt": corpus_analyzer.SYSTEM_PROMPT}
 
 
 _ID_RE = re.compile(r"[^A-Za-z0-9_]")
@@ -582,7 +590,8 @@ def analyse_corpus(req: CorpusAnalyseReq):
     if not req.api_key.strip():
         raise HTTPException(400, "Missing Anthropic API key")
 
-    results, errors = corpus_analyzer.analyse(req.documents, req.api_key.strip(), req.model.strip())
+    results, errors = corpus_analyzer.analyse(
+        req.documents, req.api_key.strip(), req.model.strip(), (req.system_prompt or "").strip())
 
     cset = {c.id for c in onto.classes}
     opset = {p.id for p in onto.object_properties}
