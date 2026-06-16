@@ -1571,6 +1571,36 @@ const APP = {
         const dotColor = { cls: '#ff9d3c', op: '#378ADD', dp: '#1D9E75', ap: '#caa72b', ind: '#9a8cff', rule: '#888' };
         const visible = sections.filter(sec => sec.items.length);
 
+        // Arbre de navigation (gauche), hiérarchique pour classes/propriétés
+        const rawOf = {
+            classes: s.classes, object_properties: s.object_properties, datatype_properties: s.datatype_properties,
+            annotation_properties: s.annotation_properties, individuals: s.individuals, swrl_rules: s.swrl_rules,
+        };
+        const subClsParents = e => (e.subClassOf || []).filter(x => typeof x === 'string');
+        const subPropParents = e => (e.subPropertyOf || []).filter(x => typeof x === 'string');
+        const parentsOf = {
+            classes: subClsParents, object_properties: subPropParents, datatype_properties: subPropParents,
+            annotation_properties: subPropParents, individuals: () => [], swrl_rules: () => [],
+        };
+        const treeRows = (arr, getParents, dot) => {
+            arr = arr || [];
+            const ids = new Set(arr.map(e => e.id)), ch = {}, hp = new Set(), byId = {};
+            arr.forEach(e => { ch[e.id] = []; byId[e.id] = e; });
+            arr.forEach(e => getParents(e).forEach(p => { if (ids.has(p) && p !== e.id) { ch[p].push(e.id); hp.add(e.id); } }));
+            const alpha = (a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' });
+            const roots = arr.filter(e => !hp.has(e.id)).map(e => e.id).sort(alpha);
+            Object.keys(ch).forEach(k => ch[k].sort(alpha));
+            const out = [], seen = new Set();
+            const visit = (id, depth) => {
+                if (seen.has(id)) return; seen.add(id);
+                const e = byId[id];
+                out.push(`<div class="ti${e && e._imported ? ' imp' : ''}" data-target="${enc(id)}" style="padding-left:${depth * 14 + 10}px"><span class="d" style="background:${dot}"></span><span class="tl">${disp(id)}</span></div>`);
+                (ch[id] || []).forEach(c => visit(c, depth + 1));
+            };
+            roots.forEach(r => visit(r, 0));
+            return out.join('');
+        };
+
         const tabs = visible.map((sec, i) => `
             <button class="tab${i === 0 ? ' active' : ''}" data-sec="${sec.key}">
                 <span class="d" style="background:${dotColor[sec.dot]}"></span>${sec.title}
@@ -1579,7 +1609,13 @@ const APP = {
 
         const panels = visible.map((sec, i) => `
             <div class="panel" data-sec="${sec.key}"${i === 0 ? '' : ' style="display:none"'}>
-                ${sec.items.map(it => it.html).join('')}
+                <div class="split">
+                    <div class="tree">${treeRows(rawOf[sec.key], parentsOf[sec.key], dotColor[sec.dot])}</div>
+                    <div class="detail">
+                        ${sec.items.map(it => it.html).join('')}
+                        <div class="placeholder">Sélectionne un élément dans l'arbre de gauche.</div>
+                    </div>
+                </div>
             </div>`).join('');
 
         const onto = s.ontology || {};
@@ -1591,9 +1627,10 @@ const APP = {
 <title>${title} — SWOWL export</title>
 <style>
 :root{--bg:#0e1219;--bg2:#161b24;--bg3:#1d2535;--bd:#2a3347;--tx:#e2e8f0;--dim:#94a3b8;--acc:#5f8dd3}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:14px/1.6 system-ui,sans-serif}
+*{box-sizing:border-box}html,body{height:100%}
+body{margin:0;display:flex;flex-direction:column;height:100vh;overflow:hidden;background:var(--bg);color:var(--tx);font:14px/1.6 system-ui,sans-serif}
 a{color:var(--acc);text-decoration:none}a:hover{text-decoration:underline}
-header{position:sticky;top:0;z-index:20;background:var(--bg2);border-bottom:1px solid var(--bd);padding:10px 16px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+header{flex-shrink:0;background:var(--bg2);border-bottom:1px solid var(--bd);padding:10px 16px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
 header h1{font-size:15px;font-weight:600;margin:0}header .pfx{color:var(--dim);font-size:12px;font-family:monospace}
 .search-wrap{position:relative;flex:1;min-width:240px}
 #q{width:100%;background:var(--bg3);border:1px solid var(--bd);color:var(--tx);border-radius:6px;padding:7px 12px;font-size:13px}
@@ -1602,20 +1639,28 @@ header h1{font-size:15px;font-weight:600;margin:0}header .pfx{color:var(--dim);f
 .res:hover{background:var(--bg3)}.res .rl{flex:1;font-family:monospace;color:#cfe0ff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .res .rs{font-size:10px;color:var(--dim);background:var(--bg3);border-radius:8px;padding:1px 7px;flex-shrink:0}
 .res.empty{color:var(--dim);font-style:italic;cursor:default}
-nav.tabs{position:sticky;top:53px;z-index:10;display:flex;flex-wrap:wrap;gap:2px;background:var(--bg2);border-bottom:1px solid var(--bd);padding:0 12px}
+nav.tabs{flex-shrink:0;display:flex;flex-wrap:wrap;gap:2px;background:var(--bg2);border-bottom:1px solid var(--bd);padding:0 12px}
 .tab{display:flex;align-items:center;gap:6px;background:none;border:none;border-bottom:2px solid transparent;color:var(--dim);font-size:13px;padding:9px 14px;cursor:pointer}
 .tab:hover{color:var(--tx)}.tab.active{color:var(--acc);border-bottom-color:var(--acc);font-weight:600}
 .tab .d{width:9px;height:9px;border-radius:50%;display:inline-block}
 .cnt{font-size:11px;color:var(--dim);background:var(--bg3);border-radius:10px;padding:1px 8px}
-.panels{padding:16px 22px;max-width:1000px;margin:0 auto}
-.ent{background:var(--bg2);border:1px solid var(--bd);border-radius:8px;padding:10px 14px;margin:10px 0;scroll-margin-top:104px}
-.ent-h{font-family:monospace;font-weight:600;font-size:14px}.ent-id{color:#cfe0ff}
-.ent-b{margin-top:6px;font-size:13px}
-.kv{display:flex;gap:8px;padding:2px 0}.kv .k{color:var(--dim);min-width:130px;flex-shrink:0;font-size:12px}.kv .v{min-width:0}
-.lang{color:var(--dim);font-size:11px}.ext{color:var(--dim)}.ref{color:var(--acc)}
+.panels{flex:1;min-height:0;overflow:hidden}.panel{height:100%}
+.split{display:flex;height:100%}
+.tree{width:300px;flex-shrink:0;overflow:auto;border-right:1px solid var(--bd);padding:8px 4px}
+.ti{display:flex;align-items:center;gap:6px;padding:3px 8px;font-family:monospace;font-size:12px;border-radius:4px;cursor:pointer;white-space:nowrap}
+.ti:hover{background:var(--bg3)}.ti.sel{background:var(--acc);color:#fff}.ti.imp{font-style:italic;opacity:.75}
+.ti .d{width:8px;height:8px;border-radius:50%;flex-shrink:0;display:inline-block}.ti .tl{overflow:hidden;text-overflow:ellipsis}
+.detail{flex:1;min-width:0;overflow:auto;padding:16px 22px}
+.detail .ent{display:none;margin:0}.detail .ent.sel{display:block}
+.placeholder{color:var(--dim);font-style:italic;padding:20px}
+.ent{background:var(--bg2);border:1px solid var(--bd);border-radius:8px;padding:12px 16px}
+.ent-h{font-family:monospace;font-weight:600;font-size:15px}.ent-id{color:#cfe0ff}
+.ent-b{margin-top:8px;font-size:13px}
+.kv{display:flex;gap:8px;padding:3px 0}.kv .k{color:var(--dim);min-width:140px;flex-shrink:0;font-size:12px}.kv .v{min-width:0}
+.lang{color:var(--dim);font-size:11px}.ext{color:var(--dim)}.ref{color:var(--acc);cursor:pointer}
 .rule{font-family:monospace;background:var(--bg);border:1px solid var(--bd);border-radius:6px;padding:8px 10px;margin-top:4px}
 .rule .imp{color:var(--acc);font-weight:700;margin:0 6px}
-.ent.hl{outline:2px solid var(--acc);outline-offset:1px}
+.ent.hl{outline:2px solid var(--acc);outline-offset:2px}
 </style></head><body>
 <header>
   <h1>🦉 ${title}</h1>
@@ -1627,35 +1672,49 @@ nav.tabs{position:sticky;top:53px;z-index:10;display:flex;flex-wrap:wrap;gap:2px
   <span id="count">${total} éléments</span>
 </header>
 <nav class="tabs">${tabs}</nav>
-<div class="panels">${panels || '<p style="color:var(--dim)">Ontologie vide.</p>'}</div>
+<div class="panels">${panels || '<p style="color:var(--dim);padding:20px">Ontologie vide.</p>'}</div>
 <script>
 (function(){
   var tabs=[].slice.call(document.querySelectorAll('.tab'));
   var panels=[].slice.call(document.querySelectorAll('.panel'));
-  function activate(sec){
-    tabs.forEach(function(t){t.classList.toggle('active',t.dataset.sec===sec);});
-    panels.forEach(function(p){p.style.display=p.dataset.sec===sec?'':'none';});
-  }
-  tabs.forEach(function(t){t.addEventListener('click',function(){activate(t.dataset.sec);});});
-  // Index de recherche construit depuis le DOM
+  var panelOf={}; panels.forEach(function(p){panelOf[p.dataset.sec]=p;});
   var secTitle={};
   tabs.forEach(function(t){secTitle[t.dataset.sec]=t.textContent.replace(/\\s+/g,' ').replace(/\\s*\\d+\\s*$/,'').trim();});
+
+  function selectIn(sec,anchor){
+    var panel=panelOf[sec]; if(!panel)return null;
+    panel.querySelectorAll('.tree .ti').forEach(function(t){t.classList.toggle('sel',t.dataset.target===anchor);});
+    var found=null;
+    panel.querySelectorAll('.detail .ent').forEach(function(e){var m=e.id===anchor;e.classList.toggle('sel',m);if(m)found=e;});
+    var ph=panel.querySelector('.placeholder'); if(ph)ph.style.display=found?'none':'';
+    var sel=panel.querySelector('.tree .ti.sel'); if(sel)sel.scrollIntoView({block:'nearest'});
+    var d=panel.querySelector('.detail'); if(d)d.scrollTop=0;
+    return found;
+  }
+  function activate(sec,anchor){
+    tabs.forEach(function(t){t.classList.toggle('active',t.dataset.sec===sec);});
+    panels.forEach(function(p){p.style.display=p.dataset.sec===sec?'':'none';});
+    var panel=panelOf[sec]; if(!panel)return;
+    if(!anchor){var cur=panel.querySelector('.tree .ti.sel');anchor=cur?cur.dataset.target:((panel.querySelector('.tree .ti')||{}).dataset||{}).target;}
+    if(anchor)selectIn(sec,anchor);
+  }
+  tabs.forEach(function(t){t.addEventListener('click',function(){activate(t.dataset.sec);});});
+  panels.forEach(function(p){var tr=p.querySelector('.tree');if(tr)tr.addEventListener('click',function(ev){var t=ev.target.closest('.ti');if(t)selectIn(p.dataset.sec,t.dataset.target);});});
+
+  // Recherche full-text (index depuis le DOM)
   var IDX=[];
-  panels.forEach(function(p){
-    [].slice.call(p.querySelectorAll('.ent')).forEach(function(e){
-      var lbl=(e.querySelector('.ent-id')||{}).textContent||e.id;
-      IDX.push({a:e.id,sec:p.dataset.sec,l:lbl,t:e.dataset.s||''});
-    });
-  });
+  panels.forEach(function(p){[].slice.call(p.querySelectorAll('.detail .ent')).forEach(function(e){
+    var lbl=(e.querySelector('.ent-id')||{}).textContent||e.id;
+    IDX.push({a:e.id,sec:p.dataset.sec,l:lbl,t:e.dataset.s||''});
+  });});
   var q=document.getElementById('q'), box=document.getElementById('results');
   function esc(t){return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;');}
   function close(){box.style.display='none';box.innerHTML='';}
-  function goTo(a,sec){activate(sec);var el=document.getElementById(a);if(el){el.scrollIntoView({block:'center'});el.classList.add('hl');setTimeout(function(){el.classList.remove('hl');},1600);}}
+  function goTo(a,sec){activate(sec);var el=selectIn(sec,a);if(el){el.classList.add('hl');setTimeout(function(){el.classList.remove('hl');},1600);}}
   q.addEventListener('input',function(){
     var v=q.value.trim().toLowerCase();
     if(!v){close();return;}
-    var m=IDX.filter(function(x){return x.t.indexOf(v)>=0;});
-    var top=m.slice(0,100);
+    var m=IDX.filter(function(x){return x.t.indexOf(v)>=0;}), top=m.slice(0,100);
     box.innerHTML=top.length
       ? top.map(function(x){return '<div class="res" data-a="'+x.a+'" data-sec="'+x.sec+'"><span class="rl">'+esc(x.l)+'</span><span class="rs">'+esc(secTitle[x.sec]||'')+'</span></div>';}).join('')
         + (m.length>top.length?'<div class="res empty">… '+(m.length-top.length)+' de plus</div>':'')
@@ -1665,9 +1724,13 @@ nav.tabs{position:sticky;top:53px;z-index:10;display:flex;flex-wrap:wrap;gap:2px
   box.addEventListener('mousedown',function(ev){var r=ev.target.closest('.res[data-a]');if(!r)return;ev.preventDefault();goTo(r.dataset.a,r.dataset.sec);close();q.blur();});
   q.addEventListener('keydown',function(e){if(e.key==='Escape')close();});
   q.addEventListener('blur',function(){setTimeout(close,150);});
-  // Liens internes / hash → bascule sur le bon onglet
-  function hl(){var id=location.hash.slice(1);if(!id)return;var el=document.getElementById(id);if(el){var p=el.closest('.panel');if(p)activate(p.dataset.sec);el.scrollIntoView({block:'center'});el.classList.add('hl');setTimeout(function(){el.classList.remove('hl');},1600);}}
-  window.addEventListener('hashchange',hl); hl();
+
+  // Liens internes (#ancre) → bon onglet + sélection
+  function hl(){var id=location.hash.slice(1);if(!id)return;var el=document.getElementById(id);if(!el)return;var p=el.closest('.panel');if(!p)return;goTo(id,p.dataset.sec);}
+  window.addEventListener('hashchange',hl);
+  // Sélection initiale
+  if(tabs.length)activate(tabs[0].dataset.sec);
+  hl();
 })();
 </script>
 </body></html>`;
