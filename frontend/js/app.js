@@ -3808,8 +3808,8 @@ APP.renderSources = function() {
         </div>`;
 
     const titles = { llms: '🤖 LLMs', corpus: '📚 Corpus', analysis: '📊 Analysis' };
-    const content = tab === 'llms'
-        ? APP._renderLLMs()
+    const content = tab === 'llms'   ? APP._renderLLMs()
+        : tab === 'corpus' ? APP._renderCorpus()
         : `<div style="padding:24px;color:var(--text-dim)">
             <h3 style="margin:0 0 8px;font-size:15px;color:var(--text1)">${titles[tab] || ''}</h3>
             <p style="font-style:italic;font-size:13px">Contenu à venir.</p>
@@ -3914,6 +3914,78 @@ APP._renderLLMs = function () {
             sent to the server for the duration of a test, never stored server-side.
         </p>
         ${this._LLM_PROVIDERS.map(card).join('')}
+    </div>`;
+};
+
+// ── Corpus : liste de documents (Name / Location) dans localStorage ──
+APP._escAttr = function (s) {
+    return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+};
+APP._corpusDocs = function () {
+    try { const a = JSON.parse(localStorage.getItem('swowl_corpus_docs') || '[]'); return Array.isArray(a) ? a : []; }
+    catch { return []; }
+};
+APP._corpusSave = function (arr) {
+    localStorage.setItem('swowl_corpus_docs', JSON.stringify(arr));
+};
+APP._corpusAdd = function () {
+    const nameI = document.getElementById('corpus-name');
+    const locI  = document.getElementById('corpus-loc');
+    const name = (nameI ? nameI.value : '').trim();
+    const loc  = (locI ? locI.value : '').trim();
+    if (!name || !loc) {
+        if (typeof UI !== 'undefined' && UI.error) UI.error('Please fill in both Name and Location.');
+        return;
+    }
+    const docs = this._corpusDocs();
+    docs.push({ name, location: loc });
+    this._corpusSave(docs);
+    this.renderSection('sources');
+    if (typeof UI !== 'undefined' && UI.success) UI.success(`Document "${name}" added.`);
+};
+APP._corpusDel = function (i) {
+    const docs = this._corpusDocs();
+    if (i < 0 || i >= docs.length) return;
+    const removed = docs.splice(i, 1)[0];
+    this._corpusSave(docs);
+    this.renderSection('sources');
+    if (typeof UI !== 'undefined' && UI.success) UI.success(`Document "${removed ? removed.name : ''}" removed.`);
+};
+APP._renderCorpus = function () {
+    const docs = this._corpusDocs();
+    const th = (label, extra = '') => `<th style="text-align:left;padding:7px 10px;border-bottom:2px solid var(--border);color:var(--text-dim);font-size:11px;text-transform:uppercase;letter-spacing:.04em;${extra}">${label}</th>`;
+    const rows = docs.length ? docs.map((d, i) => {
+        const isUrl = /^https?:\/\//i.test(d.location || '');
+        const loc = isUrl
+            ? `<a href="${this._escAttr(d.location)}" target="_blank" rel="noopener" style="color:var(--accent);word-break:break-all">${this._esc(d.location)}</a>`
+            : `<span style="font-family:monospace;font-size:12px;color:var(--text1);word-break:break-all">${this._esc(d.location)}</span>`;
+        const tag = isUrl ? '🌐 URL' : '📁 path';
+        return `<tr>
+            <td style="padding:7px 10px;border-bottom:1px solid var(--border);vertical-align:top">${this._esc(d.name)}</td>
+            <td style="padding:7px 10px;border-bottom:1px solid var(--border);vertical-align:top">${loc} <span style="font-size:10px;color:var(--text-faint);white-space:nowrap">${tag}</span></td>
+            <td style="padding:7px 10px;border-bottom:1px solid var(--border);text-align:right;vertical-align:top"><button class="btn-sm btn-del" onclick="APP._corpusDel(${i})" title="Remove document">✕</button></td>
+        </tr>`;
+    }).join('') : `<tr><td colspan="3" style="padding:16px 10px;color:var(--text-dim);font-style:italic">No document yet. Add one above.</td></tr>`;
+
+    return `<div style="padding:20px;max-width:900px">
+        <p style="margin:0 0 16px;font-size:13px;color:var(--text-dim);line-height:1.6">
+            Manage your corpus documents. A <b style="color:var(--text1)">location</b> can be a
+            <b style="color:var(--text1)">local file path</b> on your machine or an
+            <b style="color:var(--text1)">internet URL</b>. The list is stored locally in this browser.
+        </p>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:16px">
+            <input id="corpus-name" placeholder="Document name" autocomplete="off" spellcheck="false"
+                   onkeydown="if(event.key==='Enter')APP._corpusAdd()"
+                   style="width:200px;background:var(--bg3);border:1px solid var(--border);color:var(--text1);border-radius:6px;padding:7px 10px;font-size:13px">
+            <input id="corpus-loc" placeholder="Local path (/path/to/file) or https:// URL" autocomplete="off" spellcheck="false"
+                   onkeydown="if(event.key==='Enter')APP._corpusAdd()"
+                   style="flex:1;min-width:280px;background:var(--bg3);border:1px solid var(--border);color:var(--text1);border-radius:6px;padding:7px 10px;font-size:13px;font-family:monospace">
+            <button class="btn-sm" onclick="APP._corpusAdd()" title="Add document to the list">➕ Add Document</button>
+        </div>
+        <table style="width:100%;border-collapse:collapse;font-size:13px">
+            <thead><tr>${th('Name', 'width:200px')}${th('Location')}${th('', 'width:40px')}</tr></thead>
+            <tbody>${rows}</tbody>
+        </table>
     </div>`;
 };
 
