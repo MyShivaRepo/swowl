@@ -536,11 +536,18 @@ def test_llm_key(req: LlmTestReq):
                 return {"ok": True, "message": "Clé valide"}
             return {"ok": False, "message": f"HTTP {resp.status}"}
     except urllib.error.HTTPError as e:
-        if e.code in (401, 403):
-            return {"ok": False, "message": "Clé invalide ou non autorisée"}
-        if e.code == 404:
-            return {"ok": False, "message": "Endpoint introuvable (404)"}
-        return {"ok": False, "message": f"HTTP {e.code}"}
+        # Remonte le message d'erreur réel du fournisseur (ex. authentication_error)
+        detail = ""
+        try:
+            import json as _json
+            raw = e.read().decode("utf-8", "replace")
+            data = _json.loads(raw)
+            err = data.get("error", data)
+            detail = err.get("message") or err.get("type") or ""
+        except Exception:  # noqa: BLE001
+            pass
+        prefix = "Clé invalide ou non autorisée" if e.code in (401, 403) else f"HTTP {e.code}"
+        return {"ok": False, "message": f"{prefix}{(' — ' + detail) if detail else ''}"}
     except Exception as e:  # noqa: BLE001
         return {"ok": False, "message": f"Échec de connexion : {type(e).__name__}"}
 
