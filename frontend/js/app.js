@@ -1576,11 +1576,23 @@ const APP = {
                 default: return esc(a.type || '');
             }
         };
-        // Liste d'atomes : un par ligne, « ∧ » en fin de ligne (sauf la dernière)
+        // Liste d'atomes : un par ligne, « ∧ » en fin de ligne (sauf le dernier).
+        // Les atomes « conditional » sont rendus en bloc if/then imbriqué (récursif).
         const atomLines = (arr) => {
             const list = (arr || []);
             if (!list.length) return `<div class="swrl-atom">⊤</div>`;
-            return list.map((a, i) => `<div class="swrl-atom">${atomInner(a)}${i < list.length - 1 ? ' <span class="swrl-and">∧</span>' : ''}</div>`).join('');
+            return list.map((a, i) => {
+                const and = i < list.length - 1 ? ' <span class="swrl-and">∧</span>' : '';
+                if (a && a.type === 'conditional') {
+                    const cond = Array.isArray(a.condition) ? a.condition : (a.condition ? [a.condition] : []);
+                    const cons = Array.isArray(a.consequent) ? a.consequent : (a.consequent ? [a.consequent] : []);
+                    return `<div class="swrl-cond">`
+                        + `<div class="cls-frame"><div class="cls-frame-bar"><span class="cls-frame-tag swrl-if">if</span></div><div class="cls-frame-body">${atomLines(cond)}</div></div>`
+                        + `<div class="cls-frame"><div class="cls-frame-bar"><span class="cls-frame-tag swrl-then">then</span></div><div class="cls-frame-body">${atomLines(cons)}</div></div>`
+                        + `</div>${and ? `<div class="swrl-atom swrl-and-line">${and}</div>` : ''}`;
+                }
+                return `<div class="swrl-atom">${atomInner(a)}${and}</div>`;
+            }).join('');
         };
 
         // ── Sections ──────────────────────────────────────────
@@ -1861,6 +1873,8 @@ nav.tabs{flex-shrink:0;display:flex;flex-wrap:wrap;gap:2px;background:var(--bg2)
 .swrl-and{color:#e0a96d;font-weight:700;margin-left:2px}
 .swrl-naf{color:#ef4444;font-weight:700;font-size:10px;letter-spacing:.1em}
 .cls-frame-tag.swrl-if{color:#f59e0b}.cls-frame-tag.swrl-then{color:#10b981}
+.swrl-cond{display:flex;flex-direction:column;gap:4px;margin:4px 0;padding-left:8px;border-left:2px solid rgba(16,185,129,.4)}
+.swrl-and-line{padding:0 6px}
 .ent.hl{outline:2px solid var(--acc);outline-offset:2px}
 </style></head><body>
 <header>
