@@ -499,6 +499,52 @@ def update_display_rules(rules: dict):
     return rules
 
 
+# ── LLM : test d'une clé API (proxy, évite le CORS navigateur) ─────────────
+class LlmTestReq(PydanticModel):
+    provider: str
+    api_key: str
+
+
+@app.post("/api/llm/test", tags=["LLM"])
+def test_llm_key(req: LlmTestReq):
+    """Teste une clé API auprès du fournisseur (appel léger GET /v1/models).
+    La clé n'est ni stockée ni journalisée."""
+    import urllib.request
+    import urllib.error
+
+    provider = (req.provider or "").strip().lower()
+    key = (req.api_key or "").strip()
+    if not key:
+        return {"ok": False, "message": "Clé vide"}
+
+    cfg = {
+        "anthropic": ("https://api.anthropic.com/v1/models",
+                      {"x-api-key": key, "anthropic-version": "2023-06-01"}),
+        "openai":    ("https://api.openai.com/v1/models",
+                      {"Authorization": f"Bearer {key}"}),
+        "meta":      ("https://api.llama.com/v1/models",
+                      {"Authorization": f"Bearer {key}"}),
+    }
+    if provider not in cfg:
+        return {"ok": False, "message": f"Fournisseur inconnu : {provider}"}
+
+    url, headers = cfg[provider]
+    rq = urllib.request.Request(url, headers=headers, method="GET")
+    try:
+        with urllib.request.urlopen(rq, timeout=12) as resp:
+            if 200 <= resp.status < 300:
+                return {"ok": True, "message": "Clé valide"}
+            return {"ok": False, "message": f"HTTP {resp.status}"}
+    except urllib.error.HTTPError as e:
+        if e.code in (401, 403):
+            return {"ok": False, "message": "Clé invalide ou non autorisée"}
+        if e.code == 404:
+            return {"ok": False, "message": "Endpoint introuvable (404)"}
+        return {"ok": False, "message": f"HTTP {e.code}"}
+    except Exception as e:  # noqa: BLE001
+        return {"ok": False, "message": f"Échec de connexion : {type(e).__name__}"}
+
+
 # ── Peek (read prefix/URI without importing) ─────────────────
 
 @app.get("/api/ontologies/peek", tags=["Ontologie"])

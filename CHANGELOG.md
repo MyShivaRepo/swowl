@@ -8,7 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Sources (nouvel onglet, amovible)
 - Nouvel onglet **Sources** (à droite de Settings, masquable via GUI Tabs) avec
-  trois sous-onglets : **LLMs**, **Corpus**, **Analysis** (contenu à venir).
+  trois sous-onglets : **LLMs**, **Corpus**, **Analysis**.
+- **LLMs** : configuration d'un fournisseur (**Anthropic**, **OpenAI**, **Meta**),
+  saisie d'une **clé API** par fournisseur (stockée en `localStorage`, masquable)
+  et **test** de la clé via un proxy backend `POST /api/llm/test` (évite le CORS ;
+  la clé n'est ni stockée ni journalisée côté serveur).
 
 ### Export
 - **Export HTML** (bouton « ↓ HTML » dans l'onglet Ontologies) : génère une **page

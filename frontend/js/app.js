@@ -3808,8 +3808,9 @@ APP.renderSources = function() {
         </div>`;
 
     const titles = { llms: '🤖 LLMs', corpus: '📚 Corpus', analysis: '📊 Analysis' };
-    const content = `
-        <div style="padding:24px;color:var(--text-dim)">
+    const content = tab === 'llms'
+        ? APP._renderLLMs()
+        : `<div style="padding:24px;color:var(--text-dim)">
             <h3 style="margin:0 0 8px;font-size:15px;color:var(--text1)">${titles[tab] || ''}</h3>
             <p style="font-style:italic;font-size:13px">Contenu à venir.</p>
         </div>`;
@@ -3825,6 +3826,94 @@ APP.renderSources = function() {
                 ${content}
             </div>
         </div>
+    </div>`;
+};
+
+// ── LLMs : fournisseurs + clés API (localStorage) + test (proxy backend) ──
+APP._LLM_PROVIDERS = [
+    { id: 'anthropic', name: 'Anthropic', sub: 'Claude',                dot: '#d97757', hint: 'sk-ant-api03-…' },
+    { id: 'openai',    name: 'OpenAI',    sub: 'GPT',                   dot: '#10a37f', hint: 'sk-…' },
+    { id: 'meta',      name: 'Meta',      sub: 'Llama (api.llama.com)', dot: '#0668E1', hint: 'LLM|…' },
+];
+
+APP._llmKeys = function () {
+    try { return JSON.parse(localStorage.getItem('swowl_llm_keys') || '{}'); }
+    catch { return {}; }
+};
+APP._llmSetKey = function (p, v) {
+    const k = this._llmKeys();
+    if (v) k[p] = v; else delete k[p];
+    localStorage.setItem('swowl_llm_keys', JSON.stringify(k));
+};
+APP._llmToggle = function (p) {
+    const inp = document.getElementById('llm-key-' + p);
+    if (inp) inp.type = inp.type === 'password' ? 'text' : 'password';
+};
+APP._llmSave = function (p) {
+    const inp = document.getElementById('llm-key-' + p);
+    const val = (inp ? inp.value : '').trim();
+    this._llmSetKey(p, val);
+    const badge = document.getElementById('llm-badge-' + p);
+    if (badge) {
+        badge.textContent = val ? '● configurée' : '○ non configurée';
+        badge.style.color = val ? 'var(--accent2)' : 'var(--text-dim)';
+    }
+    const st = document.getElementById('llm-status-' + p);
+    if (st) st.innerHTML = val
+        ? '<span style="color:var(--text-dim)">clé enregistrée (non testée)</span>'
+        : '';
+    if (typeof UI !== 'undefined' && UI.success) UI.success(`Clé ${p} enregistrée localement.`);
+};
+APP._llmTest = async function (p) {
+    const inp = document.getElementById('llm-key-' + p);
+    const key = (inp ? inp.value : '').trim();
+    const st = document.getElementById('llm-status-' + p);
+    if (!st) return;
+    if (!key) { st.innerHTML = '<span style="color:#e0a96d">⚠ saisis une clé d\'abord</span>'; return; }
+    st.innerHTML = '<span style="color:var(--text-dim)">⏳ test en cours…</span>';
+    try {
+        const r = await API.testLlmKey(p, key);
+        st.innerHTML = r && r.ok
+            ? `<span style="color:var(--accent2)">✅ ${this._esc(r.message || 'clé valide')}</span>`
+            : `<span style="color:#ef4444">❌ ${this._esc((r && r.message) || 'clé invalide')}</span>`;
+    } catch (e) {
+        st.innerHTML = `<span style="color:#ef4444">❌ ${this._esc(e.message || 'échec du test')}</span>`;
+    }
+};
+APP._esc = function (t) { const d = document.createElement('div'); d.textContent = String(t); return d.innerHTML; };
+
+APP._renderLLMs = function () {
+    const keys = this._llmKeys();
+    const card = (p) => {
+        const has = !!keys[p.id];
+        const val = (keys[p.id] || '').replace(/"/g, '&quot;');
+        return `<div class="cls-frame" style="margin-bottom:14px">
+            <div class="cls-frame-bar" style="gap:8px">
+                <span style="width:11px;height:11px;border-radius:50%;background:${p.dot};flex-shrink:0"></span>
+                <span style="font-size:13px;font-weight:600;color:var(--text1)">${p.name}</span>
+                <span style="font-size:11px;color:var(--text-dim)">${p.sub}</span>
+                <span id="llm-badge-${p.id}" style="margin-left:auto;font-size:11px;color:${has ? 'var(--accent2)' : 'var(--text-dim)'}">${has ? '● configurée' : '○ non configurée'}</span>
+            </div>
+            <div class="cls-frame-body" style="padding:12px">
+                <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                    <input id="llm-key-${p.id}" type="password" value="${val}" placeholder="${p.hint}"
+                           autocomplete="off" spellcheck="false"
+                           style="flex:1;min-width:240px;background:var(--bg3);border:1px solid var(--border);color:var(--text1);border-radius:6px;padding:7px 10px;font-size:13px;font-family:monospace">
+                    <button class="btn-sm" onclick="APP._llmToggle('${p.id}')" title="Afficher / masquer">👁</button>
+                    <button class="btn-sm" onclick="APP._llmSave('${p.id}')" title="Enregistrer la clé localement">💾 Enregistrer</button>
+                    <button class="btn-sm" onclick="APP._llmTest('${p.id}')" title="Tester la clé auprès du fournisseur">🧪 Tester</button>
+                </div>
+                <div id="llm-status-${p.id}" style="margin-top:8px;font-size:12px;min-height:16px">${has ? '<span style="color:var(--text-dim)">clé enregistrée (non testée)</span>' : ''}</div>
+            </div>
+        </div>`;
+    };
+    return `<div style="padding:20px;max-width:780px">
+        <p style="margin:0 0 16px;font-size:13px;color:var(--text-dim);line-height:1.6">
+            Configure un fournisseur de LLM et sa clé API. Les clés sont stockées
+            <b style="color:var(--text1)">localement dans ce navigateur</b> (localStorage) ; elles ne sont
+            transmises au serveur que le temps d'un test, jamais enregistrées côté serveur.
+        </p>
+        ${this._LLM_PROVIDERS.map(card).join('')}
     </div>`;
 };
 
