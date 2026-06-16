@@ -515,7 +515,7 @@ def test_llm_key(req: LlmTestReq):
     provider = (req.provider or "").strip().lower()
     key = (req.api_key or "").strip()
     if not key:
-        return {"ok": False, "message": "Clé vide"}
+        return {"ok": False, "message": "Empty key"}
 
     cfg = {
         "anthropic": ("https://api.anthropic.com/v1/models",
@@ -526,14 +526,14 @@ def test_llm_key(req: LlmTestReq):
                       {"Authorization": f"Bearer {key}"}),
     }
     if provider not in cfg:
-        return {"ok": False, "message": f"Fournisseur inconnu : {provider}"}
+        return {"ok": False, "message": f"Unknown provider: {provider}"}
 
     url, headers = cfg[provider]
     rq = urllib.request.Request(url, headers=headers, method="GET")
     try:
         with urllib.request.urlopen(rq, timeout=12) as resp:
             if 200 <= resp.status < 300:
-                return {"ok": True, "message": "Clé valide"}
+                return {"ok": True, "message": "Valid key"}
             return {"ok": False, "message": f"HTTP {resp.status}"}
     except urllib.error.HTTPError as e:
         # Remonte le message d'erreur réel du fournisseur (ex. authentication_error)
@@ -546,10 +546,10 @@ def test_llm_key(req: LlmTestReq):
             detail = err.get("message") or err.get("type") or ""
         except Exception:  # noqa: BLE001
             pass
-        prefix = "Clé invalide ou non autorisée" if e.code in (401, 403) else f"HTTP {e.code}"
+        prefix = "Invalid or unauthorized key" if e.code in (401, 403) else f"HTTP {e.code}"
         return {"ok": False, "message": f"{prefix}{(' — ' + detail) if detail else ''}"}
     except Exception as e:  # noqa: BLE001
-        return {"ok": False, "message": f"Échec de connexion : {type(e).__name__}"}
+        return {"ok": False, "message": f"Connection failed: {type(e).__name__}"}
 
 
 # ── Peek (read prefix/URI without importing) ─────────────────

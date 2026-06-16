@@ -3855,29 +3855,29 @@ APP._llmSave = function (p) {
     this._llmSetKey(p, val);
     const badge = document.getElementById('llm-badge-' + p);
     if (badge) {
-        badge.textContent = val ? '● configurée' : '○ non configurée';
+        badge.textContent = val ? '● configured' : '○ not configured';
         badge.style.color = val ? 'var(--accent2)' : 'var(--text-dim)';
     }
     const st = document.getElementById('llm-status-' + p);
     if (st) st.innerHTML = val
-        ? '<span style="color:var(--text-dim)">clé enregistrée (non testée)</span>'
+        ? '<span style="color:var(--text-dim)">key saved (not tested)</span>'
         : '';
-    if (typeof UI !== 'undefined' && UI.success) UI.success(`Clé ${p} enregistrée localement.`);
+    if (typeof UI !== 'undefined' && UI.success) UI.success(`${p} key saved locally.`);
 };
 APP._llmTest = async function (p) {
     const inp = document.getElementById('llm-key-' + p);
     const key = (inp ? inp.value : '').trim();
     const st = document.getElementById('llm-status-' + p);
     if (!st) return;
-    if (!key) { st.innerHTML = '<span style="color:#e0a96d">⚠ saisis une clé d\'abord</span>'; return; }
-    st.innerHTML = '<span style="color:var(--text-dim)">⏳ test en cours…</span>';
+    if (!key) { st.innerHTML = '<span style="color:#e0a96d">⚠ enter a key first</span>'; return; }
+    st.innerHTML = '<span style="color:var(--text-dim)">⏳ testing…</span>';
     try {
         const r = await API.testLlmKey(p, key);
         st.innerHTML = r && r.ok
-            ? `<span style="color:var(--accent2)">✅ ${this._esc(r.message || 'clé valide')}</span>`
-            : `<span style="color:#ef4444">❌ ${this._esc((r && r.message) || 'clé invalide')}</span>`;
+            ? `<span style="color:var(--accent2)">✅ ${this._esc(r.message || 'valid key')}</span>`
+            : `<span style="color:#ef4444">❌ ${this._esc((r && r.message) || 'invalid key')}</span>`;
     } catch (e) {
-        st.innerHTML = `<span style="color:#ef4444">❌ ${this._esc(e.message || 'échec du test')}</span>`;
+        st.innerHTML = `<span style="color:#ef4444">❌ ${this._esc(e.message || 'test failed')}</span>`;
     }
 };
 APP._esc = function (t) { const d = document.createElement('div'); d.textContent = String(t); return d.innerHTML; };
@@ -3892,26 +3892,26 @@ APP._renderLLMs = function () {
                 <span style="width:11px;height:11px;border-radius:50%;background:${p.dot};flex-shrink:0"></span>
                 <span style="font-size:13px;font-weight:600;color:var(--text1)">${p.name}</span>
                 <span style="font-size:11px;color:var(--text-dim)">${p.sub}</span>
-                <span id="llm-badge-${p.id}" style="margin-left:auto;font-size:11px;color:${has ? 'var(--accent2)' : 'var(--text-dim)'}">${has ? '● configurée' : '○ non configurée'}</span>
+                <span id="llm-badge-${p.id}" style="margin-left:auto;font-size:11px;color:${has ? 'var(--accent2)' : 'var(--text-dim)'}">${has ? '● configured' : '○ not configured'}</span>
             </div>
             <div class="cls-frame-body" style="padding:12px">
                 <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
                     <input id="llm-key-${p.id}" type="password" value="${val}" placeholder="${p.hint}"
                            autocomplete="off" spellcheck="false"
                            style="flex:1;min-width:240px;background:var(--bg3);border:1px solid var(--border);color:var(--text1);border-radius:6px;padding:7px 10px;font-size:13px;font-family:monospace">
-                    <button class="btn-sm" onclick="APP._llmToggle('${p.id}')" title="Afficher / masquer">👁</button>
-                    <button class="btn-sm" onclick="APP._llmSave('${p.id}')" title="Enregistrer la clé localement">💾 Enregistrer</button>
-                    <button class="btn-sm" onclick="APP._llmTest('${p.id}')" title="Tester la clé auprès du fournisseur">🧪 Tester</button>
+                    <button class="btn-sm" onclick="APP._llmToggle('${p.id}')" title="Show / hide">👁</button>
+                    <button class="btn-sm" onclick="APP._llmSave('${p.id}')" title="Save the key locally">💾 Save</button>
+                    <button class="btn-sm" onclick="APP._llmTest('${p.id}')" title="Test the key against the provider">🧪 Test</button>
                 </div>
-                <div id="llm-status-${p.id}" style="margin-top:8px;font-size:12px;min-height:16px">${has ? '<span style="color:var(--text-dim)">clé enregistrée (non testée)</span>' : ''}</div>
+                <div id="llm-status-${p.id}" style="margin-top:8px;font-size:12px;min-height:16px">${has ? '<span style="color:var(--text-dim)">key saved (not tested)</span>' : ''}</div>
             </div>
         </div>`;
     };
     return `<div style="padding:20px;max-width:780px">
         <p style="margin:0 0 16px;font-size:13px;color:var(--text-dim);line-height:1.6">
-            Configure un fournisseur de LLM et sa clé API. Les clés sont stockées
-            <b style="color:var(--text1)">localement dans ce navigateur</b> (localStorage) ; elles ne sont
-            transmises au serveur que le temps d'un test, jamais enregistrées côté serveur.
+            Configure an LLM provider and its API key. Keys are stored
+            <b style="color:var(--text1)">locally in this browser</b> (localStorage); they are only
+            sent to the server for the duration of a test, never stored server-side.
         </p>
         ${this._LLM_PROVIDERS.map(card).join('')}
     </div>`;
