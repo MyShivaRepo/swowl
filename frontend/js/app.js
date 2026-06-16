@@ -4068,7 +4068,17 @@ APP._renderCorpus = function () {
             <thead><tr>${th('Name', 'width:200px')}${th('Location')}${th('', 'width:80px')}</tr></thead>
             <tbody>${rows}</tbody>
         </table>
+        <div style="margin-top:14px;display:flex">
+            <button class="btn-sm" onclick="APP._corpusAnalyse()" title="Analyse the corpus documents"${docs.length ? '' : ' disabled'}>🔬 Analyse Corpus</button>
+        </div>
     </div>`;
+};
+APP._corpusAnalyse = function () {
+    const docs = this._corpusDocs();
+    if (!docs.length) { if (typeof UI !== 'undefined' && UI.error) UI.error('Add at least one document first.'); return; }
+    // Bascule vers l'onglet Analysis (par ontologie) — l'analyse y sera développée
+    APP._sourcesTab = 'analysis';
+    APP.renderSection('sources');
 };
 
 // ── GUI Tabs sub-tab content ──────────────────────────────────────
