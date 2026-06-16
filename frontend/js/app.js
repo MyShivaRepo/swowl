@@ -3934,6 +3934,26 @@ APP._CORPUS_EXTS = ['.pdf', '.txt', '.md', '.csv', '.json', '.xml', '.html', '.h
 APP._corpusBrowse = function () {
     FsBrowser.open('corpus-loc', this._CORPUS_EXTS);
 };
+APP._corpusBrowseEdit = function () {
+    FsBrowser.open('corpus-edit-loc', this._CORPUS_EXTS);
+};
+APP._corpusEditIdx = null;
+APP._corpusEdit = function (i) { this._corpusEditIdx = i; this.renderSection('sources'); };
+APP._corpusEditCancel = function () { this._corpusEditIdx = null; this.renderSection('sources'); };
+APP._corpusEditSave = function (i) {
+    const nameI = document.getElementById('corpus-edit-name');
+    const locI  = document.getElementById('corpus-edit-loc');
+    const name = (nameI ? nameI.value : '').trim();
+    const loc  = (locI ? locI.value : '').trim();
+    if (!loc) { if (typeof UI !== 'undefined' && UI.error) UI.error('Location cannot be empty.'); return; }
+    const docs = this._corpusDocs();
+    if (i < 0 || i >= docs.length) { this._corpusEditIdx = null; return; }
+    docs[i] = { name: name || ((loc.split(/[\\/]/).pop() || loc).split('?')[0] || loc), location: loc };
+    this._corpusSave(docs);
+    this._corpusEditIdx = null;
+    this.renderSection('sources');
+    if (typeof UI !== 'undefined' && UI.success) UI.success('Document updated.');
+};
 APP._corpusAdd = function () {
     const nameI = document.getElementById('corpus-name');
     const locI  = document.getElementById('corpus-loc');
@@ -3963,16 +3983,35 @@ APP._corpusDel = function (i) {
 APP._renderCorpus = function () {
     const docs = this._corpusDocs();
     const th = (label, extra = '') => `<th style="text-align:left;padding:7px 10px;border-bottom:2px solid var(--border);color:var(--text-dim);font-size:11px;text-transform:uppercase;letter-spacing:.04em;${extra}">${label}</th>`;
+    const editIdx = this._corpusEditIdx;
+    const inpStyle = 'background:var(--bg3);border:1px solid var(--border);color:var(--text1);border-radius:6px;padding:6px 9px;font-size:13px';
     const rows = docs.length ? docs.map((d, i) => {
+        const cell = 'padding:7px 10px;border-bottom:1px solid var(--border);vertical-align:top';
+        if (i === editIdx) {  // ── ligne en édition ──
+            return `<tr>
+                <td style="${cell}"><input id="corpus-edit-name" value="${this._escAttr(d.name)}" placeholder="Document name" autocomplete="off" spellcheck="false" style="${inpStyle};width:100%"></td>
+                <td style="${cell}"><div style="display:flex;gap:6px;align-items:center">
+                    <input id="corpus-edit-loc" value="${this._escAttr(d.location)}" placeholder="URL or local path" autocomplete="off" spellcheck="false" style="${inpStyle};flex:1;min-width:0;font-family:monospace" onkeydown="if(event.key==='Enter')APP._corpusEditSave(${i})">
+                    <button class="btn-sm" onclick="APP._corpusBrowseEdit()" title="Pick a local file">📂</button>
+                </div></td>
+                <td style="${cell};text-align:right;white-space:nowrap">
+                    <button class="btn-sm" onclick="APP._corpusEditSave(${i})" title="Save">💾</button>
+                    <button class="btn-sm" onclick="APP._corpusEditCancel()" title="Cancel">✕</button>
+                </td>
+            </tr>`;
+        }
         const isUrl = /^https?:\/\//i.test(d.location || '');
         const loc = isUrl
             ? `<a href="${this._escAttr(d.location)}" target="_blank" rel="noopener" style="color:var(--accent);word-break:break-all">${this._esc(d.location)}</a>`
             : `<span style="font-family:monospace;font-size:12px;color:var(--text1);word-break:break-all">${this._esc(d.location)}</span>`;
         const tag = isUrl ? '🌐 URL' : '📁 path';
         return `<tr>
-            <td style="padding:7px 10px;border-bottom:1px solid var(--border);vertical-align:top">${this._esc(d.name)}</td>
-            <td style="padding:7px 10px;border-bottom:1px solid var(--border);vertical-align:top">${loc} <span style="font-size:10px;color:var(--text-faint);white-space:nowrap">${tag}</span></td>
-            <td style="padding:7px 10px;border-bottom:1px solid var(--border);text-align:right;vertical-align:top"><button class="btn-sm btn-del" onclick="APP._corpusDel(${i})" title="Remove document">✕</button></td>
+            <td style="${cell}">${this._esc(d.name)}</td>
+            <td style="${cell}">${loc} <span style="font-size:10px;color:var(--text-faint);white-space:nowrap">${tag}</span></td>
+            <td style="${cell};text-align:right;white-space:nowrap">
+                <button class="btn-sm" onclick="APP._corpusEdit(${i})" title="Edit document">✏️</button>
+                <button class="btn-sm btn-del" onclick="APP._corpusDel(${i})" title="Remove document">✕</button>
+            </td>
         </tr>`;
     }).join('') : `<tr><td colspan="3" style="padding:16px 10px;color:var(--text-dim);font-style:italic">No document yet. Add one above.</td></tr>`;
 
@@ -3996,7 +4035,7 @@ APP._renderCorpus = function () {
             Paste a Web URL into Location, or use <b>📂 Browse…</b> to pick a local file (its absolute path is filled in).
         </p>
         <table style="width:100%;border-collapse:collapse;font-size:13px">
-            <thead><tr>${th('Name', 'width:200px')}${th('Location')}${th('', 'width:40px')}</tr></thead>
+            <thead><tr>${th('Name', 'width:200px')}${th('Location')}${th('', 'width:80px')}</tr></thead>
             <tbody>${rows}</tbody>
         </table>
     </div>`;
