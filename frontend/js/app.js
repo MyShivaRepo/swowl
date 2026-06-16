@@ -3928,25 +3928,23 @@ APP._corpusDocs = function () {
 APP._corpusSave = function (arr) {
     localStorage.setItem('swowl_corpus_docs', JSON.stringify(arr));
 };
-APP._corpusPickFile = function (input) {
-    const f = input && input.files && input.files[0];
-    if (!f) return;
-    // Les navigateurs n'exposent pas le chemin absolu (sécurité) ; f.path existe sous Electron.
-    const loc = f.path || f.name;
-    const locI = document.getElementById('corpus-loc');
-    if (locI) locI.value = loc;
-    const nameI = document.getElementById('corpus-name');
-    if (nameI && !nameI.value.trim()) nameI.value = f.name.replace(/\.[^.]+$/, '');
-    input.value = '';
+// Sélecteur de fichier local via le FsBrowser (chemin absolu, comme l'onglet Ontologies)
+APP._CORPUS_EXTS = ['.pdf', '.txt', '.md', '.csv', '.json', '.xml', '.html', '.htm',
+    '.doc', '.docx', '.rtf', '.odt', '.owl', '.ttl', '.rdf', '.n3', '.nt'];
+APP._corpusBrowse = function () {
+    FsBrowser.open('corpus-loc', this._CORPUS_EXTS);
 };
 APP._corpusAdd = function () {
     const nameI = document.getElementById('corpus-name');
     const locI  = document.getElementById('corpus-loc');
-    const name = (nameI ? nameI.value : '').trim();
+    let name = (nameI ? nameI.value : '').trim();
     const loc  = (locI ? locI.value : '').trim();
-    if (!name || !loc) {
-        if (typeof UI !== 'undefined' && UI.error) UI.error('Please fill in both Name and Location.');
+    if (!loc) {
+        if (typeof UI !== 'undefined' && UI.error) UI.error('Please provide a Location (URL or local file).');
         return;
+    }
+    if (!name) {  // déduit le nom du dernier segment du chemin/URL
+        name = (loc.split(/[\\/]/).pop() || loc).split('?')[0] || loc;
     }
     const docs = this._corpusDocs();
     docs.push({ name, location: loc });
@@ -3991,12 +3989,11 @@ APP._renderCorpus = function () {
             <input id="corpus-loc" placeholder="Paste an https:// URL, or pick a local file →" autocomplete="off" spellcheck="false"
                    onkeydown="if(event.key==='Enter')APP._corpusAdd()"
                    style="flex:1;min-width:280px;background:var(--bg3);border:1px solid var(--border);color:var(--text1);border-radius:6px;padding:7px 10px;font-size:13px;font-family:monospace">
-            <input id="corpus-file" type="file" style="display:none" onchange="APP._corpusPickFile(this)">
-            <button class="btn-sm" onclick="document.getElementById('corpus-file').click()" title="Select a local file">📂 Browse…</button>
+            <button class="btn-sm" onclick="APP._corpusBrowse()" title="Pick a local file (absolute path)">📂 Browse…</button>
             <button class="btn-sm" onclick="APP._corpusAdd()" title="Add document to the list">➕ Add Document</button>
         </div>
         <p style="margin:-8px 0 16px;font-size:11px;color:var(--text-faint);font-style:italic">
-            For a local document use <b>📂 Browse…</b>; browsers expose only the file name for security, so edit the Location to the full path if needed.
+            Paste a Web URL into Location, or use <b>📂 Browse…</b> to pick a local file (its absolute path is filled in).
         </p>
         <table style="width:100%;border-collapse:collapse;font-size:13px">
             <thead><tr>${th('Name', 'width:200px')}${th('Location')}${th('', 'width:40px')}</tr></thead>
