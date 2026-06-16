@@ -530,6 +530,7 @@ const APP = {
                 main.innerHTML = APP.renderViews();
                 if (APP._viewsTab === 'ontology2')       setTimeout(() => APP._initOntology2(), 80);
                 if (APP._viewsTab === 'treemap')         setTimeout(() => APP._initTreemap(), 80);
+                if (APP._viewsTab === 'ontology-network') setTimeout(() => APP._initOntologyNetwork(), 80);
                 if (APP._viewsTab === 'knowledge-base')  setTimeout(() => APP._initKnowledgeBase(), 80);
                 break;
             case 'queries':
@@ -2146,9 +2147,10 @@ APP._viewsSidebarDragStart = function(e) {
         document.body.style.userSelect = '';
         // Réajuste la visualisation active à la nouvelle largeur
         const t = APP._viewsTab;
-        if (t === 'treemap')             APP._initTreemap();
-        else if (t === 'ontology2')      APP._initOntology2();
-        else if (t === 'knowledge-base') APP._initKnowledgeBase();
+        if (t === 'treemap')                  APP._initTreemap();
+        else if (t === 'ontology2')           APP._initOntology2();
+        else if (t === 'ontology-network')    APP._initOntologyNetwork();
+        else if (t === 'knowledge-base')      APP._initKnowledgeBase();
     };
     document.body.style.userSelect = 'none';
     document.addEventListener('mousemove', onMove);
@@ -2171,9 +2173,10 @@ APP.renderViews = function() {
 
     const sidebar = `
         <div id="views-sidebar" style="width:${APP._viewsSidebarW}px;flex-shrink:0;border-right:1px solid var(--border);padding:8px 0;overflow-x:hidden">
-            ${tabBtn('ontology2',      '🌐 Ontology (Hyperbolic)')}
-            ${tabBtn('treemap',        '🌐 Ontology (TreeMap)')}
-            ${tabBtn('knowledge-base', '🧩 Knowledge Base')}
+            ${tabBtn('ontology2',        '🌐 Ontology (Hyperbolic)')}
+            ${tabBtn('treemap',          '🌐 Ontology (TreeMap)')}
+            ${tabBtn('ontology-network', '🌐 Ontology (Network)')}
+            ${tabBtn('knowledge-base',   '🧩 Knowledge Base')}
         </div>
         <div id="views-sidebar-resizer" onmousedown="APP._viewsSidebarDragStart(event)"
              title="Glisser pour redimensionner"
@@ -2191,6 +2194,19 @@ APP.renderViews = function() {
                 <span id="tm-count" style="font-size:11px;color:var(--text-dim);margin-left:12px"></span>
             </div>
             <div id="cy-treemap" style="flex:1;min-height:0;background:#0d1117;overflow:hidden;position:relative"></div>
+        </div>`;
+    } else if (tab === 'ontology-network') {
+        tabContent = `
+        <div style="display:flex;flex-direction:column;height:100%">
+            <div style="display:flex;align-items:center;gap:8px;padding:8px 14px;border-bottom:1px solid var(--border);flex-shrink:0;background:var(--bg2)">
+                <button class="btn-sm" onclick="APP._initOntologyNetwork()" title="Relancer la disposition">⟳ Restart</button>
+                <span style="font-size:10px;color:var(--text-dim);margin-left:8px">
+                    subClassOf (hiérarchie) · ObjectProperties (domain → range) · clic → éditer la classe
+                </span>
+                <span id="onet-legend" style="display:flex;align-items:center;gap:10px;margin-left:12px;font-size:11px"></span>
+                <span id="onet-count" style="margin-left:auto;font-size:11px;color:var(--text-dim)"></span>
+            </div>
+            <div id="cy-onetwork" style="flex:1;min-height:0;background:#0e1219;overflow:hidden;position:relative"></div>
         </div>`;
     } else if (tab === 'ontology2') {
         tabContent = `
@@ -2967,6 +2983,133 @@ APP._initKnowledgeBase = function() {
 
     APP._kbNodeEls = nodeEls;
     APP._kbLinkEls = linkEls;
+};
+
+// ── Ontology (Network) : classes + subClassOf + ObjectProperties (domain→range) ──
+APP._initOntologyNetwork = function() {
+    const container = document.getElementById('cy-onetwork');
+    if (!container || APP._viewsTab !== 'ontology-network') return;
+    container.innerHTML = '';
+    if (APP._onetSim) { APP._onetSim.stop(); APP._onetSim = null; }
+
+    const classes = APP.state.classes || [];
+    if (!classes.length) {
+        container.innerHTML = '<p style="padding:24px;color:var(--text-dim);font-style:italic">Aucune classe dans cette ontologie.</p>';
+        return;
+    }
+    if (typeof d3 === 'undefined') {
+        container.innerHTML = '<p style="padding:24px;color:#f87171">⚠ D3.js non chargé.</p>';
+        return;
+    }
+
+    const W = container.offsetWidth || 900, H = container.offsetHeight || 600;
+    if (container.offsetHeight < 20) container.style.height = (window.innerHeight - 170) + 'px';
+
+    const clsIds = new Set(classes.map(c => c.id));
+    const nodes = classes.map(c => ({
+        id: c.id, label: _displayRefId(c.id), imported: !!c._imported,
+        x: W / 2 + (Math.random() - 0.5) * 200, y: H / 2 + (Math.random() - 0.5) * 200,
+    }));
+
+    const links = [];
+    // subClassOf : enfant → parent (hiérarchie des classes)
+    classes.forEach(c => {
+        (c.subClassOf || []).forEach(s => {
+            if (typeof s === 'string' && clsIds.has(s) && s !== c.id) {
+                links.push({ source: c.id, target: s, kind: 'sub', label: '', id: `${c.id}__sub__${s}` });
+            }
+        });
+    });
+    // ObjectProperties : domain → range, étiqueté par le nom de l'OP
+    (APP.state.object_properties || []).forEach(op => {
+        (op.domain || []).forEach(d => {
+            (op.range || []).forEach(r => {
+                if (clsIds.has(d) && clsIds.has(r)) {
+                    links.push({ source: d, target: r, kind: 'op', label: _displayRefId(op.id), id: `${d}__${op.id}__${r}` });
+                }
+            });
+        });
+    });
+
+    // Courbure pour arêtes multiples / réciproques (évite la superposition)
+    const revCount = {};
+    links.forEach(l => { revCount[`${l.target}__${l.source}`] = (revCount[`${l.target}__${l.source}`] || 0) + 1; });
+    const seen = {};
+    links.forEach(l => {
+        const k = `${l.source}__${l.target}`;
+        seen[k] = (seen[k] || 0) + 1;
+        l.curve = (revCount[k] || seen[k] > 1) ? 26 * seen[k] : 0;
+    });
+
+    const counter = document.getElementById('onet-count');
+    if (counter) counter.textContent = `${nodes.length} classe${nodes.length > 1 ? 's' : ''} · ${links.length} lien${links.length > 1 ? 's' : ''}`;
+    const legend = document.getElementById('onet-legend');
+    if (legend) legend.innerHTML = `
+        <span style="display:flex;align-items:center;gap:4px;color:var(--text-dim)"><span style="width:16px;border-top:2px solid #5a6478"></span>subClassOf</span>
+        <span style="display:flex;align-items:center;gap:4px;color:var(--text-dim)"><span style="width:16px;border-top:2px solid #3b82f6"></span>ObjectProperty</span>`;
+
+    const svgEl = d3.select(container).append('svg').attr('width', W).attr('height', H).style('display', 'block');
+    const defs = svgEl.append('defs');
+    const mkArrow = (id, color) => defs.append('marker').attr('id', id).attr('viewBox', '0 -4 10 8')
+        .attr('refX', 19).attr('refY', 0).attr('markerWidth', 6).attr('markerHeight', 6).attr('orient', 'auto')
+        .append('path').attr('d', 'M0,-4L10,0L0,4').attr('fill', color);
+    mkArrow('onet-arrow-sub', '#5a6478'); mkArrow('onet-arrow-op', '#3b82f6');
+
+    const zoomG = svgEl.append('g');
+    svgEl.call(d3.zoom().scaleExtent([0.1, 4]).on('zoom', ev => zoomG.attr('transform', ev.transform)));
+    const linkG = zoomG.append('g'), labelG = zoomG.append('g'), nodeG = zoomG.append('g');
+
+    const arcCtrl = (sx, sy, tx, ty, c) => { const mx = (sx + tx) / 2, my = (sy + ty) / 2, dx = tx - sx, dy = ty - sy, len = Math.hypot(dx, dy) || 1; return { cx: mx - dy / len * c, cy: my + dx / len * c }; };
+    const arcPath = (sx, sy, tx, ty, c) => { if (!c) return `M${sx},${sy}L${tx},${ty}`; const { cx, cy } = arcCtrl(sx, sy, tx, ty, c); return `M${sx},${sy}Q${cx},${cy} ${tx},${ty}`; };
+
+    const linkEls = linkG.selectAll('path').data(links, d => d.id).enter().append('path')
+        .attr('fill', 'none')
+        .attr('stroke', d => d.kind === 'op' ? '#2f5b8f' : '#3a4a62')
+        .attr('stroke-width', d => d.kind === 'op' ? 1.5 : 1.8)
+        .attr('stroke-dasharray', d => d.kind === 'op' ? '4 3' : '0')
+        .attr('marker-end', d => d.kind === 'op' ? 'url(#onet-arrow-op)' : 'url(#onet-arrow-sub)');
+
+    const edgeLabelEls = labelG.selectAll('text').data(links.filter(l => l.label), d => d.id).enter().append('text')
+        .text(d => d.label).attr('text-anchor', 'middle').attr('font-size', '9px')
+        .attr('font-family', 'system-ui,sans-serif').attr('fill', '#5a82b8').attr('pointer-events', 'none');
+
+    const nodeEls = nodeG.selectAll('g').data(nodes, d => d.id).enter().append('g').style('cursor', 'pointer');
+    nodeEls.append('circle').attr('r', 11)
+        .attr('fill', d => d.imported ? '#37506b33' : '#378ADD33')
+        .attr('stroke', d => d.imported ? '#7a8aa0' : '#378ADD').attr('stroke-width', 2);
+    nodeEls.append('text').attr('text-anchor', 'middle').attr('y', -15).attr('font-size', '11px')
+        .attr('font-family', 'system-ui,sans-serif').attr('fill', '#cbd5e1').attr('pointer-events', 'none')
+        .style('font-style', d => d.imported ? 'italic' : 'normal').text(d => d.label);
+
+    nodeEls.on('click', (ev, d) => APP.navigateTo('classes', d.id));
+
+    nodeEls.on('mouseover', function (ev, d) {
+        const conn = new Set();
+        links.forEach(l => { const s = typeof l.source === 'object' ? l.source.id : l.source, t = typeof l.target === 'object' ? l.target.id : l.target; if (s === d.id || t === d.id) { conn.add(s); conn.add(t); } });
+        nodeEls.select('circle').attr('opacity', n => conn.has(n.id) ? 1 : 0.2);
+        linkEls.attr('opacity', l => { const s = typeof l.source === 'object' ? l.source.id : l.source, t = typeof l.target === 'object' ? l.target.id : l.target; return (s === d.id || t === d.id) ? 1 : 0.06; });
+        edgeLabelEls.attr('opacity', l => { const s = typeof l.source === 'object' ? l.source.id : l.source, t = typeof l.target === 'object' ? l.target.id : l.target; return (s === d.id || t === d.id) ? 1 : 0.06; });
+    }).on('mouseout', function () { nodeEls.select('circle').attr('opacity', 1); linkEls.attr('opacity', 1); edgeLabelEls.attr('opacity', 1); });
+
+    nodeEls.call(d3.drag()
+        .on('start', (ev, d) => { if (!ev.active) APP._onetSim.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
+        .on('drag', (ev, d) => { d.fx = ev.x; d.fy = ev.y; })
+        .on('end', (ev, d) => { if (!ev.active) APP._onetSim.alphaTarget(0); d.fx = null; d.fy = null; }));
+
+    APP._onetSim = d3.forceSimulation(nodes)
+        .force('link', d3.forceLink(links).id(d => d.id).distance(110).strength(0.5))
+        .force('charge', d3.forceManyBody().strength(-380))
+        .force('center', d3.forceCenter(W / 2, H / 2).strength(0.05))
+        .force('collision', d3.forceCollide(30))
+        .on('tick', () => {
+            linkEls.attr('d', d => arcPath(d.source.x, d.source.y, d.target.x, d.target.y, d.curve));
+            edgeLabelEls.each(function (d) {
+                const sx = d.source.x, sy = d.source.y, tx = d.target.x, ty = d.target.y;
+                if (d.curve) { const { cx, cy } = arcCtrl(sx, sy, tx, ty, d.curve); d3.select(this).attr('x', (sx + tx) / 2 * 0.25 + cx * 0.75).attr('y', (sy + ty) / 2 * 0.25 + cy * 0.75 - 3); }
+                else { d3.select(this).attr('x', (sx + tx) / 2).attr('y', (sy + ty) / 2 - 4); }
+            });
+            nodeEls.attr('transform', d => `translate(${d.x},${d.y})`);
+        });
 };
 
 APP._kbRestart = function() {
