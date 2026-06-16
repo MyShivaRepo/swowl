@@ -1456,23 +1456,42 @@ const APP = {
                 default: return r.type === '_marker' ? p : esc(JSON.stringify(r));
             }
         };
-        const annoRows = (a) => {
+        // ── Rendu façon SWOWL : cadres encadrés + items à icônes ──
+        const ICONCLS = { cls: 'ic-cls', op: 'ic-op', dp: 'ic-dp', ap: 'ic-ap', ind: 'ic-ind', xsd: 'ic-xsd' };
+        const iconSpan = t => `<span class="ic ${ICONCLS[t] || ''}"></span>`;
+        // item de liste : icône de type + référence cliquable (ou texte externe)
+        const li = (id, t) => `<div class="cls-list-item">${iconSpan(t)}${ALL.has(id)
+            ? `<a href="#${enc(id)}" class="cls-list-lbl ref">${disp(id)}</a>`
+            : `<span class="cls-list-lbl ext">${disp(id)}</span>`}</div>`;
+        const liList = (arr, t) => (arr || []).filter(x => typeof x === 'string').map(x => li(x, t)).join('');
+        // item « brut » (restriction, caractéristique…) sans référence
+        const liRaw = (html, t) => `<div class="cls-list-item">${t ? iconSpan(t) : ''}<span class="cls-list-lbl">${html}</span></div>`;
+        // cadre encadré (n'apparaît que si le corps est non vide)
+        const frame = (tag, body, cls = '') => body
+            ? `<div class="cls-frame"><div class="cls-frame-bar"><span class="cls-frame-tag ${cls}">${tag}</span></div><div class="cls-frame-body">${body}</div></div>`
+            : '';
+        const annoFrame = (a) => {
             if (!a) return '';
             const rows = [];
             (a.labels || []).forEach(l => rows.push(['rdfs:label', `${esc(l.value)}${l.lang ? ` <span class="lang">@${esc(l.lang)}</span>` : ''}`]));
             (a.comments || []).forEach(c => rows.push(['rdfs:comment', `${esc(c.value)}${c.lang ? ` <span class="lang">@${esc(c.lang)}</span>` : ''}`]));
             (a.other || []).forEach(o => rows.push([esc(o.property), esc(o.value)]));
-            return rows.map(([k, v]) => `<div class="kv"><span class="k">${k}</span><span class="v">${v}</span></div>`).join('');
+            if (!rows.length) return '';
+            const tb = rows.map(([k, v]) => `<tr><td class="an-p">${k}</td><td class="an-v">${v}</td></tr>`).join('');
+            return frame('Annotation(s)', `<table class="cls-anno-table">${tb}</table>`);
         };
-        const row = (label, html) => html ? `<div class="kv"><span class="k">${label}</span><span class="v">${html}</span></div>` : '';
+        // Nom d'affichage d'un individu (1er rdfs:label), sinon null
+        const dispName = e => { const l = (e.annotations && e.annotations.labels || [])[0]; return l && l.value ? l.value : null; };
 
         // Texte de recherche (id + labels + commentaires + références + contenu)
         const annoTxt = a => !a ? '' : [...(a.labels || []).map(l => l.value), ...(a.comments || []).map(c => c.value), ...(a.other || []).map(o => o.property + ' ' + o.value)].join(' ');
 
-        const card = (id, searchExtra, bodyHtml) => {
-            const txt = (id + ' ' + _displayRefId(id) + ' ' + (searchExtra || '')).toLowerCase();
-            return `<div class="ent" id="${enc(id)}" data-id="${esc(id)}" data-s="${esc(txt)}">
-                <div class="ent-h"><span class="ent-ic"></span><span class="ent-id">${disp(id)}</span></div>
+        const card = (id, searchExtra, bodyHtml, displayName, metaTxt) => {
+            const txt = (id + ' ' + _displayRefId(id) + ' ' + (displayName || '') + ' ' + (searchExtra || '')).toLowerCase();
+            const main = displayName ? esc(displayName) : disp(id);
+            const sub = displayName ? `<span class="ent-sub">${disp(id)}</span>` : '';
+            return `<div class="ent cls-editor" id="${enc(id)}" data-id="${esc(id)}" data-s="${esc(txt)}">
+                <div class="cls-editor-hdr"><div class="ent-h"><span class="ent-ic"></span><span class="ent-id">${main}</span>${sub}${metaTxt ? `<span class="ent-meta">${metaTxt}</span>` : ''}</div></div>
                 ${bodyHtml ? `<div class="ent-b">${bodyHtml}</div>` : ''}
             </div>`;
         };
@@ -1498,61 +1517,66 @@ const APP = {
             const restr  = (c.subClassOf || []).filter(x => typeof x === 'object' && x.type !== '_marker');
             const props  = (c.subClassOf || []).filter(x => typeof x === 'object' && x.type === '_marker');
             const body = [
-                row('subClassOf', refs(supers)),
-                row('equivalentClass', (c.equivalentClass || []).map(e => typeof e === 'string' ? ref(e) : restrText(e)).join('<br>')),
-                row('disjointWith', refs(c.disjointWith)),
-                row('restrictions', restr.map(restrText).join('<br>')),
-                row('properties', props.map(restrText).join(', ')),
-                annoRows(c.annotations),
+                annoFrame(c.annotations),
+                frame('SubClassOf', liList(supers, 'cls')),
+                frame('Equivalent', (c.equivalentClass || []).map(e => typeof e === 'string' ? li(e, 'cls') : liRaw(restrText(e))).join(''), 'cls-frame-tag-orange'),
+                frame('Disjoints', liList(c.disjointWith, 'cls'), 'cls-frame-tag-orange'),
+                frame('Restrictions', restr.map(r => liRaw(restrText(r))).join(''), 'cls-frame-tag-blue'),
+                frame('Properties', props.map(r => liRaw(restrText(r), 'op')).join(''), 'cls-frame-tag-blue'),
             ].join('');
             const stxt = [...supers, ...(c.disjointWith || []), ...restr.map(r => r.property + ' ' + (r.filler || r.value || '')), annoTxt(c.annotations)].join(' ');
-            return { id: c.id, imported: !!c._imported, html: card(c.id, stxt, body) };
+            return { id: c.id, imported: !!c._imported, html: card(c.id, stxt, body, null, '(owl:Class)') };
         }) });
 
         // ObjectProperties
         sections.push({ key: 'object_properties', title: 'ObjectProperties', dot: 'op', items: (s.object_properties || []).map(p => {
             const chars = Object.entries(p.characteristics || {}).filter(([, v]) => v).map(([k]) => k);
             const body = [
-                row('domain', refs(p.domain)), row('range', refs(p.range)),
-                row('subPropertyOf', refs(p.subPropertyOf)),
-                row('inverseOf', p.inverseOf ? ref(p.inverseOf) : ''),
-                row('characteristics', chars.join(', ')),
-                annoRows(p.annotations),
+                annoFrame(p.annotations),
+                frame('Domain(s)', liList(p.domain, 'cls')),
+                frame('Range(s)', liList(p.range, 'cls')),
+                frame('SubPropertyOf', liList(p.subPropertyOf, 'op')),
+                frame('Inverse Of', p.inverseOf ? li(p.inverseOf, 'op') : ''),
+                frame('Characteristics', chars.map(c => liRaw(esc(c))).join(''), 'cls-frame-tag-blue'),
             ].join('');
             const stxt = [...(p.domain || []), ...(p.range || []), p.inverseOf, ...chars, annoTxt(p.annotations)].join(' ');
-            return { id: p.id, imported: !!p._imported, html: card(p.id, stxt, body) };
+            return { id: p.id, imported: !!p._imported, html: card(p.id, stxt, body, null, '(owl:ObjectProperty)') };
         }) });
 
         // DatatypeProperties
         sections.push({ key: 'datatype_properties', title: 'DatatypeProperties', dot: 'dp', items: (s.datatype_properties || []).map(p => {
             const body = [
-                row('domain', refs(p.domain)), row('range', (p.range || []).map(disp).join(', ')),
-                row('subPropertyOf', refs(p.subPropertyOf)),
-                row('functional', p.functional ? 'true' : ''),
-                annoRows(p.annotations),
+                annoFrame(p.annotations),
+                frame('Domain(s)', liList(p.domain, 'cls')),
+                frame('Range', (p.range || []).map(r => liRaw(disp(r), 'xsd')).join('')),
+                frame('SubPropertyOf', liList(p.subPropertyOf, 'dp')),
+                frame('Characteristics', p.functional ? liRaw('Functional') : '', 'cls-frame-tag-blue'),
             ].join('');
             const stxt = [...(p.domain || []), ...(p.range || []), annoTxt(p.annotations)].join(' ');
-            return { id: p.id, imported: !!p._imported, html: card(p.id, stxt, body) };
+            return { id: p.id, imported: !!p._imported, html: card(p.id, stxt, body, null, '(owl:DatatypeProperty)') };
         }) });
 
         // AnnotationProperties
         sections.push({ key: 'annotation_properties', title: 'AnnotationProperties', dot: 'ap', items: (s.annotation_properties || []).map(p => {
-            const body = [row('subPropertyOf', refs(p.subPropertyOf)), annoRows(p.annotations)].join('');
-            return { id: p.id, imported: !!p._imported, html: card(p.id, annoTxt(p.annotations), body) };
+            const body = [annoFrame(p.annotations), frame('SubPropertyOf', liList(p.subPropertyOf, 'ap'))].join('');
+            return { id: p.id, imported: !!p._imported, html: card(p.id, annoTxt(p.annotations), body, null, '(owl:AnnotationProperty)') };
         }) });
 
         // Individuals
         sections.push({ key: 'individuals', title: 'Individuals', dot: 'ind', items: (s.individuals || []).map(i => {
-            const oa = (i.objectAssertions || []).map(a => `${ref(a.property)} → ${ref(a.target)}`).join('<br>');
-            const da = (i.dataAssertions || []).map(a => `${ref(a.property)} : ${esc(a.value)}${a.datatype ? ` <span class="lang">^^${esc(a.datatype)}</span>` : ''}`).join('<br>');
+            const oa = (i.objectAssertions || []).map(a => liRaw(`${ref(a.property)} <span class="rel">→</span> ${ref(a.target)}`, 'op')).join('');
+            const da = (i.dataAssertions || []).map(a => liRaw(`${ref(a.property)} <span class="rel">:</span> ${esc(a.value)}${a.datatype ? ` <span class="lang">^^${esc(a.datatype)}</span>` : ''}`, 'dp')).join('');
             const body = [
-                row('types', refs(i.types)),
-                row('sameAs', refs(i.sameAs)), row('differentFrom', refs(i.differentFrom)),
-                row('object assertions', oa), row('data assertions', da),
-                annoRows(i.annotations),
+                annoFrame(i.annotations),
+                frame('Types (rdf:type)', liList(i.types, 'cls')),
+                frame('Object assertions', oa),
+                frame('Data assertions', da),
+                frame('sameAs', liList(i.sameAs, 'ind')),
+                frame('differentFrom', liList(i.differentFrom, 'ind'), 'cls-frame-tag-orange'),
             ].join('');
-            const stxt = [...(i.types || []), ...(i.objectAssertions || []).map(a => a.property + ' ' + a.target), ...(i.dataAssertions || []).map(a => a.property + ' ' + a.value), annoTxt(i.annotations)].join(' ');
-            return { id: i.id, imported: !!i._imported, html: card(i.id, stxt, body) };
+            const dn = dispName(i);
+            const stxt = [dn, ...(i.types || []), ...(i.objectAssertions || []).map(a => a.property + ' ' + a.target), ...(i.dataAssertions || []).map(a => a.property + ' ' + a.value), annoTxt(i.annotations)].join(' ');
+            return { id: i.id, imported: !!i._imported, html: card(i.id, stxt, body, dn, '(owl:NamedIndividual)') };
         }) });
 
         // SWRL Rules
@@ -1560,12 +1584,12 @@ const APP = {
             const bodyAtoms = (r.body || []).map(atomText).join(' ∧ ');
             const headAtoms = (r.head || []).map(atomText).join(' ∧ ');
             const body = [
-                r.label ? row('label', esc(r.label)) : '',
-                r.comment ? row('comment', esc(r.comment)) : '',
-                `<div class="rule">${bodyAtoms || '⊤'} <span class="imp">⟶</span> ${headAtoms || '⊤'}</div>`,
+                annoFrame({ labels: r.label ? [{ value: r.label }] : [], comments: r.comment ? [{ value: r.comment }] : [] }),
+                frame('if', `<div class="rule">${bodyAtoms || '⊤'}</div>`),
+                frame('then', `<div class="rule">${headAtoms || '⊤'}</div>`),
             ].join('');
             const stxt = [r.label, r.comment, ...(r.body || []).map(a => a.class_id || a.property_id || ''), ...(r.head || []).map(a => a.class_id || a.property_id || '')].join(' ');
-            return { id: r.id, imported: !!r._imported, html: card(r.id, stxt, body) };
+            return { id: r.id, imported: !!r._imported, html: card(r.id, stxt, body, r.label || null, '(swrl:Rule)') };
         }) });
 
         const visible = sections.filter(sec => sec.items.length);
@@ -1632,7 +1656,7 @@ const APP = {
         const INDTYPES = {}, INDLABEL = {};
         (s.individuals || []).forEach(i => {
             INDTYPES[i.id] = (i.types || []).filter(t => typeof t === 'string' && clsIds.has(t));
-            INDLABEL[i.id] = _displayRefId(i.id);
+            INDLABEL[i.id] = dispName(i) || _displayRefId(i.id);
         });
 
         const tabs = visible.map((sec, i) =>
@@ -1723,21 +1747,39 @@ nav.tabs{flex-shrink:0;display:flex;flex-wrap:wrap;gap:2px;background:var(--bg2)
 .ii:hover{background:var(--bg3)}.ii.sel{background:var(--acc);color:#fff}.ii .tl{overflow:hidden;text-overflow:ellipsis}
 .detail{flex:1;min-width:0;overflow:auto;padding:16px 22px}
 .detail .ent{display:none;margin:0}.detail .ent.sel{display:block}
+.ic-xsd{width:9px;height:9px;background:#8b4db8;border-radius:1px;transform:rotate(45deg);margin:0 2px}
 .placeholder{color:var(--dim);font-style:italic;padding:20px}
-.ent{background:var(--bg2);border:1px solid var(--bd);border-radius:8px;padding:12px 16px}
-.ent-h{display:flex;align-items:center;gap:9px;font-family:monospace;font-weight:600;font-size:15px}.ent-id{color:#cfe0ff}
+/* Fiche de détail façon éditeur SWOWL */
+.ent{max-width:880px}
+.cls-editor-hdr{padding:4px 2px 10px;border-bottom:1px solid var(--bd);margin-bottom:8px}
+.ent-h{display:flex;align-items:center;gap:9px;font-family:monospace;font-weight:600;font-size:15px;flex-wrap:wrap}.ent-id{color:#cfe0ff}
+.ent-sub{font-family:monospace;font-weight:400;font-size:11px;color:var(--dim)}
+.ent-meta{font-family:system-ui,sans-serif;font-weight:400;font-size:11px;color:var(--dim);margin-left:auto}
 .ent-ic{flex-shrink:0;display:inline-block}
 .panel[data-sec="classes"] .ent-ic{width:13px;height:13px;border-radius:50%;background:#b87333}
 .panel[data-sec="object_properties"] .ent-ic{width:13px;height:9px;border-radius:2px;background:#3b82f6}
 .panel[data-sec="datatype_properties"] .ent-ic{width:13px;height:9px;border-radius:2px;background:#10b981}
 .panel[data-sec="annotation_properties"] .ent-ic{width:13px;height:9px;border-radius:2px;background:#e8d400}
 .panel[data-sec="individuals"] .ent-ic{width:10px;height:10px;border-radius:1px;background:#8b4db8;transform:rotate(45deg);margin:0 2px}
-.panel[data-sec="swrl_rules"] .ent-ic::before{content:"⚙️"}
-.ent-b{margin-top:8px;font-size:13px}
-.kv{display:flex;gap:8px;padding:3px 0}.kv .k{color:var(--dim);min-width:140px;flex-shrink:0;font-size:12px}.kv .v{min-width:0}
+.panel[data-sec="swrl_rules"] .ent-ic::before{content:"⚙️";font-size:13px}
+.ent-b{display:flex;flex-direction:column;gap:8px}
+/* Cadres encadrés */
+.cls-frame{border:1px solid var(--bd);border-radius:5px;overflow:hidden;background:var(--bg)}
+.cls-frame-bar{display:flex;align-items:center;gap:6px;min-height:24px;padding:3px 10px;background:var(--bg3);border-bottom:1px solid var(--bd)}
+.cls-frame-tag{font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--dim)}
+.cls-frame-tag-blue{color:#7fa9e8}.cls-frame-tag-orange{color:#e0a96d}
+.cls-frame-body{padding:5px 6px}
+.cls-list-item{display:flex;align-items:center;gap:7px;padding:2px 6px;border-radius:4px;font-size:13px;font-family:monospace}
+.cls-list-item:hover{background:var(--bg3)}
+.cls-list-lbl{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.cls-list-item .rel{color:var(--dim);margin:0 4px}
+.cls-anno-table{width:100%;border-collapse:collapse;font-size:12px}
+.cls-anno-table td{padding:2px 8px;vertical-align:top;border-bottom:1px solid var(--bd)}
+.cls-anno-table tr:last-child td{border-bottom:none}
+.an-p{color:var(--dim);font-family:monospace;white-space:nowrap;width:1%}
+.an-v{color:var(--tx)}
 .lang{color:var(--dim);font-size:11px}.ext{color:var(--dim)}.ref{color:var(--acc);cursor:pointer}
-.rule{font-family:monospace;background:var(--bg);border:1px solid var(--bd);border-radius:6px;padding:8px 10px;margin-top:4px}
-.rule .imp{color:var(--acc);font-weight:700;margin:0 6px}
+.rule{font-family:monospace;font-size:13px;padding:4px 6px;white-space:normal}
 .ent.hl{outline:2px solid var(--acc);outline-offset:2px}
 </style></head><body>
 <header>
@@ -1771,8 +1813,8 @@ var INDLABEL=${JSON.stringify(INDLABEL).replace(/</g, '\\u003c')};
   function renderSuper(sec,rawId){
     var panel=panelOf[sec]; if(!panel)return; var body=panel.querySelector('.sp-body'); if(!body)return;
     var P=(META[sec]||{}).P||{}, L=(META[sec]||{}).L||{}, anc=[], seen={};
-    (function climb(id){(P[id]||[]).forEach(function(p){if(!seen[p]){seen[p]=1;anc.push(p);climb(p);}});})(rawId);
-    body.innerHTML=anc.length?anc.map(function(p){return '<div class="sp-i" data-target="'+enc(p)+'">'+(ICON[sec]||'')+'<span class="tl">'+esc(L[p]||p)+'</span></div>';}).join(''):'<div class="ph2">—</div>';
+    (function climb(id,depth){(P[id]||[]).forEach(function(p){if(!seen[p]){seen[p]=1;anc.push({id:p,d:depth});climb(p,depth+1);}});})(rawId,0);
+    body.innerHTML=anc.length?anc.map(function(a){return '<div class="sp-i" data-target="'+enc(a.id)+'" style="padding-left:'+(a.d*14+8)+'px">'+(ICON[sec]||'')+'<span class="tl">'+esc(L[a.id]||a.id)+'</span></div>';}).join(''):'<div class="ph2">—</div>';
   }
   // ── Sélection standard (classes / propriétés / règles) ──
   function selectIn(sec,anchor){
