@@ -5,7 +5,7 @@
 // ── Tab visibility (persisted in localStorage) ──────────────────────
 const TabVisibility = {
     _key:      'swowl_hidden_tabs',
-    _optional: ['annotation-properties','individuals','swrl-rules','views','queries','inferences'],
+    _optional: ['sources','annotation-properties','individuals','swrl-rules','views','queries','inferences'],
     _hidden:   new Set(),
 
     load() {
@@ -498,6 +498,9 @@ const APP = {
         switch (section) {
             case 'settings':
                 main.innerHTML = this.renderSettings();
+                break;
+            case 'sources':
+                main.innerHTML = this.renderSources();
                 break;
             case 'ontologies':
                 this.renderOntologies();
@@ -3157,11 +3160,56 @@ APP._applyTabVisibility = function() {
     });
 };
 
+// ── Sources (LLMs / Corpus / Analysis) ───────────────────────────
+APP._sourcesTab = APP._sourcesTab || 'llms';
+
+APP.renderSources = function() {
+    const tab = APP._sourcesTab;
+    const tabBtn = (id, label) => `
+        <div class="settings-vtab${tab === id ? ' active' : ''}"
+             onclick="APP._sourcesTab='${id}';APP.renderSection('sources')"
+             style="padding:10px 16px;cursor:pointer;font-size:13px;font-weight:${tab===id?'600':'400'};
+                    border-left:3px solid ${tab===id?'var(--accent)':'transparent'};
+                    color:${tab===id?'var(--accent)':'var(--text1)'};
+                    background:${tab===id?'var(--bg3)':'transparent'};
+                    white-space:nowrap;user-select:none">
+            ${label}
+        </div>`;
+
+    const sidebar = `
+        <div style="width:160px;flex-shrink:0;border-right:1px solid var(--border);padding:8px 0">
+            ${tabBtn('llms',     '🤖 LLMs')}
+            ${tabBtn('corpus',   '📚 Corpus')}
+            ${tabBtn('analysis', '📊 Analysis')}
+        </div>`;
+
+    const titles = { llms: '🤖 LLMs', corpus: '📚 Corpus', analysis: '📊 Analysis' };
+    const content = `
+        <div style="padding:24px;color:var(--text-dim)">
+            <h3 style="margin:0 0 8px;font-size:15px;color:var(--text1)">${titles[tab] || ''}</h3>
+            <p style="font-style:italic;font-size:13px">Contenu à venir.</p>
+        </div>`;
+
+    return `
+    <div class="section-split" style="display:flex;flex-direction:column">
+        <div style="padding:12px 20px;border-bottom:1px solid var(--border);flex-shrink:0">
+            <h2 style="margin:0;font-size:16px;font-weight:600;display:flex;align-items:center;gap:8px">📚 Sources</h2>
+        </div>
+        <div style="display:flex;flex:1;overflow:hidden;min-height:0">
+            ${sidebar}
+            <div style="flex:1;overflow:auto;display:flex;flex-direction:column;min-height:0">
+                ${content}
+            </div>
+        </div>
+    </div>`;
+};
+
 // ── GUI Tabs sub-tab content ──────────────────────────────────────
 APP.renderGuiTabs = function() {
     const ALL_TABS = [
         { id: 'ontologies',            label: 'Ontologies',           icon: `<svg width="14" height="12" viewBox="0 0 14 12" fill="currentColor" style="vertical-align:middle;color:var(--accent)"><circle cx="7" cy="1.5" r="1.5"/><circle cx="1.5" cy="10.5" r="1.5"/><circle cx="12.5" cy="10.5" r="1.5"/><line x1="7" y1="3" x2="2.5" y2="9" stroke="currentColor" stroke-width="1"/><line x1="7" y1="3" x2="11.5" y2="9" stroke="currentColor" stroke-width="1"/><line x1="3" y1="10.5" x2="11" y2="10.5" stroke="currentColor" stroke-width="1"/></svg>`, fixed: true  },
         { id: 'settings',              label: 'Settings',             icon: '🛠️', fixed: true  },
+        { id: 'sources',               label: 'Sources',              icon: '📚', fixed: false },
         { id: 'classes',               label: 'Classes',              icon: '<span class="cls-dot" style="display:inline-block;vertical-align:middle"></span>',        fixed: true  },
         { id: 'object-properties',     label: 'ObjectProperties',     icon: '<span class="op-prop-dot" style="display:inline-block;vertical-align:middle"></span>',    fixed: true  },
         { id: 'datatype-properties',   label: 'DatatypeProperties',   icon: '<span class="dp-prop-dot" style="display:inline-block;vertical-align:middle"></span>',    fixed: true  },

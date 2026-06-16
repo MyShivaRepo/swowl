@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SWOWL : A Best In Class OWL/SWRL Editor</title>
-<link rel="stylesheet" href="/css/style.css?v=207">
+<link rel="stylesheet" href="/css/style.css?v=208">
 </head>
 <body>
 
@@ -45,6 +45,9 @@
   <nav class="tab-nav">
     <div class="nav-item" data-section="ontologies" onclick="APP.navigate('ontologies')"><svg width="14" height="12" viewBox="0 0 14 12" fill="currentColor" style="vertical-align:middle;margin-right:3px"><circle cx="7" cy="1.5" r="1.5"/><circle cx="1.5" cy="10.5" r="1.5"/><circle cx="12.5" cy="10.5" r="1.5"/><line x1="7" y1="3" x2="2.5" y2="9" stroke="currentColor" stroke-width="1"/><line x1="7" y1="3" x2="11.5" y2="9" stroke="currentColor" stroke-width="1"/><line x1="3" y1="10.5" x2="11" y2="10.5" stroke="currentColor" stroke-width="1"/></svg> Ontologies</div>
     <div class="nav-item" data-section="settings" onclick="APP.navigate('settings')">🛠️ Settings</div>
+    <div class="nav-item" data-section="sources" onclick="APP.navigate('sources')">📚 Sources
+      <span class="tab-hide-btn" onclick="event.stopPropagation();TabVisibility.hide('sources')" title="Hide this tab">✕</span>
+    </div>
 
     <span class="tab-sep"></span>
 
@@ -109,12 +112,12 @@
 
 
 <!-- ── Scripts ── -->
-<script src="/js/api.js?v=207"></script>
-<script src="/js/owl_editor.js?v=207"></script>
-<script src="/js/swrl_editor.js?v=207"></script>
-<script src="/js/sparql_editor.js?v=207"></script>
-<script src="/js/inference_ui.js?v=207"></script>
-<script src="/js/app.js?v=207"></script>
+<script src="/js/api.js?v=208"></script>
+<script src="/js/owl_editor.js?v=208"></script>
+<script src="/js/swrl_editor.js?v=208"></script>
+<script src="/js/sparql_editor.js?v=208"></script>
+<script src="/js/inference_ui.js?v=208"></script>
+<script src="/js/app.js?v=208"></script>
 
 <script>
 // Update navigation counters
