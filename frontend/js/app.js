@@ -1569,14 +1569,18 @@ const APP = {
         }) });
 
         const dotColor = { cls: '#ff9d3c', op: '#378ADD', dp: '#1D9E75', ap: '#caa72b', ind: '#9a8cff', rule: '#888' };
+        const visible = sections.filter(sec => sec.items.length);
 
-        const toc = sections.filter(sec => sec.items.length).map(sec => `
-            <div class="toc-sec"><div class="toc-h">${sec.title} <span class="cnt">${sec.items.length}</span></div>
-            ${sec.items.map(it => `<a href="#${enc(it.id)}" class="toc-i${it.imported ? ' imp' : ''}"><span class="d" style="background:${dotColor[sec.dot]}"></span>${disp(it.id)}</a>`).join('')}</div>`).join('');
+        const tabs = visible.map((sec, i) => `
+            <button class="tab${i === 0 ? ' active' : ''}" data-sec="${sec.key}">
+                <span class="d" style="background:${dotColor[sec.dot]}"></span>${sec.title}
+                <span class="cnt">${sec.items.length}</span>
+            </button>`).join('');
 
-        const main = sections.filter(sec => sec.items.length).map(sec => `
-            <section class="sec" id="sec-${sec.key}"><h2><span class="d" style="background:${dotColor[sec.dot]}"></span>${sec.title} <span class="cnt">${sec.items.length}</span></h2>
-            ${sec.items.map(it => it.html).join('')}</section>`).join('');
+        const panels = visible.map((sec, i) => `
+            <div class="panel" data-sec="${sec.key}"${i === 0 ? '' : ' style="display:none"'}>
+                ${sec.items.map(it => it.html).join('')}
+            </div>`).join('');
 
         const onto = s.ontology || {};
         const title = esc(onto.name || name);
@@ -1589,24 +1593,26 @@ const APP = {
 :root{--bg:#0e1219;--bg2:#161b24;--bg3:#1d2535;--bd:#2a3347;--tx:#e2e8f0;--dim:#94a3b8;--acc:#5f8dd3}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:14px/1.6 system-ui,sans-serif}
 a{color:var(--acc);text-decoration:none}a:hover{text-decoration:underline}
-header{position:sticky;top:0;z-index:5;background:var(--bg2);border-bottom:1px solid var(--bd);padding:10px 16px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+header{position:sticky;top:0;z-index:20;background:var(--bg2);border-bottom:1px solid var(--bd);padding:10px 16px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
 header h1{font-size:15px;font-weight:600;margin:0}header .pfx{color:var(--dim);font-size:12px;font-family:monospace}
-#q{flex:1;min-width:220px;background:var(--bg3);border:1px solid var(--bd);color:var(--tx);border-radius:6px;padding:7px 12px;font-size:13px}
-#count{color:var(--dim);font-size:12px;white-space:nowrap}
-.layout{display:flex;align-items:flex-start}
-nav.toc{width:280px;flex-shrink:0;position:sticky;top:53px;height:calc(100vh - 53px);overflow:auto;border-right:1px solid var(--bd);padding:10px 8px}
-.toc-sec{margin-bottom:12px}.toc-h{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--dim);padding:4px 8px;font-weight:600}
-.toc-i{display:flex;align-items:center;gap:6px;padding:3px 8px;font-size:12px;border-radius:4px;color:var(--tx)}
-.toc-i:hover{background:var(--bg3);text-decoration:none}.toc-i.imp{font-style:italic;opacity:.7}
-.toc-i .d,h2 .d{width:8px;height:8px;border-radius:50%;flex-shrink:0;display:inline-block}
-main{flex:1;min-width:0;padding:16px 22px;max-width:1000px}
-section.sec{margin-bottom:30px}section.sec h2{font-size:16px;border-bottom:1px solid var(--bd);padding-bottom:6px;display:flex;align-items:center;gap:8px}
+.search-wrap{position:relative;flex:1;min-width:240px}
+#q{width:100%;background:var(--bg3);border:1px solid var(--bd);color:var(--tx);border-radius:6px;padding:7px 12px;font-size:13px}
+#results{position:absolute;top:38px;left:0;right:0;background:var(--bg2);border:1px solid var(--bd);border-radius:6px;max-height:60vh;overflow:auto;display:none;box-shadow:0 8px 24px rgba(0,0,0,.5);z-index:30}
+.res{display:flex;align-items:center;gap:8px;padding:6px 12px;cursor:pointer;font-size:13px}
+.res:hover{background:var(--bg3)}.res .rl{flex:1;font-family:monospace;color:#cfe0ff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.res .rs{font-size:10px;color:var(--dim);background:var(--bg3);border-radius:8px;padding:1px 7px;flex-shrink:0}
+.res.empty{color:var(--dim);font-style:italic;cursor:default}
+nav.tabs{position:sticky;top:53px;z-index:10;display:flex;flex-wrap:wrap;gap:2px;background:var(--bg2);border-bottom:1px solid var(--bd);padding:0 12px}
+.tab{display:flex;align-items:center;gap:6px;background:none;border:none;border-bottom:2px solid transparent;color:var(--dim);font-size:13px;padding:9px 14px;cursor:pointer}
+.tab:hover{color:var(--tx)}.tab.active{color:var(--acc);border-bottom-color:var(--acc);font-weight:600}
+.tab .d{width:9px;height:9px;border-radius:50%;display:inline-block}
 .cnt{font-size:11px;color:var(--dim);background:var(--bg3);border-radius:10px;padding:1px 8px}
-.ent{background:var(--bg2);border:1px solid var(--bd);border-radius:8px;padding:10px 14px;margin:10px 0;scroll-margin-top:64px}
+.panels{padding:16px 22px;max-width:1000px;margin:0 auto}
+.ent{background:var(--bg2);border:1px solid var(--bd);border-radius:8px;padding:10px 14px;margin:10px 0;scroll-margin-top:104px}
 .ent-h{font-family:monospace;font-weight:600;font-size:14px}.ent-id{color:#cfe0ff}
 .ent-b{margin-top:6px;font-size:13px}
 .kv{display:flex;gap:8px;padding:2px 0}.kv .k{color:var(--dim);min-width:130px;flex-shrink:0;font-size:12px}.kv .v{min-width:0}
-.lang{color:var(--dim);font-size:11px}.ext{color:var(--dim)}
+.lang{color:var(--dim);font-size:11px}.ext{color:var(--dim)}.ref{color:var(--acc)}
 .rule{font-family:monospace;background:var(--bg);border:1px solid var(--bd);border-radius:6px;padding:8px 10px;margin-top:4px}
 .rule .imp{color:var(--acc);font-weight:700;margin:0 6px}
 .ent.hl{outline:2px solid var(--acc);outline-offset:1px}
@@ -1614,30 +1620,54 @@ section.sec{margin-bottom:30px}section.sec h2{font-size:16px;border-bottom:1px s
 <header>
   <h1>🦉 ${title}</h1>
   ${onto.prefix ? `<span class="pfx">${esc(onto.prefix)}: ${esc(onto.id || '')}</span>` : `<span class="pfx">${esc(onto.id || '')}</span>`}
-  <input id="q" type="search" placeholder="Recherche full-text (id, labels, contenu)…" autocomplete="off">
-  <span id="count"></span>
+  <div class="search-wrap">
+    <input id="q" type="search" placeholder="Recherche full-text (id, labels, contenu)…" autocomplete="off">
+    <div id="results"></div>
+  </div>
+  <span id="count">${total} éléments</span>
 </header>
-<div class="layout">
-  <nav class="toc">${toc}</nav>
-  <main>${main || '<p style="color:var(--dim)">Ontologie vide.</p>'}</main>
-</div>
+<nav class="tabs">${tabs}</nav>
+<div class="panels">${panels || '<p style="color:var(--dim)">Ontologie vide.</p>'}</div>
 <script>
 (function(){
-  var q=document.getElementById('q'), count=document.getElementById('count');
-  var cards=[].slice.call(document.querySelectorAll('.ent'));
-  var secs=[].slice.call(document.querySelectorAll('section.sec'));
-  var tocItems=[].slice.call(document.querySelectorAll('.toc-i'));
-  function filter(){
-    var v=q.value.trim().toLowerCase(), n=0;
-    cards.forEach(function(c){var m=!v||c.dataset.s.indexOf(v)>=0;c.style.display=m?'':'none';if(m)n++;});
-    secs.forEach(function(sec){var any=[].slice.call(sec.querySelectorAll('.ent')).some(function(e){return e.style.display!=='none';});sec.style.display=any?'':'none';});
-    tocItems.forEach(function(a){var id=a.getAttribute('href').slice(1);var el=document.getElementById(id);a.style.display=(!el||el.style.display!=='none')?'':'none';});
-    count.textContent=v?(n+' résultat'+(n>1?'s':'')):(${total}+' éléments');
+  var tabs=[].slice.call(document.querySelectorAll('.tab'));
+  var panels=[].slice.call(document.querySelectorAll('.panel'));
+  function activate(sec){
+    tabs.forEach(function(t){t.classList.toggle('active',t.dataset.sec===sec);});
+    panels.forEach(function(p){p.style.display=p.dataset.sec===sec?'':'none';});
   }
-  q.addEventListener('input',filter);
-  function hl(){var id=location.hash.slice(1);if(!id)return;var el=document.getElementById(id);if(el){el.classList.add('hl');setTimeout(function(){el.classList.remove('hl');},1600);}}
-  window.addEventListener('hashchange',hl);
-  count.textContent=${total}+' éléments'; hl();
+  tabs.forEach(function(t){t.addEventListener('click',function(){activate(t.dataset.sec);});});
+  // Index de recherche construit depuis le DOM
+  var secTitle={};
+  tabs.forEach(function(t){secTitle[t.dataset.sec]=t.textContent.replace(/\\s+/g,' ').replace(/\\s*\\d+\\s*$/,'').trim();});
+  var IDX=[];
+  panels.forEach(function(p){
+    [].slice.call(p.querySelectorAll('.ent')).forEach(function(e){
+      var lbl=(e.querySelector('.ent-id')||{}).textContent||e.id;
+      IDX.push({a:e.id,sec:p.dataset.sec,l:lbl,t:e.dataset.s||''});
+    });
+  });
+  var q=document.getElementById('q'), box=document.getElementById('results');
+  function esc(t){return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;');}
+  function close(){box.style.display='none';box.innerHTML='';}
+  function goTo(a,sec){activate(sec);var el=document.getElementById(a);if(el){el.scrollIntoView({block:'center'});el.classList.add('hl');setTimeout(function(){el.classList.remove('hl');},1600);}}
+  q.addEventListener('input',function(){
+    var v=q.value.trim().toLowerCase();
+    if(!v){close();return;}
+    var m=IDX.filter(function(x){return x.t.indexOf(v)>=0;});
+    var top=m.slice(0,100);
+    box.innerHTML=top.length
+      ? top.map(function(x){return '<div class="res" data-a="'+x.a+'" data-sec="'+x.sec+'"><span class="rl">'+esc(x.l)+'</span><span class="rs">'+esc(secTitle[x.sec]||'')+'</span></div>';}).join('')
+        + (m.length>top.length?'<div class="res empty">… '+(m.length-top.length)+' de plus</div>':'')
+      : '<div class="res empty">Aucun résultat</div>';
+    box.style.display='';
+  });
+  box.addEventListener('mousedown',function(ev){var r=ev.target.closest('.res[data-a]');if(!r)return;ev.preventDefault();goTo(r.dataset.a,r.dataset.sec);close();q.blur();});
+  q.addEventListener('keydown',function(e){if(e.key==='Escape')close();});
+  q.addEventListener('blur',function(){setTimeout(close,150);});
+  // Liens internes / hash → bascule sur le bon onglet
+  function hl(){var id=location.hash.slice(1);if(!id)return;var el=document.getElementById(id);if(el){var p=el.closest('.panel');if(p)activate(p.dataset.sec);el.scrollIntoView({block:'center'});el.classList.add('hl');setTimeout(function(){el.classList.remove('hl');},1600);}}
+  window.addEventListener('hashchange',hl); hl();
 })();
 </script>
 </body></html>`;
