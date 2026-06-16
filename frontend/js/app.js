@@ -1595,6 +1595,28 @@ const APP = {
             }).join('');
         };
 
+        // ── « Where Used in Rules » : règles SWRL référençant l'entité ──
+        const _ruleHits = (pred) => {
+            const visit = a => {
+                if (!a) return false;
+                if (Array.isArray(a)) return a.some(visit);
+                if (pred(a)) return true;
+                if (a.type === 'naf_block') return (a.atoms || []).some(visit);
+                if (a.type === 'conditional') return visit(a.condition) || visit(a.consequent);
+                return false;
+            };
+            return (s.swrl_rules || []).filter(r => [...(r.body || []), ...(r.head || [])].some(visit));
+        };
+        const whereUsed = (pred) => {
+            const used = _ruleHits(pred);
+            if (!used.length) return '';
+            const rows = used.map(r => `<div class="cls-list-item"><span class="ic-gear">⚙️</span><a href="#${enc(r.id)}" class="cls-list-lbl ref">${esc(r.label || _displayRefId(r.id))}</a></div>`).join('');
+            return frame(`Where Used in Rules <span class="frame-cnt">${used.length}</span>`, rows, 'cls-frame-tag-rule');
+        };
+        const usedByClass = id => whereUsed(a => a.type === 'type_atom' && a.class_id === id);
+        const usedByProp  = id => whereUsed(a => a.type === 'property_atom' && a.property_id === id);
+        const usedByInd   = id => whereUsed(a => (a.type === 'equality_atom' && a.value === id) || (a.type === 'property_atom' && (a.subject === id || a.object === id)));
+
         // ── Sections ──────────────────────────────────────────
         const sections = [];
 
@@ -1610,6 +1632,7 @@ const APP = {
                 frame('Disjoints', liList(c.disjointWith, 'cls'), 'cls-frame-tag-orange'),
                 frame('Restrictions', restr.map(r => liRaw(restrText(r))).join(''), 'cls-frame-tag-blue'),
                 frame('Properties', props.map(r => liRaw(restrText(r), 'op')).join(''), 'cls-frame-tag-blue'),
+                usedByClass(c.id),
             ].join('');
             const stxt = [...supers, ...(c.disjointWith || []), ...restr.map(r => r.property + ' ' + (r.filler || r.value || '')), annoTxt(c.annotations)].join(' ');
             return { id: c.id, imported: !!c._imported, html: card(c.id, stxt, body, null, '(owl:Class)') };
@@ -1625,6 +1648,7 @@ const APP = {
                 frame('SubPropertyOf', liList(p.subPropertyOf, 'op')),
                 frame('Inverse Of', p.inverseOf ? li(p.inverseOf, 'op') : ''),
                 frame('Characteristics', chars.map(c => liRaw(esc(c))).join(''), 'cls-frame-tag-blue'),
+                usedByProp(p.id),
             ].join('');
             const stxt = [...(p.domain || []), ...(p.range || []), p.inverseOf, ...chars, annoTxt(p.annotations)].join(' ');
             return { id: p.id, imported: !!p._imported, html: card(p.id, stxt, body, null, '(owl:ObjectProperty)') };
@@ -1638,6 +1662,7 @@ const APP = {
                 frame('Range', (p.range || []).map(r => liRaw(disp(r), 'xsd')).join('')),
                 frame('SubPropertyOf', liList(p.subPropertyOf, 'dp')),
                 frame('Characteristics', p.functional ? liRaw('Functional') : '', 'cls-frame-tag-blue'),
+                usedByProp(p.id),
             ].join('');
             const stxt = [...(p.domain || []), ...(p.range || []), annoTxt(p.annotations)].join(' ');
             return { id: p.id, imported: !!p._imported, html: card(p.id, stxt, body, null, '(owl:DatatypeProperty)') };
@@ -1660,6 +1685,7 @@ const APP = {
                 frame('Data assertions', da),
                 frame('sameAs', liList(i.sameAs, 'ind')),
                 frame('differentFrom', liList(i.differentFrom, 'ind'), 'cls-frame-tag-orange'),
+                usedByInd(i.id),
             ].join('');
             const dn = indDispName(i);
             const stxt = [dn, ...(i.types || []), ...(i.objectAssertions || []).map(a => a.property + ' ' + a.target), ...(i.dataAssertions || []).map(a => a.property + ' ' + a.value), annoTxt(i.annotations)].join(' ');
@@ -1873,6 +1899,8 @@ nav.tabs{flex-shrink:0;display:flex;flex-wrap:wrap;gap:2px;background:var(--bg2)
 .swrl-and{color:#e0a96d;font-weight:700;margin-left:2px}
 .swrl-naf{color:#ef4444;font-weight:700;font-size:10px;letter-spacing:.1em}
 .cls-frame-tag.swrl-if{color:#f59e0b}.cls-frame-tag.swrl-then{color:#10b981}
+.cls-frame-tag-rule{color:var(--acc)}
+.frame-cnt{font-size:10px;color:var(--dim);background:var(--bg3);border-radius:9px;padding:0 7px;margin-left:6px;font-weight:600}
 .swrl-cond{display:flex;flex-direction:column;gap:4px;margin:4px 0;padding-left:8px;border-left:2px solid rgba(16,185,129,.4)}
 .swrl-and-line{padding:0 6px}
 .ent.hl{outline:2px solid var(--acc);outline-offset:2px}
