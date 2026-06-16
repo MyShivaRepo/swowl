@@ -4,6 +4,14 @@ All notable changes to **SWOWL** are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.1.0] — 2026-06-16
+
+### Sources (nouvel onglet, amovible)
+- Nouvel onglet **Sources** (à droite de Settings, masquable via GUI Tabs) avec
+  trois sous-onglets : **LLMs**, **Corpus**, **Analysis** (contenu à venir).
+
+[1.1.0]: https://github.com/MyShivaRepo/swowl/releases/tag/v1.1.0
+
 ## [1.0.0] — 2026-06-15
 
 First stable release. A complete web editor for **OWL 2 DL** ontologies with
@@ -41,6 +49,8 @@ First stable release. A complete web editor for **OWL 2 DL** ontologies with
   hover to highlight a sub-branch.
 - **Ontology (TreeMap)** — restyled treemap: vibrant per-branch palette, depth
   shading, rounded tiles, hover highlight, drill-down.
+- **Ontology (Network)** — force-directed graph: classes linked by `subClassOf`,
+  ObjectProperties as nodes linked to their classes via `rdfs:domain`/`rdfs:range`.
 - **Knowledge Base** — force-directed individuals graph.
 - Resizable sub-tab sidebar.
 
