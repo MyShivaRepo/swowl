@@ -3006,28 +3006,38 @@ APP._initOntologyNetwork = function() {
     if (container.offsetHeight < 20) container.style.height = (window.innerHeight - 170) + 'px';
 
     const clsIds = new Set(classes.map(c => c.id));
-    const nodes = classes.map(c => ({
-        id: c.id, label: _displayRefId(c.id), imported: !!c._imported,
-        x: W / 2 + (Math.random() - 0.5) * 200, y: H / 2 + (Math.random() - 0.5) * 200,
-    }));
+    const ops    = APP.state.object_properties || [];
+    const cid = id => 'cls::' + id;   // ids de nœuds préfixés (classe vs OP, pas de collision)
+    const pid = id => 'op::'  + id;
+
+    // Nœuds = classes + ObjectProperties (les OP deviennent des ressources du graphe)
+    const nodes = [
+        ...classes.map(c => ({
+            id: cid(c.id), refId: c.id, kind: 'class', label: _displayRefId(c.id), imported: !!c._imported,
+            x: W / 2 + (Math.random() - 0.5) * 260, y: H / 2 + (Math.random() - 0.5) * 260,
+        })),
+        ...ops.map(op => ({
+            id: pid(op.id), refId: op.id, kind: 'op', label: _displayRefId(op.id), imported: !!op._imported,
+            x: W / 2 + (Math.random() - 0.5) * 260, y: H / 2 + (Math.random() - 0.5) * 260,
+        })),
+    ];
 
     const links = [];
-    // subClassOf : enfant → parent (hiérarchie des classes)
+    // subClassOf : classe enfant → classe parent (hiérarchie)
     classes.forEach(c => {
         (c.subClassOf || []).forEach(s => {
             if (typeof s === 'string' && clsIds.has(s) && s !== c.id) {
-                links.push({ source: c.id, target: s, kind: 'sub', label: '', id: `${c.id}__sub__${s}` });
+                links.push({ source: cid(c.id), target: cid(s), kind: 'sub', label: '', id: `${c.id}__sub__${s}` });
             }
         });
     });
-    // ObjectProperties : domain → range, étiqueté par le nom de l'OP
-    (APP.state.object_properties || []).forEach(op => {
+    // ObjectProperty (nœud) relié à ses classes via les méta-propriétés rdfs:domain / rdfs:range
+    ops.forEach(op => {
         (op.domain || []).forEach(d => {
-            (op.range || []).forEach(r => {
-                if (clsIds.has(d) && clsIds.has(r)) {
-                    links.push({ source: d, target: r, kind: 'op', label: _displayRefId(op.id), id: `${d}__${op.id}__${r}` });
-                }
-            });
+            if (clsIds.has(d)) links.push({ source: pid(op.id), target: cid(d), kind: 'domain', label: 'rdfs:domain', id: `${op.id}__domain__${d}` });
+        });
+        (op.range || []).forEach(r => {
+            if (clsIds.has(r)) links.push({ source: pid(op.id), target: cid(r), kind: 'range', label: 'rdfs:range', id: `${op.id}__range__${r}` });
         });
     });
 
@@ -3042,11 +3052,12 @@ APP._initOntologyNetwork = function() {
     });
 
     const counter = document.getElementById('onet-count');
-    if (counter) counter.textContent = `${nodes.length} classe${nodes.length > 1 ? 's' : ''} · ${links.length} lien${links.length > 1 ? 's' : ''}`;
+    if (counter) counter.textContent = `${classes.length} classes · ${ops.length} OPs · ${links.length} liens`;
     const legend = document.getElementById('onet-legend');
     if (legend) legend.innerHTML = `
-        <span style="display:flex;align-items:center;gap:4px;color:var(--text-dim)"><span style="width:16px;border-top:2px solid #5a6478"></span>subClassOf</span>
-        <span style="display:flex;align-items:center;gap:4px;color:var(--text-dim)"><span style="width:16px;border-top:2px solid #3b82f6"></span>ObjectProperty</span>`;
+        <span style="display:flex;align-items:center;gap:4px;color:var(--text-dim)"><span style="width:9px;height:9px;border-radius:50%;background:#378ADD"></span>Class</span>
+        <span style="display:flex;align-items:center;gap:4px;color:var(--text-dim)"><span style="width:9px;height:9px;border-radius:50%;background:#1D9E75"></span>ObjectProperty</span>
+        <span style="display:flex;align-items:center;gap:4px;color:var(--text-dim)"><span style="width:16px;border-top:2px solid #5a6478"></span>subClassOf · <span style="color:#5a82b8">domain/range</span></span>`;
 
     const svgEl = d3.select(container).append('svg').attr('width', W).attr('height', H).style('display', 'block');
     const defs = svgEl.append('defs');
@@ -3064,24 +3075,31 @@ APP._initOntologyNetwork = function() {
 
     const linkEls = linkG.selectAll('path').data(links, d => d.id).enter().append('path')
         .attr('fill', 'none')
-        .attr('stroke', d => d.kind === 'op' ? '#2f5b8f' : '#3a4a62')
-        .attr('stroke-width', d => d.kind === 'op' ? 1.5 : 1.8)
-        .attr('stroke-dasharray', d => d.kind === 'op' ? '4 3' : '0')
-        .attr('marker-end', d => d.kind === 'op' ? 'url(#onet-arrow-op)' : 'url(#onet-arrow-sub)');
+        .attr('stroke', d => d.kind === 'sub' ? '#3a4a62' : '#2f5b8f')
+        .attr('stroke-width', d => d.kind === 'sub' ? 1.8 : 1.4)
+        .attr('stroke-dasharray', d => d.kind === 'range' ? '4 3' : '0')
+        .attr('marker-end', d => d.kind === 'sub' ? 'url(#onet-arrow-sub)' : 'url(#onet-arrow-op)');
 
     const edgeLabelEls = labelG.selectAll('text').data(links.filter(l => l.label), d => d.id).enter().append('text')
         .text(d => d.label).attr('text-anchor', 'middle').attr('font-size', '9px')
         .attr('font-family', 'system-ui,sans-serif').attr('fill', '#5a82b8').attr('pointer-events', 'none');
 
+    // class = cercle bleu ; ObjectProperty = cercle teal plus petit (ressource RDF)
+    const COL = {
+        class: { fill: '#378ADD33', stroke: '#378ADD' }, classImp: { fill: '#37506b33', stroke: '#7a8aa0' },
+        op:    { fill: '#1D9E7533', stroke: '#1D9E75' }, opImp:    { fill: '#0f6e5633', stroke: '#5d8a78' },
+    };
+    const colOf = d => COL[d.kind === 'op' ? (d.imported ? 'opImp' : 'op') : (d.imported ? 'classImp' : 'class')];
     const nodeEls = nodeG.selectAll('g').data(nodes, d => d.id).enter().append('g').style('cursor', 'pointer');
-    nodeEls.append('circle').attr('r', 11)
-        .attr('fill', d => d.imported ? '#37506b33' : '#378ADD33')
-        .attr('stroke', d => d.imported ? '#7a8aa0' : '#378ADD').attr('stroke-width', 2);
-    nodeEls.append('text').attr('text-anchor', 'middle').attr('y', -15).attr('font-size', '11px')
-        .attr('font-family', 'system-ui,sans-serif').attr('fill', '#cbd5e1').attr('pointer-events', 'none')
+    nodeEls.append('circle')
+        .attr('r', d => d.kind === 'op' ? 8 : 11)
+        .attr('fill', d => colOf(d).fill)
+        .attr('stroke', d => colOf(d).stroke).attr('stroke-width', 2);
+    nodeEls.append('text').attr('text-anchor', 'middle').attr('y', d => d.kind === 'op' ? -12 : -15).attr('font-size', d => d.kind === 'op' ? '10px' : '11px')
+        .attr('font-family', 'system-ui,sans-serif').attr('fill', d => d.kind === 'op' ? '#9fe1cb' : '#cbd5e1').attr('pointer-events', 'none')
         .style('font-style', d => d.imported ? 'italic' : 'normal').text(d => d.label);
 
-    nodeEls.on('click', (ev, d) => APP.navigateTo('classes', d.id));
+    nodeEls.on('click', (ev, d) => APP.navigateTo(d.kind === 'op' ? 'object-properties' : 'classes', d.refId));
 
     nodeEls.on('mouseover', function (ev, d) {
         const conn = new Set();
