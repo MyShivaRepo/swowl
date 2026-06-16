@@ -3921,12 +3921,35 @@ APP._renderLLMs = function () {
 APP._escAttr = function (s) {
     return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
 };
+// Corpus : propre à chaque ontologie → clé indexée par le nom de l'ontologie connectée
+APP._corpusStorageKey = function () {
+    const n = this.state.ontology && this.state.ontology.name;
+    return n ? 'swowl_corpus::' + n : null;
+};
+// Migration unique : l'ancien corpus global appartient à l'ontologie « RoHS_Ontology »
+APP._corpusMigrate = function () {
+    try {
+        if (localStorage.getItem('swowl_corpus_migrated')) return;
+        const legacy = localStorage.getItem('swowl_corpus_docs');
+        if (legacy && legacy !== '[]') {
+            const target = 'swowl_corpus::RoHS_Ontology';
+            if (!localStorage.getItem(target)) localStorage.setItem(target, legacy);
+        }
+        localStorage.removeItem('swowl_corpus_docs');
+        localStorage.setItem('swowl_corpus_migrated', '1');
+    } catch { /* localStorage indisponible */ }
+};
 APP._corpusDocs = function () {
-    try { const a = JSON.parse(localStorage.getItem('swowl_corpus_docs') || '[]'); return Array.isArray(a) ? a : []; }
+    this._corpusMigrate();
+    const key = this._corpusStorageKey();
+    if (!key) return [];
+    try { const a = JSON.parse(localStorage.getItem(key) || '[]'); return Array.isArray(a) ? a : []; }
     catch { return []; }
 };
 APP._corpusSave = function (arr) {
-    localStorage.setItem('swowl_corpus_docs', JSON.stringify(arr));
+    const key = this._corpusStorageKey();
+    if (!key) return;
+    localStorage.setItem(key, JSON.stringify(arr));
 };
 // Sélecteur de fichier local via le FsBrowser (chemin absolu, comme l'onglet Ontologies)
 APP._CORPUS_EXTS = ['.pdf', '.txt', '.md', '.csv', '.json', '.xml', '.html', '.htm',
@@ -3981,6 +4004,13 @@ APP._corpusDel = function (i) {
     if (typeof UI !== 'undefined' && UI.success) UI.success(`Document "${removed ? removed.name : ''}" removed.`);
 };
 APP._renderCorpus = function () {
+    const onto = this.state.ontology;
+    if (!onto) {
+        return `<div style="padding:24px;color:var(--text-dim)">
+            <p style="font-size:13px;font-style:italic">The Corpus is specific to each ontology. Connect an ontology first (Ontologies tab).</p>
+        </div>`;
+    }
+    const ontoLabel = (onto.prefix ? onto.prefix + ':' : '') + (onto.name || '');
     const docs = this._corpusDocs();
     const th = (label, extra = '') => `<th style="text-align:left;padding:7px 10px;border-bottom:2px solid var(--border);color:var(--text-dim);font-size:11px;text-transform:uppercase;letter-spacing:.04em;${extra}">${label}</th>`;
     const editIdx = this._corpusEditIdx;
@@ -4017,9 +4047,9 @@ APP._renderCorpus = function () {
 
     return `<div style="padding:20px;max-width:900px">
         <p style="margin:0 0 16px;font-size:13px;color:var(--text-dim);line-height:1.6">
-            Manage your corpus documents. A <b style="color:var(--text1)">location</b> can be a
-            <b style="color:var(--text1)">local file path</b> on your machine or an
-            <b style="color:var(--text1)">internet URL</b>. The list is stored locally in this browser.
+            Corpus documents for ontology <b style="color:var(--text1)">${this._esc(ontoLabel)}</b>
+            (this list is specific to this ontology). A <b style="color:var(--text1)">location</b> can be a
+            <b style="color:var(--text1)">local file path</b> or an <b style="color:var(--text1)">internet URL</b>.
         </p>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:16px">
             <input id="corpus-name" placeholder="Document name" autocomplete="off" spellcheck="false"
