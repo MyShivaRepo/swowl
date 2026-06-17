@@ -25,21 +25,33 @@ MAX_CHUNKS = 40             # garde-fou coût/temps (chunks analysés au total)
 ANTHROPIC_URL = "https://api.anthropic.com/v1/messages"
 DEFAULT_MODEL = "claude-sonnet-4-6"
 
+# Partie éditable par l'utilisateur (instructions métier, langage naturel)
 SYSTEM_PROMPT = (
-    "You are an ontology-extraction assistant. From the given document excerpt, extract a "
-    "CANDIDATE OWL ontology fragment AND SWRL rules that are explicitly supported by the text. "
-    "Return ONLY valid minified JSON (no markdown, no commentary) with EXACTLY this shape:\n"
+    "You are an ontology-extraction assistant. "
+    "From the given document excerpt, identify and extract:\n"
+    "- Concepts / categories that deserve to become OWL classes\n"
+    "- Relationships between those concepts (object properties)\n"
+    "- Scalar attributes of concepts (datatype properties)\n"
+    "- Named instances or examples of concepts (individuals)\n"
+    "- Business rules that relate concepts or derive new facts (SWRL rules)\n\n"
+    "Only extract elements that are explicitly supported by the text. "
+    "If nothing relevant is present, return nothing. "
+    "Never invent content that is absent from the excerpt."
+)
+
+# Partie technique fixe, toujours ajoutée par le backend (l'utilisateur ne la voit pas)
+_FORMAT_SUFFIX = (
+    "\n\nReturn ONLY valid minified JSON with EXACTLY this shape (no markdown, no commentary):\n"
     '{"classes":[{"id":"","label":"","comment":"","subClassOf":[]}],'
     '"object_properties":[{"id":"","label":"","domain":[],"range":[]}],'
     '"datatype_properties":[{"id":"","label":"","domain":[],"range":[]}],'
     '"individuals":[{"id":"","label":"","types":[]}],'
     '"swrl_rules":[{"id":"","label":"","comment":"","body":[],"head":[]}]}\n'
-    "Rules: ids are CamelCase local names, NO spaces, NO prefixes. domain/range/types/subClassOf "
-    "reference class or property ids. SWRL atoms use ONLY these shapes: "
+    "ids are CamelCase local names, NO spaces, NO prefixes. domain/range/types/subClassOf "
+    "reference class or property ids. SWRL atoms: "
     '{"type":"type_atom","var":"?x","class_id":"Foo"} ; '
     '{"type":"property_atom","subject":"?x","property_id":"hasBar","object":"?y"} ; '
-    '{"type":"equality_atom","var":"?x","operator":">","value":"0"}. '
-    "If nothing relevant is present, return empty arrays. Never invent content absent from the text."
+    '{"type":"equality_atom","var":"?x","operator":">","value":"0"}.'
 )
 
 
@@ -107,18 +119,41 @@ def _sections_from_text(text: str):
     return [s for s in sections if s["text"].strip()] or [{"chapter": "", "page": None, "text": text}]
 
 
+# En-têtes type directive/loi (Article 5, Annexe II, Chapter III, 1.2 Titre…)
+_PDF_HEADING_RE = re.compile(
+    r"^\s*("
+    r"(?:Article|Annexe?|Chapter|Chapitre|Section|Titre|Title)\s+[0-9IVXLCivxlc]+[A-Za-z]?"
+    r"|[0-9]+(?:\.[0-9]+){0,3}\s+\S.{0,70}"
+    r")\s*$",
+    re.IGNORECASE | re.MULTILINE,
+)
+
+
+def _detect_chapter(text: str):
+    """Repère le 1er en-tête de chapitre/article dans le texte d'une page PDF."""
+    m = _PDF_HEADING_RE.search(text)
+    if m:
+        return re.sub(r"\s+", " ", m.group(1)).strip()[:80]
+    return None
+
+
 def _sections_from_pdf(data: bytes):
     from pypdf import PdfReader
     import io
     reader = PdfReader(io.BytesIO(data))
     out = []
+    current_chapter = ""  # reporté de page en page jusqu'au prochain en-tête détecté
     for i, page in enumerate(reader.pages):
         try:
             txt = (page.extract_text() or "").strip()
         except Exception:
             txt = ""
-        if txt:
-            out.append({"chapter": "", "page": i + 1, "text": txt})
+        if not txt:
+            continue
+        ch = _detect_chapter(txt)
+        if ch:
+            current_chapter = ch
+        out.append({"chapter": current_chapter, "page": i + 1, "text": txt})
     return out
 
 
@@ -145,8 +180,13 @@ def _fetch_bytes(location: str) -> tuple[bytes, str]:
     if re.match(r"^https?://", location, re.I):
         req = urllib.request.Request(location, headers={"User-Agent": "SWOWL/1.1"})
         with urllib.request.urlopen(req, timeout=20) as r:
+            status = r.status
             data = r.read()
             ctype = r.headers.get("Content-Type", "")
+        if status != 200:
+            raise ValueError(f"HTTP {status} — the server did not return the document (try the direct URL to the HTML/PDF content)")
+        if not data:
+            raise ValueError("Empty response — the server returned no content (the URL may require a browser session or generate content asynchronously)")
         ext = Path(location.split("?")[0]).suffix.lower()
         if not ext:
             ext = ".html" if "html" in ctype else (".pdf" if "pdf" in ctype else ".txt")
@@ -185,13 +225,20 @@ def _chunks(sections, doc_name):
     return out
 
 
-# ── Appel LLM (Anthropic) ────────────────────────────────────────────────────
+# ── Appels LLM ───────────────────────────────────────────────────────────────
+
+# URLs de base pour les providers cloud compatibles OpenAI
+_PROVIDER_BASES: dict[str, str] = {
+    "openai": "https://api.openai.com",
+    "meta":   "https://api.llama.com",
+}
 
 def _call_anthropic(api_key: str, model: str, user_text: str, system: str = "") -> str:
+    base = (system.strip() if system.strip() else SYSTEM_PROMPT)
     body = json.dumps({
         "model": model or DEFAULT_MODEL,
         "max_tokens": 4096,
-        "system": system or SYSTEM_PROMPT,
+        "system": base + _FORMAT_SUFFIX,
         "messages": [{"role": "user", "content": user_text}],
     }).encode("utf-8")
     req = urllib.request.Request(
@@ -206,6 +253,28 @@ def _call_anthropic(api_key: str, model: str, user_text: str, system: str = "") 
         data = json.loads(r.read().decode("utf-8", "replace"))
     parts = data.get("content", [])
     return "".join(p.get("text", "") for p in parts if p.get("type") == "text")
+
+
+def _call_openai_compat(base_url: str, api_key: str, model: str, user_text: str,
+                        system: str = "", timeout: int = 120) -> str:
+    """Appel générique compatible OpenAI : OpenAI, Meta/Llama Cloud, Ollama local."""
+    sys_msg = (system.strip() if system.strip() else SYSTEM_PROMPT) + _FORMAT_SUFFIX
+    url = base_url.rstrip("/") + "/v1/chat/completions"
+    body = json.dumps({
+        "model": model,
+        "max_tokens": 4096,
+        "messages": [
+            {"role": "system", "content": sys_msg},
+            {"role": "user",   "content": user_text},
+        ],
+    }).encode("utf-8")
+    headers: dict[str, str] = {"Content-Type": "application/json"}
+    if api_key and api_key.lower() != "ollama":
+        headers["Authorization"] = f"Bearer {api_key}"
+    req = urllib.request.Request(url, data=body, method="POST", headers=headers)
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        data = json.loads(r.read().decode("utf-8", "replace"))
+    return data["choices"][0]["message"]["content"]
 
 
 def _parse_json(text: str) -> dict:
@@ -231,13 +300,47 @@ def _parse_json(text: str) -> dict:
         return {}
 
 
-def analyse(documents, api_key: str, model: str = DEFAULT_MODEL, system_prompt: str = ""):
+MAX_WORKERS = 5  # appels LLM simultanés
+
+
+def _analyse_chunk(chunk, api_key, model, system_prompt, provider="anthropic", base_url=""):
+    """Traite un chunk → (ref, elements | None, error | None)."""
+    if not chunk["text"].strip():
+        return chunk["ref"], None, None
+    is_local = provider == "meta" and bool(base_url.strip())
+    try:
+        if provider == "anthropic":
+            raw = _call_anthropic(api_key, model, chunk["text"], system_prompt)
+        else:
+            effective_url = base_url.strip() if base_url.strip() else _PROVIDER_BASES.get(provider, "")
+            # Modèle local (Ollama) : génération lente → timeout long
+            timeout = 600 if is_local else 120
+            raw = _call_openai_compat(effective_url, api_key, model, chunk["text"], system_prompt, timeout=timeout)
+        elements = _parse_json(raw)
+        print(f"[corpus] chunk {chunk['ref']['page']} OK ({len(elements)} keys) [{provider}]", flush=True)
+        return chunk["ref"], elements if elements else None, None
+    except urllib.error.HTTPError as e:
+        detail = ""
+        try:
+            err = json.loads(e.read().decode("utf-8", "replace"))
+            detail = (err.get("error") or {}).get("message", "")
+        except Exception:
+            pass
+        return chunk["ref"], None, f"LLM HTTP {e.code}{(' — ' + detail) if detail else ''}"
+    except Exception as e:  # noqa: BLE001
+        return chunk["ref"], None, f"{type(e).__name__}: {e}"
+
+
+def analyse(documents, api_key: str, model: str = DEFAULT_MODEL, system_prompt: str = "",
+            provider: str = "anthropic", base_url: str = "", on_chunk=None):
     """Analyse les documents et renvoie (results, errors).
 
     results : [{ "ref": {doc, chapter, page}, "elements": {...} }]
     errors  : [{ "doc": name, "error": str }]
     """
-    results, errors = [], []
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    fetch_errors = []
     all_chunks = []
     for d in documents:
         name = (d.get("name") or "").strip() or (d.get("location") or "?")
@@ -248,30 +351,34 @@ def analyse(documents, api_key: str, model: str = DEFAULT_MODEL, system_prompt: 
             sections = extract_sections(location)
             all_chunks.extend(_chunks(sections, name))
         except Exception as e:  # noqa: BLE001
-            errors.append({"doc": name, "error": f"{type(e).__name__}: {e}"})
+            fetch_errors.append({"doc": name, "error": f"{type(e).__name__}: {e}"})
 
     truncated = len(all_chunks) > MAX_CHUNKS
-    for chunk in all_chunks[:MAX_CHUNKS]:
-        if not chunk["text"].strip():
-            continue
-        try:
-            raw = _call_anthropic(api_key, model, chunk["text"], system_prompt)
-            elements = _parse_json(raw)
-            if elements:
-                results.append({"ref": chunk["ref"], "elements": elements})
-        except urllib.error.HTTPError as e:
-            detail = ""
-            try:
-                err = json.loads(e.read().decode("utf-8", "replace"))
-                detail = (err.get("error") or {}).get("message", "")
-            except Exception:
-                pass
-            errors.append({"doc": chunk["ref"]["doc"], "error": f"LLM HTTP {e.code} {detail}"})
-            if e.code in (401, 403):
-                break  # clé invalide → inutile de continuer
-        except Exception as e:  # noqa: BLE001
-            errors.append({"doc": chunk["ref"]["doc"], "error": f"{type(e).__name__}: {e}"})
+    work = [c for c in all_chunks[:MAX_CHUNKS] if c["text"].strip()]
+    # Ollama local sérialise les requêtes (1 GPU) → 1 worker = chunks affichés
+    # plus vite, un par un. Cloud/API → parallélisme complet.
+    is_local = provider == "meta" and bool(base_url.strip())
+    workers = 1 if is_local else MAX_WORKERS
+    print(f"[corpus] {len(documents)} doc(s) → {len(work)} chunks to process (parallel={workers})", flush=True)
+
+    results, errors = [], list(fetch_errors)
+    abort = False
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        futures = {pool.submit(_analyse_chunk, c, api_key, model, system_prompt, provider, base_url): c for c in work}
+        for fut in as_completed(futures):
+            ref, elements, err = fut.result()
+            if on_chunk:
+                on_chunk(ref, elements, err, futures[fut].get("text", ""))
+            if err:
+                errors.append({"doc": ref["doc"], "error": err})
+                if "401" in err or "403" in err:
+                    abort = True
+                    pool.shutdown(wait=False, cancel_futures=True)
+                    break
+            elif elements:
+                results.append({"ref": ref, "elements": elements})
 
     if truncated:
-        errors.append({"doc": "*", "error": f"Corpus truncated to {MAX_CHUNKS} chunks for this run."})
+        errors.append({"doc": "*", "error": f"Corpus truncated to {MAX_CHUNKS} chunks."})
+    print(f"[corpus] done: {len(results)} results, {len(errors)} errors", flush=True)
     return results, errors

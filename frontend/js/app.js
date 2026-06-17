@@ -302,7 +302,16 @@ const APP = {
         InferenceUI.refresh();
     },
 
-    updateStats() {},
+    updateStats() {
+        const s = this.state || {};
+        const set = (id, n) => { const el = document.getElementById(id); if (el) el.textContent = n; };
+        set('nc-classes', (s.classes || []).length);
+        set('nc-ops',     (s.object_properties || []).length);
+        set('nc-dps',     (s.datatype_properties || []).length);
+        set('nc-annos',   (s.annotation_properties || []).length);
+        set('nc-inds',    (s.individuals || []).length);
+        set('nc-swrl',    (s.swrl_rules || []).length);
+    },
 
     renderNav() {
         document.querySelectorAll('.nav-item').forEach(item => {
@@ -2118,11 +2127,11 @@ var INDLABEL=${JSON.stringify(INDLABEL).replace(/</g, '\\u003c')};
 const UI = {
     _toastTimeout: null,
 
-    success(msg) { this._toast(msg, 'success'); },
-    error(msg)   { this._toast(msg, 'error');   },
-    warn(msg)    { this._toast(msg, 'warn');     },
+    success(msg) { this._toast(msg, 'success', 4000); },
+    error(msg)   { this._toast(msg, 'error',   null);  },  // erreur : persistante jusqu'au ✕
+    warn(msg)    { this._toast(msg, 'warn',    5000);  },
 
-    _toast(msg, type) {
+    _toast(msg, type, duration) {
         let toast = document.getElementById('toast');
         if (!toast) {
             toast = document.createElement('div');
@@ -2130,10 +2139,23 @@ const UI = {
             document.body.appendChild(toast);
         }
         toast.className = `toast toast-${type}`;
-        toast.textContent = msg;
-        toast.style.display = 'block';
+        toast.style.display = 'flex';
+        toast.style.alignItems = 'flex-start';
+        toast.style.gap = '10px';
+        const text = document.createElement('span');
+        text.style.flex = '1';
+        text.textContent = msg;
+        const close = document.createElement('button');
+        close.textContent = '✕';
+        close.style.cssText = 'background:none;border:none;cursor:pointer;color:inherit;font-size:14px;padding:0;line-height:1;flex-shrink:0;opacity:.8';
+        close.onclick = () => { toast.style.display = 'none'; clearTimeout(this._toastTimeout); };
+        toast.innerHTML = '';
+        toast.appendChild(text);
+        toast.appendChild(close);
         clearTimeout(this._toastTimeout);
-        this._toastTimeout = setTimeout(() => { toast.style.display = 'none'; }, 3500);
+        if (duration) {
+            this._toastTimeout = setTimeout(() => { toast.style.display = 'none'; }, duration);
+        }
     },
 
     confirm(htmlMessage) {
@@ -2427,6 +2449,23 @@ const UndoRedo = {
 
 // Raccourcis clavier Ctrl+Z / Ctrl+Y — actifs uniquement sur les 6 onglets valides
 document.addEventListener('keydown', e => {
+    const active = document.activeElement;
+    const inInput = active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable);
+
+    // Ctrl+A — select all items in the current list
+    if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
+        if (!inInput) {
+            e.preventDefault();
+            APP._selectAllInSection();
+        }
+    }
+
+    // ArrowUp / ArrowDown — navigate list items
+    if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && !inInput) {
+        e.preventDefault();
+        APP._arrowNavSection(e.key === 'ArrowDown' ? 1 : -1);
+    }
+
     if (!UndoRedo._VALID.has(APP.currentSection)) return;
     if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key === 'z') {
         e.preventDefault(); UndoRedo.undo();
@@ -2435,6 +2474,116 @@ document.addEventListener('keydown', e => {
         e.preventDefault(); UndoRedo.redo();
     }
 });
+
+APP._arrowNavSection = function (dir) {
+    const section = this.currentSection;
+
+    // Config par onglet : { treeId, currentId(), select(id) }
+    // Pour Individuals : deux sous-listes (arbre classes + liste individus)
+    const configs = {
+        'classes':               [{ treeId: 'class-tree',     currentId: () => ClassEditor._selectedId,        select: id => ClassEditor.selectClass(id) }],
+        'object-properties':     [{ treeId: 'op-tree',        currentId: () => OPEditor._selectedId,           select: id => OPEditor.selectProp(id) }],
+        'datatype-properties':   [{ treeId: 'dp-tree',        currentId: () => DPEditor._selectedId,           select: id => DPEditor.selectProp(id) }],
+        'annotation-properties': [{ treeId: 'ap-tree',        currentId: () => APEditor._selectedId,           select: id => APEditor.selectProp(id) }],
+        'swrl-rules':            [{ treeId: 'swrl-list',      currentId: () => SWRLEditor._selectedId,         select: id => SWRLEditor.selectRule(id) }],
+        'queries':               [{ treeId: 'sparql-list',    currentId: () => typeof SparqlEditor !== 'undefined' ? SparqlEditor._selectedId : null, select: id => SparqlEditor.selectQuery(id) }],
+        'vizq':                  [{ treeId: 'sparql-list',    currentId: () => typeof SparqlEditor !== 'undefined' ? SparqlEditor._selectedId : null, select: id => SparqlEditor.selectQuery(id) }],
+        'individuals': [
+            { treeId: 'ind-class-tree', currentId: () => IndividualEditor._selectedClassId, select: id => IndividualEditor.selectClass(id) },
+            { treeId: 'ind-list-scroll', currentId: () => IndividualEditor._selectedIndId,  select: id => IndividualEditor.selectIndividual(id) },
+        ],
+    };
+
+    const list = configs[section];
+    if (!list) return;
+
+    // Pour individuals : priorité à la liste des individus si un individu est sélectionné,
+    // sinon naviguer dans l'arbre des classes.
+    let cfg;
+    if (list.length > 1) {
+        cfg = list.find(c => c.currentId() !== null && c.treeId === 'ind-list-scroll')
+           || list.find(c => c.currentId() !== null)
+           || list[list.length - 1];
+    } else {
+        cfg = list[0];
+    }
+
+    const items = [...document.querySelectorAll(`#${cfg.treeId} .tree-item[data-id]`)];
+    if (!items.length) return;
+    const ids = items.map(el => el.dataset.id);
+    const cur = cfg.currentId();
+    const curIdx = cur ? ids.indexOf(cur) : -1;
+    let nextIdx;
+    if (curIdx === -1) {
+        nextIdx = dir > 0 ? 0 : ids.length - 1;
+    } else {
+        nextIdx = curIdx + dir;
+        if (nextIdx < 0) nextIdx = 0;
+        if (nextIdx >= ids.length) nextIdx = ids.length - 1;
+    }
+    if (nextIdx === curIdx) return;
+    cfg.select(ids[nextIdx]);
+    // scroll the item into view
+    items[nextIdx]?.scrollIntoView({ block: 'nearest' });
+};
+
+APP._selectAllInSection = function () {
+    const section = this.currentSection;
+
+    const _selectInTree = (ed, treeId, detailId, label) => {
+        const items = [...document.querySelectorAll(`#${treeId} .tree-item[data-id]`)];
+        if (!items.length) return;
+        const ids = items.map(el => el.dataset.id);
+        ed._selectedIds = new Set(ids);
+        items.forEach(el => el.classList.add('selected'));
+        const detail = document.getElementById(detailId);
+        if (detail && ids.length > 1) {
+            detail.innerHTML = `<div class="detail-panel-empty"><span><strong>${ids.length}</strong> ${label} selected</span></div>`;
+        }
+        if (ed._updateTreeButtons) ed._updateTreeButtons();
+        if (ed._updateToolbar)   ed._updateToolbar();
+    };
+
+    switch (section) {
+        case 'classes':
+            _selectInTree(ClassEditor, 'class-tree', 'class-detail', 'classes');
+            break;
+        case 'object-properties':
+            _selectInTree(OPEditor, 'op-tree', 'op-detail', 'object properties');
+            break;
+        case 'datatype-properties':
+            _selectInTree(DPEditor, 'dp-tree', 'dp-detail', 'datatype properties');
+            break;
+        case 'annotation-properties':
+            _selectInTree(APEditor, 'ap-tree', 'ap-detail', 'annotation properties');
+            break;
+        case 'individuals': {
+            const items = [...document.querySelectorAll('#ind-list-scroll .tree-item[data-id]')];
+            if (!items.length) return;
+            const ids = items.map(el => el.dataset.id);
+            IndividualEditor._selectedIndIds = new Set(ids);
+            IndividualEditor._editingId = null;
+            items.forEach(el => el.classList.add('selected'));
+            IndividualEditor._setDelBtn(ids.length > 0);
+            const detail = document.getElementById('ind-detail');
+            if (detail && ids.length > 1) {
+                detail.innerHTML = `<div class="detail-panel-empty"><span style="font-size:28px">◆◆</span><span><strong>${ids.length}</strong> individuals selected</span></div>`;
+            }
+            break;
+        }
+        case 'swrl-rules':
+            _selectInTree(SWRLEditor, 'swrl-list', 'swrl-detail', 'rules');
+            if (SWRLEditor._renderMultiSelDetail) SWRLEditor._renderMultiSelDetail();
+            break;
+        case 'queries':
+        case 'vizq':
+            if (typeof SparqlEditor !== 'undefined') {
+                _selectInTree(SparqlEditor, 'sparql-list', 'sparql-detail', 'queries');
+                if (SparqlEditor._renderMultiSelDetail) SparqlEditor._renderMultiSelDetail();
+            }
+            break;
+    }
+};
 
 // ── Global Search ─────────────────────────────────────────────
 
@@ -3682,16 +3831,16 @@ APP._initOntologyNetwork = function() {
     if (counter) counter.textContent = `${classes.length} classes · ${ops.length} OPs · ${links.length} liens`;
     const legend = document.getElementById('onet-legend');
     if (legend) legend.innerHTML = `
-        <span style="display:flex;align-items:center;gap:4px;color:var(--text-dim)"><span style="width:9px;height:9px;border-radius:50%;background:#378ADD"></span>Class</span>
-        <span style="display:flex;align-items:center;gap:4px;color:var(--text-dim)"><span style="width:9px;height:9px;border-radius:50%;background:#1D9E75"></span>ObjectProperty</span>
-        <span style="display:flex;align-items:center;gap:4px;color:var(--text-dim)"><span style="width:16px;border-top:2px solid #5a6478"></span>subClassOf · <span style="color:#5a82b8">domain/range</span></span>`;
+        <span style="display:flex;align-items:center;gap:4px;color:var(--text-dim)"><span style="width:9px;height:9px;border-radius:50%;background:#8B5E3C"></span>Class</span>
+        <span style="display:flex;align-items:center;gap:4px;color:var(--text-dim)"><span style="width:9px;height:9px;border-radius:50%;background:#3b82f6"></span>ObjectProperty</span>
+        <span style="display:flex;align-items:center;gap:4px;color:var(--text-dim)"><span style="width:16px;border-top:2px solid #5a4030"></span>subClassOf · <span style="color:#5a82b8">domain/range</span></span>`;
 
     const svgEl = d3.select(container).append('svg').attr('width', W).attr('height', H).style('display', 'block');
     const defs = svgEl.append('defs');
     const mkArrow = (id, color) => defs.append('marker').attr('id', id).attr('viewBox', '0 -4 10 8')
         .attr('refX', 19).attr('refY', 0).attr('markerWidth', 6).attr('markerHeight', 6).attr('orient', 'auto')
         .append('path').attr('d', 'M0,-4L10,0L0,4').attr('fill', color);
-    mkArrow('onet-arrow-sub', '#5a6478'); mkArrow('onet-arrow-op', '#3b82f6');
+    mkArrow('onet-arrow-sub', '#5a4030'); mkArrow('onet-arrow-op', '#3b82f6');
 
     const zoomG = svgEl.append('g');
     svgEl.call(d3.zoom().scaleExtent([0.1, 4]).on('zoom', ev => zoomG.attr('transform', ev.transform)));
@@ -3702,7 +3851,7 @@ APP._initOntologyNetwork = function() {
 
     const linkEls = linkG.selectAll('path').data(links, d => d.id).enter().append('path')
         .attr('fill', 'none')
-        .attr('stroke', d => d.kind === 'sub' ? '#3a4a62' : '#2f5b8f')
+        .attr('stroke', d => d.kind === 'sub' ? '#5a3d25' : '#2f5b8f')
         .attr('stroke-width', d => d.kind === 'sub' ? 1.8 : 1.4)
         .attr('stroke-dasharray', d => d.kind === 'range' ? '4 3' : '0')
         .attr('marker-end', d => d.kind === 'sub' ? 'url(#onet-arrow-sub)' : 'url(#onet-arrow-op)');
@@ -3711,10 +3860,10 @@ APP._initOntologyNetwork = function() {
         .text(d => d.label).attr('text-anchor', 'middle').attr('font-size', '9px')
         .attr('font-family', 'system-ui,sans-serif').attr('fill', '#5a82b8').attr('pointer-events', 'none');
 
-    // class = cercle bleu ; ObjectProperty = cercle teal plus petit (ressource RDF)
+    // class = cercle marron ; ObjectProperty = cercle bleu plus petit (ressource RDF)
     const COL = {
-        class: { fill: '#378ADD33', stroke: '#378ADD' }, classImp: { fill: '#37506b33', stroke: '#7a8aa0' },
-        op:    { fill: '#1D9E7533', stroke: '#1D9E75' }, opImp:    { fill: '#0f6e5633', stroke: '#5d8a78' },
+        class: { fill: '#8B5E3C33', stroke: '#8B5E3C' }, classImp: { fill: '#5a3d2533', stroke: '#8a7060' },
+        op:    { fill: '#3b82f633', stroke: '#3b82f6' }, opImp:    { fill: '#1e3a6433', stroke: '#6080b0' },
     };
     const colOf = d => COL[d.kind === 'op' ? (d.imported ? 'opImp' : 'op') : (d.imported ? 'classImp' : 'class')];
     const nodeEls = nodeG.selectAll('g').data(nodes, d => d.id).enter().append('g').style('cursor', 'pointer');
@@ -3723,7 +3872,7 @@ APP._initOntologyNetwork = function() {
         .attr('fill', d => colOf(d).fill)
         .attr('stroke', d => colOf(d).stroke).attr('stroke-width', 2);
     nodeEls.append('text').attr('text-anchor', 'middle').attr('y', d => d.kind === 'op' ? -12 : -15).attr('font-size', d => d.kind === 'op' ? '10px' : '11px')
-        .attr('font-family', 'system-ui,sans-serif').attr('fill', d => d.kind === 'op' ? '#9fe1cb' : '#cbd5e1').attr('pointer-events', 'none')
+        .attr('font-family', 'system-ui,sans-serif').attr('fill', d => d.kind === 'op' ? '#93c5fd' : '#c4a882').attr('pointer-events', 'none')
         .style('font-style', d => d.imported ? 'italic' : 'normal').text(d => d.label);
 
     nodeEls.on('click', (ev, d) => APP.navigateTo(d.kind === 'op' ? 'object-properties' : 'classes', d.refId));
@@ -3883,7 +4032,27 @@ APP._llmTest = async function (p) {
 };
 APP._esc = function (t) { const d = document.createElement('div'); d.textContent = String(t); return d.innerHTML; };
 
-// ── Modèle Anthropic (global) ──
+// ── Provider actif ──
+APP._llmProvider    = function ()  { return localStorage.getItem('swowl_llm_provider') || 'anthropic'; };
+APP._llmSetProvider = function (v) { if (v) { localStorage.setItem('swowl_llm_provider', v); APP.renderSection('sources'); } };
+
+// ── Mode Meta/Llama : 'cloud' ou 'local' (Ollama) ──
+APP._llmMetaMode    = function ()  { return localStorage.getItem('swowl_llm_meta_mode') || 'cloud'; };
+APP._llmSetMetaMode = function (v) { localStorage.setItem('swowl_llm_meta_mode', v); APP.renderSection('sources'); };
+
+// ── URLs / modèles par provider ──
+APP._llmOllamaUrl      = function ()  { return localStorage.getItem('swowl_llm_ollama_url')   || 'http://host.docker.internal:11434'; };
+APP._llmSetOllamaUrl   = function (v) { if (v) localStorage.setItem('swowl_llm_ollama_url', v); };
+APP._llmOllamaModel    = function ()  { return localStorage.getItem('swowl_llm_ollama_model') || 'llama3.2'; };
+APP._llmSetOllamaModel = function (v) { if (v) localStorage.setItem('swowl_llm_ollama_model', v); };
+
+APP._llmOpenAIModel    = function ()  { return localStorage.getItem('swowl_llm_openai_model') || 'gpt-4o'; };
+APP._llmSetOpenAIModel = function (v) { if (v) localStorage.setItem('swowl_llm_openai_model', v); };
+
+APP._llmMetaCloudModel    = function ()  { return localStorage.getItem('swowl_llm_meta_model') || 'Llama-4-Scout-17B-16E-Instruct'; };
+APP._llmSetMetaCloudModel = function (v) { if (v) localStorage.setItem('swowl_llm_meta_model', v); };
+
+// ── Modèles Anthropic (global) ──
 APP._LLM_MODELS = [
     { id: 'claude-opus-4-8', label: 'Opus 4.8 — best quality' },
     { id: 'claude-sonnet-4-6', label: 'Sonnet 4.6 — balanced (default)' },
@@ -3891,6 +4060,39 @@ APP._LLM_MODELS = [
 ];
 APP._llmModel = function () { return localStorage.getItem('swowl_llm_model') || 'claude-sonnet-4-6'; };
 APP._llmSetModel = function (v) { if (v) localStorage.setItem('swowl_llm_model', v); };
+
+// ── Modèles Ollama découverts (via Test) ──
+APP._llmOllamaModels = function () {
+    try { const a = JSON.parse(localStorage.getItem('swowl_llm_ollama_models') || '[]'); return Array.isArray(a) ? a : []; }
+    catch { return []; }
+};
+
+// ── Test Ollama local ──
+APP._llmTestOllama = async function () {
+    const url = (document.getElementById('llm-ollama-url') || {}).value || this._llmOllamaUrl();
+    const st  = document.getElementById('llm-status-meta');
+    if (!st) return;
+    st.innerHTML = '<span style="color:var(--text-dim)">⏳ testing Ollama…</span>';
+    try {
+        const r = await API.testLlmKey('meta', '', url);
+        if (r && r.ok) {
+            const models = (r.models || []).filter(Boolean);
+            localStorage.setItem('swowl_llm_ollama_models', JSON.stringify(models));
+            // Si le modèle courant n'est pas dans la liste, présélectionne le 1er disponible
+            if (models.length && !models.includes(this._llmOllamaModel())) {
+                this._llmSetOllamaModel(models[0]);
+            }
+            this.renderSection('sources');  // re-render → menu déroulant peuplé
+            // Le re-render a remplacé l'élément de statut : ré-appliquer le message
+            const st2 = document.getElementById('llm-status-meta');
+            if (st2) st2.innerHTML = `<span style="color:var(--accent2)">✅ ${this._esc(r.message)}</span>`;
+        } else {
+            st.innerHTML = `<span style="color:#ef4444">❌ ${this._esc((r && r.message) || 'unreachable')}</span>`;
+        }
+    } catch (e) {
+        st.innerHTML = `<span style="color:#ef4444">❌ ${this._esc(e.message)}</span>`;
+    }
+};
 
 // ── Prompt système d'extraction (global, éditable) ──
 APP._llmPrompt = function () { return localStorage.getItem('swowl_llm_prompt') || ''; };  // '' = défaut backend
@@ -3914,52 +4116,173 @@ APP._llmLoadDefaultPrompt = async function () {
 };
 
 APP._renderLLMs = function () {
-    const keys = this._llmKeys();
+    const keys       = this._llmKeys();
+    const activeProv = this._llmProvider();
+    const modelSel   = this._llmModel();
+    const metaMode   = this._llmMetaMode();
+    const inp = (id, val, ph, extra='') =>
+        `<input id="${id}" type="password" value="${(val||'').replace(/"/g,'&quot;')}" placeholder="${ph}"
+                autocomplete="off" spellcheck="false" ${extra}
+                style="flex:1;min-width:200px;background:var(--bg3);border:1px solid var(--border);
+                       color:var(--text1);border-radius:6px;padding:7px 10px;font-size:13px;font-family:monospace">`;
+
+    const modelField = (id, val, ph, onchange) =>
+        `<div style="display:flex;align-items:center;gap:8px;margin-top:10px">
+            <span style="font-size:12px;color:var(--text-dim);white-space:nowrap">Model:</span>
+            <input id="${id}" type="text" value="${this._esc(val)}" placeholder="${ph}"
+                   autocomplete="off" spellcheck="false"
+                   onchange="${onchange}"
+                   style="flex:1;background:var(--bg3);border:1px solid var(--border);color:var(--text1);
+                          border-radius:6px;padding:5px 8px;font-size:12px;font-family:monospace">
+        </div>`;
+
     const card = (p) => {
-        const has = !!keys[p.id];
-        const val = (keys[p.id] || '').replace(/"/g, '&quot;');
-        return `<div class="cls-frame" style="margin-bottom:14px">
-            <div class="cls-frame-bar" style="gap:8px">
-                <span style="width:11px;height:11px;border-radius:50%;background:${p.dot};flex-shrink:0"></span>
-                <span style="font-size:13px;font-weight:600;color:var(--text1)">${p.name}</span>
-                <span style="font-size:11px;color:var(--text-dim)">${p.sub}</span>
-                <span id="llm-badge-${p.id}" style="margin-left:auto;font-size:11px;color:${has ? 'var(--accent2)' : 'var(--text-dim)'}">${has ? '● configured' : '○ not configured'}</span>
-            </div>
-            <div class="cls-frame-body" style="padding:12px">
+        const isActive = activeProv === p.id;
+        const has = p.id === 'meta' ? (metaMode === 'local' || !!keys[p.id]) : !!keys[p.id];
+        let body = '';
+
+        if (p.id === 'anthropic') {
+            const val = keys[p.id] || '';
+            body = `
                 <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-                    <input id="llm-key-${p.id}" type="password" value="${val}" placeholder="${p.hint}"
-                           autocomplete="off" spellcheck="false"
-                           style="flex:1;min-width:240px;background:var(--bg3);border:1px solid var(--border);color:var(--text1);border-radius:6px;padding:7px 10px;font-size:13px;font-family:monospace">
-                    <button class="btn-sm" onclick="APP._llmToggle('${p.id}')" title="Show / hide">👁</button>
-                    <button class="btn-sm" onclick="APP._llmSave('${p.id}')" title="Save the key locally">💾 Save</button>
-                    <button class="btn-sm" onclick="APP._llmTest('${p.id}')" title="Test the key against the provider">🧪 Test</button>
+                    ${inp('llm-key-anthropic', val, p.hint)}
+                    <button class="btn-sm" onclick="APP._llmToggle('anthropic')" title="Afficher/masquer">👁</button>
+                    <button class="btn-sm" onclick="APP._llmSave('anthropic')">💾 Save</button>
+                    <button class="btn-sm" onclick="APP._llmTest('anthropic')">🧪 Test</button>
                 </div>
-                <div id="llm-status-${p.id}" style="margin-top:8px;font-size:12px;min-height:16px">${has ? '<span style="color:var(--text-dim)">key saved (not tested)</span>' : ''}</div>
-                ${p.id === 'anthropic' ? `<div style="margin-top:10px;display:flex;align-items:center;gap:8px">
-                    <span style="font-size:12px;color:var(--text-dim)">Model (Corpus analysis):</span>
+                <div id="llm-status-anthropic" style="margin-top:8px;font-size:12px;min-height:16px">
+                    ${keys[p.id] ? '<span style="color:var(--text-dim)">key saved (not tested)</span>' : ''}
+                </div>
+                <div style="margin-top:10px;display:flex;align-items:center;gap:8px">
+                    <span style="font-size:12px;color:var(--text-dim);white-space:nowrap">Model:</span>
                     <select id="llm-model-anthropic" onchange="APP._llmSetModel(this.value)"
                             style="background:var(--bg3);border:1px solid var(--border);color:var(--text1);border-radius:6px;padding:5px 8px;font-size:12px">
                         ${this._LLM_MODELS.map(m => `<option value="${m.id}"${m.id === modelSel ? ' selected' : ''}>${m.label}</option>`).join('')}
                     </select>
-                </div>` : ''}
+                </div>`;
+
+        } else if (p.id === 'openai') {
+            const val = keys[p.id] || '';
+            body = `
+                <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                    ${inp('llm-key-openai', val, p.hint)}
+                    <button class="btn-sm" onclick="APP._llmToggle('openai')" title="Afficher/masquer">👁</button>
+                    <button class="btn-sm" onclick="APP._llmSave('openai')">💾 Save</button>
+                    <button class="btn-sm" onclick="APP._llmTest('openai')">🧪 Test</button>
+                </div>
+                <div id="llm-status-openai" style="margin-top:8px;font-size:12px;min-height:16px">
+                    ${keys[p.id] ? '<span style="color:var(--text-dim)">key saved (not tested)</span>' : ''}
+                </div>
+                ${modelField('llm-model-openai', this._llmOpenAIModel(), 'gpt-4o', "APP._llmSetOpenAIModel(this.value)")}`;
+
+        } else if (p.id === 'meta') {
+            const isLocal = metaMode === 'local';
+            const modeBtn = (m, label) =>
+                `<button class="btn-sm${metaMode === m ? ' btn-active' : ''}"
+                         style="${metaMode === m ? 'background:var(--accent);color:#fff;' : ''}"
+                         onclick="APP._llmSetMetaMode('${m}')">${label}</button>`;
+            if (isLocal) {
+                body = `
+                    <div style="display:flex;gap:6px;margin-bottom:12px">
+                        ${modeBtn('cloud','☁ Cloud (api.llama.com)')}
+                        ${modeBtn('local','💻 Local (Ollama)')}
+                    </div>
+                    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                        <input id="llm-ollama-url" type="text"
+                               value="${this._esc(this._llmOllamaUrl())}"
+                               placeholder="http://host.docker.internal:11434"
+                               onchange="APP._llmSetOllamaUrl(this.value)"
+                               autocomplete="off" spellcheck="false"
+                               style="flex:1;min-width:200px;background:var(--bg3);border:1px solid var(--border);
+                                      color:var(--text1);border-radius:6px;padding:7px 10px;font-size:13px;font-family:monospace">
+                        <button class="btn-sm" onclick="APP._llmTestOllama()">🧪 Test</button>
+                    </div>
+                    <div id="llm-status-meta" style="margin-top:8px;font-size:12px;min-height:16px"></div>
+                    ${(() => {
+                        const found = this._llmOllamaModels();
+                        const cur = this._llmOllamaModel();
+                        if (found.length) {
+                            const opts = found.map(m => `<option value="${this._esc(m)}"${m === cur ? ' selected' : ''}>${this._esc(m)}</option>`).join('');
+                            return `<div style="display:flex;align-items:center;gap:8px;margin-top:10px">
+                                <span style="font-size:12px;color:var(--text-dim);white-space:nowrap">Model:</span>
+                                <select id="llm-model-ollama" onchange="APP._llmSetOllamaModel(this.value)"
+                                        style="flex:1;background:var(--bg3);border:1px solid var(--border);color:var(--text1);
+                                               border-radius:6px;padding:5px 8px;font-size:12px;font-family:monospace">
+                                    ${opts}
+                                </select>
+                            </div>`;
+                        }
+                        return modelField('llm-model-ollama', cur, 'cliquez « Test » pour lister les modèles', "APP._llmSetOllamaModel(this.value)");
+                    })()}
+                    <p style="margin:8px 0 0;font-size:11px;color:var(--text-faint);font-style:italic">
+                        Ollama doit tourner localement et être accessible depuis le conteneur Docker.
+                        Installez Ollama depuis <a href="https://ollama.com" target="_blank" style="color:var(--accent)">ollama.com</a>
+                        puis lancez : <code>ollama pull llama3.3</code> (puissant) ou <code>ollama pull llama3.2</code> (rapide)
+                    </p>`;
+            } else {
+                const val = keys[p.id] || '';
+                body = `
+                    <div style="display:flex;gap:6px;margin-bottom:12px">
+                        ${modeBtn('cloud','☁ Cloud (api.llama.com)')}
+                        ${modeBtn('local','💻 Local (Ollama)')}
+                    </div>
+                    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                        ${inp('llm-key-meta', val, p.hint)}
+                        <button class="btn-sm" onclick="APP._llmToggle('meta')" title="Afficher/masquer">👁</button>
+                        <button class="btn-sm" onclick="APP._llmSave('meta')">💾 Save</button>
+                        <button class="btn-sm" onclick="APP._llmTest('meta')">🧪 Test</button>
+                    </div>
+                    <div id="llm-status-meta" style="margin-top:8px;font-size:12px;min-height:16px">
+                        ${val ? '<span style="color:var(--text-dim)">key saved (not tested)</span>' : ''}
+                    </div>
+                    ${modelField('llm-model-meta', this._llmMetaCloudModel(), 'Llama-4-Scout-17B-16E-Instruct', "APP._llmSetMetaCloudModel(this.value)")}`;
+            }
+        }
+
+        const activeBorder = isActive ? 'border:2px solid var(--accent);' : '';
+        return `<div class="cls-frame" style="margin-bottom:14px;${activeBorder}">
+            <div class="cls-frame-bar" style="gap:8px">
+                <span style="width:11px;height:11px;border-radius:50%;background:${p.dot};flex-shrink:0"></span>
+                <span style="font-size:13px;font-weight:600;color:var(--text1)">${p.name}</span>
+                <span style="font-size:11px;color:var(--text-dim)">${p.sub}${p.id==='meta'&&metaMode==='local' ? ' — Ollama local' : ''}</span>
+                ${isActive
+                    ? `<span style="margin-left:auto;font-size:11px;font-weight:600;color:var(--accent)">✓ Active</span>`
+                    : `<button class="btn-sm" style="margin-left:auto"
+                               onclick="APP._llmSetProvider('${p.id}')">Use for analysis</button>`}
             </div>
+            <div class="cls-frame-body" style="padding:12px">${body}</div>
         </div>`;
     };
-    // Charge le prompt par défaut dans le textarea une fois le DOM injecté
-    setTimeout(() => this._llmLoadDefaultPrompt(), 0);
-    const modelSel = this._llmModel();
+
+    // Charge le prompt dans le textarea une fois le DOM injecté
     const savedPrompt = this._llmPrompt();
+    setTimeout(async () => {
+        const t = document.getElementById('llm-prompt');
+        if (!t) return;
+        if (savedPrompt) { t.value = savedPrompt; }
+        else { try { const r = await API.getCorpusPrompt(); t.value = (r && r.prompt) || ''; } catch { /* backend indispo */ } }
+    }, 0);
+
+    const activeLabel = {
+        anthropic: 'Anthropic — Claude',
+        openai:    'OpenAI — GPT',
+        meta:      metaMode === 'local' ? 'Meta — Llama (Ollama local)' : 'Meta — Llama (Cloud)',
+    }[activeProv] || activeProv;
+
     return `<div style="padding:20px;max-width:780px">
-        <p style="margin:0 0 16px;font-size:13px;color:var(--text-dim);line-height:1.6">
-            Configure an LLM provider and its API key. Keys are stored
-            <b style="color:var(--text1)">locally in this browser</b> (localStorage); they are only
-            sent to the server for the duration of a test, never stored server-side.
-        </p>
+        <div style="margin-bottom:18px;padding:10px 14px;background:var(--bg3);border:1px solid var(--border);
+                    border-radius:8px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            <span style="font-size:12px;color:var(--text-dim)">Provider used for corpus analysis :</span>
+            <span style="font-size:13px;font-weight:600;color:var(--accent)">${activeLabel}</span>
+            <span style="font-size:11px;color:var(--text-faint);margin-left:auto">
+                (click <em>Use for analysis</em> on a card to change)
+            </span>
+        </div>
         ${this._LLM_PROVIDERS.map(card).join('')}
         <div class="cls-frame" style="margin-top:18px">
             <div class="cls-frame-bar" style="gap:8px">
                 <span style="font-size:13px;font-weight:600;color:var(--text1)">🧬 Corpus extraction prompt</span>
-                <span style="font-size:11px;color:var(--text-dim)">sent to Claude for « Analyse Corpus »</span>
+                <span style="font-size:11px;color:var(--text-dim)">sent to LLM for « Analyse with LLM »</span>
                 <span style="margin-left:auto;display:flex;gap:6px">
                     <button class="btn-sm" onclick="APP._llmSavePrompt()" title="Save your custom prompt">💾 Save</button>
                     <button class="btn-sm" onclick="APP._llmResetPrompt()" title="Restore the default prompt">↺ Reset to default</button>
@@ -3967,7 +4290,9 @@ APP._renderLLMs = function () {
             </div>
             <div class="cls-frame-body" style="padding:12px">
                 <textarea id="llm-prompt" spellcheck="false" placeholder="Loading default prompt…"
-                          style="width:100%;min-height:200px;resize:vertical;background:var(--bg3);border:1px solid var(--border);color:var(--text1);border-radius:6px;padding:10px;font-size:12px;font-family:monospace;line-height:1.5">${this._esc(savedPrompt)}</textarea>
+                          style="width:100%;min-height:200px;resize:vertical;background:var(--bg3);border:1px solid var(--border);
+                                 color:var(--text1);border-radius:6px;padding:10px;font-size:12px;font-family:monospace;
+                                 line-height:1.5;box-sizing:border-box"></textarea>
                 <p style="margin:8px 0 0;font-size:11px;color:var(--text-faint);font-style:italic">
                     The model must return strict JSON ({classes, object_properties, datatype_properties, individuals, swrl_rules}).
                     Keep that contract if you edit — the backend parses this JSON to build the candidate ontology.
@@ -4014,6 +4339,11 @@ APP._corpusSave = function (arr) {
 // Sélecteur de fichier local via le FsBrowser (chemin absolu, comme l'onglet Ontologies)
 APP._CORPUS_EXTS = ['.pdf', '.txt', '.md', '.csv', '.json', '.xml', '.html', '.htm',
     '.doc', '.docx', '.rtf', '.odt', '.owl', '.ttl', '.rdf', '.n3', '.nt'];
+APP._corpusReveal = function (i) {
+    const docs = this._corpusDocs();
+    const loc = docs[i] && docs[i].location;
+    if (loc) API.revealInFinder(loc).catch(() => {});
+};
 APP._corpusBrowse = function () {
     FsBrowser.open('corpus-loc', this._CORPUS_EXTS);
 };
@@ -4072,6 +4402,7 @@ APP._renderCorpus = function () {
     }
     const ontoLabel = (onto.prefix ? onto.prefix + ':' : '') + (onto.name || '');
     const docs = this._corpusDocs();
+    const running = !!this._analysisInProgress || (this._analysisStatus && this._analysisStatus.state === 'running');
     const th = (label, extra = '') => `<th style="text-align:left;padding:7px 10px;border-bottom:2px solid var(--border);color:var(--text-dim);font-size:11px;text-transform:uppercase;letter-spacing:.04em;${extra}">${label}</th>`;
     const editIdx = this._corpusEditIdx;
     const inpStyle = 'background:var(--bg3);border:1px solid var(--border);color:var(--text1);border-radius:6px;padding:6px 9px;font-size:13px';
@@ -4093,7 +4424,9 @@ APP._renderCorpus = function () {
         const isUrl = /^https?:\/\//i.test(d.location || '');
         const loc = isUrl
             ? `<a href="${this._escAttr(d.location)}" target="_blank" rel="noopener" style="color:var(--accent);word-break:break-all">${this._esc(d.location)}</a>`
-            : `<span style="font-family:monospace;font-size:12px;color:var(--text1);word-break:break-all">${this._esc(d.location)}</span>`;
+            : `<span onclick="APP._corpusReveal(${i})"
+                  style="font-family:monospace;font-size:12px;color:var(--accent);word-break:break-all;cursor:pointer;text-decoration:underline dotted"
+                  title="Click to reveal in Finder">${this._esc(d.location)}</span>`;
         const tag = isUrl ? '🌐 URL' : '📁 path';
         return `<tr>
             <td style="${cell}">${this._esc(d.name)}</td>
@@ -4128,10 +4461,47 @@ APP._renderCorpus = function () {
             <thead><tr>${th('Name', 'width:200px')}${th('Location')}${th('', 'width:80px')}</tr></thead>
             <tbody>${rows}</tbody>
         </table>
-        <div style="margin-top:14px;display:flex">
-            <button id="corpus-analyse-btn" class="btn-sm" onclick="APP._corpusAnalyse()" title="Analyse the corpus documents into a candidate ontology"${docs.length ? '' : ' disabled'}>🔬 Analyse Corpus</button>
+        <div style="margin-top:14px;margin-bottom:6px">
+            <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;user-select:none">
+                <input type="checkbox" id="corpus-candidate-chk" ${this._corpusCandidateFlag !== false ? 'checked' : ''} onchange="APP._corpusCandidateFlag = this.checked">
+                Add Annotation Property <code style="font-size:11px">swowl:candidate</code>
+            </label>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px">
+            <button id="corpus-analyse-btn" class="btn-sm" style="width:220px" onclick="APP._corpusAnalyse()" title="Analyse the corpus documents into a candidate ontology"${(docs.length && !running) ? '' : ' disabled'}>${running ? '⏳ Analysing…' : '🔬 Analyse with selected LLM'}</button>
+            <span id="corpus-analyse-status" style="font-size:12px">${this._analysisStatusHtml()}</span>
+        </div>
+        <div style="margin-top:8px;display:flex;align-items:center;gap:12px">
+            <button class="btn-sm" style="width:220px" onclick="APP._claudeCodeAnalyse()" title="Let Claude Code (CLI) perform the analysis and populate the ontology"${(docs.length && !running) ? '' : ' disabled'}>🤖 Analyse with Claude Code</button>
+            <span style="font-size:11px;color:var(--text-faint);font-style:italic">Use Claude Code CLI instead of a built-in LLM</span>
+        </div>
+        <div style="margin-top:8px">
+            <button class="btn-sm" style="width:220px" onclick="APP._corpusDedupe()" title="Detect and merge duplicate entities (exact, case, plural)"${running ? ' disabled' : ''}>🧹 Clean Duplicates</button>
         </div>
     </div>`;
+};
+
+// Statut de l'analyse, persistant à droite du bouton « Analyse with LLM »
+APP._analysisStatus = null;  // {state:'running'|'done'|'error', done, elements, message}
+APP._analysisStatusHtml = function () {
+    const s = this._analysisStatus;
+    if (!s) return '';
+    if (s.state === 'running') {
+        return `<span style="color:var(--text-dim)">⏳ Analyse en cours… <b style="color:var(--text1)">${s.done}</b> chunk${s.done !== 1 ? 's' : ''} traité${s.done !== 1 ? 's' : ''}, <b style="color:var(--text1)">${s.elements}</b> élément${s.elements !== 1 ? 's' : ''} extrait${s.elements !== 1 ? 's' : ''}</span>`;
+    }
+    if (s.state === 'done') {
+        return `<span style="color:var(--accent2)">✅ Analyse terminée — <b>${s.elements}</b> élément${s.elements !== 1 ? 's' : ''} extrait${s.elements !== 1 ? 's' : ''} sur <b>${s.done}</b> chunk${s.done !== 1 ? 's' : ''}</span>`;
+    }
+    if (s.state === 'error') {
+        return `<span style="color:#ef4444">❌ ${this._esc(s.message || 'analyse en échec')}</span>`;
+    }
+    return '';
+};
+// Met à jour le statut en mémoire + le DOM si le span est visible (onglet Corpus)
+APP._setAnalysisStatus = function (status) {
+    this._analysisStatus = status;
+    const el = document.getElementById('corpus-analyse-status');
+    if (el) el.innerHTML = this._analysisStatusHtml();
 };
 // ── Analyse du corpus → ontologie candidate (LLM Anthropic) ──
 APP._analysisKey = function () {
@@ -4144,76 +4514,453 @@ APP._analysisData = function () {
     try { const a = JSON.parse(localStorage.getItem(k) || '[]'); return Array.isArray(a) ? a : []; }
     catch { return []; }
 };
-APP._analysisSave = function (prov) {
+APP._analysisErrors = function () {
     const k = this._analysisKey();
-    if (k) localStorage.setItem(k, JSON.stringify(prov || []));
+    if (!k) return [];
+    try { const a = JSON.parse(localStorage.getItem(k + '::errors') || '[]'); return Array.isArray(a) ? a : []; }
+    catch { return []; }
 };
+APP._analysisSave = function (prov, errors) {
+    const k = this._analysisKey();
+    if (k) {
+        localStorage.setItem(k, JSON.stringify(prov || []));
+        localStorage.setItem(k + '::errors', JSON.stringify(errors || []));
+    }
+};
+// ── Claude Code analysis polling ──────────────────────────────────────────
+APP._corpusCandidateFlag = true;  // checkbox "Add Annotation Property swowl:candidate"
+APP._ccPolling = null;   // setInterval handle
+APP._ccChunks  = null;   // null = not in CC mode, [] = CC mode active
+
+APP._claudeCodeAnalyse = async function () {
+    if (this._analysisInProgress) { alert('An LLM analysis is already running.'); return; }
+    // Envoie la liste des docs corpus au backend (pour que Claude Code utilise le bon nom)
+    const docs = this._corpusDocs();
+    await API.clearAnalysis(docs);
+    this._ccChunks = [];
+    this._setAnalysisStatus({ state: 'running', done: 0, elements: 0 });
+    this.renderSection('corpus');
+    this._ccStartPolling();
+    alert('Claude Code analysis started.\n\nAsk Claude Code:\n"Analyse the corpus and populate the ontology (call /api/analysis/chunk for each chunk and /api/analysis/done when finished)"');
+};
+
+APP._ccStartPolling = function () {
+    if (this._ccPolling) clearInterval(this._ccPolling);
+    this._ccPolling = setInterval(() => this._ccPoll(), 2000);
+};
+
+APP._ccPoll = async function () {
+    try {
+        const res = await API.getAnalysisChunks();
+        this._ccChunks = res.chunks || [];
+        const els = this._ccChunks.reduce((n, c) =>
+            n + Object.values(c.ids || {}).reduce((s, l) => s + (l || []).length, 0), 0);
+        if (res.running) {
+            this._setAnalysisStatus({ state: 'running', done: this._ccChunks.length, elements: els });
+        } else {
+            clearInterval(this._ccPolling);
+            this._ccPolling = null;
+            this._setAnalysisStatus({ state: 'done', done: this._ccChunks.length, elements: els });
+            this._analysisSaveChunks(this._ccChunks);
+            // Dériver le format provenance (pour _whereExtractedFrame) depuis les chunks
+            this._analysisSave(this._ccBuildProv(this._ccChunks), []);
+            this._ccChunks = null;
+            this.refresh();
+        }
+        if (document.getElementById('analysis-tab-live')) this.renderSection('analysis');
+    } catch (e) { /* réseau : on ignore et on reessaie */ }
+};
+
+// Construit le format provenance [{id, kind, label, sections}] depuis les chunks CC
+// Les kinds doivent correspondre à ce que _whereExtractedFrame attend : 'class','op','dp','individual'
+APP._ccBuildProv = function (chunks) {
+    const map = {};
+    const KIND_MAP = {
+        classes: 'class', object_properties: 'op',
+        datatype_properties: 'dp', individuals: 'individual', swrl_rules: 'swrl_rule'
+    };
+    (chunks || []).forEach(c => {
+        const ref = c.ref || {};
+        const sig = JSON.stringify({doc: ref.doc, chapter: ref.chapter, page: ref.page});
+        Object.entries(c.ids || {}).forEach(([kind, list]) => {
+            const k = KIND_MAP[kind] || kind;
+            (list || []).forEach(id => {
+                if (!id) return;
+                if (!map[id]) map[id] = {id, kind: k, label: id, sections: []};
+                if (!map[id].sections.find(s => JSON.stringify(s) === sig))
+                    map[id].sections.push({doc: ref.doc, chapter: ref.chapter, page: ref.page});
+            });
+        });
+    });
+    return Object.values(map);
+};
+
+// Navigation depuis WHERE EXTRACTED → onglet Analysis, scroll jusqu'au chunk
+APP._goToAnalysisChunk = function (ref) {
+    // Analysis est un sous-onglet de sources
+    this._sourcesTab = 'analysis';
+    this.navigate('sources');
+    const key = JSON.stringify({doc: ref.doc, chapter: ref.chapter, page: ref.page});
+    setTimeout(() => {
+        const row = Array.from(document.querySelectorAll('tr[data-chunk-ref]'))
+            .find(tr => tr.dataset.chunkRef === key);
+        if (!row) return;
+        row.scrollIntoView({behavior: 'smooth', block: 'center'});
+        row.style.transition = 'background 0.4s';
+        row.style.background = 'var(--accent-dim, rgba(99,102,241,0.18))';
+        setTimeout(() => { row.style.background = ''; }, 2000);
+    }, 80);
+};
+
+// Chunks (vue document-centrée) : [{ref, text, ids, error}]
+APP._analysisChunks = function () {
+    const k = this._analysisKey();
+    if (!k) return [];
+    try { const a = JSON.parse(localStorage.getItem(k + '::chunks') || '[]'); return Array.isArray(a) ? a : []; }
+    catch { return []; }
+};
+APP._analysisSaveChunks = function (chunks) {
+    const k = this._analysisKey();
+    if (k) {
+        try { localStorage.setItem(k + '::chunks', JSON.stringify(chunks || [])); }
+        catch (e) { /* quota dépassé : on ignore, le tableau chunk sera juste vide */ }
+    }
+};
+// Surligne dans `text` les termes candidats extraits — travaille sur le texte brut,
+// construit le HTML en une seule passe (évite les matches dans les balises <mark>).
+APP._highlightTerms = function (text, ids) {
+    const plain = text || '';
+    if (!plain) return '';
+    const terms = new Set();
+    // Mots réservés HTML à exclure
+    const EXCLUDED = new Set(['mark','span','href','style','class','attr','text','data','body','head','html','true','false','null']);
+    Object.values(ids || {}).forEach(list => (list || []).forEach(id => {
+        if (!id) return;
+        const spaced = String(id)
+            .replace(/([a-z])([A-Z])/g, '$1 $2')
+            .replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2')
+            .replace(/[_]+/g, ' ').trim();
+        const words = spaced.split(/\s+/);
+        // Ajouter d'abord la phrase complète (priorité max car plus longue)
+        if (words.length > 1 && spaced.length > 4) terms.add(spaced);
+        // Puis les mots individuels en fallback
+        words.forEach(w => {
+            const lw = w.toLowerCase();
+            if (w.length > 3 && !EXCLUDED.has(lw)) terms.add(w);
+        });
+    }));
+    // Trouver tous les intervalles à surligner (sur le texte brut, insensible à la casse)
+    const sorted = [...terms].sort((a, b) => b.length - a.length);
+    const ranges = []; // [{start, end}]
+    for (const t of sorted) {
+        const pat = t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        try {
+            const re = new RegExp('\\b' + pat + '\\b', 'gi');
+            let m;
+            while ((m = re.exec(plain)) !== null) {
+                // Ignorer si chevauchement avec un range existant
+                if (!ranges.some(r => m.index < r.end && m.index + m[0].length > r.start))
+                    ranges.push({start: m.index, end: m.index + m[0].length});
+            }
+        } catch { /* regex invalide */ }
+    }
+    if (!ranges.length) return this._esc(plain);
+    ranges.sort((a, b) => a.start - b.start);
+    // Construire le HTML en une passe
+    let result = '', pos = 0;
+    for (const {start, end} of ranges) {
+        result += this._esc(plain.slice(pos, start));
+        result += `<mark style="background:var(--accent);color:#fff;border-radius:3px;padding:0 2px">${this._esc(plain.slice(start, end))}</mark>`;
+        pos = end;
+    }
+    result += this._esc(plain.slice(pos));
+    return result;
+};
+APP._analysisInProgress = null;  // {total, done, chunks: [{ref, added, error}]}
+
 APP._corpusAnalyse = async function () {
     const docs = this._corpusDocs();
     if (!docs.length) { if (UI && UI.error) UI.error('Add at least one document first.'); return; }
-    const key = (this._llmKeys().anthropic || '').trim();
-    if (!key) { if (UI && UI.error) UI.error('Configure an Anthropic API key in the LLMs tab first.'); return; }
-    const btn = document.getElementById('corpus-analyse-btn');
-    if (btn) { btn.disabled = true; btn.textContent = '⏳ Analysing corpus… (this can take a while)'; }
-    try {
-        const r = await API.analyseCorpus(key, this._llmModel(), docs, this._llmPrompt());
-        this._analysisSave(r.provenance || []);
-        await APP.refresh();                 // recharge l'ontologie (éléments candidats fusionnés)
-        const a = r.added || {};
-        const n = Object.values(a).reduce((x, y) => x + (y || 0), 0);
-        if ((r.errors || []).length) console.warn('Corpus analysis warnings:', r.errors);
-        if (UI && UI.success) UI.success(`Corpus analysed: ${n} candidate elements merged into the ontology.`);
-        APP._sourcesTab = 'analysis';
-        APP.navigate('sources');
-    } catch (e) {
-        if (btn) { btn.disabled = false; btn.textContent = '🔬 Analyse Corpus'; }
-        if (UI && UI.error) UI.error('Analysis failed: ' + (e && e.message ? e.message : e));
+
+    const provider  = this._llmProvider();
+    const metaMode  = this._llmMetaMode();
+    const isOllama  = provider === 'meta' && metaMode === 'local';
+    let   api_key   = (this._llmKeys()[provider] || '').trim();
+    let   model     = '';
+    let   base_url  = '';
+
+    if (provider === 'anthropic') {
+        model = this._llmModel();
+        if (!api_key) { UI.error('Configure an Anthropic API key in the LLMs tab first.'); return; }
+    } else if (provider === 'openai') {
+        model = this._llmOpenAIModel();
+        if (!api_key) { UI.error('Configure an OpenAI API key in the LLMs tab first.'); return; }
+    } else if (provider === 'meta') {
+        if (isOllama) {
+            base_url = this._llmOllamaUrl();
+            model    = this._llmOllamaModel();
+            api_key  = 'ollama';
+            if (!base_url) { UI.error('Configure the Ollama URL in the LLMs tab first.'); return; }
+        } else {
+            model = this._llmMetaCloudModel();
+            if (!api_key) { UI.error('Configure a Meta/Llama API key in the LLMs tab first.'); return; }
+        }
     }
+    const btn = document.getElementById('corpus-analyse-btn');
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Analysing…'; }
+
+    // Effacer les résultats/erreurs précédents et basculer sur l'onglet Analysis
+    this._analysisSave([], []);
+    this._analysisSaveChunks([]);
+    this._analysisInProgress = { done: 0, chunks: [] };
+    this._setAnalysisStatus({ state: 'running', done: 0, elements: 0 });
+    APP._sourcesTab = 'analysis';
+    APP.navigate('sources');
+
+    const ctrl = new AbortController();
+    // Timeout d'INACTIVITÉ (pas total) : réarmé à chaque event reçu (chunk/heartbeat).
+    // Le backend envoie un heartbeat toutes les 100s → 250s couvre un modèle local lent.
+    let tid;
+    const resetIdle = () => { clearTimeout(tid); tid = setTimeout(() => ctrl.abort(), 250_000); };
+    resetIdle();
+    try {
+        const resp = await fetch('/api/corpus/analyse', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ api_key, model, provider, base_url,
+                                   documents: docs, system_prompt: this._llmPrompt() }),
+            signal: ctrl.signal,
+        });
+        if (!resp.ok) {
+            const err = await resp.json().catch(() => ({ detail: resp.statusText }));
+            throw new Error(err.detail || resp.statusText);
+        }
+
+        const reader = resp.body.getReader();
+        const dec = new TextDecoder();
+        let buf = '';
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            resetIdle();  // réarme le timeout d'inactivité à chaque paquet reçu
+            buf += dec.decode(value, { stream: true });
+            const lines = buf.split('\n');
+            buf = lines.pop();
+            for (const line of lines) {
+                if (!line.startsWith('data: ')) continue;
+                let ev;
+                try { ev = JSON.parse(line.slice(6)); } catch { continue; }
+                if (ev.type === 'heartbeat') continue;
+                if (ev.type === 'chunk') {
+                    this._analysisInProgress.done++;
+                    this._analysisInProgress.chunks.push(ev);
+                    const elems = this._analysisInProgress.chunks.reduce((sum, c) =>
+                        sum + Object.values(c.ids || {}).reduce((a, l) => a + (l || []).length, 0), 0);
+                    this._setAnalysisStatus({ state: 'running', done: this._analysisInProgress.done, elements: elems });
+                    this.renderSection('sources');  // mise à jour temps réel
+                } else if (ev.type === 'done' || ev.type === 'error') {
+                    clearTimeout(tid);
+                    const chunksDone = (this._analysisInProgress && this._analysisInProgress.done) || 0;
+                    this._lastChunks = (this._analysisInProgress && this._analysisInProgress.chunks) || [];
+                    this._analysisInProgress = null;
+                    if (ev.type === 'done') {
+                        const errs = ev.errors || [];
+                        this._analysisSave(ev.provenance || [], errs);
+                        this._analysisSaveChunks(this._lastChunks || []);
+                        await APP.refresh();
+                        const n = Object.values(ev.added || {}).reduce((x, y) => x + (y || 0), 0);
+                        this._setAnalysisStatus({ state: 'done', done: chunksDone, elements: n });
+                        if (n > 0 && UI && UI.success) UI.success(`Corpus analysed: ${n} candidate elements merged.`);
+                        else if (UI && UI.warn) UI.warn('Corpus analysed: 0 new elements. See Analysis tab for details.');
+                    } else {
+                        this._setAnalysisStatus({ state: 'error', done: chunksDone, message: ev.message });
+                        if (UI && UI.error) UI.error('Analysis error: ' + ev.message);
+                    }
+                    this.renderSection('sources');
+                }
+            }
+        }
+    } catch (e) {
+        clearTimeout(tid);
+        this._analysisInProgress = null;
+        this._setAnalysisStatus({ state: 'error', done: 0, message: (e && e.message ? e.message : String(e)) });
+        if (btn) { btn.disabled = false; btn.textContent = '🔬 Analyse with selected LLM'; }
+        if (UI && UI.error) UI.error('Analysis failed: ' + (e && e.message ? e.message : e));
+        this.renderSection('sources');
+        return;
+    }
+    if (btn) { btn.disabled = false; btn.textContent = '🔬 Analyse with selected LLM'; }
 };
+
+// Détecte et fusionne les doublons : exacts+casse en auto, pluriels validés un par un
+APP._corpusDedupe = async function () {
+    let dups;
+    try { dups = await API.getDuplicates(); }
+    catch (e) { UI.error('Duplicate detection failed: ' + e.message); return; }
+
+    const KIND_LBL = { classes: 'class', object_properties: 'ObjectProperty',
+                       datatype_properties: 'DatatypeProperty', individuals: 'individual' };
+    const exactCount = Object.values(dups).reduce((n, v) => n + v.exact.length, 0);
+    const caseCount  = Object.values(dups).reduce((n, v) => n + v.case.length, 0);
+    // "plural / variant" pairs → manual validation
+    const pluralPairs = [];
+    Object.entries(dups).forEach(([kind, v]) => v.plural.forEach(g => pluralPairs.push({ kind, ids: g })));
+
+    if (!exactCount && !caseCount && !pluralPairs.length) {
+        UI.success('No duplicates found. 👍');
+        return;
+    }
+
+    // 1) Auto: exact + case. 2) Plural: ask which id to keep (or skip)
+    const merges = [];
+    for (const p of pluralPairs) {
+        const [a, b] = p.ids;
+        const keep = await UI.confirm(
+            `Duplicate ${KIND_LBL[p.kind]} (variant):<br>
+             <b>${this._esc(a)}</b> and <b>${this._esc(b)}</b><br>
+             <small style="color:var(--text-dim)">OK = merge into “${this._esc(a)}” · Cancel = keep both</small>`);
+        if (keep) merges.push({ kind: p.kind, keep: a, remove: [b] });
+    }
+
+    try {
+        const res = await API.mergeDuplicates({ auto_exact: true, auto_case: true, merges });
+        await APP.refresh();
+        APP.renderSection('sources');
+        UI.success(`Duplicates cleaned: ${res.exact_removed} exact removed, ${res.merged} merged.`);
+    } catch (e) { UI.error('Merge failed: ' + e.message); }
+};
+
 APP._renderAnalysis = function () {
     const onto = this.state.ontology;
     if (!onto) {
         return `<div style="padding:24px;color:var(--text-dim)"><p style="font-size:13px;font-style:italic">Analysis is specific to each ontology. Connect an ontology first.</p></div>`;
     }
-    const data = this._analysisData();
-    if (!data.length) {
-        return `<div style="padding:24px;color:var(--text-dim)"><p style="font-size:13px;font-style:italic">No analysis yet. Go to the <b>Corpus</b> tab and click <b>🔬 Analyse Corpus</b> to extract a candidate ontology from your documents.</p></div>`;
-    }
-    const KIND = {
-        class:      { sec: 'classes',              dot: 'cls-dot',      lbl: 'Class' },
-        op:         { sec: 'object-properties',    dot: 'op-prop-dot',  lbl: 'ObjectProperty' },
-        dp:         { sec: 'datatype-properties',  dot: 'dp-prop-dot',  lbl: 'DatatypeProperty' },
-        individual: { sec: 'individuals',          dot: 'xsd-dot',      lbl: 'Individual' },
-        rule:       { sec: 'swrl-rules',           dot: null,           lbl: 'SWRL Rule' },
+    const KIND_DOT = {classes:'cls-dot', object_properties:'op-prop-dot',
+                       datatype_properties:'dp-prop-dot', individuals:'xsd-dot', swrl_rules:'⚙️'};
+    const KIND_LBL = {classes:'C', object_properties:'OP', datatype_properties:'DP',
+                      individuals:'I', swrl_rules:'⚙️'};
+    const KIND_SEC = {classes:'classes', object_properties:'object-properties',
+                      datatype_properties:'datatype-properties', individuals:'individuals',
+                      swrl_rules:'swrl-rules'};
+
+    // Identifiant lisible d'un chunk : doc — chapitre (préféré) sinon doc — p.N
+    const chunkLabel = (ref) => {
+        const r = ref || {};
+        const parts = [r.doc || '?'];
+        if (r.chapter) parts.push(r.chapter);
+        else if (r.page != null) parts.push('p.' + r.page);
+        return parts.join(' — ');
     };
-    const th = (l, ex = '') => `<th style="text-align:left;padding:7px 10px;border-bottom:2px solid var(--border);color:var(--text-dim);font-size:11px;text-transform:uppercase;letter-spacing:.04em;${ex}">${l}</th>`;
-    const rows = data.map(e => {
-        const k = KIND[e.kind] || { sec: 'classes', lbl: e.kind };
-        const icon = k.dot ? `<span class="${k.dot}" style="display:inline-block;margin-right:7px;vertical-align:middle"></span>` : '⚙️ ';
-        const idLink = `<span onclick="APP.navigateTo('${k.sec}','${this._escAttr(e.id)}')" style="cursor:pointer;color:var(--accent);font-family:monospace" title="Go to this ${k.lbl}">${this._esc(e.id)}</span>`;
-        const label = e.label ? ` <span style="color:var(--text-dim);font-size:11px">${this._esc(e.label)}</span>` : '';
-        const secs = (e.sections || []).map(s => {
-            const parts = [s.doc];
-            if (s.chapter) parts.push(s.chapter);
-            if (s.page != null) parts.push('p.' + s.page);
-            return `<span style="display:inline-block;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:2px 9px;margin:2px;font-size:11px">${this._esc(parts.join(' — '))}</span>`;
-        }).join('') || '<span style="color:var(--text-faint);font-size:11px">—</span>';
-        return `<tr>
-            <td style="padding:7px 10px;border-bottom:1px solid var(--border);vertical-align:top;white-space:nowrap">${icon}${idLink}${label}</td>
-            <td style="padding:7px 10px;border-bottom:1px solid var(--border);vertical-align:top;color:var(--text-dim);font-size:12px">${this._esc(k.lbl)}</td>
-            <td style="padding:7px 10px;border-bottom:1px solid var(--border);vertical-align:top">${secs}</td>
+
+    // Une ligne de tableau (3 colonnes) pour un chunk
+    const chunkRow = (c) => {
+        const ref = c.ref || {};
+        const refKey = this._escAttr(JSON.stringify({doc: ref.doc, chapter: ref.chapter, page: ref.page}));
+        const chunkCell = `<div style="font-size:12px;font-weight:600;color:var(--text1)">${this._esc(ref.doc || '?')}</div>
+            ${ref.chapter ? `<div style="font-size:11px;color:var(--accent);margin-top:2px">${this._esc(ref.chapter)}</div>` : ''}
+            ${ref.page != null ? `<div style="font-size:10px;color:var(--text-faint);margin-top:1px">p.${ref.page}</div>` : ''}`;
+
+        if (c.error) {
+            return `<tr data-chunk-ref="${refKey}">
+                <td style="padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:top;white-space:nowrap">${chunkCell}</td>
+                <td colspan="2" style="padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:top;color:var(--error,#e74c3c);font-size:12px">⚠ ${this._esc(c.error)}</td>
+            </tr>`;
+        }
+        const ids = c.ids || {};
+        const textHtml = c.text
+            ? `<div style="font-size:11px;line-height:1.5;color:var(--text-dim);max-height:140px;overflow:auto;white-space:pre-wrap">${this._highlightTerms(c.text, ids)}</div>`
+            : `<span style="color:var(--text-faint);font-size:11px">—</span>`;
+        const chips = Object.entries(ids).flatMap(([kind, list]) =>
+            (list || []).map(id => {
+                const dot = KIND_DOT[kind];
+                const sec = KIND_SEC[kind] || 'classes';
+                const isEmoji = dot && /\p{Emoji}/u.test(dot);
+                const icon = !dot ? `<b>${KIND_LBL[kind]||kind} </b>`
+                           : isEmoji ? `<span style="font-size:11px;margin-right:3px">${dot}</span>`
+                           : `<span class="${dot}" style="display:inline-block;vertical-align:middle;margin-right:3px"></span>`;
+                return `<span onclick="APP.navigateTo('${sec}','${this._escAttr(id)}')" title="Go to ${this._esc(id)}" style="display:inline-flex;align-items:center;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:1px 7px;margin:2px;font-size:11px;font-family:monospace;cursor:pointer">${icon}${this._esc(id)}</span>`;
+            })
+        ).join('');
+        const elemHtml = chips || `<span style="color:var(--text-faint);font-size:11px">—</span>`;
+        return `<tr data-chunk-ref="${refKey}">
+            <td style="padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:top;white-space:nowrap">${chunkCell}</td>
+            <td style="padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:top;max-width:380px">${textHtml}</td>
+            <td style="padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:top;line-height:1.8">${elemHtml}</td>
         </tr>`;
-    }).join('');
-    return `<div style="padding:20px;max-width:1000px">
+    };
+
+    const th = (l, ex = '') => `<th style="text-align:left;padding:7px 10px;border-bottom:2px solid var(--border);color:var(--text-dim);font-size:11px;text-transform:uppercase;letter-spacing:.04em;${ex}">${l}</th>`;
+    const tableHead = `<thead><tr>${th('Chunk', 'width:170px')}${th('Text extract')}${th('Extracted elements', 'width:300px')}</tr></thead>`;
+
+    // Un chunk est "vide" s'il n'a ni erreur ni aucun élément extrait → on le masque
+    const hasContent = (c) => !!c.error || Object.values(c.ids || {}).some(list => (list || []).length);
+    const hiddenNote = (n) => n > 0
+        ? `<p style="margin:8px 0 0;font-size:11px;color:var(--text-faint);font-style:italic">${n} empty chunk${n > 1 ? 's' : ''} hidden (no element extracted).</p>`
+        : '';
+
+    // ── mode Claude Code (polling) ────────────────────────────────────────
+    if (this._ccChunks !== null) {
+        const visible = this._ccChunks.filter(hasContent);
+        const hidden  = this._ccChunks.length - visible.length;
+        const rows = visible.map(chunkRow).join('');
+        return `<div id="analysis-tab-live" style="padding:20px;max-width:1100px">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+                <span style="font-size:15px">🤖</span>
+                <span style="font-size:13px;font-weight:600;color:var(--text1)">Claude Code is analysing… (${this._ccChunks.length} chunk${this._ccChunks.length !== 1 ? 's' : ''} received)</span>
+            </div>
+            <table style="width:100%;border-collapse:collapse">${tableHead}
+                <tbody>${rows || '<tr><td colspan="3" style="padding:10px;color:var(--text-dim);font-style:italic">Waiting for first chunk…</td></tr>'}</tbody>
+            </table>
+            ${hiddenNote(hidden)}
+        </div>`;
+    }
+
+    // ── état "en cours" (LLM) ─────────────────────────────────────────────
+    const ip = this._analysisInProgress;
+    if (ip) {
+        const visible = ip.chunks.filter(hasContent);
+        const hidden  = ip.chunks.length - visible.length;
+        const rows = visible.map(chunkRow).join('');
+        return `<div style="padding:20px;max-width:1100px">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+                <span style="font-size:15px">⏳</span>
+                <span style="font-size:13px;font-weight:600;color:var(--text1)">Analysing corpus… (${ip.done} chunk${ip.done !== 1 ? 's' : ''} processed)</span>
+            </div>
+            <table style="width:100%;border-collapse:collapse">${tableHead}
+                <tbody>${rows || '<tr><td colspan="3" style="padding:10px;color:var(--text-dim);font-style:italic">Waiting for elements…</td></tr>'}</tbody>
+            </table>
+            ${hiddenNote(hidden)}
+        </div>`;
+    }
+
+    // ── état persisté ─────────────────────────────────────────────────────
+    const chunks = this._analysisChunks();
+    const errs = this._analysisErrors();
+    const errBlock = errs.length ? `<div style="margin:0 0 16px;padding:10px 14px;background:var(--error-bg,#3a1a1a);border:1px solid var(--error,#c0392b);border-radius:6px;font-size:12px;color:var(--error,#e74c3c)">
+        <b>⚠ Analysis errors (${errs.length})</b><br>${errs.map(e => `<span style="font-family:monospace">[${this._esc(e.doc)}]</span> ${this._esc(e.error)}`).join('<br>')}
+    </div>` : '';
+
+    if (!chunks.length) {
+        return `<div style="padding:24px">${errBlock}<p style="font-size:13px;font-style:italic;color:var(--text-dim)">No analysis yet. Go to the <b>Corpus</b> tab and click <b>🔬 Analyse with selected LLM</b> to extract a candidate ontology from your documents.</p></div>`;
+    }
+
+    const visible = chunks.filter(hasContent);
+    const hidden  = chunks.length - visible.length;
+    if (!visible.length) {
+        return errBlock + `<div style="padding:24px"><p style="font-size:13px;font-style:italic;color:var(--text-dim)">${chunks.length} chunk${chunks.length > 1 ? 's' : ''} analysed, but no element was extracted. Try a more capable model (e.g. Claude) or refine the extraction prompt in the LLMs tab.</p></div>`;
+    }
+    const rows = visible.map(chunkRow).join('');
+    return errBlock + `<div style="padding:20px;max-width:1100px">
         <p style="margin:0 0 16px;font-size:13px;color:var(--text-dim);line-height:1.6">
-            Candidate ontology elements extracted from the corpus of <b style="color:var(--text1)">${this._esc(onto.name || '')}</b>.
-            Each element ID is <b style="color:var(--text1)">navigable</b> to its ontology section; the
-            <b style="color:var(--text1)">Source sections</b> show where it was identified (document — chapter / page).
+            Corpus chunks analysed for <b style="color:var(--text1)">${this._esc(onto.name || '')}</b>.
+            For each chunk: its <b style="color:var(--text1)">source</b> (document — chapter / page),
+            the <b style="color:var(--text1)">text extract</b> with candidate terms highlighted, and the
+            <b style="color:var(--text1)">extracted elements</b> (navigable).
         </p>
-        <table style="width:100%;border-collapse:collapse;font-size:13px">
-            <thead><tr>${th('Element', 'width:280px')}${th('Type', 'width:140px')}${th('Source sections')}</tr></thead>
+        <table style="width:100%;border-collapse:collapse;font-size:13px">${tableHead}
             <tbody>${rows}</tbody>
         </table>
+        ${hiddenNote(hidden)}
     </div>`;
 };
 

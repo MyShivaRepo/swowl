@@ -9,6 +9,8 @@
 const SparqlEditor = {
 
     _selectedId:   null,
+    _selectedIds:  new Set(),
+    _anchorId:     null,
     _editingQuery: null,
     _isNew:        false,
     _searchQuery:  '',
@@ -41,8 +43,10 @@ const SparqlEditor = {
                  style="display:flex;flex-direction:column">
                 <div class="tree-panel-header">
                     <h3>🔎 Queries</h3>
-                    <button class="btn-sm" onclick="SparqlEditor.newQuery()"
-                            title="New query">➕</button>
+                    <div style="display:flex;gap:4px;align-items:center;flex-shrink:0" id="sparql-toolbar-btns">
+                        <button class="btn-sm" onclick="SparqlEditor.newQuery()"
+                                title="New query">➕</button>
+                    </div>
                 </div>
                 <div class="tree-scroll" id="sparql-list" style="flex:1">
                     ${this.renderList(queries)}
@@ -88,9 +92,9 @@ const SparqlEditor = {
             const mainText = x.label || x.id;
             const subText  = x.label ? x.id : '';
             return `
-            <div class="tree-item${x.id === this._selectedId ? ' selected' : ''}${isImported ? ' imported-entity' : ''}"
+            <div class="tree-item${this._selectedIds.has(x.id) ? ' selected' : ''}${isImported ? ' imported-entity' : ''}"
                  data-id="${x.id}" style="align-items:center"
-                 onclick="SparqlEditor.selectQuery('${x.id}')"
+                 onclick="SparqlEditor.selectQuery('${x.id}', event)"
                  oncontextmenu="event.preventDefault();SparqlEditor.showContextMenu(event,'${x.id}')">
                 <span style="font-size:13px;flex-shrink:0;line-height:1">🎯</span>
                 <span style="flex:1;overflow:hidden;min-width:0">
@@ -137,13 +141,113 @@ const SparqlEditor = {
         };
     },
 
-    selectQuery(id) {
+    selectQuery(id, evtOrHist = true) {
         const q = this._loadAll().find(x => x.id === id);
         if (!q) return;
-        this._selectedId   = id;
-        this._editingQuery = JSON.parse(JSON.stringify(q));
+
+        const isShift = evtOrHist && typeof evtOrHist === 'object' && evtOrHist.shiftKey;
+        const isCtrl  = evtOrHist && typeof evtOrHist === 'object' && (evtOrHist.ctrlKey || evtOrHist.metaKey);
+
+        if (isShift && this._anchorId) {
+            const items = [...document.querySelectorAll('#sparql-list .tree-item[data-id]')];
+            const ids   = items.map(el => el.dataset.id);
+            const from  = ids.indexOf(this._anchorId);
+            const to    = ids.indexOf(id);
+            if (from !== -1 && to !== -1) {
+                const [lo, hi] = from < to ? [from, to] : [to, from];
+                this._selectedIds = new Set(ids.slice(lo, hi + 1));
+            } else {
+                this._selectedIds.add(id);
+            }
+        } else if (isCtrl) {
+            if (this._selectedIds.has(id)) {
+                this._selectedIds.delete(id);
+            } else {
+                this._selectedIds.add(id);
+                this._anchorId = id;
+            }
+        } else {
+            this._selectedIds = new Set([id]);
+            this._anchorId    = id;
+        }
+
+        this._selectedId = id;
+        document.querySelectorAll('#sparql-list .tree-item[data-id]').forEach(el =>
+            el.classList.toggle('selected', this._selectedIds.has(el.dataset.id)));
+        this._updateToolbar();
+
+        if (this._selectedIds.size === 1) {
+            this._editingQuery = JSON.parse(JSON.stringify(q));
+            this._renderDetail();
+        } else {
+            this._renderMultiSelDetail();
+        }
+    },
+
+    _updateToolbar() {
+        const tb = document.getElementById('sparql-toolbar-btns');
+        if (!tb) return;
+        let btn = document.getElementById('sparql-delete-sel-btn');
+        const n = [...this._selectedIds].filter(id => {
+            const x = this._loadAll().find(q => q.id === id);
+            return x && !x._imported;
+        }).length;
+        if (n > 1) {
+            if (!btn) {
+                btn = document.createElement('button');
+                btn.id = 'sparql-delete-sel-btn';
+                btn.className = 'btn-sm';
+                btn.style.color = 'var(--red,#ef4444)';
+                btn.title = 'Delete selected queries';
+                btn.onclick = () => SparqlEditor.deleteSelected();
+                tb.insertBefore(btn, tb.firstChild);
+            }
+            btn.textContent = `🗑 ${n}`;
+        } else if (btn) {
+            btn.remove();
+        }
+    },
+
+    _renderMultiSelDetail() {
+        const panel = document.getElementById('sparql-detail');
+        if (!panel) return;
+        const n = this._selectedIds.size;
+        panel.innerHTML = `
+            <div style="padding:24px;display:flex;flex-direction:column;gap:12px;align-items:flex-start">
+                <p style="font-size:13px;color:var(--text-dim);margin:0">
+                    <b style="color:var(--text1)">${n} queries selected</b>
+                </p>
+                <button class="btn btn-danger" onclick="SparqlEditor.deleteSelected()">
+                    ${ClassEditor._svgDelete} Delete ${n} queries
+                </button>
+            </div>`;
+    },
+
+    async deleteSelected() {
+        const ids = [...this._selectedIds].filter(id => {
+            const x = this._loadAll().find(q => q.id === id);
+            return x && !x._imported;
+        });
+        if (!ids.length) return;
+        const confirmed = await UI.confirm(
+            `Delete <strong>${ids.length}</strong> quer${ids.length > 1 ? 'ies' : 'y'}?<br>
+             <small style="color:var(--text-dim)">${ids.join(', ')}</small>`);
+        if (!confirmed) return;
+        for (const id of ids) {
+            APP.state.queries = (APP.state.queries || []).filter(x => x.id !== id);
+            API.deleteQuery(id).catch(() => {});
+        }
+        UI.success(`${ids.length} quer${ids.length > 1 ? 'ies' : 'y'} deleted`);
+        this._selectedIds.clear();
+        this._anchorId    = null;
+        this._selectedId  = null;
+        this._editingQuery = null;
+        this._updateToolbar();
         this._refreshList();
-        this._renderDetail();
+        const panel = document.getElementById('sparql-detail');
+        if (panel) panel.innerHTML = `<div class="detail-panel-empty">
+            <span style="font-size:36px">🔎</span>
+            <span>Select a query or create a new one</span></div>`;
     },
 
     deleteQuery(id) {
@@ -151,6 +255,8 @@ const SparqlEditor = {
         if (q?._imported) { UI.error('Cannot delete an imported query.'); return; }
         APP.state.queries = (APP.state.queries || []).filter(x => x.id !== id);
         API.deleteQuery(id).catch(() => {});
+        this._selectedIds.delete(id);
+        this._updateToolbar();
         if (this._selectedId === id) {
             this._selectedId   = null;
             this._editingQuery = null;
@@ -1225,14 +1331,19 @@ const SparqlEditor = {
     // ── Menu contextuel (clic droit sur une requête) ──────────
     showContextMenu(event, id) {
         this._closeContextMenu();
-        if (this._selectedId !== id) this.selectQuery(id);
+        if (!this._selectedIds.has(id)) this.selectQuery(id);
         const q = this._loadAll().find(x => x.id === id);
         const isImported = !!q?._imported;
+        const multiCount = [...this._selectedIds].filter(i => !this._loadAll().find(x => x.id === i)?._imported).length;
         const menu = document.createElement('div');
         menu.id = 'sparql-ctx-menu';
         menu.className = 'ctx-menu';
         if (isImported) {
             menu.innerHTML = _importedCtxBanner();
+        } else if (multiCount > 1) {
+            menu.innerHTML = `
+                <div class="ctx-item ctx-danger" onclick="SparqlEditor._closeContextMenu();SparqlEditor.deleteSelected()">
+                    ${ClassEditor._svgDelete} Delete ${multiCount} Queries</div>`;
         } else {
             menu.innerHTML = `
                 <div class="ctx-item ctx-danger" onclick="SparqlEditor._closeContextMenu();SparqlEditor.deleteQuery('${id}')">

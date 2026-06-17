@@ -10,6 +10,8 @@
 const SWRLEditor = {
 
     _selectedId:   null,
+    _selectedIds:  new Set(),
+    _anchorId:     null,
     _editingId:             null,   // original ID of the rule being edited
     _editingRule:           null,
     _isNew:                 false,
@@ -51,7 +53,7 @@ const SWRLEditor = {
             <div class="tree-panel" id="swrl-list-panel" style="display:flex;flex-direction:column">
                 <div class="tree-panel-header">
                     <h3>SWRL Rules</h3>
-                    <div style="display:flex;gap:4px;align-items:center;flex-shrink:0">
+                    <div style="display:flex;gap:4px;align-items:center;flex-shrink:0" id="swrl-toolbar-btns">
                         <button class="btn-sm" onclick="SWRLEditor.importRules()" title="Import rules from a .sword file">📥</button>
                         <button class="btn-sm" onclick="SWRLEditor.newRule()" title="New SWRL rule">➕</button>
                     </div>
@@ -132,19 +134,17 @@ const SWRLEditor = {
         const filtered = this._filterRules(rules);
         if (!filtered || !filtered.length)
             return `<div class="cls-list-empty" style="padding:12px">${this._searchQuery ? 'No matching rule' : 'No SWRL rule'}</div>`;
-        const sel = this._selectedId;
         return filtered.map(r => {
             const broken     = this._ruleHasBrokenRefs(r);
             const isImported = !!r._imported;
-            // Préfixe sur l'ID (pas le label) : import → préfixe contextuel ;
-            // règle native → préfixe de l'ontologie courante (via _displayId).
             const idText     = _displayId(r);
             const mainText   = r.label || idText;
             const subText    = r.label ? idText : '';
+            const isSel      = this._selectedIds.has(r.id);
             return `
-            <div class="tree-item${r.id === sel ? ' selected' : ''}${isImported ? ' imported-entity' : ''}" data-id="${r.id}"
+            <div class="tree-item${isSel ? ' selected' : ''}${isImported ? ' imported-entity' : ''}" data-id="${r.id}"
                  style="align-items:center${broken ? ';color:var(--red,#ef4444)' : ''}"
-                 onclick="SWRLEditor.selectRule('${r.id}')"
+                 onclick="SWRLEditor.selectRule('${r.id}', event)"
                  oncontextmenu="event.preventDefault();SWRLEditor.showContextMenu(event,'${r.id}')">
                 <span style="font-size:13px;flex-shrink:0;line-height:1;${broken ? 'color:var(--red,#ef4444)' : 'color:var(--text-dim)'}">⚙️</span>
                 <span style="flex:1;overflow:hidden;min-width:0">
@@ -178,17 +178,120 @@ const SWRLEditor = {
     },
 
     // ── Selection / creation ─────────────────────────────────────
-    selectRule(id, _hist = true) {
+    selectRule(id, evtOrHist = true) {
         const rule = (APP.state.swrl_rules || []).find(r => r.id === id);
         if (!rule) return;
-        if (_hist) APP._pushNav('swrl-rules', id);
-        this._selectedId  = id;
-        this._editingId   = id;
-        this._isNew       = false;
-        this._editingRule = JSON.parse(JSON.stringify(rule));
-        this._renderDetail();
-        document.querySelectorAll('#swrl-list .tree-item').forEach(el =>
-            el.classList.toggle('selected', el.dataset.id === id));
+
+        const isShift = evtOrHist && typeof evtOrHist === 'object' && evtOrHist.shiftKey;
+        const isCtrl  = evtOrHist && typeof evtOrHist === 'object' && (evtOrHist.ctrlKey || evtOrHist.metaKey);
+
+        if (isShift && this._anchorId) {
+            const items = [...document.querySelectorAll('#swrl-list .tree-item[data-id]')];
+            const ids   = items.map(el => el.dataset.id);
+            const from  = ids.indexOf(this._anchorId);
+            const to    = ids.indexOf(id);
+            if (from !== -1 && to !== -1) {
+                const [lo, hi] = from < to ? [from, to] : [to, from];
+                this._selectedIds = new Set(ids.slice(lo, hi + 1));
+            } else {
+                this._selectedIds.add(id);
+            }
+        } else if (isCtrl) {
+            if (this._selectedIds.has(id)) {
+                this._selectedIds.delete(id);
+            } else {
+                this._selectedIds.add(id);
+                this._anchorId = id;
+            }
+        } else {
+            this._selectedIds = new Set([id]);
+            this._anchorId    = id;
+        }
+
+        this._selectedId = id;
+        document.querySelectorAll('#swrl-list .tree-item[data-id]').forEach(el =>
+            el.classList.toggle('selected', this._selectedIds.has(el.dataset.id)));
+        this._updateToolbar();
+
+        // Afficher le détail seulement si une seule règle sélectionnée
+        if (this._selectedIds.size === 1) {
+            if (evtOrHist !== false) APP._pushNav('swrl-rules', id);
+            this._editingId   = id;
+            this._isNew       = false;
+            this._editingRule = JSON.parse(JSON.stringify(rule));
+            this._renderDetail();
+        } else {
+            this._renderMultiSelDetail();
+        }
+    },
+
+    _updateToolbar() {
+        const tb = document.getElementById('swrl-toolbar-btns');
+        if (!tb) return;
+        let btn = document.getElementById('swrl-delete-sel-btn');
+        const n = [...this._selectedIds].filter(id => {
+            const r = (APP.state.swrl_rules || []).find(x => x.id === id);
+            return r && !r._imported;
+        }).length;
+        if (n > 1) {
+            if (!btn) {
+                btn = document.createElement('button');
+                btn.id = 'swrl-delete-sel-btn';
+                btn.className = 'btn-sm';
+                btn.style.color = 'var(--red,#ef4444)';
+                btn.title = 'Delete selected rules';
+                btn.onclick = () => SWRLEditor.deleteSelected();
+                tb.insertBefore(btn, tb.firstChild);
+            }
+            btn.textContent = `🗑 ${n}`;
+        } else if (btn) {
+            btn.remove();
+        }
+    },
+
+    _renderMultiSelDetail() {
+        const panel = document.getElementById('swrl-detail');
+        if (!panel) return;
+        const n = this._selectedIds.size;
+        panel.innerHTML = `
+            <div style="padding:24px;display:flex;flex-direction:column;gap:12px;align-items:flex-start">
+                <p style="font-size:13px;color:var(--text-dim);margin:0">
+                    <b style="color:var(--text1)">${n} rules selected</b>
+                </p>
+                <button class="btn btn-danger" onclick="SWRLEditor.deleteSelected()">
+                    ${ClassEditor._svgDelete} Delete ${n} rules
+                </button>
+            </div>`;
+    },
+
+    async deleteSelected() {
+        const ids = [...this._selectedIds].filter(id => {
+            const r = (APP.state.swrl_rules || []).find(x => x.id === id);
+            return r && !r._imported;
+        });
+        if (!ids.length) return;
+        const confirmed = await UI.confirm(
+            `Delete <strong>${ids.length}</strong> SWRL rule${ids.length > 1 ? 's' : ''}?<br>
+             <small style="color:var(--text-dim)">${ids.join(', ')}</small>`);
+        if (!confirmed) return;
+        try {
+            for (const id of ids) {
+                await API.deleteSWRLRule(id).catch(e => {
+                    if (!e.message.includes('404') && !e.message.toLowerCase().includes('not found')) throw e;
+                });
+            }
+            UI.success(`${ids.length} rule${ids.length > 1 ? 's' : ''} deleted`);
+            this._selectedIds.clear();
+            this._anchorId    = null;
+            this._selectedId  = null;
+            this._editingRule = null;
+            this._isNew       = false;
+            this._updateToolbar();
+            await APP.refresh();
+            const listEl = document.getElementById('swrl-list');
+            if (listEl) listEl.innerHTML = this.renderList(APP.state.swrl_rules || []);
+            this._cancel();
+        } catch (e) { UI.error(e.message); }
     },
 
     _generateRuleName() {
@@ -367,6 +470,7 @@ const SWRLEditor = {
                     ${head || '<div class="cls-list-empty" style="font-style:italic">— add consequents —</div>'}
                 </div>
             </div>
+            ${_whereExtractedFrame('swrl_rule', rule.id)}
         </div>`;
     },
 
@@ -1101,15 +1205,20 @@ const SWRLEditor = {
     // ── Menu contextuel (clic droit sur une règle) ────────────
     showContextMenu(event, id) {
         this._closeContextMenu();
-        if (this._selectedId !== id) this.selectRule(id);
+        // Si l'id cliqué n'est pas dans la multi-sélection courante, on recentre sur lui
+        if (!this._selectedIds.has(id)) this.selectRule(id);
         const menu = document.createElement('div');
         menu.id = 'swrl-ctx-menu';
         menu.className = 'ctx-menu';
         const isImported = _isImportedId('swrl_rules', id);
+        const multiCount = [...this._selectedIds].filter(i => !_isImportedId('swrl_rules', i)).length;
         menu.innerHTML = isImported
             ? _importedCtxBanner()
-            : `<div class="ctx-item ctx-danger" onclick="SWRLEditor._closeContextMenu();SWRLEditor.delete('${id}')">
-                ${ClassEditor._svgDelete} Delete Rule</div>`;
+            : multiCount > 1
+                ? `<div class="ctx-item ctx-danger" onclick="SWRLEditor._closeContextMenu();SWRLEditor.deleteSelected()">
+                    ${ClassEditor._svgDelete} Delete ${multiCount} Rules</div>`
+                : `<div class="ctx-item ctx-danger" onclick="SWRLEditor._closeContextMenu();SWRLEditor.delete('${id}')">
+                    ${ClassEditor._svgDelete} Delete Rule</div>`;
         menu.style.left = event.clientX + 'px';
         menu.style.top  = event.clientY + 'px';
         document.body.appendChild(menu);

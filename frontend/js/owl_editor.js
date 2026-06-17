@@ -1056,7 +1056,9 @@ const ClassEditor = {
             btnSister.disabled = true;
             btnSister.style.visibility = '';
             btnChild.disabled  = true;
-            btnDelete.disabled = _hasImported;
+            // Autoriser si au moins une classe non-importée est sélectionnée
+            const _deletableCount = [...this._selectedIds].filter(sid => !_isImportedCls(sid)).length;
+            btnDelete.disabled = _deletableCount === 0;
             btnDelete.style.visibility = '';
         } else if (this._selectedId) {
             btnSister.disabled = !!_selImported;
@@ -1131,16 +1133,24 @@ const ClassEditor = {
             return;
         }
 
-        // Multi-delete: single confirmation, then batch API calls
+        // Multi-delete: filter out imported classes, single confirmation, then batch API calls
+        const deletable = ids.filter(id => !_isImportedId('classes', id));
+        const skipped   = ids.length - deletable.length;
+        if (!deletable.length) { UI.error('All selected classes are imported and cannot be deleted.'); return; }
+
+        const skipNote = skipped > 0
+            ? `<br><small style="color:var(--text-dim)">${skipped} imported class${skipped>1?'es':''} will be skipped.</small>`
+            : '';
         const confirmed = await UI.confirm(
-            `Delete <strong>${ids.length}</strong> classes?<br>
-             <small style="color:var(--text-dim)">${ids.join(', ')}</small>`
+            `Delete <strong>${deletable.length}</strong> class${deletable.length>1?'es':''}?${skipNote}`
         );
         if (!confirmed) return;
 
         try {
-            for (const id of ids) {
-                await API.deleteClass(id);
+            for (const id of deletable) {
+                await API.deleteClass(id).catch(e => {
+                    if (!e.message.includes('404') && !e.message.toLowerCase().includes('not found')) throw e;
+                });
             }
             UI.success(`${ids.length} classes deleted`);
             this._selectedIds.clear();
@@ -1535,6 +1545,7 @@ const ClassEditor = {
             </div>
 
             ${_whereUsedFrame(r => _ruleUsesClass(r, c.id))}
+            ${_whereExtractedFrame('class', c.id)}
 
         </div>`;
     },
@@ -1848,6 +1859,50 @@ const RestrictionEditor = {
 
         const toggleFn = `const b=this.nextElementSibling;const t=this.querySelector('.restr-stoggle');const o=b.style.display!=='none';b.style.display=o?'none':'';t.style.transform=o?'rotate(0deg)':'rotate(90deg)'`;
 
+        // ── Collect ancestor class IDs for inherited domain props ──
+        const clsId = cls ? cls.id : null;
+        const ancestorIds = new Set();
+        if (clsId) {
+            const _visitAnc = (id) => {
+                if (ancestorIds.has(id)) return;
+                ancestorIds.add(id);
+                const c = (APP.state.classes || []).find(x => x.id === id);
+                if (!c) return;
+                (c.subClassOf || []).forEach(e => { if (typeof e === 'string') _visitAnc(e); });
+            };
+            (cls.subClassOf || []).filter(e => typeof e === 'string').forEach(_visitAnc);
+        }
+
+        // Asserted domain props: domain contains this class directly
+        // Inherited domain props: domain contains an ancestor (but not this class)
+        const _allProps = [
+            ...(APP.state.object_properties || []).map(p => ({ p, kind: 'op' })),
+            ...(APP.state.datatype_properties || []).map(p => ({ p, kind: 'dp' })),
+        ];
+        const assertedDomainProps = clsId
+            ? _allProps.filter(({ p }) => (p.domain || []).includes(clsId))
+            : [];
+        const inheritedDomainProps = clsId
+            ? _allProps.filter(({ p }) => !(p.domain || []).includes(clsId) && (p.domain || []).some(d => ancestorIds.has(d)))
+            : [];
+        assertedDomainProps.sort((a, b) => a.p.id.localeCompare(b.p.id));
+        inheritedDomainProps.sort((a, b) => a.p.id.localeCompare(b.p.id));
+
+        const _renderDomainPropRow = ({ p, kind }) => {
+            const dot  = kind === 'op' ? 'op-prop-dot' : 'dp-prop-dot';
+            const tab  = kind === 'op' ? 'object-properties' : 'datatype-properties';
+            const disp = _displayId(p);
+            const rangeStr = (p.range || []).join(', ');
+            return `<div class="cls-list-item" style="padding:3px 6px;gap:5px">
+                <span class="${dot}" style="flex-shrink:0"></span>
+                <span class="cls-list-lbl" style="cursor:pointer;flex:1" onclick="APP.navigateTo('${tab}','${p.id}')">${_escapeHtml(disp)}</span>
+                ${rangeStr ? `<span style="font-size:10px;color:var(--text-dim);margin-left:auto;white-space:nowrap">→ ${_escapeHtml(rangeStr)}</span>` : ''}
+            </div>`;
+        };
+
+        const inhTotal   = inhPropIds.length + inheritedDomainProps.length;
+        const assrtTotal = propIds.length   + assertedDomainProps.length;
+
         return `
         <div class="restr-panel">
 
@@ -1855,19 +1910,21 @@ const RestrictionEditor = {
             <div class="restr-section-hdr" onclick="${toggleFn}">
                 <span class="restr-stoggle" style="transform:rotate(90deg)">▶</span>
                 Inherited Properties
-                <span style="font-weight:400;color:var(--text-dim);margin-left:3px">(${inhPropIds.length})</span>
+                <span style="font-weight:400;color:var(--text-dim);margin-left:3px">(${inhTotal})</span>
             </div>
             <div class="restr-section-body">
                 <div class="restr-tree">
+                ${inheritedDomainProps.length ? inheritedDomainProps.map(_renderDomainPropRow).join('') : ''}
                 ${_srcOrder.length
                     ? _srcOrder.map((srcCls, i) => {
                         const propMap = _bySource[srcCls] || {};
                         const props   = Object.keys(propMap).sort(alpha);
                         const rows    = props.map(p => this._renderGroupReadOnly(p, propMap[p])).join('');
-                        const sep     = i > 0 ? '<div class="inh-class-sep"></div>' : '';
+                        const sep     = (i > 0 || inheritedDomainProps.length > 0) ? '<div class="inh-class-sep"></div>' : '';
                         return sep + rows;
                     }).join('')
-                    : '<div class="cls-list-empty" style="padding:4px 8px;font-size:11px;font-style:italic">—</div>'}
+                    : ''}
+                ${inhTotal === 0 ? '<div class="cls-list-empty" style="padding:4px 8px;font-size:11px;font-style:italic">—</div>' : ''}
                 </div>
             </div>
 
@@ -1875,17 +1932,17 @@ const RestrictionEditor = {
             <div class="restr-section-hdr" onclick="${toggleFn}">
                 <span class="restr-stoggle" style="transform:rotate(90deg)">▶</span>
                 Asserted Properties
-                <span style="font-weight:400;color:var(--text-dim);margin-left:3px">(${propIds.length})</span>
+                <span style="font-weight:400;color:var(--text-dim);margin-left:3px">(${assrtTotal})</span>
                 <span style="display:flex;gap:2px;margin-left:auto;flex-shrink:0" onclick="event.stopPropagation()">
-                    <button class="btn-ftool" title="Add existing property"
-                            onclick="RestrictionEditor.showPropPicker()">
-                        ${ico}&thinsp;property</button>
                     <button class="btn-ftool" title="Create new ObjectProperty with domain = ${cls?.id || 'this class'}"
                             onclick="ClassEditor.createOPForClass()">
                         <span class="op-prop-dot" style="width:9px;height:9px;display:inline-block;vertical-align:middle;flex-shrink:0"></span>&thinsp;OP</button>
                     <button class="btn-ftool" title="Create new DatatypeProperty with domain = ${cls?.id || 'this class'}"
                             onclick="ClassEditor.createDTPForClass()">
                         <span class="dp-prop-dot" style="width:9px;height:9px;display:inline-block;vertical-align:middle;flex-shrink:0"></span>&thinsp;DT</button>
+                    <button class="btn-ftool" title="Add owl:Restriction"
+                            onclick="RestrictionEditor.showPropPicker()">
+                        ${ico}&thinsp;restriction</button>
                 </span>
             </div>
             <div class="restr-section-body">
@@ -1893,9 +1950,11 @@ const RestrictionEditor = {
                     ${availProps || '<div class="cls-list-empty" style="padding:4px 8px;font-size:11px">—</div>'}
                 </div>
                 <div class="restr-tree" id="restr-tree">
+                    ${assertedDomainProps.length ? assertedDomainProps.map(_renderDomainPropRow).join('') : ''}
                     ${propIds.length
-                        ? propIds.map(p => this._renderGroup(p, groups[p])).join('')
-                        : '<div class="cls-list-empty" style="padding:6px 8px;font-size:11px;font-style:italic">No asserted properties</div>'}
+                        ? (assertedDomainProps.length ? '<div class="inh-class-sep"></div>' : '') + propIds.map(p => this._renderGroup(p, groups[p])).join('')
+                        : ''}
+                    ${assrtTotal === 0 ? '<div class="cls-list-empty" style="padding:6px 8px;font-size:11px;font-style:italic">No asserted properties</div>' : ''}
                 </div>
             </div>
 
@@ -2571,6 +2630,38 @@ function _whereUsedFrame(testFn) {
             <div class="cls-frame-bar">
                 <span class="cls-frame-tag" style="color:var(--accent)">Where Used in Rules</span>
                 <span class="nav-count" style="margin-left:6px">${used.length}</span>
+            </div>
+            <div class="cls-frame-body">${rows}</div>
+        </div>`;
+}
+
+/** Panel "Where Extracted" : liste les chunks du corpus où l'élément a été extrait.
+ *  kind ∈ {'class','op','dp','individual'} (clés de provenance d'analyse). */
+function _whereExtractedFrame(kind, id) {
+    const data = (typeof APP !== 'undefined' && APP._analysisData) ? APP._analysisData() : [];
+    const entry = data.find(e => e.kind === kind && e.id === id);
+    if (!entry || !(entry.sections || []).length) return '';
+    const rows = entry.sections.map(s => {
+        // Label unique : <doc> — <chapter> (p.N)
+        const docPart     = s.doc || '?';
+        const chapterPart = s.chapter || '';
+        const pagePart    = s.page != null ? 'p.' + s.page : '';
+        const mainLabel   = chapterPart
+            ? `${docPart} — ${chapterPart}${pagePart ? ' · ' + pagePart : ''}`
+            : pagePart ? `${docPart} — ${pagePart}` : docPart;
+        const refJson = APP._escAttr(JSON.stringify({doc: s.doc, chapter: s.chapter, page: s.page}));
+        return `<div class="cls-list-item" style="cursor:pointer;align-items:center" data-ref="${refJson}" onclick="APP._goToAnalysisChunk(JSON.parse(this.dataset.ref))" title="Go to this chunk in Analysis tab">
+            <span style="font-size:11px;flex-shrink:0">📄</span>
+            <span style="flex:1;overflow:hidden;min-width:0">
+                <span class="cls-list-lbl" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block;color:var(--accent);text-decoration:underline dotted" title="${APP._escAttr(mainLabel)}">${APP._esc(mainLabel)}</span>
+            </span>
+        </div>`;
+    }).join('');
+    return `<div class="h-resizer"></div>
+        <div class="cls-frame">
+            <div class="cls-frame-bar">
+                <span class="cls-frame-tag" style="color:var(--accent)">Where Extracted</span>
+                <span class="nav-count" style="margin-left:6px">${entry.sections.length}</span>
             </div>
             <div class="cls-frame-body">${rows}</div>
         </div>`;
@@ -3511,6 +3602,7 @@ const OPEditor = {
             </div>
 
             ${_whereUsedFrame(r => _ruleUsesProperty(r, p.id))}
+            ${_whereExtractedFrame('op', p.id)}
         </div>`;
     },
 
@@ -4365,6 +4457,7 @@ const DPEditor = {
             </div>
 
             ${_whereUsedFrame(r => _ruleUsesProperty(r, p.id))}
+            ${_whereExtractedFrame('dp', p.id)}
         </div>`;
     },
 
@@ -5624,6 +5717,7 @@ const IndividualEditor = {
             ${hasProps ? `<div class="h-resizer"></div>${propPanelsHtml}` : ''}
 
             ${ind ? _whereUsedFrame(r => _ruleUsesIndividual(r, ind.id)) : ''}
+            ${ind ? _whereExtractedFrame('individual', ind.id) : ''}
 
         </div>`;
     },

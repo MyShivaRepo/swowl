@@ -39,7 +39,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="OWL/SWRL Editor API",
     description="API REST pour créer et éditer des ontologies OWL 2 avec règles SWRL",
-    version="1.0.0",
+    version="1.1.0",
     lifespan=lifespan,
 )
 
@@ -99,6 +99,7 @@ def _rename_swrl_atom(atom, old_id: str, new_id: str, kind: str) -> None:
         _rename_swrl_atom(a, old_id, new_id, kind)
 
 
+import re
 import re as _re
 
 def _validate_ncname(id_str: str, label: str = "ID") -> None:
@@ -214,6 +215,137 @@ def require_onto():
     if not onto:
         raise HTTPException(404, "Aucune ontologie chargée. Créez ou importez une ontologie d'abord.")
     return onto
+
+
+# ── Déduplication d'entités (classes / propriétés / individus) ───────────────
+
+def _plural_key(s: str) -> str:
+    """Clé de normalisation tolérante : casse + séparateurs + pluriel basique."""
+    s2 = _re.sub(r'[_\s]', '', s.lower())
+    s2 = _re.sub(r'ies$', 'y', s2)
+    s2 = _re.sub(r'(es|s)$', '', s2)
+    return s2
+
+
+def _near_dup_groups(items, level: str):
+    """Groupes d'ids DISTINCTS partageant la même clé. level: 'case' | 'plural'."""
+    keyfn = (lambda s: s.lower()) if level == 'case' else _plural_key
+    groups: dict = {}
+    for it in items:
+        groups.setdefault(keyfn(it.id), []).append(it.id)
+    out = []
+    for ids in groups.values():
+        distinct = list(dict.fromkeys(ids))
+        if len(distinct) > 1:
+            out.append(distinct)
+    return out
+
+
+def _remove_exact_dup_objects(lst):
+    """Garde le 1er objet de chaque id. Renvoie (nouvelle_liste, nb_supprimés)."""
+    seen, out, removed = set(), [], 0
+    for it in lst:
+        if it.id in seen:
+            removed += 1
+            continue
+        seen.add(it.id)
+        out.append(it)
+    return out, removed
+
+
+def _cascade_rename_individual(onto: OWLOntology, old_id: str, new_id: str) -> None:
+    """Propage le renommage/fusion d'un individu à ses références."""
+    for ind in onto.individuals:
+        for a in getattr(ind, 'objectAssertions', []):
+            if getattr(a, 'target', None) == old_id:
+                a.target = new_id
+    for rule in onto.swrl_rules:
+        for atom in list(rule.body) + list(rule.head):
+            for fld in ('subject', 'object', 'value', 'var'):
+                if getattr(atom, fld, None) == old_id:
+                    setattr(atom, fld, new_id)
+
+
+def _clean_keep_entity(onto: OWLOntology, kind: str, keep: str) -> None:
+    """Nettoie auto-références et doublons de liste dans l'entité conservée."""
+    ent = next((it for it in getattr(onto, kind) if it.id == keep), None)
+    if not ent:
+        return
+    def _dedup_strs(lst):
+        seen, out = set(), []
+        for x in lst:
+            if isinstance(x, str):
+                if x == keep or x in seen:
+                    continue
+                seen.add(x)
+            out.append(x)
+        return out
+    for attr in ('subClassOf', 'equivalentClass', 'disjointWith', 'subPropertyOf'):
+        if hasattr(ent, attr):
+            setattr(ent, attr, _dedup_strs(getattr(ent, attr)))
+
+
+def _apply_merge(onto: OWLOntology, kind: str, keep: str, remove_ids: list) -> int:
+    """Fusionne remove_ids → keep (rewiring + suppression). Renvoie nb fusionnés."""
+    remove_ids = [r for r in remove_ids if r and r != keep]
+    if not keep or not remove_ids:
+        return 0
+    for rid in remove_ids:
+        if kind == 'classes':
+            _cascade_rename_class(onto, rid, keep)
+        elif kind in ('object_properties', 'datatype_properties'):
+            _cascade_rename_property(onto, rid, keep)
+        elif kind == 'individuals':
+            _cascade_rename_individual(onto, rid, keep)
+    setattr(onto, kind, [it for it in getattr(onto, kind) if it.id not in remove_ids])
+    _clean_keep_entity(onto, kind, keep)
+    return len(remove_ids)
+
+
+_DUP_KINDS = ('classes', 'object_properties', 'datatype_properties', 'individuals')
+
+
+@app.get("/api/ontology/duplicates", tags=["Ontologie"])
+def get_duplicates():
+    """Détecte les doublons par type : exacts (même id), casse, pluriel."""
+    from collections import Counter
+    onto = require_onto()
+    result = {}
+    for k in _DUP_KINDS:
+        lst = getattr(onto, k)
+        ctr = Counter(it.id for it in lst)
+        exact = sorted([i for i, c in ctr.items() if c > 1])
+        case = _near_dup_groups(lst, 'case')
+        plural = _near_dup_groups(lst, 'plural')
+        case_keys = {frozenset(g) for g in case}
+        plural_only = [g for g in plural if frozenset(g) not in case_keys]
+        result[k] = {"exact": exact, "case": case, "plural": plural_only}
+    return result
+
+
+class MergeDupReq(PydanticModel):
+    auto_exact: bool = True          # supprime les objets strictement dupliqués
+    auto_case: bool = False          # fusionne automatiquement les variantes de casse
+    merges: list = []                # [{kind, keep, remove:[...]}] (validation manuelle)
+
+
+@app.post("/api/ontology/merge-duplicates", tags=["Ontologie"])
+def merge_duplicates(req: MergeDupReq):
+    onto = require_onto()
+    summary = {"exact_removed": 0, "merged": 0}
+    if req.auto_exact:
+        for k in _DUP_KINDS:
+            cleaned, n = _remove_exact_dup_objects(getattr(onto, k))
+            setattr(onto, k, cleaned)
+            summary["exact_removed"] += n
+    if req.auto_case:
+        for k in _DUP_KINDS:
+            for g in _near_dup_groups(getattr(onto, k), 'case'):
+                summary["merged"] += _apply_merge(onto, k, g[0], g[1:])
+    for m in (req.merges or []):
+        summary["merged"] += _apply_merge(onto, m.get("kind"), m.get("keep"), m.get("remove") or [])
+    store.save()
+    return summary
 
 
 def run_inferences() -> InferenceResult:
@@ -502,7 +634,8 @@ def update_display_rules(rules: dict):
 # ── LLM : test d'une clé API (proxy, évite le CORS navigateur) ─────────────
 class LlmTestReq(PydanticModel):
     provider: str
-    api_key: str
+    api_key: str = ""
+    base_url: str = ""
 
 
 @app.post("/api/llm/test", tags=["LLM"])
@@ -514,8 +647,25 @@ def test_llm_key(req: LlmTestReq):
 
     provider = (req.provider or "").strip().lower()
     key = (req.api_key or "").strip()
-    if not key:
-        return {"ok": False, "message": "Empty key"}
+
+    # Ollama local : test via GET /api/tags (pas de clé nécessaire)
+    if provider == "meta" and req.base_url.strip():
+        ollama_url = req.base_url.rstrip("/") + "/api/tags"
+        try:
+            rq = urllib.request.Request(ollama_url, method="GET")
+            with urllib.request.urlopen(rq, timeout=8) as resp:
+                if 200 <= resp.status < 300:
+                    import json as _json
+                    data = _json.loads(resp.read().decode("utf-8", "replace"))
+                    models = [m.get("name", "") for m in (data.get("models") or [])]
+                    models = [m for m in models if m]
+                    msg = f"Ollama reachable — {len(models)} model(s) available"
+                    if models:
+                        msg += f": {', '.join(models[:5])}"
+                    return {"ok": True, "message": msg, "models": models}
+                return {"ok": False, "message": f"HTTP {resp.status}"}
+        except Exception as e:  # noqa: BLE001
+            return {"ok": False, "message": f"Cannot reach Ollama: {type(e).__name__}: {e}"}
 
     cfg = {
         "anthropic": ("https://api.anthropic.com/v1/models",
@@ -527,6 +677,8 @@ def test_llm_key(req: LlmTestReq):
     }
     if provider not in cfg:
         return {"ok": False, "message": f"Unknown provider: {provider}"}
+    if not key:
+        return {"ok": False, "message": "Empty key"}
 
     url, headers = cfg[provider]
     rq = urllib.request.Request(url, headers=headers, method="GET")
@@ -554,8 +706,10 @@ def test_llm_key(req: LlmTestReq):
 
 # ── Corpus → ontologie candidate (extraction LLM + fusion) ─────────────────
 class CorpusAnalyseReq(PydanticModel):
-    api_key: str
+    api_key: str = ""
     model: str = ""
+    provider: str = "anthropic"
+    base_url: str = ""
     documents: list = []
     system_prompt: str = ""
 
@@ -580,19 +734,94 @@ def _sanitize_id(raw) -> str:
     return s
 
 
+import threading as _threading_mod
+_corpus_busy = {"running": False}
+_corpus_busy_lock = _threading_mod.Lock()
+
+# ── Claude Code analysis store ─────────────────────────────────────────────
+_cc_chunks: list = []
+_cc_state: dict = {"running": False}
+_cc_docs: list = []   # [{name, location}] — docs corpus envoyés par le frontend
+_cc_lock = _threading_mod.Lock()
+
+
+class AnalysisClearReq(PydanticModel):
+    docs: list = []   # [{name, location}]
+
+
+@app.post("/api/analysis/clear", tags=["Claude Code"])
+def analysis_clear(req: AnalysisClearReq = None):
+    """Réinitialise le store des chunks (avant une nouvelle analyse Claude Code)."""
+    with _cc_lock:
+        _cc_chunks.clear()
+        _cc_state["running"] = True
+        _cc_docs.clear()
+        if req and req.docs:
+            _cc_docs.extend(req.docs)
+    return {"ok": True}
+
+
+@app.get("/api/analysis/docs", tags=["Claude Code"])
+def analysis_get_docs():
+    """Retourne la liste des documents corpus (nom enregistré + chemin)."""
+    with _cc_lock:
+        return {"docs": list(_cc_docs)}
+
+
+@app.post("/api/analysis/done", tags=["Claude Code"])
+def analysis_done():
+    """Marque l'analyse Claude Code comme terminée."""
+    with _cc_lock:
+        _cc_state["running"] = False
+    return {"ok": True}
+
+
+class AnalysisChunkReq(PydanticModel):
+    ref: dict = {}
+    text: str = ""
+    ids: dict = {}
+    error: str = ""
+
+
+@app.post("/api/analysis/chunk", tags=["Claude Code"])
+def analysis_push_chunk(req: AnalysisChunkReq):
+    """Ajoute un chunk extrait par Claude Code dans le store."""
+    with _cc_lock:
+        _cc_chunks.append({"ref": req.ref, "text": req.text,
+                            "ids": req.ids, "error": req.error})
+    return {"ok": True, "total": len(_cc_chunks)}
+
+
+@app.get("/api/analysis/chunks", tags=["Claude Code"])
+def analysis_get_chunks():
+    """Retourne tous les chunks courants + état running."""
+    with _cc_lock:
+        return {"chunks": list(_cc_chunks), "running": _cc_state["running"]}
+
+
 @app.post("/api/corpus/analyse", tags=["LLM"])
-def analyse_corpus(req: CorpusAnalyseReq):
-    """Analyse le corpus → fusionne les éléments candidats dans l'ontologie connectée,
-    et renvoie la table de provenance (élément → sections sources)."""
+async def analyse_corpus(req: CorpusAnalyseReq):
+    """Analyse le corpus en streaming SSE.
+    Émet un event 'chunk' par page analysée, puis un event 'done' avec le bilan."""
     import corpus_analyzer
+    import queue as _queue
+    import threading as _threading
+    from fastapi.responses import StreamingResponse as _SR
 
     onto = require_onto()
-    if not req.api_key.strip():
-        raise HTTPException(400, "Missing Anthropic API key")
+    provider = (req.provider or "anthropic").strip().lower()
+    # Ollama local ne nécessite pas de clé API
+    needs_key = not (provider == "meta" and (req.base_url or "").strip())
+    if needs_key and not req.api_key.strip():
+        raise HTTPException(400, f"Missing API key for provider '{provider}'")
 
-    results, errors = corpus_analyzer.analyse(
-        req.documents, req.api_key.strip(), req.model.strip(), (req.system_prompt or "").strip())
+    # Verrou anti-concurrence : interdit deux analyses simultanées (source de doublons)
+    with _corpus_busy_lock:
+        if _corpus_busy["running"]:
+            raise HTTPException(409, "Une analyse est déjà en cours. Attendez qu'elle se termine.")
+        _corpus_busy["running"] = True
 
+    # ── helpers de merge (réutilisés depuis le worker) ─────────────────────
     cset = {c.id for c in onto.classes}
     opset = {p.id for p in onto.object_properties}
     dpset = {p.id for p in onto.datatype_properties}
@@ -601,6 +830,7 @@ def analyse_corpus(req: CorpusAnalyseReq):
     added = {"classes": 0, "object_properties": 0, "datatype_properties": 0,
              "individuals": 0, "swrl_rules": 0}
     prov: dict = {}
+    _lock = _threading.Lock()
 
     def _anno(label, comment):
         a = {"labels": [], "comments": [],
@@ -621,76 +851,131 @@ def analyse_corpus(req: CorpusAnalyseReq):
                                       "page": ref.get("page")})
 
     def _ids(arr):
+        if isinstance(arr, str):
+            arr = [arr]
         return [i for i in (_sanitize_id(x) for x in (arr or [])) if i]
 
-    for res in results:
-        ref, els = res["ref"], res["elements"]
-        for c in (els.get("classes") or []):
-            cid = _sanitize_id(c.get("id"))
-            if not cid:
-                continue
-            if cid not in cset:
-                onto.classes.append(OWLClass.model_validate({
-                    "id": cid, "annotations": _anno(c.get("label"), c.get("comment")),
-                    "subClassOf": _ids(c.get("subClassOf")),
-                }))
-                cset.add(cid)
-                added["classes"] += 1
-            _record("class", cid, c.get("label"), ref)
-        for p in (els.get("object_properties") or []):
-            pid = _sanitize_id(p.get("id"))
-            if not pid:
-                continue
-            if pid not in opset:
-                onto.object_properties.append(OWLObjectProperty.model_validate({
-                    "id": pid, "annotations": _anno(p.get("label"), p.get("comment")),
-                    "domain": _ids(p.get("domain")), "range": _ids(p.get("range")),
-                }))
-                opset.add(pid)
-                added["object_properties"] += 1
-            _record("op", pid, p.get("label"), ref)
-        for p in (els.get("datatype_properties") or []):
-            pid = _sanitize_id(p.get("id"))
-            if not pid:
-                continue
-            if pid not in dpset:
-                onto.datatype_properties.append(OWLDatatypeProperty.model_validate({
-                    "id": pid, "annotations": _anno(p.get("label"), p.get("comment")),
-                    "domain": _ids(p.get("domain")), "range": (p.get("range") or ["xsd:string"]),
-                }))
-                dpset.add(pid)
-                added["datatype_properties"] += 1
-            _record("dp", pid, p.get("label"), ref)
-        for ind in (els.get("individuals") or []):
-            iid = _sanitize_id(ind.get("id"))
-            if not iid:
-                continue
-            if iid not in iset:
-                onto.individuals.append(OWLIndividual.model_validate({
-                    "id": iid, "annotations": _anno(ind.get("label"), ind.get("comment")),
-                    "types": _ids(ind.get("types")),
-                }))
-                iset.add(iid)
-                added["individuals"] += 1
-            _record("individual", iid, ind.get("label"), ref)
-        for r in (els.get("swrl_rules") or []):
-            rid = _sanitize_id(r.get("id"))
-            if not rid:
-                continue
-            if rid not in rset:
-                try:
-                    onto.swrl_rules.append(SWRLRule.model_validate({
-                        "id": rid, "label": r.get("label") or "", "comment": r.get("comment") or "",
-                        "body": r.get("body") or [], "head": r.get("head") or [],
-                    }))
-                    rset.add(rid)
-                    added["swrl_rules"] += 1
-                except Exception:  # noqa: BLE001 — règle mal formée : ignorée
+    def _merge_chunk(ref, els):
+        """Fusionne un résultat de chunk dans l'ontologie (thread-safe).
+        Renvoie (chunk_added, ids_by_kind)."""
+        chunk_added = {"classes": 0, "object_properties": 0,
+                       "datatype_properties": 0, "individuals": 0, "swrl_rules": 0}
+        ids_by_kind = {"classes": [], "object_properties": [], "datatype_properties": [],
+                       "individuals": [], "swrl_rules": []}
+        with _lock:
+            for c in (els.get("classes") or []):
+                cid = _sanitize_id(c.get("id"))
+                if not cid:
                     continue
-            _record("rule", rid, r.get("label"), ref)
+                if cid not in cset:
+                    onto.classes.append(OWLClass.model_validate({
+                        "id": cid, "annotations": _anno(c.get("label"), c.get("comment")),
+                        "subClassOf": _ids(c.get("subClassOf")),
+                    }))
+                    cset.add(cid); added["classes"] += 1; chunk_added["classes"] += 1
+                    ids_by_kind["classes"].append(cid)
+                _record("class", cid, c.get("label"), ref)
+            for p in (els.get("object_properties") or []):
+                pid = _sanitize_id(p.get("id"))
+                if not pid:
+                    continue
+                if pid not in opset:
+                    onto.object_properties.append(OWLObjectProperty.model_validate({
+                        "id": pid, "annotations": _anno(p.get("label"), p.get("comment")),
+                        "domain": _ids(p.get("domain")), "range": _ids(p.get("range")),
+                    }))
+                    opset.add(pid); added["object_properties"] += 1; chunk_added["object_properties"] += 1
+                    ids_by_kind["object_properties"].append(pid)
+                _record("op", pid, p.get("label"), ref)
+            for p in (els.get("datatype_properties") or []):
+                pid = _sanitize_id(p.get("id"))
+                if not pid:
+                    continue
+                if pid not in dpset:
+                    onto.datatype_properties.append(OWLDatatypeProperty.model_validate({
+                        "id": pid, "annotations": _anno(p.get("label"), p.get("comment")),
+                        "domain": _ids(p.get("domain")), "range": _ids(p.get("range")) or ["xsd:string"],
+                    }))
+                    dpset.add(pid); added["datatype_properties"] += 1; chunk_added["datatype_properties"] += 1
+                    ids_by_kind["datatype_properties"].append(pid)
+                _record("dp", pid, p.get("label"), ref)
+            for ind in (els.get("individuals") or []):
+                iid = _sanitize_id(ind.get("id"))
+                if not iid:
+                    continue
+                if iid not in iset:
+                    onto.individuals.append(OWLIndividual.model_validate({
+                        "id": iid, "annotations": _anno(ind.get("label"), ind.get("comment")),
+                        "types": _ids(ind.get("types")),
+                    }))
+                    iset.add(iid); added["individuals"] += 1; chunk_added["individuals"] += 1
+                    ids_by_kind["individuals"].append(iid)
+                _record("individual", iid, ind.get("label"), ref)
+            for r in (els.get("swrl_rules") or []):
+                rid = _sanitize_id(r.get("id"))
+                if not rid:
+                    continue
+                if rid not in rset:
+                    try:
+                        onto.swrl_rules.append(SWRLRule.model_validate({
+                            "id": rid, "label": r.get("label") or "",
+                            "comment": r.get("comment") or "",
+                            "body": r.get("body") or [], "head": r.get("head") or [],
+                        }))
+                        rset.add(rid); added["swrl_rules"] += 1; chunk_added["swrl_rules"] += 1
+                        ids_by_kind["swrl_rules"].append(rid)
+                    except Exception:  # noqa: BLE001
+                        pass
+                _record("rule", rid, r.get("label"), ref)
+        return chunk_added, ids_by_kind
 
-    store.save()
-    return {"ok": True, "added": added, "provenance": list(prov.values()), "errors": errors}
+    # ── endpoint async SSE (asyncio.Queue pour ne pas bloquer la boucle) ────
+    import asyncio as _asyncio
+    import json as _j
+
+    loop = _asyncio.get_running_loop()
+    aio_q: _asyncio.Queue = _asyncio.Queue()
+
+    def _put(ev):
+        loop.call_soon_threadsafe(aio_q.put_nowait, ev)
+
+    def worker():
+        try:
+            corpus_analyzer.analyse(
+                req.documents, req.api_key.strip(), req.model.strip(),
+                (req.system_prompt or "").strip(),
+                provider=(req.provider or "anthropic").strip().lower(),
+                base_url=(req.base_url or "").strip(),
+                on_chunk=lambda ref, els, err, text="": _put(
+                    {"type": "chunk", "ref": ref,
+                     "text": (text or "")[:1200],
+                     **(dict(zip(("added", "ids"), _merge_chunk(ref, els))) if els else {"added": {}, "ids": {}}),
+                     "error": err}
+                )
+            )
+            store.save()
+            _put({"type": "done", "added": added, "provenance": list(prov.values()), "errors": []})
+        except Exception as e:  # noqa: BLE001
+            _put({"type": "error", "message": str(e)})
+        finally:
+            with _corpus_busy_lock:
+                _corpus_busy["running"] = False
+
+    _threading.Thread(target=worker, daemon=True).start()
+
+    async def generate():
+        while True:
+            try:
+                ev = await _asyncio.wait_for(aio_q.get(), timeout=100)
+            except _asyncio.TimeoutError:
+                yield "data: {\"type\":\"heartbeat\"}\n\n"
+                continue
+            yield f"data: {_j.dumps(ev)}\n\n"
+            if ev.get("type") in ("done", "error"):
+                break
+
+    return _SR(generate(), media_type="text/event-stream",
+               headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
 # ── Peek (read prefix/URI without importing) ─────────────────

@@ -7,7 +7,7 @@
 const API = {
     base: '/api',
 
-    async _fetch(method, path, body = null) {
+    async _fetch(method, path, body = null, signal = null) {
         // Snapshot avant toute mutation (POST/PUT/DELETE) sauf snapshot lui-même
         if (['POST','PUT','DELETE'].includes(method) && !path.includes('/snapshot/')) {
             if (typeof UndoRedo !== 'undefined') UndoRedo.snapshot();
@@ -17,6 +17,7 @@ const API = {
             headers: { 'Content-Type': 'application/json' },
         };
         if (body !== null) opts.body = JSON.stringify(body);
+        if (signal) opts.signal = signal;
         const res = await fetch(this.base + path, opts);
         if (!res.ok) {
             const err = await res.json().catch(() => ({ detail: res.statusText }));
@@ -39,8 +40,19 @@ const API = {
     getCurrentOntology: ()           => API._fetch('GET',    '/ontologies/current'),
     updateOntology:     (data)       => API._fetch('PUT',    '/ontologies/current', data),
     updateDisplayRules: (rules)      => API._fetch('PUT',    '/display-rules', rules),
-    testLlmKey: (provider, api_key)  => API._fetch('POST',   '/llm/test', { provider, api_key }),
-    analyseCorpus: (api_key, model, documents, system_prompt) => API._fetch('POST', '/corpus/analyse', { api_key, model, documents, system_prompt }),
+    testLlmKey: (provider, api_key, base_url) => API._fetch('POST', '/llm/test', { provider, api_key: api_key || '', base_url: base_url || '' }),
+    analyseCorpus: (api_key, model, documents, system_prompt) => {
+        const ctrl = new AbortController();
+        const tid = setTimeout(() => ctrl.abort(), 240_000);
+        return API._fetch('POST', '/corpus/analyse', { api_key, model, documents, system_prompt }, ctrl.signal)
+            .finally(() => clearTimeout(tid));
+    },
+    clearAnalysis:     (docs)  => API._fetch('POST', '/analysis/clear', { docs: docs || [] }),
+    doneAnalysis:      ()      => API._fetch('POST', '/analysis/done'),
+    pushAnalysisChunk: (chunk) => API._fetch('POST', '/analysis/chunk', chunk),
+    getAnalysisChunks: ()      => API._fetch('GET',  '/analysis/chunks'),
+    getDuplicates:   ()     => API._fetch('GET',  '/ontology/duplicates'),
+    mergeDuplicates: (body) => API._fetch('POST', '/ontology/merge-duplicates', body),
     getCorpusPrompt: () => API._fetch('GET', '/corpus/prompt'),
     listImportableOntologies: (exclude = '') => API._fetch('GET', `/ontologies/importable?exclude=${encodeURIComponent(exclude)}`),
     updateOntologyImports: (name, imports) => API._fetch('PUT', `/ontologies/${encodeURIComponent(name)}/imports`, { imports }),
