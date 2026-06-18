@@ -762,6 +762,47 @@ _cc_state: dict = {"running": False}
 _cc_docs: list = []   # [{name, location}] — docs corpus envoyés par le frontend
 _cc_lock = _threading_mod.Lock()
 
+# ── Persistance des chunks d'analyse sur disque ─────────────────────────────
+from pathlib import Path as _AnalPath
+import json as _json_analysis
+
+_ANALYSIS_DIR = _AnalPath(
+    __import__("os").environ.get("SWOWL_DIR", "/host/Users/bernard/.swowl")
+) / "analysis"
+_ANALYSIS_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def _analysis_file(onto_name: str) -> _AnalPath:
+    safe = "".join(c if c.isalnum() or c in "-_." else "_" for c in onto_name)
+    return _ANALYSIS_DIR / f"{safe}.json"
+
+
+def _analysis_save_chunks(onto_name: str, chunks: list) -> None:
+    try:
+        p = _analysis_file(onto_name)
+        p.write_text(_json_analysis.dumps(chunks, ensure_ascii=False), encoding="utf-8")
+    except Exception:
+        pass
+
+
+def _analysis_load_chunks(onto_name: str) -> list:
+    try:
+        p = _analysis_file(onto_name)
+        if p.exists():
+            return _json_analysis.loads(p.read_text(encoding="utf-8"))
+    except Exception:
+        pass
+    return []
+
+
+def _analysis_delete(onto_name: str) -> None:
+    try:
+        p = _analysis_file(onto_name)
+        if p.exists():
+            p.unlink()
+    except Exception:
+        pass
+
 
 class AnalysisClearReq(PydanticModel):
     docs: list = []   # [{name, location}]
@@ -776,6 +817,9 @@ def analysis_clear(req: AnalysisClearReq = None):
         _cc_docs.clear()
         if req and req.docs:
             _cc_docs.extend(req.docs)
+    onto = store.get()
+    if onto:
+        _analysis_delete(onto.name)
     return {"ok": True}
 
 
@@ -1002,14 +1046,25 @@ def analysis_push_chunk(req: AnalysisChunkReq):
     with _cc_lock:
         _cc_chunks.append({"ref": req.ref, "text": req.text,
                             "ids": req.ids, "error": req.error})
-    return {"ok": True, "total": len(_cc_chunks)}
+        snapshot = list(_cc_chunks)
+    onto = store.get()
+    if onto:
+        _analysis_save_chunks(onto.name, snapshot)
+    return {"ok": True, "total": len(snapshot)}
 
 
 @app.get("/api/analysis/chunks", tags=["Claude Code"])
 def analysis_get_chunks():
-    """Retourne tous les chunks courants + état running."""
+    """Retourne tous les chunks courants + état running.
+    Si la mémoire est vide, charge depuis le fichier persistant de l'ontologie active."""
     with _cc_lock:
-        return {"chunks": list(_cc_chunks), "running": _cc_state["running"]}
+        mem = list(_cc_chunks)
+        running = _cc_state["running"]
+    if not mem and not running:
+        onto = store.get()
+        if onto:
+            mem = _analysis_load_chunks(onto.name)
+    return {"chunks": mem, "running": running}
 
 
 @app.post("/api/corpus/analyse", tags=["LLM"])
@@ -1152,6 +1207,16 @@ async def analyse_corpus(req: CorpusAnalyseReq):
     def _put(ev):
         loop.call_soon_threadsafe(aio_q.put_nowait, ev)
 
+    _llm_chunks_collected: list = []
+
+    def _on_chunk(ref, els, err, text=""):
+        chunk_added, ids_by_kind = _merge_chunk(ref, els) if els else ({}, {})
+        ev = {"type": "chunk", "ref": ref, "text": (text or "")[:1200],
+              "added": chunk_added, "ids": ids_by_kind, "error": err}
+        _llm_chunks_collected.append({"ref": ref, "text": (text or "")[:1200],
+                                       "ids": ids_by_kind, "error": err})
+        _put(ev)
+
     def worker():
         try:
             corpus_analyzer.analyse(
@@ -1159,14 +1224,12 @@ async def analyse_corpus(req: CorpusAnalyseReq):
                 (req.system_prompt or "").strip(),
                 provider=(req.provider or "anthropic").strip().lower(),
                 base_url=(req.base_url or "").strip(),
-                on_chunk=lambda ref, els, err, text="": _put(
-                    {"type": "chunk", "ref": ref,
-                     "text": (text or "")[:1200],
-                     **(dict(zip(("added", "ids"), _merge_chunk(ref, els))) if els else {"added": {}, "ids": {}}),
-                     "error": err}
-                )
+                on_chunk=_on_chunk,
             )
             store.save()
+            # Persistance sur disque
+            if _llm_chunks_collected:
+                _analysis_save_chunks(onto.name, _llm_chunks_collected)
             _put({"type": "done", "added": added, "provenance": list(prov.values()), "errors": []})
         except Exception as e:  # noqa: BLE001
             _put({"type": "error", "message": str(e)})
