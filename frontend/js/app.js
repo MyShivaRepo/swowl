@@ -5125,7 +5125,17 @@ APP._renderAnalysis = function () {
     if (!visible.length) {
         return errBlock + `<div style="padding:24px"><p style="font-size:13px;font-style:italic;color:var(--text-dim)">${chunks.length} chunk${chunks.length > 1 ? 's' : ''} analysed, but no element was extracted. Try a more capable model (e.g. Claude) or refine the extraction prompt in the LLMs tab.</p></div>`;
     }
-    const rows = visible.map(chunkRow).join('');
+    const PAGE = 30;
+    const showAll = this._analysisShowAll || false;
+    const displayed = showAll ? visible : visible.slice(0, PAGE);
+    const rows = displayed.map(chunkRow).join('');
+    const moreBtn = (!showAll && visible.length > PAGE)
+        ? `<div style="text-align:center;margin-top:10px">
+              <button class="btn-sm" onclick="APP._analysisShowAll=true;APP.renderSection('sources')">
+                Show all ${visible.length} chunks (${visible.length - PAGE} more)
+              </button>
+           </div>`
+        : '';
     return errBlock + `<div style="padding:20px;max-width:1100px">
         <p style="margin:0 0 16px;font-size:13px;color:var(--text-dim);line-height:1.6">
             Corpus chunks analysed for <b style="color:var(--text1)">${this._esc(onto.name || '')}</b>.
@@ -5136,6 +5146,7 @@ APP._renderAnalysis = function () {
         <table style="width:100%;border-collapse:collapse;font-size:13px">${tableHead}
             <tbody>${rows}</tbody>
         </table>
+        ${moreBtn}
         ${hiddenNote(hidden)}
     </div>`;
 };
