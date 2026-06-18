@@ -685,6 +685,24 @@ def test_llm_key(req: LlmTestReq):
     try:
         with urllib.request.urlopen(rq, timeout=12) as resp:
             if 200 <= resp.status < 300:
+                if provider == "openai":
+                    import json as _json
+                    data = _json.loads(resp.read().decode("utf-8", "replace"))
+                    all_ids = [m.get("id", "") for m in (data.get("data") or [])]
+                    _EXCLUDE = ("embed", "whisper", "tts", "dall", "realtime",
+                                "transcri", "audio", "babbage", "davinci", "curie",
+                                "ada", "text-", "ft:", "moderat")
+                    _CHAT_PFX = ("gpt-4o", "gpt-4-turbo", "gpt-4", "gpt-3.5-turbo",
+                                 "o1", "o3", "o4")
+                    models = sorted(
+                        [m for m in all_ids if m
+                         and any(m.startswith(p) for p in _CHAT_PFX)
+                         and not any(x in m for x in _EXCLUDE)],
+                        key=lambda x: x, reverse=True,
+                    )
+                    if not models:
+                        models = sorted([m for m in all_ids if m])
+                    return {"ok": True, "message": f"Valid key — {len(models)} model(s)", "models": models}
                 return {"ok": True, "message": "Valid key"}
             return {"ok": False, "message": f"HTTP {resp.status}"}
     except urllib.error.HTTPError as e:

@@ -1512,10 +1512,11 @@ const APP = {
         };
         // ── Rendu façon SWOWL : cadres encadrés + items à icônes ──
         const ICONCLS = { cls: 'ic-cls', op: 'ic-op', dp: 'ic-dp', ap: 'ic-ap', ind: 'ic-ind', xsd: 'ic-xsd' };
+        const SEC_FOR = { cls: 'classes', op: 'object-properties', dp: 'datatype-properties', ap: 'annotation-properties', ind: 'individuals' };
         const iconSpan = t => `<span class="ic ${ICONCLS[t] || ''}"></span>`;
         // item de liste : icône de type + référence cliquable (ou texte externe)
         const li = (id, t) => `<div class="cls-list-item">${iconSpan(t)}${ALL.has(id)
-            ? `<a href="#${enc(id)}" class="cls-list-lbl ref">${disp(id)}</a>`
+            ? `<a href="#${enc(id)}" class="cls-list-lbl ref" data-nav-sec="${SEC_FOR[t]||'classes'}" data-nav-id="${id.replace(/"/g,'&quot;')}">${disp(id)}</a>`
             : `<span class="cls-list-lbl ext">${disp(id)}</span>`}</div>`;
         const liList = (arr, t) => (arr || []).filter(x => typeof x === 'string').map(x => li(x, t)).join('');
         // item « brut » (restriction, caractéristique…) sans référence
@@ -1664,7 +1665,7 @@ const APP = {
         const whereUsed = (pred) => {
             const used = _ruleHits(pred);
             if (!used.length) return '';
-            const rows = used.map(r => `<div class="cls-list-item"><span class="ic-gear">⚙️</span><a href="#${enc(r.id)}" class="cls-list-lbl ref">${esc(r.label || _displayRefId(r.id))}</a></div>`).join('');
+            const rows = used.map(r => `<div class="cls-list-item"><span class="ic-gear">⚙️</span><a href="#${enc(r.id)}" class="cls-list-lbl ref" data-nav-sec="swrl-rules" data-nav-id="${r.id.replace(/"/g,'&quot;')}">${esc(r.label || _displayRefId(r.id))}</a></div>`).join('');
             return frame(`Where Used in Rules <span class="frame-cnt">${used.length}</span>`, rows, 'cls-frame-tag-rule');
         };
         const usedByClass = id => whereUsed(a => a.type === 'type_atom' && a.class_id === id);
@@ -2393,6 +2394,13 @@ const FsBrowser = {
 window.addEventListener('DOMContentLoaded', () => {
     APP.init();
 
+    // Délégation de clic pour les liens internes (domain/range/used-in-rules)
+    document.getElementById('main-content').addEventListener('click', e => {
+        const a = e.target.closest('a[data-nav-sec]');
+        if (!a) return;
+        e.preventDefault();
+        APP.navigateTo(a.dataset.navSec, a.dataset.navId);
+    });
 });
 
 // ── Undo / Redo ───────────────────────────────────────────────
@@ -4030,9 +4038,9 @@ APP.renderSources = function() {
 
 // ── LLMs : fournisseurs + clés API (localStorage) + test (proxy backend) ──
 APP._LLM_PROVIDERS = [
-    { id: 'anthropic', name: 'Anthropic', sub: 'Claude',                dot: '#d97757', hint: 'sk-ant-api03-…' },
-    { id: 'openai',    name: 'OpenAI',    sub: 'GPT',                   dot: '#10a37f', hint: 'sk-…' },
-    { id: 'meta',      name: 'Meta',      sub: 'Llama (api.llama.com)', dot: '#0668E1', hint: 'LLM|…' },
+    { id: 'anthropic', name: 'Anthropic', sub: 'Claude',                icon: '🤖', hint: 'sk-ant-api03-…' },
+    { id: 'openai',    name: 'OpenAI',    sub: 'GPT',                   icon: '🤖', hint: 'sk-…' },
+    { id: 'meta',      name: 'Meta',      sub: 'Llama (api.llama.com)', icon: '🤖', hint: 'LLM|…' },
 ];
 
 APP._llmKeys = function () {
@@ -4097,6 +4105,10 @@ APP._llmSetOllamaModel = function (v) { if (v) localStorage.setItem('swowl_llm_o
 
 APP._llmOpenAIModel    = function ()  { return localStorage.getItem('swowl_llm_openai_model') || 'gpt-4o'; };
 APP._llmSetOpenAIModel = function (v) { if (v) localStorage.setItem('swowl_llm_openai_model', v); };
+APP._llmOpenAIModels   = function ()  {
+    try { const a = JSON.parse(localStorage.getItem('swowl_llm_openai_models') || '[]'); return Array.isArray(a) ? a : []; }
+    catch { return []; }
+};
 
 APP._llmMetaCloudModel    = function ()  { return localStorage.getItem('swowl_llm_meta_model') || 'Llama-4-Scout-17B-16E-Instruct'; };
 APP._llmSetMetaCloudModel = function (v) { if (v) localStorage.setItem('swowl_llm_meta_model', v); };
@@ -4137,6 +4149,34 @@ APP._llmTestOllama = async function () {
             if (st2) st2.innerHTML = `<span style="color:var(--accent2)">✅ ${this._esc(r.message)}</span>`;
         } else {
             st.innerHTML = `<span style="color:#ef4444">❌ ${this._esc((r && r.message) || 'unreachable')}</span>`;
+        }
+    } catch (e) {
+        st.innerHTML = `<span style="color:#ef4444">❌ ${this._esc(e.message)}</span>`;
+    }
+};
+
+// ── Test OpenAI : récupère la liste des modèles dynamiquement ──
+APP._llmTestOpenAI = async function () {
+    const inp = document.getElementById('llm-key-openai');
+    const key = (inp ? inp.value : '').trim();
+    const st  = document.getElementById('llm-status-openai');
+    if (!st) return;
+    if (!key) { st.innerHTML = '<span style="color:#e0a96d">⚠ enter a key first</span>'; return; }
+    st.innerHTML = '<span style="color:var(--text-dim)">⏳ testing…</span>';
+    try {
+        const r = await API.testLlmKey('openai', key);
+        if (r && r.ok) {
+            const models = (r.models || []).filter(Boolean);
+            localStorage.setItem('swowl_llm_openai_models', JSON.stringify(models));
+            if (models.length && !models.includes(this._llmOpenAIModel())) {
+                this._llmSetOpenAIModel(models[0]);
+            }
+            this._llmSetKey('openai', key);
+            this.renderSection('sources');
+            const st2 = document.getElementById('llm-status-openai');
+            if (st2) st2.innerHTML = `<span style="color:var(--accent2)">✅ ${this._esc(r.message)}</span>`;
+        } else {
+            st.innerHTML = `<span style="color:#ef4444">❌ ${this._esc((r && r.message) || 'invalid key')}</span>`;
         }
     } catch (e) {
         st.innerHTML = `<span style="color:#ef4444">❌ ${this._esc(e.message)}</span>`;
@@ -4212,17 +4252,29 @@ APP._renderLLMs = function () {
 
         } else if (p.id === 'openai') {
             const val = keys[p.id] || '';
+            const openaiModels = this._llmOpenAIModels();
+            const curModel = this._llmOpenAIModel();
+            const modelWidget = openaiModels.length
+                ? `<div style="display:flex;align-items:center;gap:8px;margin-top:10px">
+                    <span style="font-size:12px;color:var(--text-dim);white-space:nowrap">Model:</span>
+                    <select id="llm-model-openai" onchange="APP._llmSetOpenAIModel(this.value)"
+                            style="flex:1;background:var(--bg3);border:1px solid var(--border);color:var(--text1);
+                                   border-radius:6px;padding:5px 8px;font-size:12px;font-family:monospace">
+                        ${openaiModels.map(m => `<option value="${this._esc(m)}"${m === curModel ? ' selected' : ''}>${this._esc(m)}</option>`).join('')}
+                    </select>
+                   </div>`
+                : modelField('llm-model-openai', curModel, 'cliquez « Test » pour lister les modèles', "APP._llmSetOpenAIModel(this.value)");
             body = `
                 <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
                     ${inp('llm-key-openai', val, p.hint)}
                     <button class="btn-sm" onclick="APP._llmToggle('openai')" title="Afficher/masquer">👁</button>
                     <button class="btn-sm" onclick="APP._llmSave('openai')">💾 Save</button>
-                    <button class="btn-sm" onclick="APP._llmTest('openai')">🧪 Test</button>
+                    <button class="btn-sm" onclick="APP._llmTestOpenAI()">🧪 Test</button>
                 </div>
                 <div id="llm-status-openai" style="margin-top:8px;font-size:12px;min-height:16px">
                     ${keys[p.id] ? '<span style="color:var(--text-dim)">key saved (not tested)</span>' : ''}
                 </div>
-                ${modelField('llm-model-openai', this._llmOpenAIModel(), 'gpt-4o', "APP._llmSetOpenAIModel(this.value)")}`;
+                ${modelWidget}`;
 
         } else if (p.id === 'meta') {
             const isLocal = metaMode === 'local';
@@ -4291,7 +4343,7 @@ APP._renderLLMs = function () {
         const activeBorder = isActive ? 'border:2px solid var(--accent);' : '';
         return `<div class="cls-frame" style="margin-bottom:14px;${activeBorder}">
             <div class="cls-frame-bar" style="gap:8px">
-                <span style="width:11px;height:11px;border-radius:50%;background:${p.dot};flex-shrink:0"></span>
+                <span style="font-size:16px;line-height:1;flex-shrink:0">${p.icon}</span>
                 <span style="font-size:13px;font-weight:600;color:var(--text1)">${p.name}</span>
                 <span style="font-size:11px;color:var(--text-dim)">${p.sub}${p.id==='meta'&&metaMode==='local' ? ' — Ollama local' : ''}</span>
                 ${isActive
