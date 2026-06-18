@@ -770,10 +770,65 @@ def analysis_get_docs():
 
 @app.post("/api/analysis/done", tags=["Claude Code"])
 def analysis_done():
-    """Marque l'analyse Claude Code comme terminée."""
+    """Marque l'analyse Claude Code comme terminée et fusionne les entités dans l'ontologie."""
     with _cc_lock:
         _cc_state["running"] = False
-    return {"ok": True}
+        chunks_snapshot = list(_cc_chunks)
+
+    # Merge all entities from CC chunks into the ontology (if one is loaded)
+    try:
+        onto = store.get() or store.load_last()
+    except Exception:
+        onto = None
+
+    added = {"classes": 0, "object_properties": 0, "datatype_properties": 0,
+             "individuals": 0, "swrl_rules": 0}
+
+    if onto:
+        cset = {c.id for c in onto.classes}
+        opset = {p.id for p in onto.object_properties}
+        dpset = {p.id for p in onto.datatype_properties}
+        iset  = {i.id for i in onto.individuals}
+        rset  = {r.id for r in onto.swrl_rules}
+
+        for chunk in chunks_snapshot:
+            ids = chunk.get("ids") or {}
+            for raw_id in (ids.get("classes") or []):
+                cid = _sanitize_id(raw_id)
+                if cid and cid not in cset:
+                    onto.classes.append(OWLClass.model_validate({"id": cid}))
+                    cset.add(cid); added["classes"] += 1
+            for raw_id in (ids.get("object_properties") or []):
+                pid = _sanitize_id(raw_id)
+                if pid and pid not in opset:
+                    onto.object_properties.append(OWLObjectProperty.model_validate({"id": pid}))
+                    opset.add(pid); added["object_properties"] += 1
+            for raw_id in (ids.get("datatype_properties") or []):
+                pid = _sanitize_id(raw_id)
+                if pid and pid not in dpset:
+                    onto.datatype_properties.append(OWLDatatypeProperty.model_validate(
+                        {"id": pid, "range": ["xsd:string"]}))
+                    dpset.add(pid); added["datatype_properties"] += 1
+            for raw_id in (ids.get("individuals") or []):
+                iid = _sanitize_id(raw_id)
+                if iid and iid not in iset:
+                    onto.individuals.append(OWLIndividual.model_validate({"id": iid}))
+                    iset.add(iid); added["individuals"] += 1
+            for raw_id in (ids.get("swrl_rules") or []):
+                rid = _sanitize_id(raw_id)
+                if rid and rid not in rset:
+                    try:
+                        onto.swrl_rules.append(SWRLRule.model_validate(
+                            {"id": rid, "label": rid, "comment": "", "body": [], "head": []}))
+                        rset.add(rid); added["swrl_rules"] += 1
+                    except Exception:
+                        pass
+
+        total = sum(added.values())
+        if total > 0:
+            store.save()
+
+    return {"ok": True, "added": added}
 
 
 class AnalysisChunkReq(PydanticModel):

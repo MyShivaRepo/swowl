@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "swowl",
+      "runtimeExecutable": "docker",
+      "runtimeArgs": ["compose", "-f", "/Users/bernard/AppData/Github/swowl/docker-compose.yml", "logs", "-f"],
+      "port": 12345,
+      "autoPort": false
+    }
+  ]
+}

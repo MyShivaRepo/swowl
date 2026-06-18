@@ -2451,10 +2451,14 @@ const UndoRedo = {
 document.addEventListener('keydown', e => {
     const active = document.activeElement;
     const inInput = active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable);
+    // Input is in a detail/form panel if it has a closest ancestor with id ending in "-detail".
+    // Such inputs get focus programmatically (e.g. swrl-id auto-focused on rule selection),
+    // so Cmd+A should still select all list items rather than text in the input.
+    const inDetailPanel = inInput && !!active.closest('[id$="-detail"]');
 
     // Ctrl+A — select all items in the current list
     if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
-        if (!inInput) {
+        if (!inInput || inDetailPanel) {
             e.preventDefault();
             APP._selectAllInSection();
         }
@@ -4595,6 +4599,36 @@ APP._ccBuildProv = function (chunks) {
     return Object.values(map);
 };
 
+// Sync depuis le backend : récupère les chunks CC stockés côté serveur si le localStorage est vide.
+// force=true → re-sync même si localStorage a déjà des données (bouton "Reload").
+APP._ccSyncFromBackend = async function (force = false) {
+    if (this._ccSyncInProgress) return;
+    const k = this._analysisKey();
+    if (!k) return;
+    if (!force && this._analysisChunks().length > 0) return;
+    this._ccSyncInProgress = true;
+    try {
+        const res = await API.getAnalysisChunks();
+        const serverChunks = res.chunks || [];
+        // Filtre les chunks vides (pas d'entités extraites)
+        const real = serverChunks.filter(c => {
+            const ids = c.ids || {};
+            return Object.values(ids).some(l => (l || []).length > 0);
+        });
+        if (real.length > 0) {
+            this._analysisSaveChunks(real);
+            this._analysisSave(this._ccBuildProv(real), []);
+            await this.refresh();
+        }
+    } catch (e) { /* réseau — on ignore */ }
+    finally {
+        this._ccSyncInProgress = false;
+        // Toujours re-rendre pour que le bouton donne un feedback visible
+        this._sourcesTab = 'analysis';
+        this.renderSection('sources');
+    }
+};
+
 // Navigation depuis WHERE EXTRACTED → onglet Analysis, scroll jusqu'au chunk
 APP._goToAnalysisChunk = function (ref) {
     // Analysis est un sous-onglet de sources
@@ -4631,34 +4665,50 @@ APP._analysisSaveChunks = function (chunks) {
 APP._highlightTerms = function (text, ids) {
     const plain = text || '';
     if (!plain) return '';
-    const terms = new Set();
-    // Mots réservés HTML à exclure
-    const EXCLUDED = new Set(['mark','span','href','style','class','attr','text','data','body','head','html','true','false','null']);
+    const EXCLUDED = new Set(['mark','span','href','style','class','attr','text','data','body','head','html','true','false','null','with','that','this','from','have','been','they','their','will','when','than','into','each','also','only','both','some','such','more','other']);
+
+    // Convertit un ID CamelCase / snake_case en phrase lisible
+    const toPhrase = id => String(id)
+        .replace(/([a-z])([A-Z])/g, '$1 $2')
+        .replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2')
+        .replace(/[_]+/g, ' ').trim();
+
+    // Construit un pattern regex tolérant le pluriel anglais courant sur le DERNIER mot
+    // "Hazardous Substance" → "Hazardous Substances?" (match singular et plural)
+    const pluralPat = phrase => {
+        const esc = phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        // Ajoute s? / es? / ies? sur la fin (couvre: substance→substances, property→properties)
+        return esc.replace(/(y)$/i, '(?:y|ies)')
+                  .replace(/(e)$/i,  '$1s?')
+                  .replace(/([^aeiou\s])$/i, '$1(?:es|s)?');
+    };
+
+    // Collecte phrases (priorité) puis mots individuels
+    const phrases = [];  // {pat, len}
+    const words   = [];
     Object.values(ids || {}).forEach(list => (list || []).forEach(id => {
         if (!id) return;
-        const spaced = String(id)
-            .replace(/([a-z])([A-Z])/g, '$1 $2')
-            .replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2')
-            .replace(/[_]+/g, ' ').trim();
-        const words = spaced.split(/\s+/);
-        // Ajouter d'abord la phrase complète (priorité max car plus longue)
-        if (words.length > 1 && spaced.length > 4) terms.add(spaced);
-        // Puis les mots individuels en fallback
-        words.forEach(w => {
+        const phrase = toPhrase(id);
+        const parts  = phrase.split(/\s+/);
+        if (parts.length > 1 && phrase.length > 4) {
+            phrases.push({pat: pluralPat(phrase), len: phrase.length});
+        }
+        parts.forEach(w => {
             const lw = w.toLowerCase();
-            if (w.length > 3 && !EXCLUDED.has(lw)) terms.add(w);
+            if (w.length > 3 && !EXCLUDED.has(lw))
+                words.push({pat: pluralPat(w), len: w.length});
         });
     }));
-    // Trouver tous les intervalles à surligner (sur le texte brut, insensible à la casse)
-    const sorted = [...terms].sort((a, b) => b.length - a.length);
-    const ranges = []; // [{start, end}]
-    for (const t of sorted) {
-        const pat = t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+    // Trier du plus long au plus court pour que les phrases priment sur les mots
+    const all = [...phrases, ...words].sort((a, b) => b.len - a.len);
+
+    const ranges = [];
+    for (const {pat} of all) {
         try {
             const re = new RegExp('\\b' + pat + '\\b', 'gi');
             let m;
             while ((m = re.exec(plain)) !== null) {
-                // Ignorer si chevauchement avec un range existant
                 if (!ranges.some(r => m.index < r.end && m.index + m[0].length > r.start))
                     ranges.push({start: m.index, end: m.index + m[0].length});
             }
@@ -4666,7 +4716,6 @@ APP._highlightTerms = function (text, ids) {
     }
     if (!ranges.length) return this._esc(plain);
     ranges.sort((a, b) => a.start - b.start);
-    // Construire le HTML en une passe
     let result = '', pos = 0;
     for (const {start, end} of ranges) {
         result += this._esc(plain.slice(pos, start));
@@ -4941,7 +4990,12 @@ APP._renderAnalysis = function () {
     </div>` : '';
 
     if (!chunks.length) {
-        return `<div style="padding:24px">${errBlock}<p style="font-size:13px;font-style:italic;color:var(--text-dim)">No analysis yet. Go to the <b>Corpus</b> tab and click <b>🔬 Analyse with selected LLM</b> to extract a candidate ontology from your documents.</p></div>`;
+        // Auto-sync: check if backend has CC chunks not yet in localStorage
+        APP._ccSyncFromBackend();
+        return `<div style="padding:24px">${errBlock}
+            <p style="font-size:13px;font-style:italic;color:var(--text-dim)">No analysis yet. Go to the <b>Corpus</b> tab and click <b>🔬 Analyse with selected LLM</b> to extract a candidate ontology from your documents.</p>
+            <button class="btn-sm" onclick="APP._ccSyncFromBackend(true)" style="margin-top:8px">↻ Reload from backend</button>
+        </div>`;
     }
 
     const visible = chunks.filter(hasContent);

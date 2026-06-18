@@ -2,5 +2,8 @@
 __pycache__/
 *.pyc
 *.pyo
-.claude/
+.claude/*
+!.claude/skills/
+!.claude/skills/**
+!.claude/launch.json
 data/
