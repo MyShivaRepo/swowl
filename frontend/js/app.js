@@ -4577,6 +4577,14 @@ APP._ccPoll = async function () {
 
 // Construit le format provenance [{id, kind, label, sections}] depuis les chunks CC
 // Les kinds doivent correspondre à ce que _whereExtractedFrame attend : 'class','op','dp','individual'
+// Résout un item de ids (string ou objet enrichi {id, label, ...}) → {id, label}
+APP._ccResolveItem = function (item) {
+    if (!item) return null;
+    if (typeof item === 'string') return item ? {id: item, label: item} : null;
+    if (typeof item === 'object' && item.id) return {id: item.id, label: item.label || item.id};
+    return null;
+};
+
 APP._ccBuildProv = function (chunks) {
     const map = {};
     const KIND_MAP = {
@@ -4588,9 +4596,12 @@ APP._ccBuildProv = function (chunks) {
         const sig = JSON.stringify({doc: ref.doc, chapter: ref.chapter, page: ref.page});
         Object.entries(c.ids || {}).forEach(([kind, list]) => {
             const k = KIND_MAP[kind] || kind;
-            (list || []).forEach(id => {
-                if (!id) return;
-                if (!map[id]) map[id] = {id, kind: k, label: id, sections: []};
+            (list || []).forEach(raw => {
+                const item = APP._ccResolveItem(raw);
+                if (!item) return;
+                const {id, label} = item;
+                if (!map[id]) map[id] = {id, kind: k, label, sections: []};
+                else if (label !== id) map[id].label = label; // update label if enriched
                 if (!map[id].sections.find(s => JSON.stringify(s) === sig))
                     map[id].sections.push({doc: ref.doc, chapter: ref.chapter, page: ref.page});
             });
@@ -4686,8 +4697,13 @@ APP._highlightTerms = function (text, ids) {
     // Collecte phrases (priorité) puis mots individuels
     const phrases = [];  // {pat, len}
     const words   = [];
-    Object.values(ids || {}).forEach(list => (list || []).forEach(id => {
-        if (!id) return;
+    Object.values(ids || {}).forEach(list => (list || []).forEach(raw => {
+        const item = APP._ccResolveItem(raw);
+        if (!item) return;
+        // Indexer à la fois l'ID et le label (si différent) pour le surlignage
+        const candidates = [item.id];
+        if (item.label && item.label !== item.id) candidates.push(item.label);
+        candidates.forEach(id => {
         const phrase = toPhrase(id);
         const parts  = phrase.split(/\s+/);
         if (parts.length > 1 && phrase.length > 4) {
@@ -4698,6 +4714,7 @@ APP._highlightTerms = function (text, ids) {
             if (w.length > 3 && !EXCLUDED.has(lw))
                 words.push({pat: pluralPat(w), len: w.length});
         });
+        }); // end candidates.forEach
     }));
 
     // Trier du plus long au plus court pour que les phrases priment sur les mots
@@ -4920,14 +4937,18 @@ APP._renderAnalysis = function () {
             ? `<div style="font-size:11px;line-height:1.5;color:var(--text-dim);max-height:140px;overflow:auto;white-space:pre-wrap">${this._highlightTerms(c.text, ids)}</div>`
             : `<span style="color:var(--text-faint);font-size:11px">—</span>`;
         const chips = Object.entries(ids).flatMap(([kind, list]) =>
-            (list || []).map(id => {
+            (list || []).map(raw => {
+                const item = APP._ccResolveItem(raw);
+                if (!item) return '';
+                const {id, label} = item;
                 const dot = KIND_DOT[kind];
                 const sec = KIND_SEC[kind] || 'classes';
                 const isEmoji = dot && /\p{Emoji}/u.test(dot);
                 const icon = !dot ? `<b>${KIND_LBL[kind]||kind} </b>`
                            : isEmoji ? `<span style="font-size:11px;margin-right:3px">${dot}</span>`
                            : `<span class="${dot}" style="display:inline-block;vertical-align:middle;margin-right:3px"></span>`;
-                return `<span onclick="APP.navigateTo('${sec}','${this._escAttr(id)}')" title="Go to ${this._esc(id)}" style="display:inline-flex;align-items:center;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:1px 7px;margin:2px;font-size:11px;font-family:monospace;cursor:pointer">${icon}${this._esc(id)}</span>`;
+                const displayLabel = (label && label !== id) ? `${this._esc(id)} <span style="color:var(--text-dim);font-style:italic">${this._esc(label)}</span>` : this._esc(id);
+                return `<span onclick="APP.navigateTo('${sec}','${this._escAttr(id)}')" title="Go to ${this._esc(id)}" style="display:inline-flex;align-items:center;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:1px 7px;margin:2px;font-size:11px;font-family:monospace;cursor:pointer">${icon}${displayLabel}</span>`;
             })
         ).join('');
         const elemHtml = chips || `<span style="color:var(--text-faint);font-size:11px">—</span>`;
@@ -4942,7 +4963,9 @@ APP._renderAnalysis = function () {
     const tableHead = `<thead><tr>${th('Chunk', 'width:170px')}${th('Text extract')}${th('Extracted elements', 'width:300px')}</tr></thead>`;
 
     // Un chunk est "vide" s'il n'a ni erreur ni aucun élément extrait → on le masque
-    const hasContent = (c) => !!c.error || Object.values(c.ids || {}).some(list => (list || []).length);
+    // Gère les deux formats : string et objet enrichi
+    const hasContent = (c) => !!c.error || Object.values(c.ids || {}).some(list =>
+        (list || []).some(raw => APP._ccResolveItem(raw) !== null));
     const hiddenNote = (n) => n > 0
         ? `<p style="margin:8px 0 0;font-size:11px;color:var(--text-faint);font-style:italic">${n} empty chunk${n > 1 ? 's' : ''} hidden (no element extracted).</p>`
         : '';

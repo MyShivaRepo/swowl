@@ -768,14 +768,63 @@ def analysis_get_docs():
         return {"docs": list(_cc_docs)}
 
 
+def _cc_resolve_item(raw) -> tuple[str, dict]:
+    """Accepte un item de chunk ids en format string OU objet enrichi.
+    Retourne (id_sanitisé, dict_données) ou ("", {}) si invalide.
+    Format objet : {"id": "...", "label": "...", "comment": "...",
+                    "subClassOf": [...], "domain": [...], "range": [...],
+                    "types": [...], "body": [...], "head": [...]}
+    """
+    if isinstance(raw, str):
+        return _sanitize_id(raw), {}
+    if isinstance(raw, dict):
+        raw_id = raw.get("id") or ""
+        return _sanitize_id(raw_id), raw
+    return "", {}
+
+
+def _cc_anno(data: dict) -> dict:
+    """Construit les annotations rdfs:label / rdfs:comment depuis un dict enrichi."""
+    annos = {}
+    label = (data.get("label") or "").strip()
+    comment = (data.get("comment") or "").strip()
+    if label:
+        annos["rdfs:label"] = [{"type": "literal", "value": label, "lang": "en"}]
+    if comment:
+        annos["rdfs:comment"] = [{"type": "literal", "value": comment, "lang": "en"}]
+    return annos
+
+
+def _cc_ids(raw_list) -> list[str]:
+    """Sanitise une liste de références (strings ou objets → ids)."""
+    result = []
+    for r in (raw_list or []):
+        sid, _ = _cc_resolve_item(r)
+        if sid:
+            result.append(sid)
+    return result
+
+
 @app.post("/api/analysis/done", tags=["Claude Code"])
 def analysis_done():
-    """Marque l'analyse Claude Code comme terminée et fusionne les entités dans l'ontologie."""
+    """Marque l'analyse Claude Code comme terminée et fusionne les entités dans l'ontologie.
+
+    Supporte deux formats dans ids :
+    - Format simple  : {"classes": ["Id1", "Id2"], ...}
+    - Format enrichi : {"classes": [{"id":"Id1","label":"...","subClassOf":["Parent"]}, ...],
+                        "object_properties": [{"id":"prop","domain":["A"],"range":["B"]}, ...],
+                        "datatype_properties": [{"id":"attr","domain":["A"],"range":["xsd:decimal"]}],
+                        "individuals": [{"id":"Ind","types":["Cls"],"label":"..."}, ...],
+                        "swrl_rules": [{"id":"rule","label":"...","comment":"...",
+                                        "body":[...],"head":[...]}]}
+    Les deux formats peuvent coexister dans le même chunk.
+    Les relations (subClassOf, domain, range, types) du format enrichi sont appliquées
+    immédiatement — pas besoin de PATCH séparé.
+    """
     with _cc_lock:
         _cc_state["running"] = False
         chunks_snapshot = list(_cc_chunks)
 
-    # Merge all entities from CC chunks into the ontology (if one is loaded)
     try:
         onto = store.get() or store.load_last()
     except Exception:
@@ -785,47 +834,138 @@ def analysis_done():
              "individuals": 0, "swrl_rules": 0}
 
     if onto:
-        cset = {c.id for c in onto.classes}
+        cset  = {c.id for c in onto.classes}
         opset = {p.id for p in onto.object_properties}
         dpset = {p.id for p in onto.datatype_properties}
         iset  = {i.id for i in onto.individuals}
         rset  = {r.id for r in onto.swrl_rules}
 
+        # ── Passe 1 : créer toutes les entités (sans relations inter-entités) ──
+        # Les relations référencent d'autres entités qui peuvent apparaître plus tard
+        pending_cls  = {}   # id → data dict (pour passe 2)
+        pending_ops  = {}
+        pending_dps  = {}
+        pending_inds = {}
+
         for chunk in chunks_snapshot:
             ids = chunk.get("ids") or {}
-            for raw_id in (ids.get("classes") or []):
-                cid = _sanitize_id(raw_id)
-                if cid and cid not in cset:
-                    onto.classes.append(OWLClass.model_validate({"id": cid}))
+
+            for raw in (ids.get("classes") or []):
+                cid, data = _cc_resolve_item(raw)
+                if not cid:
+                    continue
+                if cid not in cset:
+                    onto.classes.append(OWLClass.model_validate({
+                        "id": cid, "annotations": _cc_anno(data)
+                    }))
                     cset.add(cid); added["classes"] += 1
-            for raw_id in (ids.get("object_properties") or []):
-                pid = _sanitize_id(raw_id)
-                if pid and pid not in opset:
-                    onto.object_properties.append(OWLObjectProperty.model_validate({"id": pid}))
+                # Mémoriser les données enrichies même si entité déjà existante
+                if data:
+                    pending_cls[cid] = data
+
+            for raw in (ids.get("object_properties") or []):
+                pid, data = _cc_resolve_item(raw)
+                if not pid:
+                    continue
+                if pid not in opset:
+                    onto.object_properties.append(OWLObjectProperty.model_validate({
+                        "id": pid, "annotations": _cc_anno(data)
+                    }))
                     opset.add(pid); added["object_properties"] += 1
-            for raw_id in (ids.get("datatype_properties") or []):
-                pid = _sanitize_id(raw_id)
-                if pid and pid not in dpset:
-                    onto.datatype_properties.append(OWLDatatypeProperty.model_validate(
-                        {"id": pid, "range": ["xsd:string"]}))
+                if data:
+                    pending_ops[pid] = data
+
+            for raw in (ids.get("datatype_properties") or []):
+                pid, data = _cc_resolve_item(raw)
+                if not pid:
+                    continue
+                if pid not in dpset:
+                    rng = _cc_ids(data.get("range")) if data else []
+                    onto.datatype_properties.append(OWLDatatypeProperty.model_validate({
+                        "id": pid, "annotations": _cc_anno(data),
+                        "range": rng or ["xsd:string"]
+                    }))
                     dpset.add(pid); added["datatype_properties"] += 1
-            for raw_id in (ids.get("individuals") or []):
-                iid = _sanitize_id(raw_id)
-                if iid and iid not in iset:
-                    onto.individuals.append(OWLIndividual.model_validate({"id": iid}))
+                if data:
+                    pending_dps[pid] = data
+
+            for raw in (ids.get("individuals") or []):
+                iid, data = _cc_resolve_item(raw)
+                if not iid:
+                    continue
+                if iid not in iset:
+                    onto.individuals.append(OWLIndividual.model_validate({
+                        "id": iid, "annotations": _cc_anno(data)
+                    }))
                     iset.add(iid); added["individuals"] += 1
-            for raw_id in (ids.get("swrl_rules") or []):
-                rid = _sanitize_id(raw_id)
-                if rid and rid not in rset:
+                if data:
+                    pending_inds[iid] = data
+
+            for raw in (ids.get("swrl_rules") or []):
+                rid, data = _cc_resolve_item(raw)
+                if not rid:
+                    continue
+                if rid not in rset:
                     try:
-                        onto.swrl_rules.append(SWRLRule.model_validate(
-                            {"id": rid, "label": rid, "comment": "", "body": [], "head": []}))
+                        onto.swrl_rules.append(SWRLRule.model_validate({
+                            "id": rid,
+                            "label":   (data.get("label")   or rid) if data else rid,
+                            "comment": (data.get("comment") or "")  if data else "",
+                            "body":    (data.get("body")    or [])  if data else [],
+                            "head":    (data.get("head")    or [])  if data else [],
+                        }))
                         rset.add(rid); added["swrl_rules"] += 1
                     except Exception:
                         pass
 
-        total = sum(added.values())
-        if total > 0:
+        # ── Passe 2 : appliquer les relations (toutes entités maintenant créées) ──
+        cls_index = {c.id: c for c in onto.classes}
+        op_index  = {p.id: p for p in onto.object_properties}
+        dp_index  = {p.id: p for p in onto.datatype_properties}
+        ind_index = {i.id: i for i in onto.individuals}
+
+        for cid, data in pending_cls.items():
+            c = cls_index.get(cid)
+            if not c:
+                continue
+            sub = [s for s in _cc_ids(data.get("subClassOf")) if s in cset]
+            if sub:
+                c.subClassOf = list(dict.fromkeys(list(c.subClassOf or []) + sub))
+            disjoint = [s for s in _cc_ids(data.get("disjointWith")) if s in cset]
+            if disjoint:
+                c.disjointWith = list(dict.fromkeys(list(c.disjointWith or []) + disjoint))
+
+        for pid, data in pending_ops.items():
+            p = op_index.get(pid)
+            if not p:
+                continue
+            dom = [s for s in _cc_ids(data.get("domain")) if s in cset]
+            rng = [s for s in _cc_ids(data.get("range"))  if s in cset]
+            if dom:
+                p.domain = list(dict.fromkeys(list(p.domain or []) + dom))
+            if rng:
+                p.range  = list(dict.fromkeys(list(p.range  or []) + rng))
+
+        for pid, data in pending_dps.items():
+            p = dp_index.get(pid)
+            if not p:
+                continue
+            dom = [s for s in _cc_ids(data.get("domain")) if s in cset]
+            rng_raw = _cc_ids(data.get("range"))
+            if dom:
+                p.domain = list(dict.fromkeys(list(p.domain or []) + dom))
+            if rng_raw:
+                p.range  = list(dict.fromkeys(list(p.range  or []) + rng_raw))
+
+        for iid, data in pending_inds.items():
+            i = ind_index.get(iid)
+            if not i:
+                continue
+            types = [s for s in _cc_ids(data.get("types")) if s in cset]
+            if types:
+                i.types = list(dict.fromkeys(list(i.types or []) + types))
+
+        if sum(added.values()) > 0 or pending_cls or pending_ops or pending_dps or pending_inds:
             store.save()
 
     return {"ok": True, "added": added}
