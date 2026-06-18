@@ -267,32 +267,75 @@ const APP = {
     },
 
     _updateTopbarOntology() {
-        const el = document.getElementById('topbar-onto-label');
-        if (!el) return;
+        const wrap  = document.getElementById('topbar-onto-wrap');
+        const label = document.getElementById('topbar-onto-label');
+        const sep   = document.querySelector('.topbar-vsep-nav');
+        if (!wrap || !label) return;
+
         const onto = this.state.ontology;
-        if (onto) {
-            const prefix = onto.prefix || '';
-            const name   = onto.name   || '';
-            const label  = prefix && name ? `${prefix}:${name}` : name || prefix;
-            el.textContent = label;
-            el.title = 'Go to ontology';
-            el.style.display = '';
-            el.style.cursor = 'pointer';
-            el.onclick = () => {
-                APP.navigate('ontologies');
-                setTimeout(() => {
-                    const row = document.querySelector(`#onto-registry-body tr[data-name="${CSS.escape(name)}"]`);
-                    if (row) { row.scrollIntoView({ block: 'center' }); row.classList.add('highlight-flash'); setTimeout(() => row.classList.remove('highlight-flash'), 1200); }
-                }, 120);
-            };
-            const sep = document.querySelector('.topbar-vsep-nav');
+        if (onto && onto.name) {
+            const display = onto.prefix && onto.name ? `${onto.prefix}:${onto.name}` : onto.name || onto.prefix;
+            label.textContent = display;
+            wrap.style.display = '';
             if (sep) sep.style.display = '';
         } else {
-            el.textContent = '';
-            el.style.display = 'none';
-            const sep = document.querySelector('.topbar-vsep-nav');
+            wrap.style.display = 'none';
             if (sep) sep.style.display = 'none';
         }
+    },
+
+    _topbarOntoNavigate() {
+        const name = (this.state.ontology && this.state.ontology.name) || null;
+        if (!name) return;
+        APP.navigate('ontologies');
+        setTimeout(() => {
+            const row = document.querySelector(`#onto-registry-body tr[data-name="${CSS.escape(name)}"]`);
+            if (row) { row.scrollIntoView({ block: 'center' }); row.classList.add('highlight-flash'); setTimeout(() => row.classList.remove('highlight-flash'), 1200); }
+        }, 120);
+    },
+
+    _topbarOntoDropdown() {
+        const dropdown = document.getElementById('topbar-onto-dropdown');
+        if (!dropdown) return;
+        if (dropdown.style.display !== 'none') { dropdown.style.display = 'none'; return; }
+
+        // User ontologies only (exclude readonly/system)
+        const userList = (this._ontoList || []).filter(o => !o.readonly).sort((a, b) => a.name.localeCompare(b.name));
+        if (userList.length === 0) return;
+
+        const current = (this.state.ontology && this.state.ontology.name) || null;
+        dropdown.innerHTML = '';
+        userList.forEach(o => {
+            const btn = document.createElement('button');
+            btn.className = 'topbar-onto-dropdown-item' + (o.name === current ? ' active' : '');
+            btn.textContent = (o.name === current ? '● ' : '○ ') + o.name;
+            btn.onclick = async () => {
+                dropdown.style.display = 'none';
+                if (o.name === current) return;
+                try {
+                    await API.connectOntology(o.name);
+                    UI.success(`Ontology "${o.name}" connected.`);
+                    await this.refresh();
+                    this.renderSection(this.currentSection);
+                    API.listOntologies().then(list => {
+                        this._ontoList = list;
+                        const tbody = document.getElementById('onto-registry-body');
+                        if (tbody) this._refreshOntoTable(list);
+                    }).catch(() => {});
+                } catch (e) { UI.error(e.message); }
+            };
+            dropdown.appendChild(btn);
+        });
+        dropdown.style.display = '';
+
+        // Ferme le dropdown si on clique ailleurs
+        const close = (e) => {
+            if (!dropdown.contains(e.target) && e.target.id !== 'topbar-onto-arrow') {
+                dropdown.style.display = 'none';
+                document.removeEventListener('mousedown', close);
+            }
+        };
+        setTimeout(() => document.addEventListener('mousedown', close), 10);
     },
 
     async refresh() {
@@ -300,6 +343,8 @@ const APP = {
         _TreeCommon.invalidateCaches();   // hierarchy trees changed → drop buildTree caches
         this.updateStats();
         InferenceUI.refresh();
+        // Keep the topbar ontology selector in sync
+        API.listOntologies().then(list => { this._ontoList = list; this._updateTopbarOntology(); }).catch(() => {});
     },
 
     updateStats() {
