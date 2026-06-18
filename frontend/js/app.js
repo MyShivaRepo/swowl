@@ -4731,9 +4731,11 @@ APP._ccSyncFromBackend = async function (force = false) {
     } catch (e) { /* réseau — on ignore */ }
     finally {
         this._ccSyncInProgress = false;
-        // Toujours re-rendre pour que le bouton donne un feedback visible
-        this._sourcesTab = 'analysis';
-        this.renderSection('sources');
+        // Re-rendre uniquement si l'utilisateur est déjà sur l'onglet sources/analysis
+        if (this.currentSection === 'sources') {
+            this._sourcesTab = 'analysis';
+            this.renderSection('sources');
+        }
     }
 };
 
@@ -5033,7 +5035,7 @@ APP._renderAnalysis = function () {
         }
         const ids = c.ids || {};
         const textHtml = c.text
-            ? `<div style="font-size:11px;line-height:1.5;color:var(--text-dim);max-height:140px;overflow:auto;white-space:pre-wrap">${this._esc(c.text)}</div>`
+            ? `<div style="font-size:11px;line-height:1.5;color:var(--text-dim);max-height:140px;overflow:auto;white-space:pre-wrap">${this._highlightTerms(c.text, ids)}</div>`
             : `<span style="color:var(--text-faint);font-size:11px">—</span>`;
         const chips = Object.entries(ids).flatMap(([kind, list]) =>
             (list || []).map(raw => {
@@ -5105,8 +5107,6 @@ APP._renderAnalysis = function () {
     }
 
     // ── état persisté ─────────────────────────────────────────────────────
-    // [DIAG] retour immédiat pour isoler la source du freeze
-    return `<div style="padding:24px"><p>DIAG: ${this._esc(String(this._analysisChunks().length))} chunks in localStorage.</p></div>`;
     const chunks = this._analysisChunks();
     const errs = this._analysisErrors();
     const errBlock = errs.length ? `<div style="margin:0 0 16px;padding:10px 14px;background:var(--error-bg,#3a1a1a);border:1px solid var(--error,#c0392b);border-radius:6px;font-size:12px;color:var(--error,#e74c3c)">
