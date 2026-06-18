@@ -4920,7 +4920,9 @@ APP._corpusAnalyse = async function () {
                     const elems = this._analysisInProgress.chunks.reduce((sum, c) =>
                         sum + Object.values(c.ids || {}).reduce((a, l) => a + (l || []).length, 0), 0);
                     this._setAnalysisStatus({ state: 'running', done: this._analysisInProgress.done, elements: elems });
-                    this.renderSection('sources');  // mise à jour temps réel
+                    // Re-render uniquement si l'utilisateur est sur cet onglet
+                    // (évite de forcer la navigation et de geler l'IHM)
+                    if (this.currentSection === 'sources') this.renderSection('sources');
                 } else if (ev.type === 'done' || ev.type === 'error') {
                     clearTimeout(tid);
                     const chunksDone = (this._analysisInProgress && this._analysisInProgress.done) || 0;
