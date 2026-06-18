@@ -5033,7 +5033,7 @@ APP._renderAnalysis = function () {
         }
         const ids = c.ids || {};
         const textHtml = c.text
-            ? `<div style="font-size:11px;line-height:1.5;color:var(--text-dim);max-height:140px;overflow:auto;white-space:pre-wrap">${this._highlightTerms(c.text, ids)}</div>`
+            ? `<div style="font-size:11px;line-height:1.5;color:var(--text-dim);max-height:140px;overflow:auto;white-space:pre-wrap">${this._esc(c.text)}</div>`
             : `<span style="color:var(--text-faint);font-size:11px">—</span>`;
         const chips = Object.entries(ids).flatMap(([kind, list]) =>
             (list || []).map(raw => {
