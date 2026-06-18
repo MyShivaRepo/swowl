@@ -709,22 +709,26 @@ const ClassEditor = {
     },
 
     /** Expands all ancestors of classId in _expanded to unfold the tree down to it */
-    _expandAncestors(classId) {
+    _expandAncestors(classId, visited = new Set()) {
+        if (visited.has(classId)) return;
+        visited.add(classId);
         const classes = APP.state.classes || [];
         const allIds  = new Set(classes.map(c => c.id));
         const cls     = classes.find(c => c.id === classId);
         if (!cls) return;
         (cls.subClassOf || [])
             .filter(s => typeof s === 'string' && allIds.has(s))
-            .forEach(par => { this._expanded.add(par); this._expandAncestors(par); });
+            .forEach(par => { this._expanded.add(par); this._expandAncestors(par, visited); });
     },
 
     // ── Tree rendering ──────────────────────────────────────────
 
-    _renderNode(id, childrenOf, depth) {
+    _renderNode(id, childrenOf, depth, visited = new Set()) {
+        if (visited.has(id)) return ''; // cycle guard
         const cls = (APP.state.classes || []).find(c => c.id === id);
         if (!cls) return '';
         const children = childrenOf[id] || [];
+        const nextVisited = new Set(visited); nextVisited.add(id);
         const hasChildren = children.length > 0;
         const isSelected = this._selectedIds.has(id);
         const isOpen = this._expanded.has(id);
@@ -752,7 +756,7 @@ const ClassEditor = {
                 <span class="tree-label">${_escapeHtml(displayId)}</span>
             </div>
             <div id="tcn-${id}" style="display:${isOpen ? 'block' : 'none'}">
-                ${children.map(cid => this._renderNode(cid, childrenOf, depth + 1)).join('')}
+                ${children.map(cid => this._renderNode(cid, childrenOf, depth + 1, nextVisited)).join('')}
             </div>
         </div>`;
     },
@@ -2969,20 +2973,24 @@ const OPEditor = {
         return { roots, childrenOf };
     },
 
-    _expandAncestors(propId) {
+    _expandAncestors(propId, visited = new Set()) {
+        if (visited.has(propId)) return;
+        visited.add(propId);
         const props  = APP.state.object_properties || [];
         const allIds = new Set(props.map(p => p.id));
         const prop   = props.find(p => p.id === propId);
         if (!prop) return;
         (prop.subPropertyOf || [])
             .filter(s => typeof s === 'string' && allIds.has(s))
-            .forEach(par => { this._expanded.add(par); this._expandAncestors(par); });
+            .forEach(par => { this._expanded.add(par); this._expandAncestors(par, visited); });
     },
 
-    _renderNode(id, childrenOf, depth) {
+    _renderNode(id, childrenOf, depth, visited = new Set()) {
+        if (visited.has(id)) return ''; // cycle guard
         const prop = (APP.state.object_properties || []).find(p => p.id === id);
         if (!prop) return '';
         const children = childrenOf[id] || [];
+        const nextVisited = new Set(visited); nextVisited.add(id);
         const hasChildren = children.length > 0;
         const isSelected = this._selectedIds.has(id);
         const isOpen = this._expanded.has(id);
@@ -3013,7 +3021,7 @@ const OPEditor = {
                       onmouseout="this.style.color='';this.style.textDecoration='';">${_displayRefId(prop.inverseOf)}</span>)</span>` : ''}
             </div>
             <div id="op-tcn-${id}" style="display:${isOpen ? 'block' : 'none'}">
-                ${children.map(cid => this._renderNode(cid, childrenOf, depth + 1)).join('')}
+                ${children.map(cid => this._renderNode(cid, childrenOf, depth + 1, nextVisited)).join('')}
             </div>
         </div>`;
     },
@@ -3843,20 +3851,24 @@ const DPEditor = {
         return { roots, childrenOf };
     },
 
-    _expandAncestors(propId) {
+    _expandAncestors(propId, visited = new Set()) {
+        if (visited.has(propId)) return;
+        visited.add(propId);
         const props  = APP.state.datatype_properties || [];
         const allIds = new Set(props.map(p => p.id));
         const prop   = props.find(p => p.id === propId);
         if (!prop) return;
         (prop.subPropertyOf || [])
             .filter(s => typeof s === 'string' && allIds.has(s))
-            .forEach(par => { this._expanded.add(par); this._expandAncestors(par); });
+            .forEach(par => { this._expanded.add(par); this._expandAncestors(par, visited); });
     },
 
-    _renderNode(id, childrenOf, depth) {
+    _renderNode(id, childrenOf, depth, visited = new Set()) {
+        if (visited.has(id)) return ''; // cycle guard
         const prop = (APP.state.datatype_properties || []).find(p => p.id === id);
         if (!prop) return '';
         const children = childrenOf[id] || [];
+        const nextVisited = new Set(visited); nextVisited.add(id);
         const hasChildren = children.length > 0;
         const isSelected = this._selectedIds.has(id);
         const isOpen = this._expanded.has(id);
@@ -3883,7 +3895,7 @@ const DPEditor = {
                 <span class="tree-label">${_escapeHtml(displayId)}</span>
             </div>
             <div id="dp-tcn-${id}" style="display:${isOpen ? 'block' : 'none'}">
-                ${children.map(cid => this._renderNode(cid, childrenOf, depth + 1)).join('')}
+                ${children.map(cid => this._renderNode(cid, childrenOf, depth + 1, nextVisited)).join('')}
             </div>
         </div>`;
     },
