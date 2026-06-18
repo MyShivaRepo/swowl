@@ -28,6 +28,7 @@
 - [REQ-ONT-034 — Persisting imported namespaces and deriving imports](#req-ont-034--persisting-imported-namespaces-and-deriving-imports)
 
 ### Form
+- [REQ-ONT-036 — Active ontology selector in the title bar](#req-ont-036--active-ontology-selector-in-the-title-bar)
 - [REQ-ONT-017 — Displaying the Ontologies tab](#req-ont-017--displaying-the-ontologies-tab)
 - [REQ-ONT-018 — Loading and displaying the registry](#req-ont-018--loading-and-displaying-the-registry)
 - [REQ-ONT-019 — Selecting a registry row](#req-ont-019--selecting-a-registry-row)
@@ -291,6 +292,28 @@ For a declared import, the suggested prefix is derived from a matching `xmlns` b
 ## 2. Form — Presentation and UI
 
 > Requirements relating to display: layout, visual components, interactions, navigation, styles.
+
+### REQ-ONT-036 — Active ontology selector in the title bar
+
+| **If** | a user `ontology` is connected, |
+|---|---|
+| **Then** | its name (or `prefix:name` if a prefix is defined) is displayed in the application title bar as a widget composed of two distinct clickable zones. |
+
+| **If** | the ontologist clicks on the **label** (ontology name), |
+|---|---|
+| **Then** | the application navigates to the `Ontologies` tab and highlights the connected ontology's row in the registry. |
+
+| **If** | the ontologist clicks on the **▾ button** (dropdown arrow) to the right of the label, |
+|---|---|
+| **Then** | a dropdown menu displays the list of user `ontologies` only (system ontologies `rdf`, `rdfs`, `owl`, `skos` are excluded), sorted alphabetically, with a `●` indicator next to the currently connected `ontology`; selecting an ontology from this menu connects it immediately **without changing the active tab**, enabling content comparison between multiple `ontologies`. |
+
+| **If** | no `ontology` is connected, |
+|---|---|
+| **Then** | the widget is hidden. |
+
+---
+
+**Source code:** `app.js` → `_updateTopbarOntology()` — Updates the label and widget visibility; `_topbarOntoNavigate()` — Navigates to the `Ontologies` tab and scrolls to the connected ontology's row; `_topbarOntoDropdown()` — Builds and displays the dropdown from `!readonly` ontologies sorted by `localeCompare`, then calls `API.connectOntology(name)` and `renderSection(this.currentSection)` without modifying `currentSection`. `index.html` — HTML widget: `#topbar-onto-label` (clickable) + `#topbar-onto-arrow` (▾) + `#topbar-onto-dropdown` (menu). `style.css` — Classes `.topbar-onto-wrap`, `.topbar-onto-label`, `.topbar-onto-arrow`, `.topbar-onto-dropdown`, `.topbar-onto-dropdown-item`.
 
 ### REQ-ONT-017 — Displaying the Ontologies tab
 

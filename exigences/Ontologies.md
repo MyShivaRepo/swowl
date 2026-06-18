@@ -28,6 +28,7 @@
 - [REQ-ONT-034 — Persistance des namespaces importés et dérivation des imports](#req-ont-034--persistance-des-namespaces-importés-et-dérivation-des-imports)
 
 ### Forme
+- [REQ-ONT-036 — Sélecteur d'ontologie active dans la barre de titre](#req-ont-036--sélecteur-dontologie-active-dans-la-barre-de-titre)
 - [REQ-ONT-017 — Affichage de l'onglet Ontologies](#req-ont-017--affichage-de-longlet-ontologies)
 - [REQ-ONT-018 — Chargement et affichage du registre](#req-ont-018--chargement-et-affichage-du-registre)
 - [REQ-ONT-019 — Sélection d'une ligne du registre](#req-ont-019--sélection-dune-ligne-du-registre)
@@ -291,6 +292,28 @@ Pour un import déclaré, le préfixe proposé est dérivé d'un binding `xmlns`
 ## 2. Forme — Présentation et interface utilisateur
 
 > Exigences relatives à l'affichage : layout, composants visuels, interactions, navigation, styles.
+
+### REQ-ONT-036 — Sélecteur d'ontologie active dans la barre de titre
+
+| **Si** | une `ontologie` utilisateur est connectée, |
+|---|---|
+| **Alors** | son nom (ou `préfixe:nom` si le préfixe est défini) est affiché dans la barre de titre de l'application, sous la forme d'un widget composé de deux zones cliquables distinctes. |
+
+| **Si** | l'ontologiste clique sur le **label** (nom de l'`ontologie`), |
+|---|---|
+| **Alors** | l'application navigue vers l'onglet `Ontologies` et met en évidence la ligne de l'`ontologie` connectée dans le registre. |
+
+| **Si** | l'ontologiste clique sur le **bouton ▾** (flèche vers le bas) à droite du label, |
+|---|---|
+| **Alors** | un menu déroulant affiche la liste des `ontologies` utilisateur uniquement (les `ontologies` système `rdf`, `rdfs`, `owl`, `skos` sont exclues), triées par ordre alphabétique, avec un indicateur `●` devant l'`ontologie` actuellement connectée ; sélectionner une `ontologie` dans ce menu la connecte immédiatement **sans changer l'onglet actif**, permettant la comparaison de contenu entre plusieurs `ontologies`. |
+
+| **Si** | aucune `ontologie` n'est connectée, |
+|---|---|
+| **Alors** | le widget est masqué. |
+
+---
+
+**Code source :** `app.js` → `_updateTopbarOntology()` — Met à jour le label et la visibilité du widget ; `_topbarOntoNavigate()` — Navigue vers l'onglet `Ontologies` et scrolle vers la ligne de l'ontologie connectée ; `_topbarOntoDropdown()` — Construit et affiche le menu déroulant à partir des ontologies `!readonly` triées par `localeCompare`, puis appelle `API.connectOntology(name)` et `renderSection(this.currentSection)` sans modifier `currentSection`. `index.html` — Widget HTML : `#topbar-onto-label` (cliquable) + `#topbar-onto-arrow` (▾) + `#topbar-onto-dropdown` (menu). `style.css` — Classes `.topbar-onto-wrap`, `.topbar-onto-label`, `.topbar-onto-arrow`, `.topbar-onto-dropdown`, `.topbar-onto-dropdown-item`.
 
 ### REQ-ONT-017 — Affichage de l'onglet Ontologies
 
