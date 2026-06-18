@@ -4718,17 +4718,16 @@ APP._ccSyncFromBackend = async function (force = false) {
     try {
         const res = await API.getAnalysisChunks();
         const serverChunks = res.chunks || [];
-        // Filtre les chunks vides (pas d'entités extraites)
-        const real = serverChunks.filter(c => {
-            const ids = c.ids || {};
-            return Object.values(ids).some(l => (l || []).length > 0);
-        });
-        if (real.length > 0) {
-            this._analysisSaveChunks(real);
-            this._analysisSave(this._ccBuildProv(real), []);
+        if (serverChunks.length > 0) {
+            // Sauvegarde sans le texte brut pour éviter le dépassement du quota localStorage
+            const lean = serverChunks.map(c => ({ ref: c.ref, ids: c.ids, error: c.error }));
+            this._analysisSaveChunks(lean);
+            this._analysisSave(this._ccBuildProv(lean), []);
             await this.refresh();
+            if (UI && UI.success) UI.success(`Analysis ready — ${serverChunks.length} chunks loaded. Click Analysis tab to view.`);
+        } else {
+            if (UI && UI.warn) UI.warn('No analysis found on backend for this ontology.');
         }
-        if (UI && UI.success) UI.success('Analysis loaded from backend — click Analysis tab to view.');
     } catch (e) { /* réseau — on ignore */ }
     finally { this._ccSyncInProgress = false; }
 };
