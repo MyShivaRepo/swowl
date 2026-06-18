@@ -4728,15 +4728,9 @@ APP._ccSyncFromBackend = async function (force = false) {
             this._analysisSave(this._ccBuildProv(real), []);
             await this.refresh();
         }
+        if (UI && UI.success) UI.success('Analysis loaded from backend — click Analysis tab to view.');
     } catch (e) { /* réseau — on ignore */ }
-    finally {
-        this._ccSyncInProgress = false;
-        // Re-rendre uniquement si l'utilisateur est déjà sur l'onglet sources/analysis
-        if (this.currentSection === 'sources') {
-            this._sourcesTab = 'analysis';
-            this.renderSection('sources');
-        }
-    }
+    finally { this._ccSyncInProgress = false; }
 };
 
 // Navigation depuis WHERE EXTRACTED → onglet Analysis, scroll jusqu'au chunk
