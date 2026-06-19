@@ -69,7 +69,3 @@ backend/    FastAPI API, OWL models, triple store, inference/serialization engin
 frontend/   index.html, js/ (editors, app, api), css/
 exigences/  requirements (specs per tab)
 ```
-
-## API
-
-Interactive documentation: http://localhost:8001/docs
