@@ -4,56 +4,59 @@ All notable changes to **SWOWL** are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+> 🇫🇷 Une version française de ce fichier est disponible : [CHANGELOG.fr.md](CHANGELOG.fr.md).
+
 ## [1.1.0] — 2026-06-19
 
-### Sources (nouvel onglet, amovible)
-- Nouvel onglet **Sources** (à droite de Settings, masquable via GUI Tabs) avec
-  trois sous-onglets : **LLMs**, **Corpus**, **Analysis**.
-- **LLMs** : configuration d'un fournisseur (**Anthropic**, **OpenAI**, **Meta**),
-  saisie d'une **clé API** par fournisseur (stockée en `localStorage`, masquable)
-  et **test** de la clé via un proxy backend `POST /api/llm/test` (évite le CORS ;
-  la clé n'est ni stockée ni journalisée côté serveur).
-- **Corpus** (par ontologie) : liste de documents **Name / Location** (chemin
-  local via le **FsBrowser** → chemin absolu, ou URL Web), ajout / édition /
-  suppression. Bouton **🔬 Analyse Corpus**.
-- **Analyse Corpus → ontologie candidate** : `POST /api/corpus/analyse` parse chaque
-  document (PDF, TXT/MD, HTML/URL, DOCX) section par section et extrait via **Claude**
-  un modèle **OWL + règles SWRL** fusionnés dans l'ontologie connectée (marqués
-  `swowl:candidate`). L'onglet **Analysis** affiche la **traçabilité** : chaque
-  élément (ID navigable) et les **sections sources** (document — chapitre / page).
+### Sources (new, hideable tab)
+- New **Sources** tab (right of Settings, hideable via GUI Tabs) with three
+  sub-tabs: **LLMs**, **Corpus**, **Analysis**.
+- **LLMs**: configure a provider (**Anthropic**, **OpenAI**, **Meta**), enter an
+  **API key** per provider (stored in `localStorage`, maskable) and **test** the
+  key through a backend proxy `POST /api/llm/test` (avoids CORS; the key is
+  neither stored nor logged server-side).
+- **Corpus** (per ontology): list of **Name / Location** documents (local path
+  via the **FsBrowser** → absolute path, or web URL), add / edit / delete.
+  **🔬 Analyse Corpus** button.
+- **Corpus analysis → candidate ontology**: `POST /api/corpus/analyse` parses each
+  document (PDF, TXT/MD, HTML/URL, DOCX) section by section and extracts, via
+  **Claude**, an **OWL + SWRL rules** model merged into the connected ontology
+  (flagged `swowl:candidate`). The **Analysis** tab shows the **traceability**:
+  each element (navigable ID) and the **source sections** (document — chapter / page).
 
 ### Export
-- **Export HTML** (bouton « ↓ HTML » dans l'onglet Ontologies) : génère une **page
-  HTML autonome** (1 fichier) de l'ontologie connectée — Classes, ObjectProperties,
-  DatatypeProperties, AnnotationProperties, Individuals, SWRL Rules — entièrement
-  **navigable** (liens internes + sommaire) avec **recherche full-text**.
-- L'export HTML reprend désormais le **look & feel de SWOWL** (onglets, fiches,
-  panneaux), ajoute un onglet **Ontology (Network)** (graphe **D3.js** force-directed)
-  et reproduit fidèlement les panneaux de **références croisées** des fiches
-  (mêmes libellés que l'éditeur : *Properties and Restrictions*, *Where Used in
-  Range*, *Disjoints*, *Equivalent*, *SubClassOf*…).
+- **HTML export** (« ↓ HTML » button in the Ontologies tab): generates a
+  **standalone HTML page** (single file) of the connected ontology — Classes,
+  ObjectProperties, DatatypeProperties, AnnotationProperties, Individuals,
+  SWRL Rules — fully **navigable** (internal links + table of contents) with
+  **full-text search**.
+- The HTML export now reproduces the **SWOWL look & feel** (tabs, cards, panels),
+  adds an **Ontology (Network)** tab (force-directed **D3.js** graph) and
+  faithfully reproduces the card **cross-reference** panels (same labels as the
+  editor: *Properties and Restrictions*, *Where Used in Range*, *Disjoints*,
+  *Equivalent*, *SubClassOf*…).
 
-### Portée contextuelle des onglets
-- Seul l'onglet **Ontologies** reste **global**. Les réglages des onglets
-  **GUI Tabs**, **Languages**, **IDs Rules** et **LLMs** sont désormais
-  **contextuels (par ontologie)** : clés `localStorage` suffixées par
-  `::{nom_ontologie}` (repli sur la clé de base si aucune ontologie connectée).
-- Le sélecteur d'ontologie de la barre supérieure redirige vers **Ontologies**
-  si l'onglet actif est masqué dans l'ontologie cible.
+### Contextual (per-ontology) tab scope
+- Only the **Ontologies** tab remains **global**. The settings of the
+  **GUI Tabs**, **Languages**, **IDs Rules** and **LLMs** tabs are now
+  **contextual (per ontology)**: `localStorage` keys are suffixed with
+  `::{ontology_name}` (falling back to the base key when no ontology is connected).
+- The top-bar ontology switcher redirects to **Ontologies** if the active tab is
+  hidden in the target ontology.
 
-### Suppressions & UI
-- Suppression de l'onglet **Inferences** (nav + ligne dans GUI Tabs).
-- Suppression de la sous-barre **SPARQL VizQ** : les requêtes s'affichent
-  directement dans l'onglet **Queries** ; icône des requêtes : 🎯 → **🔎**.
-- Barres d'outils homogénéisées via une classe CSS unique **`btn-tool`**
-  (boutons carrés identiques, corbeille rouge) dans **SWRL Rules**, **Queries**
-  et **Individuals** ; suppression désormais via un **bouton unique** dans la
-  barre d'outils (plus de corbeille par ligne).
-- Onglet **Analysis** : les puces des éléments extraits affichent l'**ID seul**.
+### Removals & UI
+- Removed the **Inferences** tab (nav item + GUI Tabs row).
+- Removed the **SPARQL VizQ** sub-bar: queries are now displayed directly in the
+  **Queries** tab; query icon: 🎯 → **🔎**.
+- Toolbars homogenised through a single CSS class **`btn-tool`** (identical square
+  buttons, red trash) in **SWRL Rules**, **Queries** and **Individuals**;
+  deletion is now done via a **single button** in the toolbar (no more per-row
+  trash).
+- **Analysis** tab: extracted-element chips show the **ID only**.
 
-### Robustesse
-- **OpenAI** : nouvelle logique de **retry avec backoff** sur les erreurs HTTP
-  **429** (lecture de l'en-tête `Retry-After`, repli exponentiel).
+### Robustness
+- **OpenAI**: new **retry-with-backoff** logic on HTTP **429** errors (reads the
+  `Retry-After` header, exponential fallback).
 
 [1.1.0]: https://github.com/MyShivaRepo/swowl/releases/tag/v1.1.0
 

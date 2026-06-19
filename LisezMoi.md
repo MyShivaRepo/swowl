@@ -5,7 +5,7 @@
 Éditeur web d'ontologies **OWL** : classes, propriétés, individus & règles **SWRL**.
 IHM pour les requêtes **SPARQL** visuelles.
 
-> **Version actuelle : 1.1.0** — voir le [CHANGELOG](CHANGELOG.md) pour la liste complète des fonctionnalités.
+> **Version actuelle : 1.1.0** — voir le [CHANGELOG](CHANGELOG.fr.md) pour la liste complète des fonctionnalités.
 
 ## Démarrage
 
