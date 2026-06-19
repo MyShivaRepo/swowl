@@ -10,8 +10,8 @@ permettent d'amener une ontologie dans SWOWL. Tous deux se trouvent dans l'ongle
 
 | Bouton | Rôle |
 |--------|------|
-| ✨ **New Ontology** | Créer une nouvelle ontologie vide — *Section 1 ci-dessous* |
-| 📥 **Import Ontology** | Importer un fichier `.owl` / `.ttl` / `.rdf` existant — *Section 2 ci-dessous* |
+| ✨ **New Ontology** | Créer une nouvelle ontologie vide — *Cas n°1 ci-dessous* |
+| 📥 **Import Ontology** | Importer un fichier `.owl` / `.ttl` / `.rdf` existant — *Cas n°2 ci-dessous* |
 | 📂 **Load Ontology** | Enregistrer une ontologie déjà sauvegardée en `.json` SWOWL |
 | **W3C** Fetch W3C Ontologies | Télécharger les ontologies de référence RDF, RDFS, OWL, SKOS depuis w3.org |
 
@@ -21,7 +21,7 @@ faire. Les champs marqués d'une **\*** sont obligatoires.
 
 ---
 
-## Section 1 — Partir de zéro : l'assistant **New Ontology**
+## Cas n°1 : Je pars de zéro => Choisir l'assistant **« New Ontology »**
 
 À utiliser lorsque vous n'avez encore aucune ontologie et que vous voulez en
 construire une de zéro.
@@ -69,7 +69,7 @@ construire une de zéro.
 
 ---
 
-## Section 2 — Vous avez déjà une ontologie : l'assistant **Import Ontology**
+## Cas n°2 : J'ai déjà une ontologie => Choisir l'assistant **« Import Ontology »**
 
 À utiliser lorsque vous disposez déjà d'un fichier d'ontologie (`.owl`, `.ttl`,
 `.rdf`, `.xml`) que vous souhaitez visualiser et éditer dans SWOWL.

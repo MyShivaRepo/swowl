@@ -10,8 +10,8 @@ When you open the **Ontologies** tab you see four action buttons:
 
 | Button | What it does |
 |--------|--------------|
-| ✨ **New Ontology** | Create a new, empty ontology — *Section 1 below* |
-| 📥 **Import Ontology** | Bring in an existing `.owl` / `.ttl` / `.rdf` file — *Section 2 below* |
+| ✨ **New Ontology** | Create a new, empty ontology — *Case #1 below* |
+| 📥 **Import Ontology** | Bring in an existing `.owl` / `.ttl` / `.rdf` file — *Case #2 below* |
 | 📂 **Load Ontology** | Register an ontology already saved as a SWOWL `.json` file |
 | **W3C** Fetch W3C Ontologies | Download the RDF, RDFS, OWL, SKOS reference ontologies from w3.org |
 
@@ -21,7 +21,7 @@ with **\*** are required.
 
 ---
 
-## Section 1 — Starting from scratch: the **New Ontology** wizard
+## Case #1 : I'm starting from scratch => Choose the **"New Ontology"** wizard
 
 Use this when you have no ontology yet and want to build one from zero.
 
@@ -64,7 +64,7 @@ Use this when you have no ontology yet and want to build one from zero.
 
 ---
 
-## Section 2 — You already have an ontology: the **Import Ontology** wizard
+## Case #2 : I already have an ontology => Choose the **"Import Ontology"** wizard
 
 Use this when you already have an ontology file (`.owl`, `.ttl`, `.rdf`, `.xml`)
 that you want to visualise and edit in SWOWL.
