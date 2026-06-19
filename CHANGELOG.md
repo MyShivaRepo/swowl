@@ -4,7 +4,7 @@ All notable changes to **SWOWL** are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [1.1.0] — 2026-06-16
+## [1.1.0] — 2026-06-19
 
 ### Sources (nouvel onglet, amovible)
 - Nouvel onglet **Sources** (à droite de Settings, masquable via GUI Tabs) avec
@@ -27,6 +27,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   HTML autonome** (1 fichier) de l'ontologie connectée — Classes, ObjectProperties,
   DatatypeProperties, AnnotationProperties, Individuals, SWRL Rules — entièrement
   **navigable** (liens internes + sommaire) avec **recherche full-text**.
+- L'export HTML reprend désormais le **look & feel de SWOWL** (onglets, fiches,
+  panneaux), ajoute un onglet **Ontology (Network)** (graphe **D3.js** force-directed)
+  et reproduit fidèlement les panneaux de **références croisées** des fiches
+  (mêmes libellés que l'éditeur : *Properties and Restrictions*, *Where Used in
+  Range*, *Disjoints*, *Equivalent*, *SubClassOf*…).
+
+### Portée contextuelle des onglets
+- Seul l'onglet **Ontologies** reste **global**. Les réglages des onglets
+  **GUI Tabs**, **Languages**, **IDs Rules** et **LLMs** sont désormais
+  **contextuels (par ontologie)** : clés `localStorage` suffixées par
+  `::{nom_ontologie}` (repli sur la clé de base si aucune ontologie connectée).
+- Le sélecteur d'ontologie de la barre supérieure redirige vers **Ontologies**
+  si l'onglet actif est masqué dans l'ontologie cible.
+
+### Suppressions & UI
+- Suppression de l'onglet **Inferences** (nav + ligne dans GUI Tabs).
+- Suppression de la sous-barre **SPARQL VizQ** : les requêtes s'affichent
+  directement dans l'onglet **Queries** ; icône des requêtes : 🎯 → **🔎**.
+- Barres d'outils homogénéisées via une classe CSS unique **`btn-tool`**
+  (boutons carrés identiques, corbeille rouge) dans **SWRL Rules**, **Queries**
+  et **Individuals** ; suppression désormais via un **bouton unique** dans la
+  barre d'outils (plus de corbeille par ligne).
+- Onglet **Analysis** : les puces des éléments extraits affichent l'**ID seul**.
+
+### Robustesse
+- **OpenAI** : nouvelle logique de **retry avec backoff** sur les erreurs HTTP
+  **429** (lecture de l'en-tête `Retry-After`, repli exponentiel).
 
 [1.1.0]: https://github.com/MyShivaRepo/swowl/releases/tag/v1.1.0
 

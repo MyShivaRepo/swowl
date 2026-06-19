@@ -286,6 +286,7 @@ def _call_anthropic(api_key: str, model: str, user_text: str, system: str = "") 
 def _call_openai_compat(base_url: str, api_key: str, model: str, user_text: str,
                         system: str = "", timeout: int = 120) -> str:
     """Appel générique compatible OpenAI : OpenAI, Meta/Llama Cloud, Ollama local."""
+    import time as _time
     sys_msg = (system.strip() if system.strip() else SYSTEM_PROMPT) + _FORMAT_SUFFIX
     url = base_url.rstrip("/") + "/v1/chat/completions"
     body = json.dumps({
@@ -299,10 +300,21 @@ def _call_openai_compat(base_url: str, api_key: str, model: str, user_text: str,
     headers: dict[str, str] = {"Content-Type": "application/json"}
     if api_key and api_key.lower() != "ollama":
         headers["Authorization"] = f"Bearer {api_key}"
-    req = urllib.request.Request(url, data=body, method="POST", headers=headers)
-    with urllib.request.urlopen(req, timeout=timeout) as r:
-        data = json.loads(r.read().decode("utf-8", "replace"))
-    return data["choices"][0]["message"]["content"]
+    max_retries = 6
+    for attempt in range(max_retries):
+        req = urllib.request.Request(url, data=body, method="POST", headers=headers)
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as r:
+                data = json.loads(r.read().decode("utf-8", "replace"))
+            return data["choices"][0]["message"]["content"]
+        except urllib.error.HTTPError as e:
+            if e.code == 429 and attempt < max_retries - 1:
+                retry_after = e.headers.get("Retry-After")
+                wait = float(retry_after) if retry_after else min(2 ** attempt, 60)
+                print(f"[corpus] 429 rate-limit, retry in {wait:.1f}s (attempt {attempt+1}/{max_retries})", flush=True)
+                _time.sleep(wait)
+                continue
+            raise
 
 
 def _parse_json(text: str) -> dict:

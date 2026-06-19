@@ -471,7 +471,7 @@
 
 ### REQ-IND-040 — Sélection complète d'un individual lors d'une navigation inter-onglets
 
-| **Si** | l'ontologiste navigue vers un `individual` depuis l'extérieur de l'onglet `Individuals` — clic sur un `individual` dans le tableau de résultats SPARQL VizQ, lien d'entité inter-onglets (`APP.navigateTo`), navigation arrière/avant de l'historique (`APP._restoreState`) ou restauration annuler/rétablir, |
+| **Si** | l'ontologiste navigue vers un `individual` depuis l'extérieur de l'onglet `Individuals` — clic sur un `individual` dans le tableau de résultats Queries, lien d'entité inter-onglets (`APP.navigateTo`), navigation arrière/avant de l'historique (`APP._restoreState`) ou restauration annuler/rétablir, |
 |---|---|
 | **Alors** | l'`individual` ciblé est sélectionné de bout en bout dans les trois colonnes : sa `classe` représentative est sélectionnée dans l'arbre (colonne 1), la liste filtrée des `individuals` est reconstruite (colonne 2), l'`individual` lui-même est surligné et son formulaire est affiché (colonne 3), et l'item est défilé pour être visible. |
 

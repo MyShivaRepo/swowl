@@ -72,7 +72,7 @@
 
 ---
 
-**Code source :** `sparql_editor.js` → `selectQuery()` — Charge la requête depuis le `localStorage`, en effectue une copie profonde (via `JSON.parse/JSON.stringify`) dans `_editingQuery`, met à jour `_selectedId`, rafraîchit la liste (surlignage de l'élément sélectionné) et rend le panneau de détail.
+**Code source :** `app.js` → `APP.renderQueries()`, `sparql_editor.js` → `renderSplit()`, `renderList()`, `selectQuery()` — Les requêtes sauvegardées s'affichent directement dans l'onglet « Queries » : `APP.renderQueries()` rend simplement `SparqlEditor.renderSplit()` sans aucune sous-barre verticale propre (l'ancienne sous-barre « SPARQL VizQ » interne à l'onglet a été supprimée ; le stockage persistant est inchangé). Chaque requête de `renderList()` est affichée avec une icône loupe 🔎. À la sélection, `selectQuery()` charge la requête depuis le `localStorage`, en effectue une copie profonde (via `JSON.parse/JSON.stringify`) dans `_editingQuery`, met à jour `_selectedId`, rafraîchit la liste (surlignage de l'élément sélectionné) et rend le panneau de détail.
 
 ### REQ-QRY-004 — Suppression d'une requête
 
@@ -82,7 +82,7 @@
 
 ---
 
-**Code source :** `sparql_editor.js` → `deleteQuery()` — Filtre le tableau de requêtes persistées pour exclure la requête ciblée, sauvegarde le tableau résultant, et, si la requête supprimée était sélectionnée, réinitialise `_selectedId` et `_editingQuery` à `null` et remplace le panneau de détail par un message vide.
+**Code source :** `sparql_editor.js` → `deleteSelected()`, `deleteQuery()` — La suppression est déclenchée depuis un bouton corbeille rouge placé dans la barre d'outils du panneau (à droite du bouton « + »), qui agit sur la (les) requête(s) sélectionnée(s) via `deleteSelected()` (ce n'est plus un contrôle par ligne en face de chaque requête). La logique sous-jacente filtre le tableau de requêtes persistées pour exclure la requête ciblée, sauvegarde le tableau résultant, et, si la requête supprimée était sélectionnée, réinitialise `_selectedId` et `_editingQuery` à `null` et remplace le panneau de détail par un message vide.
 
 ### REQ-QRY-005 — Recherche/filtrage dans la liste des requêtes
 

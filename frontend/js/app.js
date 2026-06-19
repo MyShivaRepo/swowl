@@ -4,19 +4,24 @@
 
 // ── Tab visibility (persisted in localStorage) ──────────────────────
 const TabVisibility = {
-    _key:      'swowl_hidden_tabs',
-    _optional: ['sources','annotation-properties','individuals','swrl-rules','views','queries','inferences'],
+    _baseKey:  'swowl_hidden_tabs',
+    _optional: ['sources','annotation-properties','individuals','swrl-rules','views','queries'],
     _hidden:   new Set(),
+
+    _ctxKey() {
+        const n = typeof APP !== 'undefined' && APP.state && APP.state.ontology && APP.state.ontology.name;
+        return n ? this._baseKey + '::' + n : this._baseKey;
+    },
 
     load() {
         try {
-            const arr = JSON.parse(localStorage.getItem(this._key) || '[]');
+            const arr = JSON.parse(localStorage.getItem(this._ctxKey()) || '[]');
             this._hidden = new Set(arr);
         } catch(_) { this._hidden = new Set(); }
     },
 
     save() {
-        localStorage.setItem(this._key, JSON.stringify([...this._hidden]));
+        localStorage.setItem(this._ctxKey(), JSON.stringify([...this._hidden]));
     },
 
     isHidden(tabId)   { return this._hidden.has(tabId); },
@@ -81,13 +86,18 @@ const Settings = {
     activeLangs:   ['fr', 'en'],   // active languages (subset of available)
     preferredLang: 'fr',           // preferred language (1 among active)
     namingFormat:  'individual_counter', // default ID format for individuals
-    _key: 'swowl_settings',
+    _baseKey: 'swowl_settings',
 
     get defaultLang() { return this.preferredLang; },
 
+    _ctxKey() {
+        const n = typeof APP !== 'undefined' && APP.state && APP.state.ontology && APP.state.ontology.name;
+        return n ? this._baseKey + '::' + n : this._baseKey;
+    },
+
     load() {
         try {
-            const s = JSON.parse(localStorage.getItem(this._key) || '{}');
+            const s = JSON.parse(localStorage.getItem(this._ctxKey()) || '{}');
             this.preferredLang = s.preferredLang || 'fr';
             this.activeLangs   = s.activeLangs   || ['fr'];
             if (!this.activeLangs.includes(this.preferredLang))
@@ -97,7 +107,7 @@ const Settings = {
     },
 
     save() {
-        localStorage.setItem(this._key, JSON.stringify({
+        localStorage.setItem(this._ctxKey(), JSON.stringify({
             preferredLang: this.preferredLang,
             activeLangs:   this.activeLangs,
             namingFormat:  this.namingFormat,
@@ -216,7 +226,7 @@ const APP = {
             this.renderNav();
             this.renderSection(this.currentSection);
             this._updateNavButtons();
-            InferenceUI.startAutoRefresh(4000);
+
         } catch (e) {
             this.renderSection('ontologies');
         }
@@ -316,7 +326,13 @@ const APP = {
                     await API.connectOntology(o.name);
                     UI.success(`Ontology "${o.name}" connected.`);
                     await this.refresh();
-                    this.renderSection(this.currentSection);
+                    // Si l'onglet courant est maintenant caché pour cette ontologie → retour à Ontologies
+                    const sec = this.currentSection;
+                    if (sec && sec !== 'ontologies' && TabVisibility.isHidden(sec)) {
+                        this.navigate('ontologies');
+                    } else {
+                        this.renderSection(sec);
+                    }
                     API.listOntologies().then(list => {
                         this._ontoList = list;
                         const tbody = document.getElementById('onto-registry-body');
@@ -342,7 +358,9 @@ const APP = {
         await this.loadState();
         _TreeCommon.invalidateCaches();   // hierarchy trees changed → drop buildTree caches
         this.updateStats();
-        InferenceUI.refresh();
+        Settings.load();        // recharge les settings contextuels de l'ontologie connectée
+        TabVisibility.load();   // recharge la visibilité des onglets contextuelle
+        this._applyTabVisibility();
         // Keep the topbar ontology selector in sync
         API.listOntologies().then(list => { this._ontoList = list; this._updateTopbarOntology(); }).catch(() => {});
     },
@@ -543,7 +561,7 @@ const APP = {
         const main = document.getElementById('main-content');
 
         // Block editing tabs if no ontology is connected
-        const editSections = ['classes','object-properties','datatype-properties','individuals','swrl-rules','views','queries','inferences'];
+        const editSections = ['classes','object-properties','datatype-properties','individuals','swrl-rules','views','queries'];
         if (!this.state.ontology && editSections.includes(section)) {
             main.innerHTML = this._noOntoMsg();
             return;
@@ -594,15 +612,7 @@ const APP = {
                 main.innerHTML = APP.renderQueries();
                 if (APP._queriesTab === 'vizq')        SparqlEditor.restoreSelection();
                 break;
-            case 'inferences':
-                main.innerHTML = `
-                    <div class="section-header">
-                        <h2>🧠 Real-time Inferences</h2>
-                        <button class="btn-secondary" onclick="InferenceUI.refresh()">↻ Recalculate</button>
-                    </div>
-                    <div id="inference-panel"><p class="empty">Loading…</p></div>`;
-                InferenceUI.refresh();
-                break;
+
         }
     },
 
@@ -1672,6 +1682,20 @@ const APP = {
         const usedByProp  = id => whereUsed(a => a.type === 'property_atom' && a.property_id === id);
         const usedByInd   = id => whereUsed(a => (a.type === 'equality_atom' && a.value === id) || (a.type === 'property_atom' && (a.subject === id || a.object === id)));
 
+        // ── Cross-références classe → OPs/DPs/individus ──
+        const opRange = {};
+        (s.object_properties || []).forEach(p => {
+            (p.range || []).forEach(r => { (opRange[r] = opRange[r] || []).push(p.id); });
+        });
+        const indTypes = {};
+        (s.individuals || []).forEach(i => {
+            (i.types || []).filter(t => typeof t === 'string').forEach(t => { (indTypes[t] = indTypes[t] || []).push(i.id); });
+        });
+        const xrefFrame = (tag, ids, type, cls = 'cls-frame-tag-blue') => {
+            if (!ids || !ids.length) return '';
+            return frame(`${tag} <span class="frame-cnt">${ids.length}</span>`, ids.map(id => li(id, type)).join(''), cls);
+        };
+
         // ── Sections ──────────────────────────────────────────
         const sections = [];
 
@@ -1680,13 +1704,15 @@ const APP = {
             const supers = (c.subClassOf || []).filter(x => typeof x === 'string');
             const restr  = (c.subClassOf || []).filter(x => typeof x === 'object' && x.type !== '_marker');
             const props  = (c.subClassOf || []).filter(x => typeof x === 'object' && x.type === '_marker');
+            const propRestrBody = [...restr.map(r => liRaw(restrText(r))), ...props.map(r => liRaw(restrText(r), 'op'))].join('');
             const body = [
                 annoFrame(c.annotations),
-                frame('SubClassOf', liList(supers, 'cls')),
-                frame('Equivalent', (c.equivalentClass || []).map(e => typeof e === 'string' ? li(e, 'cls') : liRaw(restrText(e))).join(''), 'cls-frame-tag-orange'),
+                frame('Properties and Restrictions', propRestrBody, 'cls-frame-tag-blue'),
+                xrefFrame('Where Used in Range', opRange[c.id], 'op'),
                 frame('Disjoints', liList(c.disjointWith, 'cls'), 'cls-frame-tag-orange'),
-                frame('Restrictions', restr.map(r => liRaw(restrText(r))).join(''), 'cls-frame-tag-blue'),
-                frame('Properties', props.map(r => liRaw(restrText(r), 'op')).join(''), 'cls-frame-tag-blue'),
+                frame('Equivalent', (c.equivalentClass || []).map(e => typeof e === 'string' ? li(e, 'cls') : liRaw(restrText(e))).join(''), 'cls-frame-tag-orange'),
+                frame('SubClassOf', liList(supers, 'cls')),
+                xrefFrame('Individuals', indTypes[c.id], 'ind'),
                 usedByClass(c.id),
             ].join('');
             const stxt = [...supers, ...(c.disjointWith || []), ...restr.map(r => r.property + ' ' + (r.filler || r.value || '')), annoTxt(c.annotations)].join(' ');
@@ -1861,16 +1887,60 @@ const APP = {
         const title = esc(onto.name || name);
         const total = sections.reduce((n, sec) => n + sec.items.length, 0);
 
+        // ── Données graphe D3 ──
+        const gNodes = [
+            ...(s.classes || []).map(c => ({ id: c.id, lbl: _displayRefId(c.id), type: 'cls' })),
+            ...(s.object_properties || []).map(p => ({ id: p.id, lbl: _displayRefId(p.id), type: 'op' })),
+            ...(s.datatype_properties || []).map(p => ({ id: p.id, lbl: _displayRefId(p.id), type: 'dp' })),
+            ...(s.individuals || []).map(i => ({ id: i.id, lbl: indDispName(i) || _displayRefId(i.id), type: 'ind' })),
+        ];
+        const gNodeIds = new Set(gNodes.map(n => n.id));
+        const gEdges = [];
+        (s.classes || []).forEach(c => {
+            (c.subClassOf || []).filter(x => typeof x === 'string' && gNodeIds.has(x)).forEach(p => gEdges.push({ s: c.id, t: p, lbl: 'subClassOf', k: 'sub' }));
+        });
+        (s.object_properties || []).forEach(p => {
+            (p.domain || []).filter(x => gNodeIds.has(x)).forEach(d => gEdges.push({ s: p.id, t: d, lbl: 'domain', k: 'dom' }));
+            (p.range || []).filter(x => gNodeIds.has(x)).forEach(r => gEdges.push({ s: p.id, t: r, lbl: 'range', k: 'rng' }));
+        });
+        (s.individuals || []).forEach(i => {
+            (i.types || []).filter(x => gNodeIds.has(x)).forEach(t => gEdges.push({ s: i.id, t, lbl: 'type', k: 'type' }));
+            (i.objectAssertions || []).filter(a => gNodeIds.has(a.target)).forEach(a => gEdges.push({ s: i.id, t: a.target, lbl: _displayRefId(a.property), k: 'oa' }));
+        });
+
+        const networkTab = `<button class="tab" data-sec="__network__"><span style="font-size:13px">🕸</span> Ontology (Network)<span class="cnt">${gNodes.length}</span></button>`;
+        const networkPanel = `<div class="panel" data-sec="__network__" style="display:none;height:100%;position:relative">
+  <div id="net-wrap" style="width:100%;height:100%;position:relative;background:#0e1219">
+    <svg id="net-svg" style="width:100%;height:100%"></svg>
+    <div id="net-tooltip" style="position:absolute;pointer-events:none;display:none;background:#1d2535;border:1px solid #2a3347;border-radius:6px;padding:7px 12px;font-size:12px;color:#e2e8f0;font-family:monospace;z-index:20;max-width:340px;word-break:break-all"></div>
+    <button id="net-fit" style="position:absolute;top:12px;right:12px;background:#1d2535;border:1px solid #2a3347;color:#94a3b8;border-radius:6px;padding:6px 14px;font-size:12px;cursor:pointer;z-index:10">Fit</button>
+    <div id="net-legend" style="position:absolute;bottom:16px;left:16px;background:#161b24cc;border:1px solid #2a3347;border-radius:7px;padding:10px 14px;font-size:11px;color:#94a3b8;display:flex;flex-direction:column;gap:5px;z-index:10;backdrop-filter:blur(4px)">
+      <div style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:#4b5a6e;margin-bottom:2px">Nœuds</div>
+      <div style="display:flex;align-items:center;gap:7px"><span style="width:12px;height:12px;border-radius:50%;background:#b87333;display:inline-block;flex-shrink:0"></span>Class</div>
+      <div style="display:flex;align-items:center;gap:7px"><span style="width:12px;height:8px;border-radius:2px;background:#3b82f6;display:inline-block;flex-shrink:0"></span>Object Property</div>
+      <div style="display:flex;align-items:center;gap:7px"><span style="width:12px;height:8px;border-radius:2px;background:#10b981;display:inline-block;flex-shrink:0"></span>Data Property</div>
+      <div style="display:flex;align-items:center;gap:7px"><span style="width:10px;height:10px;background:#8b4db8;display:inline-block;transform:rotate(45deg);flex-shrink:0"></span>Individual</div>
+      <div style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:#4b5a6e;margin-top:4px;margin-bottom:2px">Arêtes</div>
+      <div style="display:flex;align-items:center;gap:7px"><span style="width:20px;height:2px;background:#6b7280;display:inline-block;flex-shrink:0"></span>subClassOf</div>
+      <div style="display:flex;align-items:center;gap:7px"><span style="width:20px;height:2px;background:#60a5fa;display:inline-block;flex-shrink:0"></span>domain</div>
+      <div style="display:flex;align-items:center;gap:7px"><span style="width:20px;height:2px;background:#34d399;display:inline-block;flex-shrink:0"></span>range</div>
+      <div style="display:flex;align-items:center;gap:7px"><span style="width:20px;height:2px;background:#a78bfa;display:inline-block;flex-shrink:0"></span>type</div>
+      <div style="display:flex;align-items:center;gap:7px"><span style="width:20px;height:2px;background:#e2d9c0;display:inline-block;flex-shrink:0"></span>objectAssertion</div>
+    </div>
+  </div>
+</div>`;
+
         const html = `<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${title} — SWOWL export</title>
 <style>
-:root{--bg:#0e1219;--bg2:#161b24;--bg3:#1d2535;--bd:#2a3347;--tx:#e2e8f0;--dim:#94a3b8;--acc:#5f8dd3}
+:root{--bg:#0e1219;--bg2:#161b24;--bg3:#1d2535;--bd:#2a3347;--tx:#e2e8f0;--dim:#94a3b8;--faint:#4b5a6e;--acc:#5f8dd3}
 *{box-sizing:border-box}html,body{height:100%}
 body{margin:0;display:flex;flex-direction:column;height:100vh;overflow:hidden;background:var(--bg);color:var(--tx);font:14px/1.6 system-ui,sans-serif}
 a{color:var(--acc);text-decoration:none}a:hover{text-decoration:underline}
 header{flex-shrink:0;background:var(--bg2);border-bottom:1px solid var(--bd);padding:10px 16px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
 header h1{font-size:15px;font-weight:600;margin:0}header .pfx{color:var(--dim);font-size:12px;font-family:monospace}
+header .badge-ro{font-size:11px;color:var(--faint);background:var(--bg3);border:1px solid var(--bd);border-radius:10px;padding:1px 8px;white-space:nowrap}
 .search-wrap{position:relative;flex:1;min-width:240px}
 #q{width:100%;background:var(--bg3);border:1px solid var(--bd);color:var(--tx);border-radius:6px;padding:7px 12px;font-size:13px}
 #results{position:absolute;top:38px;left:0;right:0;background:var(--bg2);border:1px solid var(--bd);border-radius:6px;max-height:60vh;overflow:auto;display:none;box-shadow:0 8px 24px rgba(0,0,0,.5);z-index:30}
@@ -1890,7 +1960,7 @@ nav.tabs{flex-shrink:0;display:flex;flex-wrap:wrap;gap:2px;background:var(--bg2)
 .ic-ap{width:12px;height:8px;border-radius:2px;background:#e8d400}
 .ic-ind{width:9px;height:9px;background:#8b4db8;border-radius:1px;transform:rotate(45deg);margin:0 2px}
 .ic-gear{flex-shrink:0;font-size:12px;line-height:1}
-.panels{flex:1;min-height:0;overflow:hidden}.panel{height:100%}
+.panels{flex:1;min-height:0;overflow:hidden;position:relative}.panel{position:absolute;inset:0;display:none}
 .split{display:flex;height:100%}
 .tree{width:300px;flex-shrink:0;overflow:auto;border-right:1px solid var(--bd);padding:8px 4px}
 .ti{display:flex;align-items:center;gap:6px;padding:3px 8px;font-family:monospace;font-size:12px;border-radius:4px;cursor:pointer;white-space:nowrap}
@@ -1959,22 +2029,30 @@ nav.tabs{flex-shrink:0;display:flex;flex-wrap:wrap;gap:2px;background:var(--bg2)
 .swrl-cond{display:flex;flex-direction:column;gap:4px;margin:4px 0;padding-left:8px;border-left:2px solid rgba(16,185,129,.4)}
 .swrl-and-line{padding:0 6px}
 .ent.hl{outline:2px solid var(--acc);outline-offset:2px}
+/* Graphe D3 */
+#net-svg .link{stroke-opacity:.7}
+#net-svg .link-lbl{font-size:9px;fill:#64748b;pointer-events:none}
+#net-svg .node text{font-size:11px;font-family:monospace;fill:#e2e8f0;pointer-events:none}
 </style></head><body>
 <header>
-  <h1>🦉 ${title}</h1>
+  <h1>🦉 SWOWL | ${title}</h1>
   ${onto.prefix ? `<span class="pfx">${esc(onto.prefix)}: ${esc(onto.id || '')}</span>` : `<span class="pfx">${esc(onto.id || '')}</span>`}
   <div class="search-wrap">
     <input id="q" type="search" placeholder="Recherche full-text (id, labels, contenu)…" autocomplete="off">
     <div id="results"></div>
   </div>
   <span id="count">${total} éléments</span>
+  <span class="badge-ro">read-only export</span>
 </header>
-<nav class="tabs">${tabs}</nav>
-<div class="panels">${panels || '<p style="color:var(--dim);padding:20px">Ontologie vide.</p>'}</div>
+<nav class="tabs">${tabs}${networkTab}</nav>
+<div class="panels">${panels || '<p style="color:var(--dim);padding:20px">Ontologie vide.</p>'}${networkPanel}</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
 <script>
 var META=${JSON.stringify(META).replace(/</g, '\\u003c')};
 var INDTYPES=${JSON.stringify(INDTYPES).replace(/</g, '\\u003c')};
 var INDLABEL=${JSON.stringify(INDLABEL).replace(/</g, '\\u003c')};
+var GNODES=${JSON.stringify(gNodes).replace(/</g, '\\u003c')};
+var GEDGES=${JSON.stringify(gEdges).replace(/</g, '\\u003c')};
 (function(){
   var ICON={classes:'<span class="ic ic-cls"></span>',object_properties:'<span class="ic ic-op"></span>',datatype_properties:'<span class="ic ic-dp"></span>',annotation_properties:'<span class="ic ic-ap"></span>',individuals:'<span class="ic ic-ind"></span>'};
   function enc(id){return 'e_'+String(id).replace(/[^a-zA-Z0-9_-]/g,'_');}
@@ -2010,7 +2088,9 @@ var INDLABEL=${JSON.stringify(INDLABEL).replace(/</g, '\\u003c')};
   var indP=panelOf['individuals'];
   function renderIndList(classId){
     if(!indP)return; var body=indP.querySelector('.il-body');
-    var ids=Object.keys(INDTYPES).filter(function(id){return INDTYPES[id].indexOf(classId)>=0;});
+    var allIds=Object.keys(INDLABEL);
+    var ids=classId?allIds.filter(function(id){return (INDTYPES[id]||[]).indexOf(classId)>=0;}):allIds;
+    if(!ids.length&&classId)ids=allIds; // fallback : tous les individus si aucun ne match la classe
     ids.sort(function(a,b){return (INDLABEL[a]||a).localeCompare(INDLABEL[b]||b,undefined,{sensitivity:'base'});});
     body.innerHTML=ids.length?ids.map(function(id){return '<div class="ii" data-target="'+enc(id)+'"><span class="ic ic-ind"></span><span class="tl">'+esc(INDLABEL[id]||id)+'</span></div>';}).join(''):'<div class="ph2">Aucun individu.</div>';
   }
@@ -2036,14 +2116,14 @@ var INDLABEL=${JSON.stringify(INDLABEL).replace(/</g, '\\u003c')};
   var indInited=false;
   function ensureIndInit(){
     if(indInited||!indP)return; indInited=true;
-    var first=indP.querySelector('.tree .ti'); if(!first)return;
-    setIndClass(first.dataset.id);
+    renderIndList(null); // tous les individus par défaut
     var fi=indP.querySelector('.il-body .ii'); if(fi)showInd(fi.dataset.target);
   }
   // ── Activation d'onglet ──
   function activate(sec){
     tabs.forEach(function(t){t.classList.toggle('active',t.dataset.sec===sec);});
-    panels.forEach(function(p){p.style.display=p.dataset.sec===sec?'':'none';});
+    panels.forEach(function(p){p.style.display=p.dataset.sec===sec?'block':'none';});
+    if(sec==='__network__'){initNetwork();return;}
     var panel=panelOf[sec]; if(!panel)return;
     if(sec==='individuals'){ensureIndInit();return;}
     if(!panel.querySelector('.tree .ti.sel')){var first=panel.querySelector('.tree .ti');if(first)selectIn(sec,first.dataset.target);}
@@ -2051,6 +2131,7 @@ var INDLABEL=${JSON.stringify(INDLABEL).replace(/</g, '\\u003c')};
   tabs.forEach(function(t){t.addEventListener('click',function(){activate(t.dataset.sec);});});
   panels.forEach(function(p){
     var sec=p.dataset.sec;
+    if(sec==='__network__')return;
     if(sec==='individuals'){
       var ct=p.querySelector('.tree'); if(ct)ct.addEventListener('click',function(ev){var t=ev.target.closest('.ti');if(!t)return;setIndClass(t.dataset.id);var fi=p.querySelector('.il-body .ii');showInd(fi?fi.dataset.target:null);});
       var lb=p.querySelector('.il-body'); if(lb)lb.addEventListener('click',function(ev){var i=ev.target.closest('.ii');if(i)showInd(i.dataset.target);});
@@ -2062,7 +2143,7 @@ var INDLABEL=${JSON.stringify(INDLABEL).replace(/</g, '\\u003c')};
 
   // ── Recherche full-text (index depuis le DOM) ──
   var IDX=[];
-  panels.forEach(function(p){[].slice.call(p.querySelectorAll('.detail .ent')).forEach(function(e){
+  panels.forEach(function(p){if(p.dataset.sec==='__network__')return;[].slice.call(p.querySelectorAll('.detail .ent')).forEach(function(e){
     var lbl=(e.querySelector('.ent-id')||{}).textContent||e.id;
     IDX.push({a:e.id,sec:p.dataset.sec,l:lbl,t:e.dataset.s||''});
   });});
@@ -2072,12 +2153,12 @@ var INDLABEL=${JSON.stringify(INDLABEL).replace(/</g, '\\u003c')};
   q.addEventListener('input',function(){
     var v=q.value.trim().toLowerCase();
     if(!v){close();return;}
-    var m=IDX.filter(function(x){return x.t.indexOf(v)>=0;}), top=m.slice(0,100);
+    var m=IDX.filter(function(x){return x.l.toLowerCase().indexOf(v)>=0;}), top=m.slice(0,100);
     box.innerHTML=top.length
       ? top.map(function(x){return '<div class="res" data-a="'+x.a+'" data-sec="'+x.sec+'"><span class="rl">'+esc(x.l)+'</span><span class="rs">'+esc(secTitle[x.sec]||'')+'</span></div>';}).join('')
         + (m.length>top.length?'<div class="res empty">… '+(m.length-top.length)+' de plus</div>':'')
       : '<div class="res empty">Aucun résultat</div>';
-    box.style.display='';
+    box.style.display='block';
   });
   box.addEventListener('mousedown',function(ev){var r=ev.target.closest('.res[data-a]');if(!r)return;ev.preventDefault();goTo(r.dataset.a,r.dataset.sec);close();q.blur();});
   q.addEventListener('keydown',function(e){if(e.key==='Escape')close();});
@@ -2088,6 +2169,94 @@ var INDLABEL=${JSON.stringify(INDLABEL).replace(/</g, '\\u003c')};
   window.addEventListener('hashchange',hl);
   if(tabs.length)activate(tabs[0].dataset.sec);
   hl();
+
+  // ── Graphe D3 force-directed ──
+  var netInited=false;
+  var NODE_SEC={cls:'classes',op:'object_properties',dp:'datatype_properties',ind:'individuals'};
+  var NODE_CLR={cls:'#b87333',op:'#3b82f6',dp:'#10b981',ind:'#8b4db8'};
+  var EDGE_CLR={sub:'#6b7280',dom:'#60a5fa',rng:'#34d399',type:'#a78bfa',oa:'#e2d9c0'};
+  function initNetwork(){
+    if(netInited)return; netInited=true;
+    var svg=d3.select('#net-svg');
+    var w=document.getElementById('net-wrap').clientWidth||800;
+    var h=document.getElementById('net-wrap').clientHeight||600;
+    // Marqueurs de flèches
+    var defs=svg.append('defs');
+    Object.keys(EDGE_CLR).forEach(function(k){
+      defs.append('marker').attr('id','arr-'+k).attr('viewBox','0 -4 8 8').attr('refX',18).attr('refY',0)
+        .attr('markerWidth',6).attr('markerHeight',6).attr('orient','auto')
+        .append('path').attr('d','M0,-4L8,0L0,4').attr('fill',EDGE_CLR[k]).attr('opacity',.8);
+    });
+    var g=svg.append('g');
+    // Zoom/pan
+    var zoom=d3.zoom().scaleExtent([0.05,4]).on('zoom',function(ev){g.attr('transform',ev.transform);});
+    svg.call(zoom);
+    // Données
+    var nodes=GNODES.map(function(n){return Object.assign({},n);});
+    var idIdx={}; nodes.forEach(function(n,i){idIdx[n.id]=i;});
+    var links=GEDGES.map(function(e){return {source:e.s,target:e.t,lbl:e.lbl,k:e.k};}).filter(function(e){return idIdx[e.source]!==undefined&&idIdx[e.target]!==undefined;});
+    // Simulation
+    var sim=d3.forceSimulation(nodes)
+      .force('link',d3.forceLink(links).id(function(d){return d.id;}).distance(100))
+      .force('charge',d3.forceManyBody().strength(-220))
+      .force('center',d3.forceCenter(w/2,h/2))
+      .force('collide',d3.forceCollide(28));
+    // Arêtes
+    var link=g.append('g').selectAll('line').data(links).join('line')
+      .attr('class','link')
+      .attr('stroke',function(d){return EDGE_CLR[d.k]||'#4b5a6e';})
+      .attr('stroke-width',1.5)
+      .attr('marker-end',function(d){return 'url(#arr-'+d.k+')';});
+    // Labels arêtes
+    var linkLbl=g.append('g').selectAll('text').data(links).join('text')
+      .attr('class','link-lbl').text(function(d){return d.lbl;});
+    // Nœuds
+    var node=g.append('g').selectAll('g').data(nodes).join('g').attr('class','node').style('cursor','pointer');
+    node.each(function(d){
+      var el=d3.select(this);
+      if(d.type==='cls'){el.append('circle').attr('r',10).attr('fill',NODE_CLR[d.type]).attr('stroke','#0e1219').attr('stroke-width',1.5);}
+      else if(d.type==='ind'){el.append('rect').attr('x',-8).attr('y',-8).attr('width',16).attr('height',16).attr('fill',NODE_CLR[d.type]).attr('stroke','#0e1219').attr('stroke-width',1.5).attr('transform','rotate(45)');}
+      else{el.append('rect').attr('x',-14).attr('y',-7).attr('width',28).attr('height',14).attr('rx',3).attr('fill',NODE_CLR[d.type]).attr('stroke','#0e1219').attr('stroke-width',1.5);}
+      el.append('text').attr('dy',22).attr('text-anchor','middle').text(d.lbl.length>18?d.lbl.slice(0,16)+'…':d.lbl);
+    });
+    // Drag
+    node.call(d3.drag()
+      .on('start',function(ev,d){if(!ev.active)sim.alphaTarget(.3).restart();d.fx=d.x;d.fy=d.y;})
+      .on('drag',function(ev,d){d.fx=ev.x;d.fy=ev.y;})
+      .on('end',function(ev,d){if(!ev.active)sim.alphaTarget(0);d.fx=null;d.fy=null;}));
+    // Tooltip
+    var tip=document.getElementById('net-tooltip');
+    node.on('mouseover',function(ev,d){
+      tip.innerHTML='<b>'+d.lbl+'</b><br><span style="color:#64748b">'+d.type+'</span>';
+      tip.style.display='';
+    }).on('mousemove',function(ev){
+      var rect=document.getElementById('net-wrap').getBoundingClientRect();
+      tip.style.left=(ev.clientX-rect.left+14)+'px'; tip.style.top=(ev.clientY-rect.top-10)+'px';
+    }).on('mouseout',function(){tip.style.display='none';});
+    // Clic → goTo
+    node.on('click',function(ev,d){
+      ev.stopPropagation();
+      var sec=NODE_SEC[d.type]; if(!sec)return;
+      var anchor=enc(d.id);
+      goTo(anchor,sec);
+    });
+    // Tick
+    sim.on('tick',function(){
+      link.attr('x1',function(d){return d.source.x;}).attr('y1',function(d){return d.source.y;})
+          .attr('x2',function(d){return d.target.x;}).attr('y2',function(d){return d.target.y;});
+      linkLbl.attr('x',function(d){return (d.source.x+d.target.x)/2;}).attr('y',function(d){return (d.source.y+d.target.y)/2;});
+      node.attr('transform',function(d){return 'translate('+d.x+','+d.y+')';});
+    });
+    // Bouton Fit
+    document.getElementById('net-fit').addEventListener('click',function(){
+      var bounds=g.node().getBBox();
+      if(!bounds.width||!bounds.height)return;
+      var pw=document.getElementById('net-wrap').clientWidth, ph2=document.getElementById('net-wrap').clientHeight;
+      var scale=0.85/Math.max(bounds.width/pw,bounds.height/ph2);
+      var tx=pw/2-(bounds.x+bounds.width/2)*scale, ty=ph2/2-(bounds.y+bounds.height/2)*scale;
+      svg.transition().duration(500).call(zoom.transform,d3.zoomIdentity.translate(tx,ty).scale(scale));
+    });
+  }
 })();
 </script>
 </body></html>`;
@@ -2652,7 +2821,7 @@ const GlobalSearch = {
 
     _dot(type) {
         if (type === 'swrl-rules')  return `<span style="flex-shrink:0;font-size:11px">⚙️</span>`;
-        if (type === 'sparql-vizq') return `<span style="flex-shrink:0;font-size:11px">🎯</span>`;
+        if (type === 'sparql-vizq') return `<span style="flex-shrink:0;font-size:11px">🔎</span>`;
         const map = { classes: 'cls-dot', 'object-properties': 'op-prop-dot',
                       'datatype-properties': 'dp-prop-dot', 'annotation-properties': 'anno-prop-dot',
                       individuals: 'xsd-dot' };
@@ -2796,7 +2965,7 @@ const GlobalSearch = {
                             <span class="gs-item-sub">${_escapeHtml(r.id)}</span>`;
                         break;
                     case 'sparql-labels':
-                        inner = `<span style="flex-shrink:0;font-size:11px">🎯</span>
+                        inner = `<span style="flex-shrink:0;font-size:11px">🔎</span>
                             <span class="gs-item-label">${_escapeHtml(r.label)}</span>
                             <span class="gs-item-sub">${_escapeHtml(r.id)}</span>`;
                         break;
@@ -2923,37 +3092,12 @@ const GlobalSearch = {
 APP._queriesTab = APP._queriesTab || 'vizq';
 
 APP.renderQueries = function() {
-    const tab = APP._queriesTab;
-
-    // ── Sidebar vertical ──────────────────────────────────────────
-    const tabBtn = (id, icon, label) => {
-        const active = tab === id;
-        return `
-        <div class="settings-vtab${active ? ' active' : ''}"
-             onclick="APP._queriesTab='${id}';APP.renderSection('queries')"
-             style="padding:10px 16px;cursor:pointer;font-size:13px;
-                    font-weight:${active ? '600' : '400'};user-select:none;
-                    border-left:3px solid ${active ? 'var(--accent)' : 'transparent'};
-                    color:${active ? 'var(--accent)' : 'var(--text1)'};
-                    background:${active ? 'var(--bg3)' : 'transparent'};
-                    white-space:nowrap;display:flex;align-items:center;gap:6px">
-            ${icon} ${label}
-        </div>`;
-    };
-
-    const sidebar = `
-        <div style="width:160px;flex-shrink:0;border-right:1px solid var(--border);padding:8px 0">
-            ${tabBtn('vizq',        '🎯', 'SPARQL VizQ')}
-        </div>`;
-
-    // ── Tab content ───────────────────────────────────────────────
-    const content = SparqlEditor.renderSplit();
-
+    // Les requêtes sont affichées directement dans l'onglet « Queries »
+    // (l'ancienne sous-barre « SPARQL VizQ » a été supprimée).
     return `
     <div style="height:100%;display:flex;overflow:hidden">
-        ${sidebar}
         <div style="flex:1;overflow:hidden;display:flex;flex-direction:column;min-height:0">
-            ${content}
+            ${SparqlEditor.renderSplit()}
         </div>
     </div>`;
 };
@@ -4037,6 +4181,9 @@ APP.renderSources = function() {
 };
 
 // ── LLMs : fournisseurs + clés API (localStorage) + test (proxy backend) ──
+// Clé contextuelle : préfixée par le nom de l'ontologie connectée
+APP._ontoName   = function () { return this.state && this.state.ontology && this.state.ontology.name || null; };
+APP._llmCtxKey  = function (base) { const n = this._ontoName(); return n ? base + '::' + n : base; };
 APP._LLM_PROVIDERS = [
     { id: 'anthropic', name: 'Anthropic', sub: 'Claude',                icon: '🤖', hint: 'sk-ant-api03-…' },
     { id: 'openai',    name: 'OpenAI',    sub: 'GPT',                   icon: '🤖', hint: 'sk-…' },
@@ -4044,13 +4191,13 @@ APP._LLM_PROVIDERS = [
 ];
 
 APP._llmKeys = function () {
-    try { return JSON.parse(localStorage.getItem('swowl_llm_keys') || '{}'); }
+    try { return JSON.parse(localStorage.getItem(this._llmCtxKey('swowl_llm_keys')) || '{}'); }
     catch { return {}; }
 };
 APP._llmSetKey = function (p, v) {
     const k = this._llmKeys();
     if (v) k[p] = v; else delete k[p];
-    localStorage.setItem('swowl_llm_keys', JSON.stringify(k));
+    localStorage.setItem(this._llmCtxKey('swowl_llm_keys'), JSON.stringify(k));
 };
 APP._llmToggle = function (p) {
     const inp = document.getElementById('llm-key-' + p);
@@ -4090,28 +4237,28 @@ APP._llmTest = async function (p) {
 APP._esc = function (t) { const d = document.createElement('div'); d.textContent = String(t); return d.innerHTML; };
 
 // ── Provider actif ──
-APP._llmProvider    = function ()  { return localStorage.getItem('swowl_llm_provider') || 'anthropic'; };
-APP._llmSetProvider = function (v) { if (v) { localStorage.setItem('swowl_llm_provider', v); APP.renderSection('sources'); } };
+APP._llmProvider    = function ()  { return localStorage.getItem(this._llmCtxKey('swowl_llm_provider')) || 'anthropic'; };
+APP._llmSetProvider = function (v) { if (v) { localStorage.setItem(this._llmCtxKey('swowl_llm_provider'), v); APP.renderSection('sources'); } };
 
 // ── Mode Meta/Llama : 'cloud' ou 'local' (Ollama) ──
-APP._llmMetaMode    = function ()  { return localStorage.getItem('swowl_llm_meta_mode') || 'cloud'; };
-APP._llmSetMetaMode = function (v) { localStorage.setItem('swowl_llm_meta_mode', v); APP.renderSection('sources'); };
+APP._llmMetaMode    = function ()  { return localStorage.getItem(this._llmCtxKey('swowl_llm_meta_mode')) || 'cloud'; };
+APP._llmSetMetaMode = function (v) { localStorage.setItem(this._llmCtxKey('swowl_llm_meta_mode'), v); APP.renderSection('sources'); };
 
 // ── URLs / modèles par provider ──
-APP._llmOllamaUrl      = function ()  { return localStorage.getItem('swowl_llm_ollama_url')   || 'http://host.docker.internal:11434'; };
-APP._llmSetOllamaUrl   = function (v) { if (v) localStorage.setItem('swowl_llm_ollama_url', v); };
-APP._llmOllamaModel    = function ()  { return localStorage.getItem('swowl_llm_ollama_model') || 'llama3.2'; };
-APP._llmSetOllamaModel = function (v) { if (v) localStorage.setItem('swowl_llm_ollama_model', v); };
+APP._llmOllamaUrl      = function ()  { return localStorage.getItem(this._llmCtxKey('swowl_llm_ollama_url'))   || 'http://host.docker.internal:11434'; };
+APP._llmSetOllamaUrl   = function (v) { if (v) localStorage.setItem(this._llmCtxKey('swowl_llm_ollama_url'), v); };
+APP._llmOllamaModel    = function ()  { return localStorage.getItem(this._llmCtxKey('swowl_llm_ollama_model')) || 'llama3.2'; };
+APP._llmSetOllamaModel = function (v) { if (v) localStorage.setItem(this._llmCtxKey('swowl_llm_ollama_model'), v); };
 
-APP._llmOpenAIModel    = function ()  { return localStorage.getItem('swowl_llm_openai_model') || 'gpt-4o'; };
-APP._llmSetOpenAIModel = function (v) { if (v) localStorage.setItem('swowl_llm_openai_model', v); };
+APP._llmOpenAIModel    = function ()  { return localStorage.getItem(this._llmCtxKey('swowl_llm_openai_model')) || 'gpt-4o'; };
+APP._llmSetOpenAIModel = function (v) { if (v) localStorage.setItem(this._llmCtxKey('swowl_llm_openai_model'), v); };
 APP._llmOpenAIModels   = function ()  {
-    try { const a = JSON.parse(localStorage.getItem('swowl_llm_openai_models') || '[]'); return Array.isArray(a) ? a : []; }
+    try { const a = JSON.parse(localStorage.getItem(this._llmCtxKey('swowl_llm_openai_models')) || '[]'); return Array.isArray(a) ? a : []; }
     catch { return []; }
 };
 
-APP._llmMetaCloudModel    = function ()  { return localStorage.getItem('swowl_llm_meta_model') || 'Llama-4-Scout-17B-16E-Instruct'; };
-APP._llmSetMetaCloudModel = function (v) { if (v) localStorage.setItem('swowl_llm_meta_model', v); };
+APP._llmMetaCloudModel    = function ()  { return localStorage.getItem(this._llmCtxKey('swowl_llm_meta_model')) || 'Llama-4-Scout-17B-16E-Instruct'; };
+APP._llmSetMetaCloudModel = function (v) { if (v) localStorage.setItem(this._llmCtxKey('swowl_llm_meta_model'), v); };
 
 // ── Modèles Anthropic (global) ──
 APP._LLM_MODELS = [
@@ -4119,12 +4266,12 @@ APP._LLM_MODELS = [
     { id: 'claude-sonnet-4-6', label: 'Sonnet 4.6 — balanced (default)' },
     { id: 'claude-haiku-4-5-20251001', label: 'Haiku 4.5 — fast / cheap' },
 ];
-APP._llmModel = function () { return localStorage.getItem('swowl_llm_model') || 'claude-sonnet-4-6'; };
-APP._llmSetModel = function (v) { if (v) localStorage.setItem('swowl_llm_model', v); };
+APP._llmModel = function () { return localStorage.getItem(this._llmCtxKey('swowl_llm_model')) || 'claude-sonnet-4-6'; };
+APP._llmSetModel = function (v) { if (v) localStorage.setItem(this._llmCtxKey('swowl_llm_model'), v); };
 
 // ── Modèles Ollama découverts (via Test) ──
 APP._llmOllamaModels = function () {
-    try { const a = JSON.parse(localStorage.getItem('swowl_llm_ollama_models') || '[]'); return Array.isArray(a) ? a : []; }
+    try { const a = JSON.parse(localStorage.getItem(this._llmCtxKey('swowl_llm_ollama_models')) || '[]'); return Array.isArray(a) ? a : []; }
     catch { return []; }
 };
 
@@ -4138,7 +4285,7 @@ APP._llmTestOllama = async function () {
         const r = await API.testLlmKey('meta', '', url);
         if (r && r.ok) {
             const models = (r.models || []).filter(Boolean);
-            localStorage.setItem('swowl_llm_ollama_models', JSON.stringify(models));
+            localStorage.setItem(this._llmCtxKey('swowl_llm_ollama_models'), JSON.stringify(models));
             // Si le modèle courant n'est pas dans la liste, présélectionne le 1er disponible
             if (models.length && !models.includes(this._llmOllamaModel())) {
                 this._llmSetOllamaModel(models[0]);
@@ -4167,7 +4314,7 @@ APP._llmTestOpenAI = async function () {
         const r = await API.testLlmKey('openai', key);
         if (r && r.ok) {
             const models = (r.models || []).filter(Boolean);
-            localStorage.setItem('swowl_llm_openai_models', JSON.stringify(models));
+            localStorage.setItem(this._llmCtxKey('swowl_llm_openai_models'), JSON.stringify(models));
             if (models.length && !models.includes(this._llmOpenAIModel())) {
                 this._llmSetOpenAIModel(models[0]);
             }
@@ -4184,15 +4331,16 @@ APP._llmTestOpenAI = async function () {
 };
 
 // ── Prompt système d'extraction (global, éditable) ──
-APP._llmPrompt = function () { return localStorage.getItem('swowl_llm_prompt') || ''; };  // '' = défaut backend
+APP._llmPrompt = function () { return localStorage.getItem(this._llmCtxKey('swowl_llm_prompt')) || ''; };  // '' = défaut backend
 APP._llmSavePrompt = function () {
     const t = document.getElementById('llm-prompt');
     const v = (t ? t.value : '').trim();
-    if (v) localStorage.setItem('swowl_llm_prompt', v); else localStorage.removeItem('swowl_llm_prompt');
+    const k = this._llmCtxKey('swowl_llm_prompt');
+    if (v) localStorage.setItem(k, v); else localStorage.removeItem(k);
     if (UI && UI.success) UI.success('Extraction prompt saved.');
 };
 APP._llmResetPrompt = async function () {
-    localStorage.removeItem('swowl_llm_prompt');
+    localStorage.removeItem(this._llmCtxKey('swowl_llm_prompt'));
     const t = document.getElementById('llm-prompt');
     if (t) { try { const r = await API.getCorpusPrompt(); t.value = (r && r.prompt) || ''; } catch { t.value = ''; } }
     if (UI && UI.success) UI.success('Extraction prompt reset to default.');
@@ -5041,7 +5189,7 @@ APP._renderAnalysis = function () {
                 const icon = !dot ? `<b>${KIND_LBL[kind]||kind} </b>`
                            : isEmoji ? `<span style="font-size:11px;margin-right:3px">${dot}</span>`
                            : `<span class="${dot}" style="display:inline-block;vertical-align:middle;margin-right:3px"></span>`;
-                const displayLabel = (label && label !== id) ? `${this._esc(id)} <span style="color:var(--text-dim);font-style:italic">${this._esc(label)}</span>` : this._esc(id);
+                const displayLabel = this._esc(id);
                 return `<span onclick="APP.navigateTo('${sec}','${this._escAttr(id)}')" title="Go to ${this._esc(id)}" style="display:inline-flex;align-items:center;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:1px 7px;margin:2px;font-size:11px;font-family:monospace;cursor:pointer">${icon}${displayLabel}</span>`;
             })
         ).join('');
@@ -5158,9 +5306,8 @@ APP.renderGuiTabs = function() {
         { id: 'annotation-properties', label: 'AnnotationProperties', icon: '<span class="anno-prop-dot" style="display:inline-block;vertical-align:middle"></span>',  fixed: false },
         { id: 'individuals',           label: 'Individuals',          icon: '<span class="xsd-dot" style="display:inline-block;vertical-align:middle;margin:0"></span>',fixed: false },
         { id: 'swrl-rules',            label: 'SWRL Rules',           icon: '⚙️', fixed: false },
-        { id: 'queries',               label: 'Queries',              icon: '🎯', fixed: false },
+        { id: 'queries',               label: 'Queries',              icon: '🔎', fixed: false },
         { id: 'views',                 label: 'Views',                icon: `<svg width="14" height="10" viewBox="0 0 14 10" fill="none" style="vertical-align:middle;color:var(--text1)"><ellipse cx="7" cy="5" rx="6.5" ry="4.5" stroke="currentColor" stroke-width="1.2"/><circle cx="7" cy="5" r="2" fill="currentColor"/></svg>`, fixed: false },
-        { id: 'inferences',            label: 'Inferences',           icon: '🧠', fixed: false },
     ];
 
     const rows = ALL_TABS.map(t => {

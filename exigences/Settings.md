@@ -36,7 +36,7 @@
 |---|---|
 | **Alors** | l'application mémorise automatiquement ces préférences pour les retrouver lors des sessions ultérieures. |
 
-**Code source :** `app.js` → `Settings.save()` — Sérialise en JSON les trois paramètres `preferredLang`, `activeLangs` et `namingFormat`, puis les stocke dans le `localStorage` sous la clé `swowl_settings`.
+**Code source :** `app.js` → `Settings.save()` — Sérialise en JSON les trois paramètres `preferredLang`, `activeLangs` et `namingFormat`, puis les stocke dans le `localStorage` sous la clé contextuelle retournée par `Settings._ctxKey()` : `swowl_settings::{nom_ontologie}` lorsqu'une ontologie est connectée, avec repli sur la clé de base `swowl_settings` sinon. Les paramètres sont donc stockés par ontologie.
 
 ### REQ-SET-002 — Chargement des paramètres au démarrage
 
@@ -44,7 +44,7 @@
 |---|---|
 | **Alors** | ses préférences précédemment enregistrées sont automatiquement restaurées ; si aucune préférence n'a jamais été sauvegardée, l'application s'initialise avec des valeurs par défaut : le français comme langue préférée et unique langue active, et le format de comptage simple pour les identifiants d'`individus`. |
 
-**Code source :** `app.js` → `Settings.load()` — Lit l'entrée `swowl_settings` du `localStorage` et réhydrate les champs `preferredLang`, `activeLangs` et `namingFormat` ; applique les valeurs par défaut (`preferredLang: 'fr'`, `activeLangs: ['fr']`, `namingFormat: 'individual_counter'`) si aucune valeur n'est stockée.
+**Code source :** `app.js` → `Settings.load()` — Lit l'entrée désignée par la clé contextuelle `Settings._ctxKey()` (`swowl_settings::{nom_ontologie}` si une ontologie est connectée, sinon la clé de base `swowl_settings`) du `localStorage` et réhydrate les champs `preferredLang`, `activeLangs` et `namingFormat` ; applique les valeurs par défaut (`preferredLang: 'fr'`, `activeLangs: ['fr']`, `namingFormat: 'individual_counter'`) si aucune valeur n'est stockée.
 
 ### REQ-SET-005 — Masquage d'un onglet optionnel
 
@@ -52,7 +52,7 @@
 |---|---|
 | **Alors** | l'onglet disparaît immédiatement de la barre de navigation et ce choix est mémorisé ; si l'onglet masqué était celui actif, l'utilisateur est automatiquement redirigé vers l'onglet **`Ontologies`**. |
 
-**Code source :** `app.js` → `TabVisibility.hide(tabId)` — Vérifie que `tabId` est présent dans `_optional`, l'ajoute au `Set` interne `_hidden`, sauvegarde l'état dans le `localStorage`, applique la visibilité dans le DOM via `APP._applyTabVisibility()`, puis redirige vers `'ontologies'` si l'onglet actif correspond à celui masqué.
+**Code source :** `app.js` → `TabVisibility.hide(tabId)` — Vérifie que `tabId` est présent dans `_optional`, l'ajoute au `Set` interne `_hidden`, sauvegarde l'état dans le `localStorage` sous la clé contextuelle (`swowl_hidden_tabs::{nom_ontologie}`, cf. REQ-SET-009), applique la visibilité dans le DOM via `APP._applyTabVisibility()`, puis redirige vers `'ontologies'` si l'onglet actif correspond à celui masqué.
 
 ### REQ-SET-006 — Affichage d'un onglet optionnel précédemment masqué
 
@@ -76,7 +76,7 @@
 |---|---|
 | **Alors** | la configuration de visibilité de tous les onglets optionnels est sauvegardée pour être restaurée à la prochaine session. |
 
-**Code source :** `app.js` → `TabVisibility.save()` — Sérialise le contenu du `Set` `_hidden` en tableau JSON et le stocke dans le `localStorage` sous la clé `swowl_hidden_tabs`.
+**Code source :** `app.js` → `TabVisibility.save()` — Sérialise le contenu du `Set` `_hidden` en tableau JSON et le stocke dans le `localStorage` sous la clé contextuelle retournée par `TabVisibility._ctxKey()` : `swowl_hidden_tabs::{nom_ontologie}` lorsqu'une ontologie est connectée, avec repli sur la clé de base `swowl_hidden_tabs` sinon. La visibilité des onglets est donc stockée par ontologie.
 
 ### REQ-SET-010 — Définition de la langue préférée
 
@@ -146,7 +146,7 @@
 |---|---|
 | **Alors** | il voit la liste de tous les onglets de l'application, avec une indication claire pour chaque onglet : ceux qui sont obligatoires (non modifiables) sont signalés comme tels, tandis que les onglets optionnels affichent leur état de visibilité actuel et peuvent être activés ou désactivés. |
 
-**Code source :** `app.js` → `APP.renderGuiTabs()` — Affiche les 11 onglets (`Ontologies`, `Settings`, `Classes`, `ObjectProperties`, `DatatypeProperties`, `AnnotationProperties`, `Individuals`, `SWRL Rules`, `Views`, `Queries`, `Inferences`) ; pour les onglets `fixed: true`, génère une case à cocher désactivée avec le label `required` ; pour les onglets optionnels, génère une case à cocher interactive dont l'état reflète la présence ou l'absence dans `TabVisibility._hidden`.
+**Code source :** `app.js` → `APP.renderGuiTabs()` — Affiche les 10 onglets (`Ontologies`, `Settings`, `Classes`, `ObjectProperties`, `DatatypeProperties`, `AnnotationProperties`, `Individuals`, `SWRL Rules`, `Views`, `Queries`) ; pour les onglets `fixed: true`, génère une case à cocher désactivée avec le label `required` ; pour les onglets optionnels, génère une case à cocher interactive dont l'état reflète la présence ou l'absence dans `TabVisibility._hidden`.
 
 ### REQ-SET-008 — Application immédiate de la visibilité des onglets dans le DOM
 

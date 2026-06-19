@@ -471,7 +471,7 @@
 
 ### REQ-IND-040 — Complete individual selection on cross-tab navigation
 
-| **If** | the ontologist navigates to an `individual` from outside the `Individuals` tab — clicking an `individual` in the SPARQL VizQ results table, a cross-tab entity link (`APP.navigateTo`), Back/Forward history navigation (`APP._restoreState`) or undo/redo restore, |
+| **If** | the ontologist navigates to an `individual` from outside the `Individuals` tab — clicking an `individual` in the Queries results table, a cross-tab entity link (`APP.navigateTo`), Back/Forward history navigation (`APP._restoreState`) or undo/redo restore, |
 |---|---|
 | **Then** | the target `individual` is selected end-to-end across all three columns: its representative class is selected in the tree (column 1), the filtered `individual` list is rebuilt (column 2), the `individual` itself is highlighted and its form is displayed (column 3), and the item is scrolled into view. |
 

@@ -43,6 +43,7 @@
 - [REQ-ONT-029 — Export des règles au format SWORD (.swd)](#req-ont-029--export-des-règles-au-format-sword-swd)
 - [REQ-ONT-030 — Section « Imported namespaces » éditable dans les wizards](#req-ont-030--section--imported-namespaces--éditable-dans-les-wizards)
 - [REQ-ONT-035 — Ouverture du namespace de l'ontologie depuis le registre](#req-ont-035--ouverture-du-namespace-de-lontologie-depuis-le-registre)
+- [REQ-ONT-037 — Export d'une ontologie en page HTML autonome navigable](#req-ont-037--export-dune-ontologie-en-page-html-autonome-navigable)
 
 ---
 
@@ -478,3 +479,29 @@ Les wizards d'Import et de Chargement sont homogénéisés (mêmes sections, mê
 ---
 
 **Code source :** `app.js` → `_refreshOntoTable()` (fonction `renderRow`) — La cellule Namespace est rendue comme un `<code class="onto-ns-link">` cliquable dont le `onclick` appelle `window.open(uri, '_blank', 'noopener')` (avec `event.stopPropagation()` pour ne pas sélectionner la ligne) ; si l'URI est vide, affiche `—`.
+
+### REQ-ONT-037 — Export d'une ontologie en page HTML autonome navigable
+
+| **Si** | l'ontologiste clique sur l'action `↓ HTML` d'une ligne du registre (l'export porte sur l'`ontologie` couramment connectée ; si une autre `ontologie` est connectée, un avertissement demande de connecter d'abord la bonne), |
+|---|---|
+| **Alors** | une page HTML autonome unique est générée et téléchargée ; la page reproduit le « look &amp; feel » de SWOWL (thème sombre, navigation par onglets, arbres hiérarchiques et fiches d'entités rendues comme l'éditeur SWOWL — cadres encadrés à icônes de type : rond cuivré pour les classes, rectangle bleu pour les propriétés d'objet, rectangle vert pour les propriétés de données, rectangle jaune pour les propriétés d'annotation, losange violet pour les individus, engrenage pour les règles). |
+
+| **Si** | l'ontologie contient des classes, propriétés d'objet, propriétés de données, propriétés d'annotation, individus ou règles SWRL, |
+|---|---|
+| **Alors** | la page présente un onglet par catégorie non vide (chacun avec un badge de comptage) ; classes / propriétés d'objet / propriétés de données / propriétés d'annotation affichent un arbre de navigation, un panneau « Super … » et un volet de détail, les individus affichent une disposition à trois colonnes (arbre des classes → liste des individus → détail), et les règles un arbre plus un détail. |
+
+| **Si** | l'ontologiste ouvre la fiche de détail d'une entité, |
+|---|---|
+| **Alors** | la fiche affiche les mêmes cadres de références croisées que SWOWL, uniquement lorsqu'ils sont non vides : pour les classes — « Annotation(s) », « Properties and Restrictions », « Where Used in Range », « Disjoints », « Equivalent », « SubClassOf », « Individuals », « Where Used in Rules » ; pour les propriétés d'objet — « Domain(s) », « Range(s) », « SubPropertyOf », « Inverse Of », « Characteristics », « Where Used in Rules » ; pour les propriétés de données — « Domain(s) », « Range », « SubPropertyOf », « Characteristics » ; pour les individus — « Types (rdf:type) », « Object assertions », « Data assertions », « sameAs », « differentFrom », « Where Used in Rules » ; pour les règles — « if » / « then ». Chaque cadre porte un badge de comptage et des références cliquables qui naviguent vers l'entité référencée (les ids externes/préfixés tels que `owl:Thing` ou `xsd:*` sont affichés en texte simple). |
+
+| **Si** | l'ontologiste ouvre l'onglet « Ontology (Network) », |
+|---|---|
+| **Alors** | un graphe orienté par forces D3.js (D3 chargé depuis un CDN) affiche des nœuds pour les classes, propriétés d'objet, propriétés de données et individus, reliés par des arêtes orientées pour `subClassOf`, `domain`, `range`, `type` et les assertions d'objet ; le panneau propose une infobulle au survol, un bouton « Fit » et une légende de couleurs pour les types de nœuds et d'arêtes. |
+
+| **Si** | l'ontologiste saisit du texte dans le champ de recherche de l'en-tête de la page, |
+|---|---|
+| **Alors** | les entités sont filtrées par leur id, leur libellé d'affichage, leurs annotations et le contenu référencé, et la sélection d'un résultat navigue vers l'entité correspondante. |
+
+---
+
+**Code source :** `app.js` → `exportHtmlSite()` — Construit un document HTML unique (CSS inline reproduisant le style et les icônes de l'éditeur SWOWL) à partir de `APP.state` : refuse de s'exécuter si aucune ontologie n'est connectée ou avertit si une autre ontologie est connectée ; rend les cadres encadrés via `frame()` / `xrefFrame()` avec les libellés exacts ci-dessus (« Properties and Restrictions », « Where Used in Range », « Disjoints », « Equivalent », « SubClassOf », « Individuals », « Where Used in Rules », etc.) ; construit une disposition onglets/panneaux par catégorie (`tabs`, `panels`, `treeRows()`), un onglet « Ontology (Network) » (`networkTab` / `networkPanel`) rendant un graphe orienté par forces D3.js à partir de `gNodes` / `gEdges` (D3 depuis un CDN), et un champ de recherche dans l'en-tête filtrant sur le texte `data-s` de chaque fiche.

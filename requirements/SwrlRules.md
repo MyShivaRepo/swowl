@@ -138,13 +138,13 @@
 
 ### REQ-SWR-015 — Deleting a rule
 
-| **If** | the ontologist requests the deletion of a rule and confirms their intention, |
+| **If** | the ontologist requests the deletion of the selected rule(s) via the single trash button in the panel toolbar and confirms their intention, |
 |---|---|
-| **Then** | the rule is permanently removed from the `ontology`, the selection is reset and the editing panel is cleared. |
+| **Then** | the selected rule(s) are permanently removed from the `ontology`, the selection is reset and the editing panel is cleared. The trash button is disabled while no rule is selected. |
 
 ---
 
-**Source code:** `swrl_editor.js` → `delete()` — Calls `API.deleteSWRLRule(id)` (a 404 error is ignored), resets `_editingRule` and `_editingId`, refreshes `APP.state`, updates the list and clears the detail panel.
+**Source code:** `swrl_editor.js` → `deleteSelected()` and `delete()` — Deletion is triggered by the single `#swrl-btn-delete` trash button in the toolbar (disabled while the selection is empty), which deletes the currently selected rule(s); each call to `API.deleteSWRLRule(id)` ignores a 404 error, resets `_editingRule` and `_editingId`, refreshes `APP.state`, updates the list and clears the detail panel.
 
 ### REQ-SWR-016 — Adding an atom to a section
 
@@ -306,11 +306,11 @@ The import is the exact inverse of the `.swd` export: a round-trip preserves NAF
 
 | **If** | the `SWRL rule` list is displayed, filtered or in full, |
 |---|---|
-| **Then** | each rule is presented with its label or identifier, its identifier as subtext when a distinct label exists, and a delete button; the rule currently being edited is visually highlighted; if no rule is available, an empty message is displayed. |
+| **Then** | each rule is presented with its label or identifier, and its identifier as subtext when a distinct label exists; the rule currently being edited is visually highlighted; if no rule is available, an empty message is displayed. No per-rule delete button is shown — deletion is performed via the single trash button in the panel toolbar (see REQ-SWR-015 and REQ-SWR-038). |
 
 ---
 
-**Source code:** `swrl_editor.js` → `renderList()` — Iterates over the filtered rule array, generates a `<li>` per rule with the label (`label` or `id`), the identifier in `<small>` if a distinct label exists, a ⚙️ icon, a delete button and the CSS class `selected` if the rule matches `_editingId`.
+**Source code:** `swrl_editor.js` → `renderList()` — Iterates over the filtered rule array, generates a `tree-item` per rule with the label (`label` or `id`), the identifier in `<small>` if a distinct label exists, a ⚙️ icon and the CSS class `selected` if the rule is in the selection set; no per-rule delete control is rendered.
 
 ### REQ-SWR-004 — Visual indicator for broken references
 
@@ -458,11 +458,11 @@ The import is the exact inverse of the `.swd` export: a round-trip preserves NAF
 
 | **If** | the SWRL Rules list panel is displayed, |
 |---|---|
-| **Then** | an **Import rules** button is shown to the left of the **+** (add rule) button in the panel header, allowing the ontologist to import `SWRL rules` from a SWORD-format file (`.swd`). |
+| **Then** | the panel toolbar presents three buttons of strictly identical size (shared CSS class `btn-tool`): import (`📥`), new rule (`➕`) and, to their right, a single red trash button (`🗑`) for deleting the selected rule(s). The import button lets the ontologist import `SWRL rules` from a SWORD-format file (`.swd`); the trash button is disabled while no rule is selected. |
 
 ---
 
-**Source code:** `swrl_editor.js` → `renderSplit()` — Renders, in the `tree-panel-header`, an import button (`📥`, `title="Import rules from a .swd file"`) calling `SWRLEditor.importRules()` immediately before the new-rule button (`➕`) calling `SWRLEditor.newRule()`.
+**Source code:** `swrl_editor.js` → `renderSplit()` — Renders, in the `tree-panel-header`, three `btn-tool` buttons of identical size: an import button (`📥`, `title="Import rules from a .swd file"`) calling `SWRLEditor.importRules()`, then the new-rule button (`➕`) calling `SWRLEditor.newRule()`, and finally the delete button (`#swrl-btn-delete`, class `btn-tool is-danger`, `disabled` by default) calling `SWRLEditor.deleteSelected()`.
 
 ### REQ-SWR-039 — Homogeneous class and property pickers
 

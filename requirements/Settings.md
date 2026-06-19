@@ -36,7 +36,7 @@
 |---|---|
 | **Then** | the application automatically saves these preferences so they can be restored in subsequent sessions. |
 
-**Source code:** `app.js` → `Settings.save()` — Serialises the three parameters `preferredLang`, `activeLangs` and `namingFormat` as JSON, then stores them in `localStorage` under the key `swowl_settings`.
+**Source code:** `app.js` → `Settings.save()` — Serialises the three parameters `preferredLang`, `activeLangs` and `namingFormat` as JSON, then stores them in `localStorage` under the contextual key returned by `Settings._ctxKey()`: `swowl_settings::{ontology_name}` when an ontology is connected, falling back to the base key `swowl_settings` otherwise. The settings are therefore stored per ontology.
 
 ### REQ-SET-002 — Settings loading at startup
 
@@ -44,7 +44,7 @@
 |---|---|
 | **Then** | their previously saved preferences are automatically restored; if no preference has ever been saved, the application initialises with default values: French as the preferred and sole active language, and the simple counter format for `individual` identifiers. |
 
-**Source code:** `app.js` → `Settings.load()` — Reads the `swowl_settings` entry from `localStorage` and rehydrates the fields `preferredLang`, `activeLangs` and `namingFormat`; applies default values (`preferredLang: 'fr'`, `activeLangs: ['fr']`, `namingFormat: 'individual_counter'`) if no value is stored.
+**Source code:** `app.js` → `Settings.load()` — Reads the entry designated by the contextual key `Settings._ctxKey()` (`swowl_settings::{ontology_name}` if an ontology is connected, otherwise the base key `swowl_settings`) from `localStorage` and rehydrates the fields `preferredLang`, `activeLangs` and `namingFormat`; applies default values (`preferredLang: 'fr'`, `activeLangs: ['fr']`, `namingFormat: 'individual_counter'`) if no value is stored.
 
 ### REQ-SET-005 — Hiding an optional tab
 
@@ -52,7 +52,7 @@
 |---|---|
 | **Then** | the tab immediately disappears from the navigation bar and this choice is saved; if the hidden tab was the active one, the user is automatically redirected to the **`Ontologies`** tab. |
 
-**Source code:** `app.js` → `TabVisibility.hide(tabId)` — Verifies that `tabId` is present in `_optional`, adds it to the internal `Set` `_hidden`, saves the state to `localStorage`, applies the visibility in the DOM via `APP._applyTabVisibility()`, then redirects to `'ontologies'` if the active tab matches the one being hidden.
+**Source code:** `app.js` → `TabVisibility.hide(tabId)` — Verifies that `tabId` is present in `_optional`, adds it to the internal `Set` `_hidden`, saves the state to `localStorage` under the contextual key (`swowl_hidden_tabs::{ontology_name}`, see REQ-SET-009), applies the visibility in the DOM via `APP._applyTabVisibility()`, then redirects to `'ontologies'` if the active tab matches the one being hidden.
 
 ### REQ-SET-006 — Showing a previously hidden optional tab
 
@@ -76,7 +76,7 @@
 |---|---|
 | **Then** | the visibility configuration of all optional tabs is saved to be restored in the next session. |
 
-**Source code:** `app.js` → `TabVisibility.save()` — Serialises the contents of the `Set` `_hidden` as a JSON array and stores it in `localStorage` under the key `swowl_hidden_tabs`.
+**Source code:** `app.js` → `TabVisibility.save()` — Serialises the contents of the `Set` `_hidden` as a JSON array and stores it in `localStorage` under the contextual key returned by `TabVisibility._ctxKey()`: `swowl_hidden_tabs::{ontology_name}` when an ontology is connected, falling back to the base key `swowl_hidden_tabs` otherwise. Tab visibility is therefore stored per ontology.
 
 ### REQ-SET-010 — Setting the preferred language
 
@@ -146,7 +146,7 @@
 |---|---|
 | **Then** | they see the list of all application tabs, with a clear indication for each tab: those that are mandatory (non-editable) are flagged as such, while optional tabs display their current visibility state and can be enabled or disabled. |
 
-**Source code:** `app.js` → `APP.renderGuiTabs()` — Displays the 11 tabs (`Ontologies`, `Settings`, `Classes`, `ObjectProperties`, `DatatypeProperties`, `AnnotationProperties`, `Individuals`, `SWRL Rules`, `Views`, `Queries`, `Inferences`); for tabs with `fixed: true`, generates a disabled checkbox with the label `required`; for optional tabs, generates an interactive checkbox whose state reflects the presence or absence of the tab in `TabVisibility._hidden`.
+**Source code:** `app.js` → `APP.renderGuiTabs()` — Displays the 10 tabs (`Ontologies`, `Settings`, `Classes`, `ObjectProperties`, `DatatypeProperties`, `AnnotationProperties`, `Individuals`, `SWRL Rules`, `Views`, `Queries`); for tabs with `fixed: true`, generates a disabled checkbox with the label `required`; for optional tabs, generates an interactive checkbox whose state reflects the presence or absence of the tab in `TabVisibility._hidden`.
 
 ### REQ-SET-008 — Immediate application of tab visibility in the DOM
 

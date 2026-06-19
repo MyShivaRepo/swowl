@@ -44,8 +44,10 @@ const SparqlEditor = {
                 <div class="tree-panel-header">
                     <h3>🔎 Queries</h3>
                     <div style="display:flex;gap:4px;align-items:center;flex-shrink:0" id="sparql-toolbar-btns">
-                        <button class="btn-sm" onclick="SparqlEditor.newQuery()"
-                                title="New query">➕</button>
+                        <button class="btn-tool" onclick="SparqlEditor.newQuery()" title="New query">➕</button>
+                        <button id="sparql-btn-delete" class="btn-tool is-danger" disabled
+                                onclick="SparqlEditor.deleteSelected()"
+                                title="Delete selected quer(y/ies)">${ClassEditor._svgDelete}</button>
                     </div>
                 </div>
                 <div class="tree-scroll" id="sparql-list" style="flex:1">
@@ -96,14 +98,11 @@ const SparqlEditor = {
                  data-id="${x.id}" style="align-items:center"
                  onclick="SparqlEditor.selectQuery('${x.id}', event)"
                  oncontextmenu="event.preventDefault();SparqlEditor.showContextMenu(event,'${x.id}')">
-                <span style="font-size:13px;flex-shrink:0;line-height:1">🎯</span>
+                <span style="font-size:13px;flex-shrink:0;line-height:1">🔎</span>
                 <span style="flex:1;overflow:hidden;min-width:0">
                     <span class="tree-label" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block">${importedPrefix}${this._esc(mainText)}</span>
                     ${subText ? `<span style="font-size:10px;color:var(--text-faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block">${this._esc(subText)}</span>` : ''}
                 </span>
-                ${!isImported ? `<button class="btn-icon btn-icon-danger" style="flex-shrink:0;padding:2px 4px"
-                        onclick="event.stopPropagation();SparqlEditor.deleteQuery('${x.id}')"
-                        title="Delete query">${ClassEditor._svgDelete}</button>` : ''}
             </div>`;
         }).join('');
     },
@@ -185,27 +184,14 @@ const SparqlEditor = {
     },
 
     _updateToolbar() {
-        const tb = document.getElementById('sparql-toolbar-btns');
-        if (!tb) return;
-        let btn = document.getElementById('sparql-delete-sel-btn');
+        const btn = document.getElementById('sparql-btn-delete');
+        if (!btn) return;
         const n = [...this._selectedIds].filter(id => {
             const x = this._loadAll().find(q => q.id === id);
             return x && !x._imported;
         }).length;
-        if (n > 1) {
-            if (!btn) {
-                btn = document.createElement('button');
-                btn.id = 'sparql-delete-sel-btn';
-                btn.className = 'btn-sm';
-                btn.style.color = 'var(--red,#ef4444)';
-                btn.title = 'Delete selected queries';
-                btn.onclick = () => SparqlEditor.deleteSelected();
-                tb.insertBefore(btn, tb.firstChild);
-            }
-            btn.textContent = `🗑 ${n}`;
-        } else if (btn) {
-            btn.remove();
-        }
+        btn.disabled = n === 0;
+        btn.title = n > 1 ? `Delete ${n} selected queries` : 'Delete selected query';
     },
 
     _renderMultiSelDetail() {

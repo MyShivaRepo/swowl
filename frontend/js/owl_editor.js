@@ -4682,8 +4682,8 @@ const IndividualEditor = {
                 <div class="tree-panel-header">
                     <h3 id="ind-list-title">${this._selectedClassId || 'All Individuals'}</h3>
                     <div style="display:flex;gap:4px;flex-shrink:0;align-items:center">
-                        <button class="btn-sm ind-hdr-btn" onclick="IndividualEditor.newIndividual()" title="New individual">➕</button>
-                        <button id="ind-del-btn" class="btn-sm ind-hdr-btn btn-del" ${this._selectedIndId ? '' : 'disabled'}
+                        <button class="btn-tool" onclick="IndividualEditor.newIndividual()" title="New individual">➕</button>
+                        <button id="ind-del-btn" class="btn-tool is-danger" ${this._selectedIndId ? '' : 'disabled'}
                                 onclick="IndividualEditor.deleteSelected()" title="Delete selected individual">${ClassEditor._svgDelete}</button>
                     </div>
                 </div>

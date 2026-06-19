@@ -138,13 +138,13 @@
 
 ### REQ-SWR-015 — Suppression d'une règle
 
-| **Si** | l'ontologiste demande la suppression d'une règle et confirme son intention, |
+| **Si** | l'ontologiste demande la suppression de la (des) règle(s) sélectionnée(s) via l'unique bouton corbeille de la barre d'outils du panneau et confirme son intention, |
 |---|---|
-| **Alors** | la règle est définitivement retirée de l'`ontologie`, la sélection est réinitialisée et le panneau d'édition est vidé. |
+| **Alors** | la (les) règle(s) sélectionnée(s) sont définitivement retirées de l'`ontologie`, la sélection est réinitialisée et le panneau d'édition est vidé. Le bouton corbeille est désactivé tant qu'aucune règle n'est sélectionnée. |
 
 ---
 
-**Code source :** `swrl_editor.js` → `delete()` — Appelle `API.deleteSWRLRule(id)` (une erreur 404 est ignorée), réinitialise `_editingRule` et `_editingId`, rafraîchit `APP.state`, met à jour la liste et vide le panneau de détail.
+**Code source :** `swrl_editor.js` → `deleteSelected()` et `delete()` — La suppression est déclenchée par l'unique bouton corbeille `#swrl-btn-delete` de la barre d'outils (désactivé tant que la sélection est vide), qui supprime la (les) règle(s) sélectionnée(s) ; chaque appel à `API.deleteSWRLRule(id)` ignore une erreur 404, réinitialise `_editingRule` et `_editingId`, rafraîchit `APP.state`, met à jour la liste et vide le panneau de détail.
 
 ### REQ-SWR-016 — Ajout d'un atome dans une section
 
@@ -306,11 +306,11 @@ L'import est l'exact inverse de l'export `.swd` : un aller-retour préserve la n
 
 | **Si** | la liste des `règles SWRL` est affichée, filtrée ou complète, |
 |---|---|
-| **Alors** | chaque règle est présentée avec son libellé ou son identifiant, son identifiant en sous-texte lorsqu'un libellé distinct existe, et un bouton de suppression ; la règle en cours d'édition est visuellement mise en surbrillance ; si aucune règle n'est disponible, un message vide est affiché. |
+| **Alors** | chaque règle est présentée avec son libellé ou son identifiant, et son identifiant en sous-texte lorsqu'un libellé distinct existe ; la règle en cours d'édition est visuellement mise en surbrillance ; si aucune règle n'est disponible, un message vide est affiché. Aucun bouton de suppression n'est affiché en face de chaque règle — la suppression s'effectue via l'unique bouton corbeille de la barre d'outils du panneau (voir REQ-SWR-015 et REQ-SWR-038). |
 
 ---
 
-**Code source :** `swrl_editor.js` → `renderList()` — Itère sur le tableau filtré de règles, génère un `<li>` par règle avec le libellé (`label` ou `id`), l'identifiant en `<small>` si libellé distinct, une icône ⚙️, un bouton de suppression et la classe CSS `selected` si la règle correspond à `_editingId`.
+**Code source :** `swrl_editor.js` → `renderList()` — Itère sur le tableau filtré de règles, génère un `tree-item` par règle avec le libellé (`label` ou `id`), l'identifiant en `<small>` si libellé distinct, une icône ⚙️ et la classe CSS `selected` si la règle est dans l'ensemble de sélection ; aucun contrôle de suppression par règle n'est rendu.
 
 ### REQ-SWR-004 — Indicateur visuel de références cassées
 
@@ -458,11 +458,11 @@ L'import est l'exact inverse de l'export `.swd` : un aller-retour préserve la n
 
 | **Si** | le panneau liste des règles SWRL est affiché, |
 |---|---|
-| **Alors** | un bouton **Importer des règles** est présenté à gauche du bouton **+** (ajout de règle) dans l'en-tête du panneau, permettant à l'ontologiste d'importer des `règles SWRL` depuis un fichier au format SWORD (`.swd`). |
+| **Alors** | la barre d'outils du panneau présente trois boutons de taille strictement identique (classe CSS commune `btn-tool`) : import (`📥`), nouvelle règle (`➕`) et, à leur droite, un unique bouton corbeille rouge (`🗑`) pour supprimer la (les) règle(s) sélectionnée(s). Le bouton d'import permet à l'ontologiste d'importer des `règles SWRL` depuis un fichier au format SWORD (`.swd`) ; le bouton corbeille est désactivé tant qu'aucune règle n'est sélectionnée. |
 
 ---
 
-**Code source :** `swrl_editor.js` → `renderSplit()` — Rend, dans le `tree-panel-header`, un bouton d'import (`📥`, `title="Import rules from a .swd file"`) appelant `SWRLEditor.importRules()` immédiatement avant le bouton de création (`➕`) appelant `SWRLEditor.newRule()`.
+**Code source :** `swrl_editor.js` → `renderSplit()` — Rend, dans le `tree-panel-header`, trois boutons `btn-tool` de taille identique : un bouton d'import (`📥`, `title="Import rules from a .swd file"`) appelant `SWRLEditor.importRules()`, puis le bouton de création (`➕`) appelant `SWRLEditor.newRule()`, et enfin le bouton de suppression (`#swrl-btn-delete`, classe `btn-tool is-danger`, `disabled` par défaut) appelant `SWRLEditor.deleteSelected()`.
 
 ### REQ-SWR-039 — Pickers de classe et de propriété homogènes
 

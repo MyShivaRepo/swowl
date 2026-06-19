@@ -72,7 +72,7 @@
 
 ---
 
-**Source code:** `sparql_editor.js` → `selectQuery()` — Loads the query from `localStorage`, performs a deep copy (via `JSON.parse/JSON.stringify`) into `_editingQuery`, updates `_selectedId`, refreshes the list (highlighting the selected item) and renders the detail panel.
+**Source code:** `app.js` → `APP.renderQueries()`, `sparql_editor.js` → `renderSplit()`, `renderList()`, `selectQuery()` — The saved queries are displayed directly in the "Queries" tab: `APP.renderQueries()` simply renders `SparqlEditor.renderSplit()` with no vertical sidebar of its own (the former "SPARQL VizQ" sub-bar internal to the tab has been removed; persistent storage is unchanged). Each query in `renderList()` is shown with a magnifying-glass icon 🔎. On selection, `selectQuery()` loads the query from `localStorage`, performs a deep copy (via `JSON.parse/JSON.stringify`) into `_editingQuery`, updates `_selectedId`, refreshes the list (highlighting the selected item) and renders the detail panel.
 
 ### REQ-QRY-004 — Deleting a query
 
@@ -82,7 +82,7 @@
 
 ---
 
-**Source code:** `sparql_editor.js` → `deleteQuery()` — Filters the persisted query array to exclude the targeted query, saves the resulting array, and, if the deleted query was selected, resets `_selectedId` and `_editingQuery` to `null` and replaces the detail panel with an empty message.
+**Source code:** `sparql_editor.js` → `deleteSelected()`, `deleteQuery()` — Deletion is triggered from a red trash-can button placed in the panel toolbar (to the right of the "+" button), which acts on the selected quer(y/ies) via `deleteSelected()` (it is no longer a per-row control facing each query). The underlying logic filters the persisted query array to exclude the targeted query, saves the resulting array, and, if the deleted query was selected, resets `_selectedId` and `_editingQuery` to `null` and replaces the detail panel with an empty message.
 
 ### REQ-QRY-005 — Search/filtering in the query list
 

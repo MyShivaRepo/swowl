@@ -54,8 +54,11 @@ const SWRLEditor = {
                 <div class="tree-panel-header">
                     <h3>SWRL Rules</h3>
                     <div style="display:flex;gap:4px;align-items:center;flex-shrink:0" id="swrl-toolbar-btns">
-                        <button class="btn-sm" onclick="SWRLEditor.importRules()" title="Import rules from a .sword file">📥</button>
-                        <button class="btn-sm" onclick="SWRLEditor.newRule()" title="New SWRL rule">➕</button>
+                        <button class="btn-tool" onclick="SWRLEditor.importRules()" title="Import rules from a .swd file">📥</button>
+                        <button class="btn-tool" onclick="SWRLEditor.newRule()" title="New SWRL rule">➕</button>
+                        <button id="swrl-btn-delete" class="btn-tool is-danger" disabled
+                                onclick="SWRLEditor.deleteSelected()"
+                                title="Delete selected rule(s)">${ClassEditor._svgDelete}</button>
                     </div>
                 </div>
                 <div class="tree-scroll" id="swrl-list" style="flex:1">${this.renderList(rules)}</div>
@@ -151,9 +154,6 @@ const SWRLEditor = {
                     <span class="tree-label" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block${broken ? ';color:var(--red,#ef4444)' : ''}">${mainText}</span>
                     ${subText ? `<span style="font-size:10px;color:${broken ? 'var(--red,#ef4444)' : 'var(--text-faint)'};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block">${subText}</span>` : ''}
                 </span>
-                ${!isImported ? `<button class="btn-icon btn-icon-danger" style="flex-shrink:0;padding:2px 4px"
-                        onclick="event.stopPropagation();SWRLEditor.delete('${r.id}')"
-                        title="Delete rule">${ClassEditor._svgDelete}</button>` : ''}
             </div>`;
         }).join('');
     },
@@ -226,27 +226,14 @@ const SWRLEditor = {
     },
 
     _updateToolbar() {
-        const tb = document.getElementById('swrl-toolbar-btns');
-        if (!tb) return;
-        let btn = document.getElementById('swrl-delete-sel-btn');
+        const btn = document.getElementById('swrl-btn-delete');
+        if (!btn) return;
         const n = [...this._selectedIds].filter(id => {
             const r = (APP.state.swrl_rules || []).find(x => x.id === id);
             return r && !r._imported;
         }).length;
-        if (n > 1) {
-            if (!btn) {
-                btn = document.createElement('button');
-                btn.id = 'swrl-delete-sel-btn';
-                btn.className = 'btn-sm';
-                btn.style.color = 'var(--red,#ef4444)';
-                btn.title = 'Delete selected rules';
-                btn.onclick = () => SWRLEditor.deleteSelected();
-                tb.insertBefore(btn, tb.firstChild);
-            }
-            btn.textContent = `🗑 ${n}`;
-        } else if (btn) {
-            btn.remove();
-        }
+        btn.disabled = n === 0;
+        btn.title = n > 1 ? `Delete ${n} selected rules` : 'Delete selected rule';
     },
 
     _renderMultiSelDetail() {
@@ -320,11 +307,11 @@ const SWRLEditor = {
         } catch (e) { UI.error(e.message); }
     },
 
-    // ── Import de règles depuis un fichier .sword ─────────────────
+    // ── Import de règles depuis un fichier .swd ─────────────────
     importRules() {
         const input = document.createElement('input');
         input.type = 'file';
-        // Pas de filtre d'extension : macOS/WebKit grise les .sword (extension inconnue).
+        // Pas de filtre d'extension : macOS/WebKit grise les .swd (extension inconnue).
         // Le contenu est de toute façon validé par le parseur SWORD côté backend.
         input.onchange = async () => {
             const file = input.files && input.files[0];

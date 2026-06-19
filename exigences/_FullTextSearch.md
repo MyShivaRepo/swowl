@@ -129,9 +129,9 @@
 
 | **Si** | un résultat appartient à la Partie A (label utilisateur), |
 |---|---|
-| **Alors** | chaque ligne affiche : (1) une icône caractéristique du type de label (`rectangle jaune` pour `rdfs:label`, `losange violet` pour Individual Display Name, `⚙️` pour SWRL Labels, `🎯` pour SPARQL Labels), (2) le texte du label qui a matché, (3) l'icône de l'entité parente (`rond marron` pour `Class`, `rectangle bleu` pour `ObjectProperty`, `rectangle vert` pour `DatatypeProperty`, etc.), (4) l'ID de l'entité parente en texte secondaire. |
+| **Alors** | chaque ligne affiche : (1) une icône caractéristique du type de label (`rectangle jaune` pour `rdfs:label`, `losange violet` pour Individual Display Name, `⚙️` pour SWRL Labels, `🔎` pour SPARQL Labels), (2) le texte du label qui a matché, (3) l'icône de l'entité parente (`rond marron` pour `Class`, `rectangle bleu` pour `ObjectProperty`, `rectangle vert` pour `DatatypeProperty`, etc.), (4) l'ID de l'entité parente en texte secondaire. |
 
-**Code source :** `app.js` → `GlobalSearch._render()` — Le `switch(sec)` gère chaque section Partie A : `rdfs-labels` utilise `<span class="lbl-dot">` + `this._dot(r.kind)` + `<span class="gs-item-sub">${r.id}</span>` ; `individual-names` utilise `<span class="xsd-dot">` ; `swrl-labels` utilise l'emoji `⚙️` ; `sparql-labels` utilise l'emoji `🎯`. Le CSS `.lbl-dot` définit un rectangle de 14×9px avec `background: #FACC15` (jaune).
+**Code source :** `app.js` → `GlobalSearch._render()` — Le `switch(sec)` gère chaque section Partie A : `rdfs-labels` utilise `<span class="lbl-dot">` + `this._dot(r.kind)` + `<span class="gs-item-sub">${r.id}</span>` ; `individual-names` utilise `<span class="xsd-dot">` ; `swrl-labels` utilise l'emoji `⚙️` ; `sparql-labels` utilise l'emoji `🔎`. Le CSS `.lbl-dot` définit un rectangle de 14×9px avec `background: #FACC15` (jaune).
 
 ---
 
@@ -141,7 +141,7 @@
 |---|---|
 | **Alors** | chaque ligne affiche uniquement l'icône caractéristique du type d'entité suivie de son ID, sans texte secondaire. |
 
-**Code source :** `app.js` → `GlobalSearch._render()` — La branche `default` du `switch(sec)` rend `${this._dot(sec)}<span class="gs-item-label">${r.label}</span>` sans `gs-item-sub`. `GlobalSearch._dot()` retourne le span CSS correspondant : `cls-dot` (Classes), `op-prop-dot` (ObjectProperties), `dp-prop-dot` (DatatypeProperties), `anno-prop-dot` (AnnotationProperties), `xsd-dot` (Individuals), emoji `⚙️` (SWRL Rules), emoji `🎯` (SPARQL VizQ).
+**Code source :** `app.js` → `GlobalSearch._render()` — La branche `default` du `switch(sec)` rend `${this._dot(sec)}<span class="gs-item-label">${r.label}</span>` sans `gs-item-sub`. `GlobalSearch._dot()` retourne le span CSS correspondant : `cls-dot` (Classes), `op-prop-dot` (ObjectProperties), `dp-prop-dot` (DatatypeProperties), `anno-prop-dot` (AnnotationProperties), `xsd-dot` (Individuals), emoji `⚙️` (SWRL Rules), emoji `🔎` (SPARQL VizQ).
 
 ---
 

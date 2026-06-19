@@ -131,9 +131,9 @@
 
 | **If** | a result belongs to Part A (user label), |
 |---|---|
-| **Then** | each row displays: (1) a characteristic icon for the label type (`yellow rectangle` for `rdfs:label`, `purple diamond` for Individual Display Name, `⚙️` for SWRL Labels, `🎯` for SPARQL Labels), (2) the matching label text followed by the language tag in parentheses if defined — e.g. **PPB (en)** — styled in a muted colour, (3) the parent entity icon (`brown dot` for `Class`, `blue rectangle` for `ObjectProperty`, `green rectangle` for `DatatypeProperty`, etc.), (4) the parent entity ID as secondary text. |
+| **Then** | each row displays: (1) a characteristic icon for the label type (`yellow rectangle` for `rdfs:label`, `purple diamond` for Individual Display Name, `⚙️` for SWRL Labels, `🔎` for SPARQL Labels), (2) the matching label text followed by the language tag in parentheses if defined — e.g. **PPB (en)** — styled in a muted colour, (3) the parent entity icon (`brown dot` for `Class`, `blue rectangle` for `ObjectProperty`, `green rectangle` for `DatatypeProperty`, etc.), (4) the parent entity ID as secondary text. |
 
-**Source code:** `app.js` → `GlobalSearch._render()` — The `switch(sec)` handles each Part A section: `rdfs-labels` uses `<span class="lbl-dot">` + `<span class="gs-lang-tag">(${r.lang})</span>` + `this._dot(r.kind)` + `<span class="gs-item-sub">${r.id}</span>`; `individual-names` uses `<span class="xsd-dot">`; `swrl-labels` uses emoji `⚙️`; `sparql-labels` uses emoji `🎯`. CSS `.lbl-dot` defines a 14×9 px rectangle with `background: #FACC15` (yellow). CSS `.gs-lang-tag` renders in 10 px muted text (`--text-faint`).
+**Source code:** `app.js` → `GlobalSearch._render()` — The `switch(sec)` handles each Part A section: `rdfs-labels` uses `<span class="lbl-dot">` + `<span class="gs-lang-tag">(${r.lang})</span>` + `this._dot(r.kind)` + `<span class="gs-item-sub">${r.id}</span>`; `individual-names` uses `<span class="xsd-dot">`; `swrl-labels` uses emoji `⚙️`; `sparql-labels` uses emoji `🔎`. CSS `.lbl-dot` defines a 14×9 px rectangle with `background: #FACC15` (yellow). CSS `.gs-lang-tag` renders in 10 px muted text (`--text-faint`).
 
 ---
 
@@ -143,7 +143,7 @@
 |---|---|
 | **Then** | each row displays only the characteristic icon of the entity type followed by its ID, with no secondary text. |
 
-**Source code:** `app.js` → `GlobalSearch._render()` — The `default` branch of `switch(sec)` renders `${this._dot(sec)}<span class="gs-item-label">${r.label}</span>` without `gs-item-sub`. `GlobalSearch._dot()` returns the corresponding CSS span: `cls-dot` (Classes), `op-prop-dot` (ObjectProperties), `dp-prop-dot` (DatatypeProperties), `anno-prop-dot` (AnnotationProperties), `xsd-dot` (Individuals), emoji `⚙️` (SWRL Rules), emoji `🎯` (SPARQL VizQ).
+**Source code:** `app.js` → `GlobalSearch._render()` — The `default` branch of `switch(sec)` renders `${this._dot(sec)}<span class="gs-item-label">${r.label}</span>` without `gs-item-sub`. `GlobalSearch._dot()` returns the corresponding CSS span: `cls-dot` (Classes), `op-prop-dot` (ObjectProperties), `dp-prop-dot` (DatatypeProperties), `anno-prop-dot` (AnnotationProperties), `xsd-dot` (Individuals), emoji `⚙️` (SWRL Rules), emoji `🔎` (SPARQL VizQ).
 
 ---
 

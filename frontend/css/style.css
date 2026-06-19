@@ -496,10 +496,30 @@ button, .btn-primary, .btn-secondary, .btn-sm {
 }
 .btn-sm:hover { background: var(--bg4); }
 .btn-sm.ind-eye-on { color: var(--accent); border-color: var(--accent); }
-/* Boutons carrés identiques dans l'en-tête Class Hierarchy (œil + Display options) */
+/* ── Bouton d'outil carré, homogène dans TOUTES les barres d'outils ──
+   (SWRL Rules, Queries, Individuals…). Une seule définition, taille fixe,
+   icône (emoji ou SVG) centrée → tous les boutons sont identiques. */
+.btn-tool,
 .btn-sm.ind-hdr-btn {
   width: 26px; height: 26px; padding: 0; box-sizing: border-box;
   display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--border); border-radius: 6px;
+  background: var(--bg3); color: var(--text-dim);
+  font-size: 13px; line-height: 1; cursor: pointer;
+  transition: background .15s, color .15s, border-color .15s;
+}
+.btn-tool:hover:not(:disabled) { background: var(--bg4); }
+.btn-tool:disabled { opacity: .4; cursor: not-allowed; }
+.btn-tool svg { display: block; }
+/* Variante « danger » (corbeille) : toujours rouge, activée ou désactivée. */
+.btn-tool.is-danger,
+.btn-tool.is-danger:disabled {
+  color: #ff4455;
+}
+.btn-tool.is-danger:hover:not(:disabled) {
+  background: rgba(255, 68, 85, .15);
+  border-color: #ff4455;
+  color: #ff4455;
 }
 .btn-edit   { color: var(--accent); }
 .btn-del    { color: var(--danger); }

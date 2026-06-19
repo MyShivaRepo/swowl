@@ -43,6 +43,7 @@
 - [REQ-ONT-029 — Exporting rules in SWORD format (.swd)](#req-ont-029--exporting-rules-in-sword-format-swd)
 - [REQ-ONT-030 — Editable "Imported namespaces" section in the wizards](#req-ont-030--editable-imported-namespaces-section-in-the-wizards)
 - [REQ-ONT-035 — Opening the ontology namespace from the registry](#req-ont-035--opening-the-ontology-namespace-from-the-registry)
+- [REQ-ONT-037 — Exporting an ontology as a standalone navigable HTML page](#req-ont-037--exporting-an-ontology-as-a-standalone-navigable-html-page)
 
 ---
 
@@ -478,3 +479,29 @@ The Import and Load wizards are homogenised (same sections, same labels, same bu
 ---
 
 **Source code:** `app.js` → `_refreshOntoTable()` (`renderRow` function) — The Namespace cell is rendered as a clickable `<code class="onto-ns-link">` whose `onclick` calls `window.open(uri, '_blank', 'noopener')` (with `event.stopPropagation()` so the row is not selected); if the URI is empty, displays `—`.
+
+### REQ-ONT-037 — Exporting an ontology as a standalone navigable HTML page
+
+| **If** | the ontologist clicks the `↓ HTML` action on a registry row (the export targets the currently connected `ontology`; if a different `ontology` is connected, a warning asks to connect the right one first), |
+|---|---|
+| **Then** | a single self-contained HTML page is generated and downloaded; the page reproduces the SWOWL look &amp; feel (dark theme, tabbed navigation, hierarchical trees, and entity cards rendered like the SWOWL editor — boxed frames with type icons: copper circle for classes, blue rectangle for object properties, green rectangle for datatype properties, yellow rectangle for annotation properties, purple diamond for individuals, gear for rules). |
+
+| **If** | the ontology contains classes, object properties, datatype properties, annotation properties, individuals, or SWRL rules, |
+|---|---|
+| **Then** | the page presents one tab per non-empty category (each with a count badge); classes / object properties / datatype properties / annotation properties show a navigation tree plus a "Super …" panel and a detail pane, individuals show a three-column layout (classes tree → individuals list → detail), and rules show a tree plus detail. |
+
+| **If** | the ontologist opens the detail card of an entity, |
+|---|---|
+| **Then** | the card shows the same cross-reference frames as SWOWL, only when non-empty: for classes — "Annotation(s)", "Properties and Restrictions", "Where Used in Range", "Disjoints", "Equivalent", "SubClassOf", "Individuals", "Where Used in Rules"; for object properties — "Domain(s)", "Range(s)", "SubPropertyOf", "Inverse Of", "Characteristics", "Where Used in Rules"; for datatype properties — "Domain(s)", "Range", "SubPropertyOf", "Characteristics"; for individuals — "Types (rdf:type)", "Object assertions", "Data assertions", "sameAs", "differentFrom", "Where Used in Rules"; for rules — "if" / "then". Each frame carries a count badge and clickable references that navigate to the referenced entity (external/namespaced ids such as `owl:Thing` or `xsd:*` are shown as plain text). |
+
+| **If** | the ontologist opens the "Ontology (Network)" tab, |
+|---|---|
+| **Then** | a D3.js force-directed graph (D3 loaded from a CDN) displays nodes for classes, object properties, datatype properties, and individuals, connected by directed edges for `subClassOf`, `domain`, `range`, `type`, and object assertions; the panel offers a hover tooltip, a "Fit" button, and a colour legend for node and edge kinds. |
+
+| **If** | the ontologist types in the search box in the page header, |
+|---|---|
+| **Then** | entities are filtered by their id, display label, annotations, and referenced content, and selecting a result navigates to the matching entity. |
+
+---
+
+**Source code:** `app.js` → `exportHtmlSite()` — Builds a single HTML document (inline CSS reproducing the SWOWL editor styling and icons) from `APP.state`: refuses to run if no ontology is connected or warns if a different ontology is connected; renders boxed frames via `frame()` / `xrefFrame()` with the exact labels listed above ("Properties and Restrictions", "Where Used in Range", "Disjoints", "Equivalent", "SubClassOf", "Individuals", "Where Used in Rules", etc.); builds a per-category tab/panel layout (`tabs`, `panels`, `treeRows()`), an "Ontology (Network)" tab (`networkTab` / `networkPanel`) rendering a D3.js force-directed graph from `gNodes` / `gEdges` (D3 from a CDN), and a header search box filtering on each card's `data-s` text.
