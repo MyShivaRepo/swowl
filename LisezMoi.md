@@ -1,11 +1,11 @@
 # 🦉 SWOWL — OWL/SWRL Editor
 
-![version](https://img.shields.io/badge/version-1.0.0-blue)
+![version](https://img.shields.io/badge/version-1.1.0-blue)
 
 Éditeur web d'ontologies **OWL 2 DL** : classes, propriétés, individus,
 règles **SWRL**, requêtes **SPARQL** visuelles et moteur d'inférence backend.
 
-> **Version actuelle : 1.0.0** — voir le [CHANGELOG](CHANGELOG.md) pour la liste complète des fonctionnalités.
+> **Version actuelle : 1.1.0** — voir le [CHANGELOG](CHANGELOG.md) pour la liste complète des fonctionnalités.
 
 Architecture : frontend Nginx (JS vanilla) + backend FastAPI + triple store rdflib,
 le tout en Docker.
