@@ -3,7 +3,7 @@
 ![version](https://img.shields.io/badge/version-1.0.0-blue)
 
 Web editor for **OWL 2 DL** ontologies: classes, properties, individuals,
-**SWRL** rules, visual **SPARQL** queries, and a real-time inference engine.
+**SWRL** rules, visual **SPARQL** queries, and a backend inference engine.
 
 > **Current version: 1.0.0** — see the [CHANGELOG](CHANGELOG.md) for the full feature list.
 
@@ -38,10 +38,11 @@ docker compose up --build
 - **Imports** — `owl:imports`: imported entities appear read-only, dimmed,
   with their prefix.
 - **SWRL** — visual rule editor with live preview.
-- **SPARQL** — visual query builder (VizQ).
+- **SPARQL** — visual query builder.
 - **SKOS** — `skos:` annotations (prefLabel, altLabel, definition…) imported and editable.
-- **Real-time inference** — transitivity, restriction inheritance, types via
-  domain/range, inverse, property chains, violation detection…
+- **Inference engine** — transitivity, restriction inheritance, types via
+  domain/range, inverse, property chains, violation detection… (backend engine,
+  available via the REST API `/api/inferences`).
 - **Import / Export** — OWL/XML, Turtle, JSON-LD, SWORD (rules import/export).
 - **Consistent UX** — homogeneous filter+tree pickers everywhere, global search,
   undo/redo, USER/SYSTEM ontology registry.
@@ -62,7 +63,7 @@ Two Docker containers orchestrated by Compose:
 
 - **Communication** — REST API; Nginx serves the static files and proxies `/api/` to the backend (Uvicorn, port 8000).
 - **Model** — OWL 2 and SWRL entities are typed with Pydantic models; an rdflib triple store handles RDF import/export.
-- **Inference** — in-house engine (forward chaining) on the backend, exposed to the interface in real time.
+- **Inference** — in-house engine (forward chaining) on the backend, available via the REST API (`/api/inferences`); no dedicated UI tab.
 
 ## Structure
 
