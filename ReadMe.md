@@ -7,9 +7,6 @@ GUI for visual **SPARQL** queries.
 
 > **Current version: 1.1.0** — see the [CHANGELOG](CHANGELOG.md) for the full feature list.
 
-Architecture: Nginx frontend (vanilla JS) + FastAPI backend + rdflib triple store,
-all running in Docker.
-
 ## Getting started
 
 ### Prerequisites

@@ -7,9 +7,6 @@ IHM pour les requêtes **SPARQL** visuelles.
 
 > **Version actuelle : 1.1.0** — voir le [CHANGELOG](CHANGELOG.md) pour la liste complète des fonctionnalités.
 
-Architecture : frontend Nginx (JS vanilla) + backend FastAPI + triple store rdflib,
-le tout en Docker.
-
 ## Démarrage
 
 ### Pré-requis
