@@ -2,8 +2,8 @@
 
 ![version](https://img.shields.io/badge/version-1.1.0-blue)
 
-Web editor for **OWL 2 DL** ontologies: classes, properties, individuals,
-**SWRL** rules, visual **SPARQL** queries, and a backend inference engine.
+Web editor for **OWL** ontologies : classes, properties, individuals & **SWRL** rules.
+GUI for visual **SPARQL** queries.
 
 > **Current version: 1.1.0** — see the [CHANGELOG](CHANGELOG.md) for the full feature list.
 
