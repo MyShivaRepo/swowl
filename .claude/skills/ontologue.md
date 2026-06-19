@@ -1,7 +1,7 @@
 # Skill : Assistant Ontologue SWOWL `/ontologue`
 
 ## Déclenchement
-Invoque ce skill dès que l'utilisateur demande d'analyser un corpus dans SWOWL — quel que soit le domaine (droit, médecine, industrie, finance, science, normes techniques, etc.).
+Invoque ce skill dès que l'utilisateur demande d'analyser un corpus documentaire dans SWOWL dans le but d'extraire de ce corpus une ontologie "complète", c'est à dire constitué d'un modèle métier OWL et de règles métiers SWRL. Ce skill est générique, c'est à dire qu'il ne dépends pas d'un domaine d'application particulier (droit, finance, médecine, industrie, finance, science, ...)
 
 ---
 
