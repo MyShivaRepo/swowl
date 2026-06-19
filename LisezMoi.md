@@ -28,6 +28,15 @@ docker compose up --build
 | Interface      | http://localhost:12345       |
 | API (Swagger)  | http://localhost:8001/docs   |
 
+### Premiers pas
+
+Vous débutez avec SWOWL ? Le guide **[Comment démarrer](HowToStart.fr.md)** vous
+accompagne pas à pas dans les deux assistants d'ontologie :
+
+- **New Ontology** — partir de zéro avec une ontologie vide.
+- **Import Ontology** — importer un fichier `.owl` / `.ttl` / `.rdf` existant
+  pour le visualiser et l'éditer.
+
 ## Fonctionnalités
 
 - **OWL 2** — classes (subClassOf, equivalent, disjoint, restrictions), object/datatype
