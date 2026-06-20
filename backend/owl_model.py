@@ -160,12 +160,14 @@ class OWLDatatypeProperty(BaseModel):
 class ObjectPropertyAssertion(BaseModel):
     property: str
     target: str   # IRI individu
+    derived: bool = False   # True = matérialisé par inférence (inverseOf / subPropertyOf)
 
 
 class DataPropertyAssertion(BaseModel):
     property: str
     value: str
     datatype: str = "xsd:string"
+    derived: bool = False   # True = matérialisé par inférence (subPropertyOf)
 
 
 class OWLIndividual(BaseModel):

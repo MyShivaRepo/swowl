@@ -210,6 +210,24 @@ def _sync_domain_markers(onto: OWLOntology, prop_id: str,
                 cls_obj.subClassOf.append(PropertyPresence(property=prop_id))
 
 
+def _backfill_domain_markers(onto: OWLOntology) -> bool:
+    """Normalise les données : garantit qu'un `_marker` existe dans chaque classe
+    pour toute propriété (OP/DP) ayant cette classe dans son `domain`. Rend le
+    rendu indépendant de l'origine des données (UI vs analyse de corpus).
+    Retourne True si au moins un marqueur a été ajouté."""
+    before = sum(
+        1 for c in onto.classes for r in c.subClassOf
+        if hasattr(r, 'type') and r.type == '_marker'
+    )
+    for prop in list(onto.object_properties) + list(onto.datatype_properties):
+        _sync_domain_markers(onto, prop.id, set(), set(prop.domain or []))
+    after = sum(
+        1 for c in onto.classes for r in c.subClassOf
+        if hasattr(r, 'type') and r.type == '_marker'
+    )
+    return after > before
+
+
 def require_onto():
     onto = store.get()
     if not onto:
@@ -595,6 +613,9 @@ def connect_ontology(name: str):
     onto = store.connect(name)
     if onto is None:
         raise HTTPException(404, f"Ontologie '{name}' introuvable dans le registre.")
+    # Normalisation : garantir un marker pour chaque (propriété, classe de domaine)
+    if _backfill_domain_markers(onto):
+        store.save()
     return onto
 
 
@@ -1026,6 +1047,9 @@ def analysis_done():
             types = [s for s in _cc_ids(data.get("types")) if s in cset]
             if types:
                 i.types = list(dict.fromkeys(list(i.types or []) + types))
+
+        # Normalisation : marker pour chaque (propriété, classe de domaine)
+        _backfill_domain_markers(onto)
 
         if sum(added.values()) > 0 or pending_cls or pending_ops or pending_dps or pending_inds:
             store.save()
@@ -1661,6 +1685,16 @@ def delete_class(class_id: str):
     onto.classes = [c for c in onto.classes if c.id not in to_delete]
     if len(onto.classes) == before:
         raise HTTPException(404, f"Classe '{class_id}' not found")
+    # Nettoyer les références aux classes supprimées dans les classes restantes
+    # (évite des super-classes « pendantes » qui réapparaissent à l'export/import).
+    for c in onto.classes:
+        c.subClassOf = [
+            r for r in (c.subClassOf or [])
+            if not (isinstance(r, str) and r in to_delete)
+        ]
+        c.equivalentClass = [e for e in (c.equivalentClass or [])
+                             if not (isinstance(e, str) and e in to_delete)]
+        c.disjointWith = [d for d in (c.disjointWith or []) if d not in to_delete]
     store.save()
     return {"deleted": sorted(to_delete)}
 
@@ -1728,6 +1762,7 @@ def update_object_property(prop_id: str, prop: OWLObjectProperty):
                          set(onto.object_properties[idx].domain or []),
                          set(prop.domain or []))
     onto.object_properties[idx] = prop
+    _materialize_inferences(onto)   # inverseOf/subPropertyOf modifiés → recalcul
     store.save()
     return prop
 
@@ -1804,6 +1839,7 @@ def update_datatype_property(prop_id: str, prop: OWLDatatypeProperty):
                          set(onto.datatype_properties[idx].domain or []),
                          set(prop.domain or []))
     onto.datatype_properties[idx] = prop
+    _materialize_inferences(onto)   # subPropertyOf modifié → recalcul
     store.save()
     return prop
 
@@ -1901,41 +1937,89 @@ def list_individuals():
     return require_onto().individuals
 
 
-def _sync_inverse_assertions(onto: OWLOntology, ind_id: str,
-                             old_assertions: list, new_assertions: list) -> None:
-    """Propage les assertions inverses (owl:inverseOf) quand les ObjectAssertions d'un individu changent.
-    - old_assertions : ObjectPropertyAssertion avant la modification
-    - new_assertions : ObjectPropertyAssertion après la modification
+def _transitive_supers(props) -> dict:
+    """Retourne {prop_id: set(ids de toutes les super-propriétés transitives)}."""
+    direct = {p.id: [s for s in (p.subPropertyOf or []) if isinstance(s, str)] for p in props}
+    cache: dict = {}
+    def supers(pid, seen):
+        if pid in cache:
+            return cache[pid]
+        res = set()
+        for q in direct.get(pid, []):
+            if q in seen:
+                continue
+            res.add(q)
+            res |= supers(q, seen | {pid})
+        cache[pid] = res
+        return res
+    return {pid: supers(pid, set()) for pid in direct}
+
+
+def _materialize_inferences(onto: OWLOntology) -> None:
+    """Matérialise (comme assertions `derived=True`) la clôture déductive des
+    ObjectAssertions / DataAssertions d'un individu sous owl:inverseOf et
+    rdfs:subPropertyOf. Les assertions de base (derived=False) saisies par
+    l'utilisateur sont la source ; les dérivées sont recalculées intégralement.
     """
-    old_set = {(a.property, a.target) for a in old_assertions}
-    new_set = {(a.property, a.target) for a in new_assertions}
+    # 1. Purge des dérivées précédentes (on repart de la base utilisateur)
+    for ind in onto.individuals:
+        ind.objectAssertions = [a for a in ind.objectAssertions if not getattr(a, 'derived', False)]
+        ind.dataAssertions   = [a for a in ind.dataAssertions   if not getattr(a, 'derived', False)]
 
-    def _inverse_of(prop_id: str):
-        p = next((x for x in onto.object_properties if x.id == prop_id), None)
-        return p.inverseOf if p else None
+    # 2. Cartes subPropertyOf (transitif) et inverseOf (bidirectionnel)
+    op_supers = _transitive_supers(onto.object_properties)
+    dp_supers = _transitive_supers(onto.datatype_properties)
+    inverse: dict = {}
+    for p in onto.object_properties:
+        if p.inverseOf:
+            inverse.setdefault(p.id, p.inverseOf)
+            inverse.setdefault(p.inverseOf, p.id)
+    ind_by_id = {i.id: i for i in onto.individuals}
 
-    # Assertions retirées → supprimer l'assertion inverse sur l'individu cible
-    for prop_id, target_id in old_set - new_set:
-        inv = _inverse_of(prop_id)
-        if not inv:
-            continue
-        target = next((i for i in onto.individuals if i.id == target_id), None)
-        if target:
-            target.objectAssertions = [
-                a for a in target.objectAssertions
-                if not (a.property == inv and a.target == ind_id)
-            ]
+    # 3. Clôture jusqu'à point fixe
+    changed = True
+    guard = 0
+    while changed and guard < 100:
+        changed = False
+        guard += 1
+        for ind in onto.individuals:
+            obj_keys = {(a.property, a.target) for a in ind.objectAssertions}
+            # subPropertyOf (object) sur le même individu
+            for a in list(ind.objectAssertions):
+                for q in op_supers.get(a.property, ()):
+                    if (q, a.target) not in obj_keys:
+                        ind.objectAssertions.append(ObjectPropertyAssertion(property=q, target=a.target, derived=True))
+                        obj_keys.add((q, a.target)); changed = True
+            # inverseOf (object) → assertion réciproque sur l'individu cible
+            for a in list(ind.objectAssertions):
+                inv = inverse.get(a.property)
+                if not inv:
+                    continue
+                tgt = ind_by_id.get(a.target)
+                if not tgt:
+                    continue
+                if not any(x.property == inv and x.target == ind.id for x in tgt.objectAssertions):
+                    tgt.objectAssertions.append(ObjectPropertyAssertion(property=inv, target=ind.id, derived=True))
+                    changed = True
+            # subPropertyOf (data) sur le même individu
+            data_keys = {(a.property, a.value, a.datatype) for a in ind.dataAssertions}
+            for a in list(ind.dataAssertions):
+                for q in dp_supers.get(a.property, ()):
+                    if (q, a.value, a.datatype) not in data_keys:
+                        ind.dataAssertions.append(DataPropertyAssertion(property=q, value=a.value, datatype=a.datatype, derived=True))
+                        data_keys.add((q, a.value, a.datatype)); changed = True
 
-    # Assertions ajoutées → ajouter l'assertion inverse sur l'individu cible
-    for prop_id, target_id in new_set - old_set:
-        inv = _inverse_of(prop_id)
-        if not inv:
-            continue
-        target = next((i for i in onto.individuals if i.id == target_id), None)
-        if target:
-            already = any(a.property == inv and a.target == ind_id for a in target.objectAssertions)
-            if not already:
-                target.objectAssertions.append(ObjectPropertyAssertion(property=inv, target=ind_id))
+
+def _reclassify_base(new_ind: OWLIndividual, old_ind: OWLIndividual) -> None:
+    """Avant un update : marque comme `derived` les assertions entrantes qui
+    l'étaient déjà (le front renvoie tout sans le flag) → seules les nouvelles
+    assertions utilisateur restent en base."""
+    old_obj = {(a.property, a.target) for a in (old_ind.objectAssertions or []) if getattr(a, 'derived', False)}
+    old_dat = {(a.property, a.value, a.datatype) for a in (old_ind.dataAssertions or []) if getattr(a, 'derived', False)}
+    for a in new_ind.objectAssertions or []:
+        a.derived = (a.property, a.target) in old_obj
+    for a in new_ind.dataAssertions or []:
+        a.derived = (a.property, a.value, a.datatype) in old_dat
 
 
 @app.post("/api/individuals", tags=["Individus"], status_code=201)
@@ -1946,8 +2030,8 @@ def create_individual(ind: OWLIndividual):
     if any(i.id == ind.id for i in onto.individuals):
         raise HTTPException(409, f"Individual '{ind.id}' already exists")
     onto.individuals.append(ind)
-    # Propager les assertions inverses (pas d'état précédent → old = [])
-    _sync_inverse_assertions(onto, ind.id, [], ind.objectAssertions)
+    # Matérialiser la clôture inverseOf + subPropertyOf
+    _materialize_inferences(onto)
     store.save()
     return ind
 
@@ -1968,7 +2052,7 @@ def update_individual(ind_id: str, ind: OWLIndividual):
     idx = next((i for i, x in enumerate(onto.individuals) if x.id == ind_id), None)
     if idx is None:
         raise HTTPException(404, f"Individual '{ind_id}' not found")
-    old_assertions = onto.individuals[idx].objectAssertions
+    old_ind = onto.individuals[idx]
     new_id = ind.id.strip().replace(' ', '_') if ind.id else ind_id
     if not new_id:
         raise HTTPException(422, "Individual ID cannot be empty")
@@ -1984,8 +2068,10 @@ def update_individual(ind_id: str, ind: OWLIndividual):
             ]
             other.sameAs = [x if x != ind_id else new_id for x in (other.sameAs or [])]
             other.differentFrom = [x if x != ind_id else new_id for x in (other.differentFrom or [])]
-    _sync_inverse_assertions(onto, ind_id, old_assertions, ind.objectAssertions)
+    # Conserver la distinction base/dérivé (le front renvoie tout sans le flag)
+    _reclassify_base(ind, old_ind)
     onto.individuals[idx] = ind
+    _materialize_inferences(onto)
     store.save()
     return ind
 
@@ -1996,9 +2082,11 @@ def delete_individual(ind_id: str):
     ind = next((i for i in onto.individuals if i.id == ind_id), None)
     if not ind:
         raise HTTPException(404, f"Individual '{ind_id}' not found")
-    # Retirer toutes les assertions inverses pointant vers cet individu
-    _sync_inverse_assertions(onto, ind_id, ind.objectAssertions, [])
     onto.individuals = [i for i in onto.individuals if i.id != ind_id]
+    # Retirer les assertions (inverses/super) pointant vers l'individu supprimé
+    for other in onto.individuals:
+        other.objectAssertions = [a for a in other.objectAssertions if a.target != ind_id]
+    _materialize_inferences(onto)
     store.save()
     return {"deleted": ind_id}
 

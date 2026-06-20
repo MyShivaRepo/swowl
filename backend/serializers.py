@@ -6,7 +6,9 @@ from triple_store import TripleStore
 
 def export_owl_xml(store: TripleStore) -> bytes:
     g = store.to_rdf_graph()
-    return g.serialize(format="pretty-xml").encode("utf-8")
+    # « xml » (RDF/XML plat, standard) plutôt que « pretty-xml » (déprécié : imbrique
+    # les individus, génère des rdf:nodeID, et déroute certains parseurs comme Protégé).
+    return g.serialize(format="xml").encode("utf-8")
 
 
 def export_turtle(store: TripleStore) -> bytes:

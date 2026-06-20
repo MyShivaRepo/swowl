@@ -888,7 +888,13 @@ const SWRLEditor = {
                 </div>
                 <div class="ind-picker-inds" style="display:flex;flex-direction:column;overflow:hidden">
                     <div class="tree-panel-header" style="padding:4px 8px;flex-shrink:0"><h3 id="swrl-ind-cls-title">— select a class —</h3></div>
-                    <div id="swrl-ind-list" style="overflow-y:auto;flex:1"><div class="cls-list-empty" style="padding:8px;font-style:italic">Select a class</div></div>
+                    <div style="padding:4px 8px;flex-shrink:0">
+                        <input id="swrl-ind-search" type="text" placeholder="Filter individuals…"
+                               autocomplete="off" spellcheck="false" oninput="SWRLEditor._renderSwrlIndList()"
+                               style="width:100%;box-sizing:border-box;background:var(--bg3);border:1px solid var(--border);
+                                      color:var(--text1);border-radius:6px;padding:5px 8px;font-size:12px">
+                    </div>
+                    <div id="swrl-ind-list" style="overflow-y:auto;flex:1"><div class="cls-list-empty" style="padding:8px;font-style:italic">Select a class or type to filter all</div></div>
                 </div>
             </div>
             <div class="ind-picker-ftr">
@@ -907,24 +913,43 @@ const SWRLEditor = {
         const title = document.getElementById('swrl-ind-cls-title');
         if (title) title.textContent = classId === '__all__' ? 'owl:Thing' : classId;
 
+        this._renderSwrlIndList();
+        const ok = document.getElementById('swrl-ind-ok');
+        if (ok) ok.disabled = true;
+    },
+
+    /** (Re)render the individuals list for the selected class, filtered by the
+     *  search field. Search alone (no class) filters across all individuals —
+     *  homogène avec les autres pickers de l'application. */
+    _renderSwrlIndList() {
         const allInds = APP.state.individuals || [];
-        let filtered;
-        if (classId === '__all__') {
-            filtered = allInds;
+        const classId = this._swrlIndPicker.selectedClass;
+        let base;
+        if (!classId || classId === '__all__') {
+            base = allInds;
         } else {
             const { childrenOf } = ClassEditor.buildTree(APP.state.classes || []);
             const desc = new Set([classId]);
             const q = [...(childrenOf[classId]||[])];
             while (q.length) { const c = q.shift(); if (!desc.has(c)) { desc.add(c); (childrenOf[c]||[]).forEach(x => q.push(x)); } }
-            filtered = allInds.filter(x => (x.types||[]).some(t => desc.has(t)));
+            base = allInds.filter(x => (x.types||[]).some(t => desc.has(t)));
         }
 
-        const ctxClass = classId === '__all__' ? null : classId;
+        const ctxClass = (classId && classId !== '__all__') ? classId : null;
+        const query = (document.getElementById('swrl-ind-search')?.value || '').trim().toLowerCase();
+        const filtered = query
+            ? base.filter(x => {
+                const lbl = IndividualEditor._labelForId(x.id, ctxClass) || '';
+                return x.id.toLowerCase().includes(query) || lbl.toLowerCase().includes(query);
+              })
+            : base;
+
         const listHtml = filtered.length
             ? filtered.map(x => {
                 const lbl = IndividualEditor._labelForId(x.id, ctxClass);
                 const sub = lbl !== x.id ? `<span style="font-size:10px;color:var(--text-faint);display:block">${x.id}</span>` : '';
-                return `<div class="tree-item ind-picker-ind" data-id="${x.id}"
+                const isSel = x.id === this._swrlIndPicker.selectedInd;
+                return `<div class="tree-item ind-picker-ind${isSel ? ' selected' : ''}" data-id="${x.id}"
                      style="padding:4px 10px;cursor:pointer"
                      onclick="SWRLEditor.swrlIndPickerSelectInd('${x.id}')"
                      ondblclick="SWRLEditor.swrlIndPickerSelectInd('${x.id}');SWRLEditor.confirmIndPicker()">
@@ -932,12 +957,10 @@ const SWRLEditor = {
                     <span class="tree-label">${lbl}${sub}</span>
                 </div>`;
             }).join('')
-            : '<div class="cls-list-empty" style="padding:8px;font-style:italic">No individuals</div>';
+            : `<div class="cls-list-empty" style="padding:8px;font-style:italic">${query ? 'No matching individual' : 'No individuals'}</div>`;
 
         const listEl = document.getElementById('swrl-ind-list');
         if (listEl) listEl.innerHTML = listHtml;
-        const ok = document.getElementById('swrl-ind-ok');
-        if (ok) ok.disabled = true;
     },
 
     swrlIndPickerSelectInd(indId) {

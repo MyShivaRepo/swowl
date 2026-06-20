@@ -4187,7 +4187,18 @@ APP._llmCtxKey  = function (base) { const n = this._ontoName(); return n ? base 
 APP._LLM_PROVIDERS = [
     { id: 'anthropic', name: 'Anthropic', sub: 'Claude',                icon: '🤖', hint: 'sk-ant-api03-…' },
     { id: 'openai',    name: 'OpenAI',    sub: 'GPT',                   icon: '🤖', hint: 'sk-…' },
-    { id: 'meta',      name: 'Meta',      sub: 'Llama (api.llama.com)', icon: '🤖', hint: 'LLM|…' },
+    { id: 'meta',      name: 'Meta',      sub: 'Llama',                 icon: '🤖', hint: 'LLM|…' },
+    { id: 'claude-code', name: 'Claude Code', sub: 'CLI agent',         icon: '🧑‍💻' },
+];
+
+// Regroupement des providers par mode d'exécution (affiché dans l'onglet LLMs)
+APP._LLM_MODES = [
+    { key: 'online',     label: 'On-Line LLMs',  badge: 'built-in',   icon: '🌐',
+      desc: 'Cloud LLMs called directly by SWOWL (an API key is required).', providers: ['anthropic', 'openai'] },
+    { key: 'offline',    label: 'Off-Line LLMs', badge: 'built-in',   icon: '💻',
+      desc: 'Local LLM running on your machine — no data leaves your computer.', providers: ['meta'] },
+    { key: 'interfaced', label: 'Interfaced',    badge: 'agent',      icon: '🔌',
+      desc: 'The analysis is delegated to an external agent driving SWOWL.', providers: ['claude-code'] },
 ];
 
 APP._llmKeys = function () {
@@ -4240,8 +4251,26 @@ APP._esc = function (t) { const d = document.createElement('div'); d.textContent
 APP._llmProvider    = function ()  { return localStorage.getItem(this._llmCtxKey('swowl_llm_provider')) || 'anthropic'; };
 APP._llmSetProvider = function (v) { if (v) { localStorage.setItem(this._llmCtxKey('swowl_llm_provider'), v); APP.renderSection('sources'); } };
 
+// Libellé lisible du mode d'exécution actif (utilisé dans l'onglet LLMs et Corpus)
+APP._llmActiveLabel = function () {
+    const p = this._llmProvider();
+    const metaMode = this._llmMetaMode();
+    return {
+        anthropic:     'On-Line — Anthropic Claude',
+        openai:        'On-Line — OpenAI GPT',
+        meta:          metaMode === 'local' ? 'Off-Line — Meta Llama (Ollama local)' : 'Off-Line — Meta Llama (Cloud)',
+        'claude-code': 'Interfaced — Claude Code',
+    }[p] || p;
+};
+
+// Routeur d'analyse : aiguille vers le bon moteur selon le mode choisi dans l'onglet LLMs
+APP._analyseCorpus = function () {
+    if (this._llmProvider() === 'claude-code') return this._claudeCodeAnalyse();
+    return this._corpusAnalyse();
+};
+
 // ── Mode Meta/Llama : 'cloud' ou 'local' (Ollama) ──
-APP._llmMetaMode    = function ()  { return localStorage.getItem(this._llmCtxKey('swowl_llm_meta_mode')) || 'cloud'; };
+APP._llmMetaMode    = function ()  { return 'local'; };  // Meta = Ollama local uniquement (mode Cloud retiré)
 APP._llmSetMetaMode = function (v) { localStorage.setItem(this._llmCtxKey('swowl_llm_meta_mode'), v); APP.renderSection('sources'); };
 
 // ── URLs / modèles par provider ──
@@ -4425,67 +4454,52 @@ APP._renderLLMs = function () {
                 ${modelWidget}`;
 
         } else if (p.id === 'meta') {
-            const isLocal = metaMode === 'local';
-            const modeBtn = (m, label) =>
-                `<button class="btn-sm${metaMode === m ? ' btn-active' : ''}"
-                         style="${metaMode === m ? 'background:var(--accent);color:#fff;' : ''}"
-                         onclick="APP._llmSetMetaMode('${m}')">${label}</button>`;
-            if (isLocal) {
-                body = `
-                    <div style="display:flex;gap:6px;margin-bottom:12px">
-                        ${modeBtn('cloud','☁ Cloud (api.llama.com)')}
-                        ${modeBtn('local','💻 Local (Ollama)')}
-                    </div>
-                    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-                        <input id="llm-ollama-url" type="text"
-                               value="${this._esc(this._llmOllamaUrl())}"
-                               placeholder="http://host.docker.internal:11434"
-                               onchange="APP._llmSetOllamaUrl(this.value)"
-                               autocomplete="off" spellcheck="false"
-                               style="flex:1;min-width:200px;background:var(--bg3);border:1px solid var(--border);
-                                      color:var(--text1);border-radius:6px;padding:7px 10px;font-size:13px;font-family:monospace">
-                        <button class="btn-sm" onclick="APP._llmTestOllama()">🧪 Test</button>
-                    </div>
-                    <div id="llm-status-meta" style="margin-top:8px;font-size:12px;min-height:16px"></div>
-                    ${(() => {
-                        const found = this._llmOllamaModels();
-                        const cur = this._llmOllamaModel();
-                        if (found.length) {
-                            const opts = found.map(m => `<option value="${this._esc(m)}"${m === cur ? ' selected' : ''}>${this._esc(m)}</option>`).join('');
-                            return `<div style="display:flex;align-items:center;gap:8px;margin-top:10px">
-                                <span style="font-size:12px;color:var(--text-dim);white-space:nowrap">Model:</span>
-                                <select id="llm-model-ollama" onchange="APP._llmSetOllamaModel(this.value)"
-                                        style="flex:1;background:var(--bg3);border:1px solid var(--border);color:var(--text1);
-                                               border-radius:6px;padding:5px 8px;font-size:12px;font-family:monospace">
-                                    ${opts}
-                                </select>
-                            </div>`;
-                        }
-                        return modelField('llm-model-ollama', cur, 'cliquez « Test » pour lister les modèles', "APP._llmSetOllamaModel(this.value)");
-                    })()}
-                    <p style="margin:8px 0 0;font-size:11px;color:var(--text-faint);font-style:italic">
-                        Ollama doit tourner localement et être accessible depuis le conteneur Docker.
-                        Installez Ollama depuis <a href="https://ollama.com" target="_blank" style="color:var(--accent)">ollama.com</a>
-                        puis lancez : <code>ollama pull llama3.3</code> (puissant) ou <code>ollama pull llama3.2</code> (rapide)
-                    </p>`;
-            } else {
-                const val = keys[p.id] || '';
-                body = `
-                    <div style="display:flex;gap:6px;margin-bottom:12px">
-                        ${modeBtn('cloud','☁ Cloud (api.llama.com)')}
-                        ${modeBtn('local','💻 Local (Ollama)')}
-                    </div>
-                    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-                        ${inp('llm-key-meta', val, p.hint)}
-                        <button class="btn-sm" onclick="APP._llmToggle('meta')" title="Afficher/masquer">👁</button>
-                        <button class="btn-sm" onclick="APP._llmSave('meta')">💾 Save</button>
-                        <button class="btn-sm" onclick="APP._llmTest('meta')">🧪 Test</button>
-                    </div>
-                    <div id="llm-status-meta" style="margin-top:8px;font-size:12px;min-height:16px">
-                        ${val ? '<span style="color:var(--text-dim)">key saved (not tested)</span>' : ''}
-                    </div>
-                    ${modelField('llm-model-meta', this._llmMetaCloudModel(), 'Llama-4-Scout-17B-16E-Instruct', "APP._llmSetMetaCloudModel(this.value)")}`;
-            }
+            // Meta = LLM Off-Line via Ollama (local) uniquement.
+            body = `
+                <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                    <input id="llm-ollama-url" type="text"
+                           value="${this._esc(this._llmOllamaUrl())}"
+                           placeholder="http://host.docker.internal:11434"
+                           onchange="APP._llmSetOllamaUrl(this.value)"
+                           autocomplete="off" spellcheck="false"
+                           style="flex:1;min-width:200px;background:var(--bg3);border:1px solid var(--border);
+                                  color:var(--text1);border-radius:6px;padding:7px 10px;font-size:13px;font-family:monospace">
+                    <button class="btn-sm" onclick="APP._llmTestOllama()">🧪 Test</button>
+                </div>
+                <div id="llm-status-meta" style="margin-top:8px;font-size:12px;min-height:16px"></div>
+                ${(() => {
+                    const found = this._llmOllamaModels();
+                    const cur = this._llmOllamaModel();
+                    if (found.length) {
+                        const opts = found.map(m => `<option value="${this._esc(m)}"${m === cur ? ' selected' : ''}>${this._esc(m)}</option>`).join('');
+                        return `<div style="display:flex;align-items:center;gap:8px;margin-top:10px">
+                            <span style="font-size:12px;color:var(--text-dim);white-space:nowrap">Model:</span>
+                            <select id="llm-model-ollama" onchange="APP._llmSetOllamaModel(this.value)"
+                                    style="flex:1;background:var(--bg3);border:1px solid var(--border);color:var(--text1);
+                                           border-radius:6px;padding:5px 8px;font-size:12px;font-family:monospace">
+                                ${opts}
+                            </select>
+                        </div>`;
+                    }
+                    return modelField('llm-model-ollama', cur, 'cliquez « Test » pour lister les modèles', "APP._llmSetOllamaModel(this.value)");
+                })()}
+                <p style="margin:8px 0 0;font-size:11px;color:var(--text-faint);font-style:italic">
+                    Ollama doit tourner localement et être accessible depuis le conteneur Docker.
+                    Installez Ollama depuis <a href="https://ollama.com" target="_blank" style="color:var(--accent)">ollama.com</a>
+                    puis lancez : <code>ollama pull llama3.3</code> (puissant) ou <code>ollama pull llama3.2</code> (rapide)
+                </p>`;
+
+        } else if (p.id === 'claude-code') {
+            body = `
+                <p style="margin:0 0 8px;font-size:13px;color:var(--text1);line-height:1.6">
+                    Claude Code (CLI) — the analysis is performed by the <b>Claude Code</b> agent
+                    via the <code>/ontologue</code> skill, which drives SWOWL for you.
+                </p>
+                <p style="margin:0;font-size:12px;color:var(--text-dim);line-height:1.6">
+                    No API key is needed here: select this mode, then click
+                    <b>🔬 Analyse Corpus</b> in the <b>Corpus</b> tab and let Claude Code populate
+                    the candidate ontology. See <b>« How to do it »</b> below.
+                </p>`;
         }
 
         const activeBorder = isActive ? 'border:2px solid var(--accent);' : '';
@@ -4493,7 +4507,7 @@ APP._renderLLMs = function () {
             <div class="cls-frame-bar" style="gap:8px">
                 <span style="font-size:16px;line-height:1;flex-shrink:0">${p.icon}</span>
                 <span style="font-size:13px;font-weight:600;color:var(--text1)">${p.name}</span>
-                <span style="font-size:11px;color:var(--text-dim)">${p.sub}${p.id==='meta'&&metaMode==='local' ? ' — Ollama local' : ''}</span>
+                <span style="font-size:11px;color:var(--text-dim)">${p.sub}${p.id==='meta' ? ' — Ollama local' : ''}</span>
                 ${isActive
                     ? `<span style="margin-left:auto;font-size:11px;font-weight:600;color:var(--accent)">✓ Active</span>`
                     : `<button class="btn-sm" style="margin-left:auto"
@@ -4512,32 +4526,52 @@ APP._renderLLMs = function () {
         else { try { const r = await API.getCorpusPrompt(); t.value = (r && r.prompt) || ''; } catch { /* backend indispo */ } }
     }, 0);
 
-    const activeLabel = {
-        anthropic: 'Anthropic — Claude',
-        openai:    'OpenAI — GPT',
-        meta:      metaMode === 'local' ? 'Meta — Llama (Ollama local)' : 'Meta — Llama (Cloud)',
-    }[activeProv] || activeProv;
+    const activeLabel = this._llmActiveLabel();
+
+    // Une « mode-group » : un titre de mode + ses cartes provider
+    const cardById = {};
+    this._LLM_PROVIDERS.forEach(p => { cardById[p.id] = p; });
+    const modeGroup = (m) => `
+        <div style="margin-bottom:22px">
+            <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:4px">
+                <span style="font-size:15px">${m.icon}</span>
+                <span style="font-size:14px;font-weight:700;color:var(--text1)">${m.label}</span>
+                <span style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;
+                             color:var(--text-dim);border:1px solid var(--border);border-radius:4px;padding:1px 6px">${m.badge}</span>
+            </div>
+            <p style="margin:0 0 10px;font-size:11px;color:var(--text-faint);font-style:italic">${m.desc}</p>
+            ${m.providers.map(id => cardById[id] ? card(cardById[id]) : '').join('')}
+        </div>`;
 
     return `<div style="padding:20px;max-width:780px">
         <div style="margin-bottom:18px;padding:10px 14px;background:var(--bg3);border:1px solid var(--border);
                     border-radius:8px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-            <span style="font-size:12px;color:var(--text-dim)">Provider used for corpus analysis :</span>
+            <span style="font-size:12px;color:var(--text-dim)">Execution mode used for corpus analysis :</span>
             <span style="font-size:13px;font-weight:600;color:var(--accent)">${activeLabel}</span>
             <span style="font-size:11px;color:var(--text-faint);margin-left:auto">
                 (click <em>Use for analysis</em> on a card to change)
             </span>
         </div>
-        ${this._LLM_PROVIDERS.map(card).join('')}
-        <div class="cls-frame" style="margin-top:18px">
+        ${this._LLM_MODES.map(modeGroup).join('')}
+
+        <hr style="border:none;border-top:1px solid var(--border);margin:18px 0">
+
+        <!-- ── What to do ── -->
+        <div class="cls-frame" style="margin-top:6px">
             <div class="cls-frame-bar" style="gap:8px">
-                <span style="font-size:13px;font-weight:600;color:var(--text1)">🧬 Corpus extraction prompt</span>
-                <span style="font-size:11px;color:var(--text-dim)">sent to LLM for « Analyse with LLM »</span>
+                <span style="font-size:13px;font-weight:600;color:var(--text1)">🧬 What to do</span>
+                <span style="font-size:11px;color:var(--text-dim)">corpus extraction prompt</span>
                 <span style="margin-left:auto;display:flex;gap:6px">
                     <button class="btn-sm" onclick="APP._llmSavePrompt()" title="Save your custom prompt">💾 Save</button>
                     <button class="btn-sm" onclick="APP._llmResetPrompt()" title="Restore the default prompt">↺ Reset to default</button>
                 </span>
             </div>
             <div class="cls-frame-body" style="padding:12px">
+                <p style="margin:0 0 10px;font-size:12px;color:var(--text-dim);line-height:1.5">
+                    The instruction sent to the model (built-in LLMs) and the goal the Claude Code agent
+                    must achieve: extract a complete ontology (OWL business model + SWRL business rules)
+                    from the corpus documents.
+                </p>
                 <textarea id="llm-prompt" spellcheck="false" placeholder="Loading default prompt…"
                           style="width:100%;min-height:200px;resize:vertical;background:var(--bg3);border:1px solid var(--border);
                                  color:var(--text1);border-radius:6px;padding:10px;font-size:12px;font-family:monospace;
@@ -4545,6 +4579,26 @@ APP._renderLLMs = function () {
                 <p style="margin:8px 0 0;font-size:11px;color:var(--text-faint);font-style:italic">
                     The model must return strict JSON ({classes, object_properties, datatype_properties, individuals, swrl_rules}).
                     Keep that contract if you edit — the backend parses this JSON to build the candidate ontology.
+                </p>
+            </div>
+        </div>
+
+        <!-- ── How to do it ── -->
+        <div class="cls-frame" style="margin-top:14px">
+            <div class="cls-frame-bar" style="gap:8px">
+                <span style="font-size:13px;font-weight:600;color:var(--text1)">📖 How to do it</span>
+                <span style="font-size:11px;color:var(--text-dim)">Claude Code skill</span>
+            </div>
+            <div class="cls-frame-body" style="padding:12px">
+                <p style="margin:0;font-size:13px;color:var(--text1);line-height:1.6">
+                    The <b>Interfaced</b> mode relies on the <code>/ontologue</code> Claude Code skill,
+                    which drives SWOWL step by step to build the candidate ontology.
+                </p>
+                <p style="margin:8px 0 0;font-size:13px;line-height:1.6">
+                    👉 <a href="https://github.com/MyShivaRepo/swowl/blob/main/.claude/skills/ontologue.md"
+                          target="_blank" rel="noopener" style="color:var(--accent);font-weight:600">
+                        Open the <code>/ontologue</code> skill on GitHub
+                    </a>
                 </p>
             </div>
         </div>
@@ -4717,20 +4771,19 @@ APP._renderCorpus = function () {
             </label>
         </div>
         <div style="display:flex;align-items:center;gap:12px">
-            <button id="corpus-analyse-btn" class="btn-sm" style="width:220px" onclick="APP._corpusAnalyse()" title="Analyse the corpus documents into a candidate ontology"${(docs.length && !running) ? '' : ' disabled'}>${running ? '⏳ Analysing…' : '🔬 Analyse with selected LLM'}</button>
+            <button id="corpus-analyse-btn" class="btn-sm" style="width:220px" onclick="APP._analyseCorpus()" title="Analyse the corpus documents into a candidate ontology, using the mode selected in the LLMs tab"${(docs.length && !running) ? '' : ' disabled'}>${running ? '⏳ Analysing…' : '🔬 Analyse Corpus'}</button>
             <span id="corpus-analyse-status" style="font-size:12px">${this._analysisStatusHtml()}</span>
         </div>
-        <div style="margin-top:8px;display:flex;align-items:center;gap:12px">
-            <button class="btn-sm" style="width:220px" onclick="APP._claudeCodeAnalyse()" title="Let Claude Code (CLI) perform the analysis and populate the ontology"${(docs.length && !running) ? '' : ' disabled'}>🤖 Analyse with Claude Code</button>
-            <span style="font-size:11px;color:var(--text-faint);font-style:italic">Use Claude Code CLI instead of a built-in LLM</span>
-        </div>
-        <div style="margin-top:8px">
+        <p style="margin:6px 0 0;font-size:11px;color:var(--text-faint);font-style:italic">
+            In case of Claude Code (CLI) choose, continu to chat into Claude Desktop
+        </p>
+        <div style="margin-top:12px">
             <button class="btn-sm" style="width:220px" onclick="APP._corpusDedupe()" title="Detect and merge duplicate entities (exact, case, plural)"${running ? ' disabled' : ''}>🧹 Clean Duplicates</button>
         </div>
     </div>`;
 };
 
-// Statut de l'analyse, persistant à droite du bouton « Analyse with LLM »
+// Statut de l'analyse, persistant à droite du bouton « Analyse Corpus »
 APP._analysisStatus = null;  // {state:'running'|'done'|'error', done, elements, message}
 APP._analysisStatusHtml = function () {
     const s = this._analysisStatus;
@@ -5092,12 +5145,12 @@ APP._corpusAnalyse = async function () {
         clearTimeout(tid);
         this._analysisInProgress = null;
         this._setAnalysisStatus({ state: 'error', done: 0, message: (e && e.message ? e.message : String(e)) });
-        if (btn) { btn.disabled = false; btn.textContent = '🔬 Analyse with selected LLM'; }
+        if (btn) { btn.disabled = false; btn.textContent = '🔬 Analyse Corpus'; }
         if (UI && UI.error) UI.error('Analysis failed: ' + (e && e.message ? e.message : e));
         this.renderSection('sources');
         return;
     }
-    if (btn) { btn.disabled = false; btn.textContent = '🔬 Analyse with selected LLM'; }
+    if (btn) { btn.disabled = false; btn.textContent = '🔬 Analyse Corpus'; }
 };
 
 // Détecte et fusionne les doublons : exacts+casse en auto, pluriels validés un par un
@@ -5258,7 +5311,7 @@ APP._renderAnalysis = function () {
         // Auto-sync: check if backend has CC chunks not yet in localStorage
         APP._ccSyncFromBackend();
         return `<div style="padding:24px">${errBlock}
-            <p style="font-size:13px;font-style:italic;color:var(--text-dim)">No analysis yet. Go to the <b>Corpus</b> tab and click <b>🔬 Analyse with selected LLM</b> to extract a candidate ontology from your documents.</p>
+            <p style="font-size:13px;font-style:italic;color:var(--text-dim)">No analysis yet. Go to the <b>Corpus</b> tab and click <b>🔬 Analyse Corpus</b> to extract a candidate ontology from your documents.</p>
             <button class="btn-sm" onclick="APP._ccSyncFromBackend(true)" style="margin-top:8px">↻ Reload from backend</button>
         </div>`;
     }

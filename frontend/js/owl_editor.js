@@ -155,7 +155,7 @@ function _propTreeLines(props, excluded, dotCls, callExpr) {
 
 /** Picker "Asserted Properties" : section ObjectProperties (arbre) puis
  *  section DatatypeProperties (arbre). excludeIds = propriétés déjà posées. */
-function _assertedPropPickerItems(excludeIds = []) {
+function _assertedPropPickerItems(excludeIds = [], action = 'RestrictionEditor.addProperty') {
     const excluded = new Set(excludeIds);
     const ops = APP.state.object_properties   || [];
     const dps = APP.state.datatype_properties || [];
@@ -164,8 +164,8 @@ function _assertedPropPickerItems(excludeIds = []) {
                letter-spacing:.05em;user-select:none;display:flex;align-items:center;gap:5px">
         <span class="${dot}" style="flex-shrink:0"></span>${txt}</div>`;
     const empty = '<div class="cls-list-empty" style="padding:3px 8px;font-size:11px;font-style:italic;color:var(--text-faint)">—</div>';
-    const opLines = _propTreeLines(ops, excluded, 'op-prop-dot', 'RestrictionEditor.addProperty');
-    const dpLines = _propTreeLines(dps, excluded, 'dp-prop-dot', 'RestrictionEditor.addProperty');
+    const opLines = _propTreeLines(ops, excluded, 'op-prop-dot', action);
+    const dpLines = _propTreeLines(dps, excluded, 'dp-prop-dot', action);
     return hdr('ObjectProperties', 'op-prop-dot') + (opLines || empty)
          + hdr('DatatypeProperties', 'dp-prop-dot') + (dpLines || empty);
 }
@@ -1206,6 +1206,48 @@ const ClassEditor = {
         } catch (e) { UI.error(e.message); }
     },
 
+    /** Ouvre/ferme le picker « + Property » (rattacher une OP/DP existante au domaine). */
+    showDomainPropPicker() {
+        const el = document.getElementById('domain-prop-picker');
+        if (!el) return;
+        const v = el.style.display !== 'none';
+        el.style.display = v ? 'none' : '';
+        if (!v) {
+            if (typeof _decoratePickerWithFilter === 'function') _decoratePickerWithFilter(el);
+            _floatPickerBelow(el, '[onclick*="showDomainPropPicker"]');
+            const _close = (e) => {
+                if (!el.contains(e.target) && !e.target.closest('[onclick*="showDomainPropPicker"]')) {
+                    el.style.display = 'none';
+                    document.removeEventListener('mousedown', _close, true);
+                }
+            };
+            document.addEventListener('mousedown', _close, true);
+        }
+    },
+
+    /** Rattache la propriété sélectionnée à la classe courante : ajoute la classe
+     *  au Domain de la propriété → elle apparaît dans « Asserted Properties ». */
+    async addDomainProperty(propId) {
+        const classId = this._selectedId;
+        if (!classId || !propId) return;
+        const picker = document.getElementById('domain-prop-picker');
+        if (picker) picker.style.display = 'none';
+        const op = (APP.state.object_properties || []).find(p => p.id === propId);
+        const dp = !op && (APP.state.datatype_properties || []).find(p => p.id === propId);
+        const prop = op || dp;
+        if (!prop) return;
+        if ((prop.domain || []).includes(classId)) return;  // déjà présent
+        try {
+            const updated = { ...prop, domain: [...(prop.domain || []), classId] };
+            if (op) await API.updateOP(propId, updated);
+            else    await API.updateDP(propId, updated);
+            await APP.refresh();
+            APP.renderSection('classes');
+            setTimeout(() => this.restoreSelection(), 50);
+            if (UI && UI.success) UI.success(`'${propId}' added to domain of '${classId}'`);
+        } catch (e) { UI.error(e.message); }
+    },
+
     // ── Where Used in Range ───────────────────────────────────
     /** Panneau listant les ObjectProperties dont le range contient la classe. */
     _renderRangeUsagePanel(c) {
@@ -1832,9 +1874,21 @@ const RestrictionEditor = {
         const propIds = Object.keys(groups).sort(alpha);
         // Picker en arbre : section ObjectProperties puis DatatypeProperties (+ filtre à l'ouverture)
         const availProps = _assertedPropPickerItems(propIds);
+        // Picker « + Property » : ajoute une OP/DP existante au domaine de la classe.
+        // Exclut les propriétés ayant déjà cette classe dans leur domaine.
+        const _clsIdForDom = cls ? cls.id : null;
+        const _domainExclude = _clsIdForDom
+            ? [...(APP.state.object_properties || []), ...(APP.state.datatype_properties || [])]
+                .filter(p => (p.domain || []).includes(_clsIdForDom)).map(p => p.id)
+            : [];
+        const availDomainProps = _assertedPropPickerItems(_domainExclude, 'ClassEditor.addDomainProperty');
 
         // ── "Inherited" section ───────────────────────────────
-        const inherited  = cls ? this._computeInherited(cls) : [];
+        // Une propriété héritée qui a une restriction/marker LOCAL (asserté sur cette
+        // classe) bascule en « Asserted » → on l'exclut de la section « Inherited ».
+        const _localAssertedSet = new Set(propIds);
+        const inherited  = (cls ? this._computeInherited(cls) : [])
+            .filter(r => !_localAssertedSet.has(r.property || r._marker));
 
         // Order source classes: DFS traversal gives closest-parent-first → reverse = highest-ancestor-first
         const _srcOrder = [];
@@ -1883,24 +1937,65 @@ const RestrictionEditor = {
             ...(APP.state.object_properties || []).map(p => ({ p, kind: 'op' })),
             ...(APP.state.datatype_properties || []).map(p => ({ p, kind: 'dp' })),
         ];
+        // Dédup : ne pas re-lister par domaine une propriété déjà affichée via son
+        // _marker (le backend crée un _marker quand une prop a la classe en domaine).
+        const _assertedMarkerSet = new Set(propIds);
+        const _inhMarkerSet      = new Set(inhPropIds);
         const assertedDomainProps = clsId
-            ? _allProps.filter(({ p }) => (p.domain || []).includes(clsId))
+            ? _allProps.filter(({ p }) => (p.domain || []).includes(clsId) && !_assertedMarkerSet.has(p.id))
             : [];
         const inheritedDomainProps = clsId
-            ? _allProps.filter(({ p }) => !(p.domain || []).includes(clsId) && (p.domain || []).some(d => ancestorIds.has(d)))
+            ? _allProps.filter(({ p }) => !(p.domain || []).includes(clsId)
+                  && (p.domain || []).some(d => ancestorIds.has(d))
+                  && !_inhMarkerSet.has(p.id)
+                  && !_localAssertedSet.has(p.id))   // assertée localement → ne pas la remettre en hérité
             : [];
         assertedDomainProps.sort((a, b) => a.p.id.localeCompare(b.p.id));
         inheritedDomainProps.sort((a, b) => a.p.id.localeCompare(b.p.id));
 
-        const _renderDomainPropRow = ({ p, kind }) => {
+        const _renderDomainPropRow = ({ p, kind }, showFrom = false) => {
             const dot  = kind === 'op' ? 'op-prop-dot' : 'dp-prop-dot';
             const tab  = kind === 'op' ? 'object-properties' : 'datatype-properties';
             const disp = _displayId(p);
-            const rangeStr = (p.range || []).join(', ');
+            // ── Range : juste à droite de la propriété, entre parenthèses, icône devant.
+            //    OP → classe (rond marron, navigable) ; DP → type xsd: (marqueur, non navigable).
+            const rangeTag = (p.range || []).length
+                ? `<span style="display:inline-flex;align-items:center;gap:4px;flex-shrink:0;flex-wrap:wrap;margin-left:5px;font-size:10px;color:var(--text-dim)">
+                    <span style="opacity:.7">(→</span>${(p.range || []).map(r => {
+                        const isClass = (APP.state.classes || []).some(c => c.id === r);
+                        const dotCls  = isClass ? 'cls-dot' : 'dp-prop-dot';  // datatype (xsd:) → marqueur vert
+                        const dotStyle = isClass ? 'width:11px;height:11px' : 'width:8px;height:5px';  // datatype plus petit
+                        const inner   = isClass
+                            ? `<span style="color:var(--text-dim);cursor:pointer" title="Go to class ${_escapeHtml(r)}"
+                                     onclick="APP.navigateTo('classes','${r}')"
+                                     onmouseover="this.style.color='var(--accent,#5f8dd3)';this.style.textDecoration='underline'"
+                                     onmouseout="this.style.color='var(--text-dim)';this.style.textDecoration=''">${_escapeHtml(_displayRefId(r))}</span>`
+                            : `<span style="color:var(--text-dim)">${_escapeHtml(_displayRefId(r))}</span>`;
+                        return `<span style="display:inline-flex;align-items:center;gap:3px">
+                            <span class="${dotCls}" style="flex-shrink:0;${dotStyle};margin:0"></span>${inner}
+                        </span>`;
+                    }).join('<span style="opacity:.5">,</span>')}<span style="opacity:.7">)</span>
+                   </span>`
+                : '';
+            // Classe(s) de provenance (uniquement pour les propriétés héritées).
+            const fromClasses = showFrom ? (p.domain || []) : [];
+            const fromTag = fromClasses.length
+                ? `<span style="display:inline-flex;align-items:center;gap:4px;flex-shrink:0;flex-wrap:wrap;margin-left:5px;font-size:10px;color:var(--text-dim)">
+                    <span style="opacity:.7">(↑</span>${fromClasses.map(fc => `
+                    <span style="display:inline-flex;align-items:center;gap:3px">
+                        <span class="cls-dot" style="flex-shrink:0;width:11px;height:11px"></span>
+                        <span style="color:var(--text-dim);cursor:pointer" title="Go to class ${_escapeHtml(fc)}"
+                              onclick="APP.navigateTo('classes','${fc}')"
+                              onmouseover="this.style.color='var(--accent,#5f8dd3)';this.style.textDecoration='underline'"
+                              onmouseout="this.style.color='var(--text-dim)';this.style.textDecoration=''">${_escapeHtml(_displayRefId(fc))}</span>
+                    </span>`).join('<span style="opacity:.5">,</span>')}<span style="opacity:.7">)</span>
+                   </span>`
+                : '';
             return `<div class="cls-list-item" style="padding:3px 6px;gap:5px">
                 <span class="${dot}" style="flex-shrink:0"></span>
-                <span class="cls-list-lbl" style="cursor:pointer;flex:1" onclick="APP.navigateTo('${tab}','${p.id}')">${_escapeHtml(disp)}</span>
-                ${rangeStr ? `<span style="font-size:10px;color:var(--text-dim);margin-left:auto;white-space:nowrap">→ ${_escapeHtml(rangeStr)}</span>` : ''}
+                <span class="cls-list-lbl" style="cursor:pointer;flex-shrink:0" onclick="APP.navigateTo('${tab}','${p.id}')">${_escapeHtml(disp)}</span>
+                ${rangeTag}
+                ${fromTag}
             </div>`;
         };
 
@@ -1918,7 +2013,7 @@ const RestrictionEditor = {
             </div>
             <div class="restr-section-body">
                 <div class="restr-tree">
-                ${inheritedDomainProps.length ? inheritedDomainProps.map(_renderDomainPropRow).join('') : ''}
+                ${inheritedDomainProps.length ? inheritedDomainProps.map(x => _renderDomainPropRow(x, true)).join('') : ''}
                 ${_srcOrder.length
                     ? _srcOrder.map((srcCls, i) => {
                         const propMap = _bySource[srcCls] || {};
@@ -1938,23 +2033,29 @@ const RestrictionEditor = {
                 Asserted Properties
                 <span style="font-weight:400;color:var(--text-dim);margin-left:3px">(${assrtTotal})</span>
                 <span style="display:flex;gap:2px;margin-left:auto;flex-shrink:0" onclick="event.stopPropagation()">
+                    <button class="btn-ftool" title="Attach an existing ObjectProperty or DatatypeProperty to this class (adds the class to the property's Domain)"
+                            onclick="ClassEditor.showDomainPropPicker()">
+                        ${ico}&thinsp;Property</button>
+                    <button class="btn-ftool" title="Add owl:Restriction"
+                            onclick="RestrictionEditor.showPropPicker()">
+                        ${ico}&thinsp;restriction</button>
                     <button class="btn-ftool" title="Create new ObjectProperty with domain = ${cls?.id || 'this class'}"
                             onclick="ClassEditor.createOPForClass()">
                         <span class="op-prop-dot" style="width:9px;height:9px;display:inline-block;vertical-align:middle;flex-shrink:0"></span>&thinsp;OP</button>
                     <button class="btn-ftool" title="Create new DatatypeProperty with domain = ${cls?.id || 'this class'}"
                             onclick="ClassEditor.createDTPForClass()">
-                        <span class="dp-prop-dot" style="width:9px;height:9px;display:inline-block;vertical-align:middle;flex-shrink:0"></span>&thinsp;DT</button>
-                    <button class="btn-ftool" title="Add owl:Restriction"
-                            onclick="RestrictionEditor.showPropPicker()">
-                        ${ico}&thinsp;restriction</button>
+                        <span class="dp-prop-dot" style="width:9px;height:9px;display:inline-block;vertical-align:middle;flex-shrink:0"></span>&thinsp;DP</button>
                 </span>
             </div>
             <div class="restr-section-body">
+                <div id="domain-prop-picker" class="cls-tree-picker" style="display:none;margin:2px 4px 4px">
+                    ${availDomainProps || '<div class="cls-list-empty" style="padding:4px 8px;font-size:11px">—</div>'}
+                </div>
                 <div id="restr-prop-picker" class="cls-tree-picker" style="display:none;margin:2px 4px 4px">
                     ${availProps || '<div class="cls-list-empty" style="padding:4px 8px;font-size:11px">—</div>'}
                 </div>
                 <div class="restr-tree" id="restr-tree">
-                    ${assertedDomainProps.length ? assertedDomainProps.map(_renderDomainPropRow).join('') : ''}
+                    ${assertedDomainProps.length ? assertedDomainProps.map(x => _renderDomainPropRow(x)).join('') : ''}
                     ${propIds.length
                         ? (assertedDomainProps.length ? '<div class="inh-class-sep"></div>' : '') + propIds.map(p => this._renderGroup(p, groups[p])).join('')
                         : ''}
@@ -1999,19 +2100,41 @@ const RestrictionEditor = {
         const navSection = isOP ? 'object-properties' : isDP ? 'datatype-properties' : null;
         const visible = restrictions.filter(r => r.type !== '_marker');
 
-        // Source tag — shown in the header, not in child rows
+        // Range (→) : juste à droite du nom, entre parenthèses, icône devant.
+        const _propObj = (APP.state.object_properties || []).find(p => p.id === prop)
+                      || (APP.state.datatype_properties || []).find(p => p.id === prop);
+        const _ranges  = (_propObj && _propObj.range) || [];
+        const rangeTag = _ranges.length
+            ? `<span style="display:inline-flex;align-items:center;gap:4px;flex-shrink:0;flex-wrap:wrap;margin-left:5px;font-size:10px;color:var(--text-dim)">
+                <span style="opacity:.7">(→</span>${_ranges.map(r => {
+                    const isClass = (APP.state.classes || []).some(c => c.id === r);
+                    const dotC    = isClass ? 'cls-dot' : 'dp-prop-dot';
+                    const dotSt   = isClass ? 'width:11px;height:11px' : 'width:8px;height:5px';
+                    const inner   = isClass
+                        ? `<span style="color:var(--text-dim);cursor:pointer" title="Go to class ${_escapeHtml(r)}"
+                                 onclick="APP.navigateTo('classes','${r}')"
+                                 onmouseover="this.style.color='var(--accent,#5f8dd3)';this.style.textDecoration='underline'"
+                                 onmouseout="this.style.color='var(--text-dim)';this.style.textDecoration=''">${_escapeHtml(_displayRefId(r))}</span>`
+                        : `<span style="color:var(--text-dim)">${_escapeHtml(_displayRefId(r))}</span>`;
+                    return `<span style="display:inline-flex;align-items:center;gap:3px">
+                        <span class="${dotC}" style="flex-shrink:0;${dotSt};margin:0"></span>${inner}
+                    </span>`;
+                }).join('<span style="opacity:.5">,</span>')}<span style="opacity:.7">)</span>
+               </span>`
+            : '';
+
+        // Source tag — provenance (↑) : juste après le range, rond marron devant chaque classe source.
         const fromClasses = [...new Set(restrictions.map(r => r._fromClass).filter(Boolean))];
         const fromTag = fromClasses.length
-            ? `<span class="restr-prop-summary" style="display:inline-flex;align-items:center;gap:4px;flex-wrap:wrap">
+            ? `<span style="display:inline-flex;align-items:center;gap:4px;flex-shrink:0;flex-wrap:wrap;margin-left:5px;font-size:10px;color:var(--text-dim)">
                 <span style="opacity:.7">(↑</span>${fromClasses.map(fc => `
                 <span style="display:inline-flex;align-items:center;gap:3px">
-                    <span class="cls-dot" style="flex-shrink:0;width:12px;height:12px"></span>
+                    <span class="cls-dot" style="flex-shrink:0;width:11px;height:11px"></span>
                     <span class="restr-from-nav" style="color:var(--text-dim)"
                           onclick="ClassEditor._expandAncestors('${fc}');ClassEditor._selectedId='${fc}';ClassEditor._selectedIds=new Set(['${fc}']);ClassEditor._anchorId='${fc}';ClassEditor._owlThingSelected=false;APP.renderSection('classes');setTimeout(()=>ClassEditor.restoreSelection(),50)"
                           onmouseover="this.style.color='var(--accent,#5f8dd3)';this.style.textDecoration='underline'"
                           onmouseout="this.style.color='var(--text-dim)';this.style.textDecoration=''">${_displayRefId(fc)}</span>
-                </span>`).join('<span style="opacity:.5">,</span>')}
-                <span style="opacity:.7">)</span>
+                </span>`).join('<span style="opacity:.5">,</span>')}<span style="opacity:.7">)</span>
                </span>`
             : '';
 
@@ -2062,7 +2185,10 @@ const RestrictionEditor = {
             <div class="tree-item restr-prop-row-ro" style="padding-left:4px;cursor:default">
                 <span class="${dotCls}"></span>
                 <span class="restr-prop-name" style="cursor:pointer"
-                      onclick="APP.navigateTo('${navSection}','${prop}')">${_displayRefId(prop)}</span>
+                      onclick="APP.navigateTo('${navSection}','${prop}')"
+                      oncontextmenu="event.preventDefault();event.stopPropagation();RestrictionEditor.showInheritedContextMenu(event,'${prop}')"
+                      title="Right-click to add a restriction on this inherited property">${_displayRefId(prop)}</span>
+                ${rangeTag}
                 ${fromTag}
             </div>
             ${childRows}
@@ -2182,6 +2308,7 @@ const RestrictionEditor = {
         el.style.display = v ? 'none' : '';
         if (!v) {
             _decoratePickerWithFilter(el);   // champ filtre + liste scrollable (homogène)
+            _floatPickerBelow(el, '[onclick*="showPropPicker"]');
             // Fermer si clic en dehors du picker
             const _close = (e) => {
                 if (!el.contains(e.target) && !e.target.closest('[onclick*="showPropPicker"]')) {
@@ -2291,6 +2418,73 @@ const RestrictionEditor = {
         childrenEl.appendChild(div.firstElementChild);
     },
 
+    // ── Restriction sur une propriété HÉRITÉE (façon Protégé) ──────────
+    /** Menu contextuel (clic droit) sur une propriété de la section Inherited. */
+    showInheritedContextMenu(event, prop) {
+        event.preventDefault();
+        event.stopPropagation();
+        this._closeContextMenu();
+        const types = [
+            { id: 'someValuesFrom',   label: '∃ someValuesFrom' },
+            { id: 'allValuesFrom',    label: '∀ allValuesFrom' },
+            { id: 'hasValue',         label: '∋ hasValue' },
+            { id: 'exactCardinality', label: '= exactCardinality' },
+            { id: 'minCardinality',   label: '≥ minCardinality' },
+            { id: 'maxCardinality',   label: '≤ maxCardinality' },
+        ];
+        const menu = document.createElement('div');
+        menu.id = 'restr-ctx-menu';
+        menu.className = 'ctx-menu';
+        menu.style.left = event.clientX + 'px';
+        menu.style.top  = event.clientY + 'px';
+        menu.innerHTML =
+            `<div style="font-size:10px;color:var(--text-dim);padding:3px 16px 4px;letter-spacing:.04em;text-transform:uppercase">Add restriction (inherited → asserted)</div>` +
+            `<div class="ctx-sep"></div>` +
+            types.map(t =>
+                `<div class="ctx-item" onclick="RestrictionEditor.addInheritedRestriction('${prop}','${t.id}')">${t.label}</div>`
+            ).join('');
+        document.body.appendChild(menu);
+        setTimeout(() => {
+            document.addEventListener('click', function close() {
+                RestrictionEditor._closeContextMenu();
+                document.removeEventListener('click', close);
+            });
+        }, 0);
+    },
+
+    /** Crée une restriction du type donné sur la classe courante pour une propriété
+     *  héritée → la propriété bascule dans « Asserted ». */
+    async addInheritedRestriction(prop, type) {
+        this._closeContextMenu();
+        const classId = ClassEditor._selectedId;
+        if (!classId || !prop) return;
+        const cls = (APP.state.classes || []).find(c => c.id === classId);
+        if (!cls) return;
+        let restr;
+        if (type.includes('Cardinality')) restr = { type, property: prop, cardinality: 0 };
+        else if (type === 'hasValue')     restr = { type, property: prop, value: null };
+        else                              restr = { type, property: prop, filler: null };
+        // Retire un éventuel _marker local pour cette prop (la restriction le remplace),
+        // puis ajoute la restriction.
+        const subClean = (cls.subClassOf || []).filter(r =>
+            !(typeof r === 'object' && r.type === '_marker' && r.property === prop));
+        subClean.push(restr);
+        const updated = {
+            id: cls.id,
+            annotations: cls.annotations || { labels: [], comments: [], other: [] },
+            subClassOf: subClean,
+            equivalentClass: cls.equivalentClass || [],
+            disjointWith: cls.disjointWith || [],
+        };
+        try {
+            await API.updateClass(classId, updated);
+            await APP.refresh();
+            APP.renderSection('classes');
+            setTimeout(() => ClassEditor.restoreSelection(), 50);
+            if (typeof UI !== 'undefined' && UI.success) UI.success(`Restriction added on '${prop}' — now asserted`);
+        } catch (e) { if (typeof UI !== 'undefined' && UI.error) UI.error(e.message); }
+    },
+
     deleteProp(prop) {
         document.querySelector(`.restr-prop-group[data-prop="${prop}"]`)?.remove();
         if (this._selectedProp === prop) this._selectedProp = null;
@@ -2316,7 +2510,20 @@ const RestrictionEditor = {
     },
 
     deleteChild(gid) {
-        document.getElementById(`restr-child-${gid}`)?.remove();
+        const childEl = document.getElementById(`restr-child-${gid}`);
+        const group   = childEl?.closest('.restr-prop-group');
+        childEl?.remove();
+        // Groupe désormais vide : un groupe vide est sérialisé comme _marker (reste
+        // asserté). Pour une propriété PUREMENT HÉRITÉE (pas dans le domaine de la
+        // classe courante), on retire le groupe entier → retour à « Inherited ».
+        if (group && group.querySelectorAll('.restr-child-row').length === 0) {
+            const prop    = group.dataset.prop;
+            const clsId   = ClassEditor._editingId;
+            const propObj = (APP.state.object_properties || []).find(p => p.id === prop)
+                         || (APP.state.datatype_properties || []).find(p => p.id === prop);
+            const inDomain = !!(clsId && propObj && (propObj.domain || []).includes(clsId));
+            if (!inDomain) group.remove();
+        }
         if (ClassEditor._editingId !== null) ClassEditor.autoSave();
     },
 
@@ -2743,6 +2950,27 @@ function _filterPicker(input) {
 
 /** Ajoute (à la première ouverture) un champ filtre en tête d'un .cls-tree-picker,
  *  enveloppe les items dans une zone scrollable, puis remet à zéro et focus le filtre. */
+/** Affiche un picker en overlay flottant (position:fixed) juste sous le bouton
+ *  déclencheur, pour qu'il ne soit pas clippé par l'overflow de la section. */
+function _floatPickerBelow(el, anchorSelector) {
+    if (!el) return;
+    const btn = typeof anchorSelector === 'string'
+        ? document.querySelector(anchorSelector) : anchorSelector;
+    if (!btn) return;
+    const r = btn.getBoundingClientRect();
+    const w = 300;
+    const left = Math.max(8, Math.min(r.right - w, window.innerWidth - w - 8));
+    Object.assign(el.style, {
+        position: 'fixed', zIndex: '3000',
+        top: (r.bottom + 3) + 'px',
+        left: left + 'px',
+        width: w + 'px',
+        maxHeight: '340px',
+        margin: '0',
+        boxShadow: '0 6px 24px rgba(0,0,0,.45)',
+    });
+}
+
 function _decoratePickerWithFilter(el) {
     if (!el || !el.classList.contains('cls-tree-picker')) return;
     let filter = el.querySelector(':scope > .cls-picker-filter');
@@ -5120,7 +5348,11 @@ const IndividualEditor = {
     },
 
     async deleteSelected() {
-        const toDelete = [...this._selectedIndIds];
+        // Repli : si l'ensemble multi-sélection est vide mais qu'un individu est
+        // sélectionné (col 3), on le supprime — cohérent avec l'état du bouton.
+        const toDelete = this._selectedIndIds.size
+            ? [...this._selectedIndIds]
+            : (this._selectedIndId ? [this._selectedIndId] : []);
         if (!toDelete.length) return;
         const n = toDelete.length;
         const label = n === 1
@@ -5166,7 +5398,7 @@ const IndividualEditor = {
             if (e.target.closest('#ind-detail'))         return;  // property panels, navigation links…
             if (e.target.closest('.ind-picker-overlay')) return;  // picker modal + display modals
             if (e.target.closest('#ind-ctx-menu'))       return;
-            if (e.target.closest('.btn-icon, .btn-sm')) return;
+            if (e.target.closest('.btn-icon, .btn-sm, .btn-tool')) return;
             // Tout autre clic → désélectionner
             this._selectedIndIds.clear();
             this._selectedIndId = null;
@@ -5518,103 +5750,32 @@ const IndividualEditor = {
         </div>`;
     },
 
-    // ── subPropertyOf inference (client-side) ────────────────────────
 
-    /** Returns all ancestor property IDs transitively via subPropertyOf. */
-    _getSuperProperties(propId, allProps) {
-        const result  = [];
-        const visited = new Set([propId]);
-        const walk = (id) => {
-            const p = allProps.find(x => x.id === id);
-            if (!p) return;
-            (p.subPropertyOf || []).filter(s => typeof s === 'string').forEach(parentId => {
-                if (!visited.has(parentId)) {
-                    visited.add(parentId);
-                    result.push(parentId);
-                    walk(parentId);   // transitive
-                }
-            });
+    /** Propriétés applicables par DOMAINE pour les types donnés (et leurs ancêtres),
+     *  hors propriétés déjà couvertes par les restrictions de la classe.
+     *  Permet d'afficher des panneaux d'assertion même sans axiome de restriction
+     *  (cohérent avec le picker _buildPropOptions / _openDisplayPropModal). */
+    _getDomainProperties(types, covered) {
+        const map = new Map();
+        if (!types || !types.length) return map;
+        const classes  = APP.state.classes || [];
+        const relevant = new Set();
+        const addAnc = (id) => {
+            if (relevant.has(id)) return;
+            relevant.add(id);
+            const cls = classes.find(c => c.id === id);
+            if (!cls) return;
+            (cls.subClassOf || []).filter(s => typeof s === 'string').forEach(addAnc);
         };
-        walk(propId);
-        return result;
-    },
-
-    /** Computes inferred OP + DP assertions for an individual based on subPropertyOf chains. */
-    _inferredAssertions(ind) {
-        const ops = APP.state.object_properties  || [];
-        const dps = APP.state.datatype_properties || [];
-
-        // Keys of explicit assertions — used to avoid showing duplicates
-        const explicitOp = new Set((ind.objectAssertions || []).map(a => `${a.property}||${a.target}`));
-        const explicitDp = new Set((ind.dataAssertions   || []).map(a => `${a.property}||${a.value}`));
-
-        // inferredFrom may have multiple sources → group by propId
-        const opMap = new Map(); // parentPropId → [{target, inferredFrom}]
-        const dpMap = new Map(); // parentPropId → [{value, datatype, inferredFrom}]
-
-        (ind.objectAssertions || []).forEach(a => {
-            this._getSuperProperties(a.property, ops).forEach(parentId => {
-                const key = `${parentId}||${a.target}`;
-                if (!explicitOp.has(key)) {
-                    explicitOp.add(key);
-                    if (!opMap.has(parentId)) opMap.set(parentId, []);
-                    opMap.get(parentId).push({ target: a.target, inferredFrom: a.property });
-                }
-            });
+        types.forEach(addAnc);
+        const ops = APP.state.object_properties || [];
+        [...ops, ...(APP.state.datatype_properties || [])].forEach(p => {
+            if (covered.has(p.id) || map.has(p.id)) return;
+            if ((p.domain || []).some(d => relevant.has(d))) {
+                map.set(p.id, { kind: ops.some(o => o.id === p.id) ? 'op' : 'dp', fillers: new Set() });
+            }
         });
-
-        (ind.dataAssertions || []).forEach(a => {
-            this._getSuperProperties(a.property, dps).forEach(parentId => {
-                const key = `${parentId}||${a.value}`;
-                if (!explicitDp.has(key)) {
-                    explicitDp.add(key);
-                    if (!dpMap.has(parentId)) dpMap.set(parentId, []);
-                    dpMap.get(parentId).push({ value: a.value, datatype: a.datatype, inferredFrom: a.property });
-                }
-            });
-        });
-
-        return { opMap, dpMap };
-    },
-
-    /** Renders a read-only inferred property panel (🧠 italic, non-editable). */
-    _renderInferredPanel(propId, assertions, kind) {
-        const dotCls = kind === 'op' ? 'op-prop-dot' : 'dp-prop-dot';
-        const navSection = kind === 'op' ? 'object-properties' : 'datatype-properties';
-
-        const rows = assertions.map(a => {
-            const value = kind === 'op' ? a.target : a.value;
-            const lbl   = kind === 'op' ? ((this._labelForId(a.target, null) !== a.target ? this._labelForId(a.target, null) : null) || _displayRefId(a.target)) : a.value;
-            const dtype = kind === 'dp' ? `<span style="font-size:10px;color:var(--text-dim);margin-left:4px">${a.datatype || ''}</span>` : '';
-            const navClick = kind === 'op'
-                ? `onclick="APP.navigateTo('individuals','${value}')"
-                   onmouseover="this.style.textDecoration='underline';this.style.color='var(--accent,#5f8dd3)'"
-                   onmouseout="this.style.textDecoration='';this.style.color=''"
-                   style="font-size:12px;font-family:var(--font-mono);flex:1;cursor:pointer;font-style:italic"`
-                : `style="font-size:11px;font-family:var(--font-mono);flex:1;font-style:italic;color:var(--text-dim)"`;
-            return `
-            <div ${kind === 'op' ? `data-id="${value}"` : ''} style="display:flex;align-items:center;gap:4px;padding:2px 4px">
-                <span class="xsd-dot" style="flex-shrink:0;margin:0;opacity:0.6"></span>
-                <span ${navClick}>${(lbl+'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</span>
-                ${dtype}
-                <span style="font-size:10px;color:var(--text-faint);font-style:italic;flex-shrink:0"
-                      title="Inféré via subPropertyOf">⊢ via ${_displayRefId(a.inferredFrom)}</span>
-            </div>`;
-        }).join('');
-
-        return `
-        <div class="cls-frame ind-prop-panel" style="opacity:0.85">
-            <div class="cls-frame-bar" style="font-style:italic">
-                <span class="${dotCls}" style="opacity:0.7"></span>
-                <span class="cls-frame-tag" style="margin-left:4px;cursor:pointer;font-style:italic;color:var(--text-dim)"
-                      onclick="APP.navigateTo('${navSection}','${propId}')"
-                      onmouseover="this.style.textDecoration='underline'"
-                      onmouseout="this.style.textDecoration=''"
-                      title="Navigate to ${propId}">${_displayRefId(propId)}</span>
-                <span style="margin-left:6px;font-size:10px;color:var(--text-faint)">🧠 inferred</span>
-            </div>
-            <div class="cls-frame-body">${rows}</div>
-        </div>`;
+        return map;
     },
 
     renderForm(ind = null, defaultClassId = null) {
@@ -5651,30 +5812,40 @@ const IndividualEditor = {
 
         // Panels dynamiques : inherited d'abord (alpha), puis asserted (alpha)
         const { inherited: inhProps, asserted: assProps } = this._getClassProperties(i.types || []);
+        // Propriétés applicables par domaine (non couvertes par les restrictions).
+        const domProps = this._getDomainProperties(i.types || [], new Set([...inhProps.keys(), ...assProps.keys()]));
         const makePanels = (map) => [...map.entries()]
             .map(([propId, propInfo]) => this._renderPropPanel(propId, propInfo, i, ac, ico))
             .join('<div class="h-resizer"></div>');
+        // Propriétés réellement assertées par l'individu mais NON couvertes par les
+        // restrictions/domaines ci-dessus (ex. MemberOf avec domaine vide) → sinon
+        // l'assertion existante serait invisible.
+        const _coveredPanels = new Set([...inhProps.keys(), ...assProps.keys(), ...domProps.keys()]);
+        const _opSet = new Set((APP.state.object_properties   || []).map(p => p.id));
+        const _dpSet = new Set((APP.state.datatype_properties || []).map(p => p.id));
+        const usedProps = new Map();
+        [...(i.objectAssertions || []).map(a => a.property),
+         ...(i.dataAssertions   || []).map(a => a.property)].forEach(pid => {
+            if (!pid || _coveredPanels.has(pid) || usedProps.has(pid)) return;
+            const kind = _opSet.has(pid) ? 'op' : (_dpSet.has(pid) ? 'dp' : null);
+            if (kind) usedProps.set(pid, { kind, fillers: new Set() });
+        });
         const inhHtml  = makePanels(inhProps);
-        const assHtml  = makePanels(assProps);
-
-        // Inferred panels (subPropertyOf transitive)
-        const { opMap, dpMap } = !isNew ? this._inferredAssertions(i) : { opMap: new Map(), dpMap: new Map() };
-        const infPanels = [
-            ...[...opMap.entries()].map(([propId, assertions]) => this._renderInferredPanel(propId, assertions, 'op')),
-            ...[...dpMap.entries()].map(([propId, assertions]) => this._renderInferredPanel(propId, assertions, 'dp')),
-        ];
-        const infSeparator = infPanels.length ? `
+        const assHtml  = [makePanels(assProps), makePanels(usedProps)].filter(Boolean).join('<div class="h-resizer"></div>');
+        const domHtml  = makePanels(domProps);
+        const domSeparator = domProps.size ? `
             <div style="display:flex;align-items:center;gap:8px;padding:6px 4px 2px;user-select:none">
                 <span style="flex:1;height:1px;background:var(--border)"></span>
                 <span style="font-size:10px;color:var(--text-faint);font-style:italic;white-space:nowrap">
-                    🧠 Inferred Properties (subPropertyOf)
+                    🧩 Applicable Properties (by domain)
                 </span>
                 <span style="flex:1;height:1px;background:var(--border)"></span>
             </div>` : '';
-        const infHtml = infPanels.join('<div class="h-resizer"></div>');
 
-        const propPanelsHtml = [inhHtml, assHtml, infSeparator + infHtml].filter(Boolean).join('<div class="h-resizer"></div>');
-        const hasProps = inhProps.size + assProps.size > 0 || opMap.size > 0 || dpMap.size > 0;
+        // Plus de section « inférée » : les entailments (subPropertyOf / inverseOf)
+        // sont désormais matérialisés côté backend (assertions derived=True).
+        const propPanelsHtml = [inhHtml, assHtml, domSeparator + domHtml].filter(Boolean).join('<div class="h-resizer"></div>');
+        const hasProps = inhProps.size + assProps.size + domProps.size + usedProps.size > 0;
 
         return `
         <div class="cls-editor">
@@ -6565,7 +6736,10 @@ const IndividualEditor = {
                 UI.success(`Individual '${id}' created`);
                 await APP.refresh();
                 this._selectedIndId = id;
+                this._selectedIndIds = new Set([id]);   // garde la sélection cohérente (corbeille, etc.)
+                this._anchorIndId   = id;
                 this._editingId     = id;
+                this._setDelBtn(!_isImportedId('individuals', id));
                 // Col 1 — recalculate counters
                 const classTree = document.getElementById('ind-class-tree');
                 if (classTree) classTree.innerHTML = this._renderClassTree(APP.state.individuals);
@@ -6584,6 +6758,9 @@ const IndividualEditor = {
                 if (id !== originalId) UI.success(`Individual renamed → '${id}'`);
                 this._editingId     = id;
                 this._selectedIndId = id;
+                this._selectedIndIds = new Set([id]);   // garde la sélection cohérente (corbeille, etc.)
+                this._anchorIndId   = id;
+                this._setDelBtn(!_isImportedId('individuals', id));
                 await APP.refresh();
                 // Col 1 — recalculate counters
                 const classTree = document.getElementById('ind-class-tree');

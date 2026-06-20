@@ -23,6 +23,19 @@ from owl_model import (
     PropertyPresence,
 )
 
+# Types de données XSD reconnus (pour mapper les range de DatatypeProperty vers
+# l'espace de noms XSD, qu'ils soient nus « string » ou préfixés « xsd:string »).
+_XSD_DATATYPES = {
+    "string", "boolean", "decimal", "integer", "float", "double",
+    "date", "dateTime", "dateTimeStamp", "time", "duration",
+    "anyURI", "base64Binary", "hexBinary", "language",
+    "normalizedString", "token", "Name", "NCName", "anySimpleType",
+    "long", "int", "short", "byte",
+    "nonNegativeInteger", "positiveInteger", "negativeInteger", "nonPositiveInteger",
+    "unsignedLong", "unsignedInt", "unsignedShort", "unsignedByte",
+    "gYear", "gMonth", "gDay", "gYearMonth", "gMonthDay",
+}
+
 ANNO_PROP_MAP = {
     'rdfs:seeAlso':               RDFS.seeAlso,
     'rdfs:isDefinedBy':           RDFS.isDefinedBy,
@@ -881,14 +894,28 @@ class TripleStore:
         for ann in onto.annotations.comments:
             g.add((onto_uri, RDFS.comment, Literal(ann.value, lang=ann.lang)))
 
+        _EXT_PREFIX_NS = {"xsd:": XSD, "owl:": OWL, "rdfs:": RDFS, "rdf:": RDF, "skos:": SKOS}
+
         def iri(local_id: str) -> URIRef:
             if local_id.startswith("http"):
                 return URIRef(local_id)
-            if ":" in local_id and not local_id.startswith(onto.prefix):
-                return URIRef(local_id.replace("xsd:", str(XSD))
-                              .replace("owl:", str(OWL))
-                              .replace("rdfs:", str(RDFS)))
+            # Préfixes externes connus → leur espace de noms (indépendant du préfixe
+            # de l'ontologie, qui peut être vide → l'ancien test startswith cassait).
+            for pfx, ns in _EXT_PREFIX_NS.items():
+                if local_id.startswith(pfx):
+                    return ns[local_id[len(pfx):]]
             return NS[local_id]
+
+        def dt_iri(r: str) -> URIRef:
+            """Range d'une DatatypeProperty → toujours un type de données.
+            Mappe les noms XSD (nus « string » ou préfixés « xsd:string ») vers
+            l'espace de noms XSD pour éviter qu'ils deviennent des classes #string."""
+            if r.startswith("http"):
+                return URIRef(r)
+            name = r.split(":", 1)[1] if r.startswith("xsd:") else r
+            if name in _XSD_DATATYPES:
+                return XSD[name]
+            return iri(r)
 
         def add_anns(subject: URIRef, anns) -> None:
             for a in anns.labels:
@@ -990,7 +1017,7 @@ class TripleStore:
             for d in prop.domain:
                 g.add((uri_, RDFS.domain, iri(d)))
             for r in prop.range:
-                g.add((uri_, RDFS.range, iri(r)))
+                g.add((uri_, RDFS.range, dt_iri(r)))
             for sp in prop.subPropertyOf:
                 g.add((uri_, RDFS.subPropertyOf, iri(sp)))
             if prop.functional:
@@ -998,14 +1025,20 @@ class TripleStore:
 
         for ind in onto.individuals:
             uri_ = iri(ind.id)
-            g.add((uri_, RDF.type, OWL.NamedIndividual))
-            add_anns(uri_, ind.annotations)
-            for t in ind.types:
+            # rdf:type des classes de l'individu
+            real_types = [t for t in ind.types if t and t != 'owl:NamedIndividual']
+            for t in real_types:
                 g.add((uri_, RDF.type, iri(t)))
+            # owl:NamedIndividual seulement si AUCUNE classe (sinon l'individu est déjà
+            # déclaré via sa classe ; éviter ce triplet supprime l'affichage fantôme
+            # « owl:NamedIndividual » comme classe dans Protégé).
+            if not real_types:
+                g.add((uri_, RDF.type, OWL.NamedIndividual))
+            add_anns(uri_, ind.annotations)
             for oa in ind.objectAssertions:
                 g.add((uri_, iri(oa.property), iri(oa.target)))
             for da in ind.dataAssertions:
-                dt = iri(da.datatype) if da.datatype.startswith("xsd:") else XSD.string
+                dt = dt_iri(da.datatype) if da.datatype else XSD.string
                 g.add((uri_, iri(da.property), Literal(da.value, datatype=dt)))
             for s in ind.sameAs:
                 g.add((uri_, OWL.sameAs, iri(s)))
