@@ -17,6 +17,10 @@
 - [REQ-IMP-015 — Préfixage contextuel des entités issues des namespaces importés](#req-imp-015--préfixage-contextuel-des-entités-issues-des-namespaces-importés)
 - [REQ-IMP-016 — Priorité de la base de l'ontologie sur les namespaces utilisateur](#req-imp-016--priorité-de-la-base-de-lontologie-sur-les-namespaces-utilisateur)
 - [REQ-IMP-017 — Conversion des namespaces du wizard en owl:imports](#req-imp-017--conversion-des-namespaces-du-wizard-en-owlimports)
+- [REQ-IMP-018 — Export : mapping des préfixes externes vers leur namespace](#req-imp-018--export--mapping-des-préfixes-externes-vers-leur-namespace)
+- [REQ-IMP-019 — Export : types de données XSD pour les ranges et les littéraux](#req-imp-019--export--types-de-données-xsd-pour-les-ranges-et-les-littéraux)
+- [REQ-IMP-020 — Export : owl:NamedIndividual uniquement pour les individus sans classe](#req-imp-020--export--owlnamedindividual-uniquement-pour-les-individus-sans-classe)
+- [REQ-IMP-021 — Export : sérialisation RDF/XML plate](#req-imp-021--export--sérialisation-rdfxml-plate)
 
 ### Forme
 - [REQ-IMP-006 — Style visuel atténué dans les listes et arbres](#req-imp-006--style-visuel-atténué-dans-les-listes-et-arbres)
@@ -151,6 +155,46 @@
 | **Alors** | ces namespaces sont aussi convertis en `owl:imports` accompagnés de leurs `import_labels` (préfixe contextuel), à la fois sur l'entrée de registre et dans le fichier `.json` de l'ontologie, afin que l'import soit réellement **résolu** et que les entités importées soient affichées en lecture seule (voir REQ-IMP-001 à REQ-IMP-005). |
 
 **Code source :** `backend/triple_store.py` → helper `store._imports_from_ns` — convertit la table `ns_prefixes` en entrées `owl:imports` + `import_labels` (préfixe contextuel) sur l'entrée de registre et le `.json`.
+
+---
+
+### REQ-IMP-018 — Export : mapping des préfixes externes vers leur namespace
+
+| **Si** | un identifiant d'entité porte un préfixe externe connu (`xsd:`, `owl:`, `rdfs:`, `rdf:`, `skos:`) lors de la sérialisation RDF, |
+|---|---|
+| **Alors** | l'export résout ce préfixe vers son **espace de noms standard**, **indépendamment du préfixe propre de l'ontologie**. La fonction interne `iri()` teste une table explicite `_EXT_PREFIX_NS` (`xsd:` → XSD, `owl:` → OWL, `rdfs:` → RDFS, `rdf:` → RDF, `skos:` → SKOS) avant de retomber sur l'espace de noms de l'ontologie. Cela corrige un bug survenant quand le préfixe de l'ontologie est **vide** : l'ancien test `startswith` produisait alors des IRIs malformés comme `<base>#xsd:string`. |
+
+**Code source :** `backend/triple_store.py` → `to_rdf_graph` — la fonction interne `iri(local_id)` parcourt `_EXT_PREFIX_NS = {"xsd:": XSD, "owl:": OWL, "rdfs:": RDFS, "rdf:": RDF, "skos:": SKOS}` et renvoie `ns[local_id[len(pfx):]]` pour un préfixe correspondant ; sinon elle renvoie `NS[local_id]`.
+
+---
+
+### REQ-IMP-019 — Export : types de données XSD pour les ranges et les littéraux
+
+| **Si** | une `DatatypeProperty` déclare un `rdfs:range` qui est un type de données XSD, ou une data assertion d'un `Individual` porte un `rdf:datatype`, et que la valeur stockée est nue (`string`) ou préfixée (`xsd:string`), |
+|---|---|
+| **Alors** | l'export émet le type de données dans l'**espace de noms XSD** (`http://www.w3.org/2001/XMLSchema#…`). Le helper `dt_iri` retire un préfixe `xsd:` éventuel et, lorsque le nom appartient à l'ensemble reconnu `_XSD_DATATYPES`, renvoie `XSD[name]`. Les data assertions sans type de données explicite retombent par défaut sur `xsd:string`. Cela évite l'apparition de classes fantômes telles que `#string`, `#date`, etc. à la ré-importation. |
+
+**Code source :** `backend/triple_store.py` → l'ensemble `_XSD_DATATYPES` (niveau module) ; `to_rdf_graph` → la fonction interne `dt_iri(r)` utilisée pour le `RDFS.range` des DatatypeProperties (`g.add((uri_, RDFS.range, dt_iri(r)))`) et pour le `datatype` des littéraux des data assertions (`dt = dt_iri(da.datatype) if da.datatype else XSD.string`).
+
+---
+
+### REQ-IMP-020 — Export : owl:NamedIndividual uniquement pour les individus sans classe
+
+| **Si** | un `Individual` est exporté, |
+|---|---|
+| **Alors** | `rdf:type owl:NamedIndividual` n'est **pas** émis lorsque l'individu possède déjà au moins une classe : il reste reconnu comme individu via son assertion `rdf:type <Classe>` (voir REQ-IMP-012). `owl:NamedIndividual` n'est émis **que** pour un individu ne possédant aucune classe. Cela évite l'affichage fantôme de « owl:NamedIndividual » comme classe dans Protégé. |
+
+**Code source :** `backend/triple_store.py` → `to_rdf_graph` — `real_types = [t for t in ind.types if t and t != 'owl:NamedIndividual']` ; chaque type réel est ajouté en `rdf:type`, et `g.add((uri_, RDF.type, OWL.NamedIndividual))` ne s'exécute que dans le bloc `if not real_types:`.
+
+---
+
+### REQ-IMP-021 — Export : sérialisation RDF/XML plate
+
+| **Si** | l'ontologie est exportée au format OWL/XML (RDF/XML), |
+|---|---|
+| **Alors** | le graphe est sérialisé avec le format rdflib **`xml`** (plat, standard) plutôt qu'avec le format déprécié **`pretty-xml`**, qui imbriquait les individus et générait des références `rdf:nodeID`. La sérialisation plate produit un fichier proprement ré-importable. |
+
+**Code source :** `backend/serializers.py` → `export_owl_xml` — `return g.serialize(format="xml").encode("utf-8")` (graphe construit par `store.to_rdf_graph()`).
 
 ---
 

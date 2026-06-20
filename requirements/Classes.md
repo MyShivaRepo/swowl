@@ -24,6 +24,9 @@
 - [REQ-CLS-017 — Collecting restrictions for saving](#req-cls-017--collecting-restrictions-for-saving)
 - [REQ-CLS-018 — Quick creation of an ObjectProperty from the Classes tab](#req-cls-018--quick-creation-of-an-objectproperty-from-the-classes-tab)
 - [REQ-CLS-019 — Quick creation of a DatatypeProperty from the Classes tab](#req-cls-019--quick-creation-of-a-datatypeproperty-from-the-classes-tab)
+- [REQ-CLS-035 — Attaching an existing property to the class via "+ Property"](#req-cls-035--attaching-an-existing-property-to-the-class-via--property)
+- [REQ-CLS-036 — Adding a restriction on an inherited property (inherited → asserted)](#req-cls-036--adding-a-restriction-on-an-inherited-property-inherited--asserted)
+- [REQ-CLS-038 — Normalising domain markers and cleaning references on deletion (backend)](#req-cls-038--normalising-domain-markers-and-cleaning-references-on-deletion-backend)
 
 ### Form
 - [REQ-CLS-020 — Rendering the class tree with owl:Thing root node](#req-cls-020--rendering-the-class-tree-with-owlthing-root-node)
@@ -41,6 +44,7 @@
 - [REQ-CLS-032 — Superclass panel with ancestor hierarchy](#req-cls-032--superclass-panel-with-ancestor-hierarchy)
 - [REQ-CLS-033 — "WHERE USED IN RANGE" panel of properties targeting the class](#req-cls-033--where-used-in-range-panel-of-properties-targeting-the-class)
 - [REQ-CLS-034 — Homogeneous (filter + tree) asserted-properties picker](#req-cls-034--homogeneous-filter--tree-asserted-properties-picker)
+- [REQ-CLS-037 — Displaying the range and provenance of a property in the panel](#req-cls-037--displaying-the-range-and-provenance-of-a-property-in-the-panel)
 
 ---
 
@@ -257,6 +261,44 @@ In both cases, the change is saved automatically if the class is being edited.
 
 ---
 
+### REQ-CLS-035 — Attaching an existing property to the class via "+ Property"
+
+| **If** | the ontologist clicks the "+ Property" button of the *Asserted Properties* section and selects an existing `object property` or data `property`, |
+|---|---|
+| **Then** | the current class is added to that `property`'s `domain`, so the `property` becomes attached to the class and appears in the *Asserted Properties* section, without having to declare an explicit `restriction`. The picker is presented as a filterable floating overlay. |
+
+**Source code:** `owl_editor.js` → `ClassEditor.showDomainPropPicker()` — Toggles the `#domain-prop-picker` overlay, decorates it with a `Filter` field (`_decoratePickerWithFilter`), floats it below the "+ Property" button (`_floatPickerBelow`) and closes it on outside click. | `ClassEditor.addDomainProperty(propId)` — Looks up the selected property among `object_properties`/`datatype_properties`, appends the current class to its `domain` (no-op if already present) via `API.updateOP()` / `API.updateDP()`, then refreshes and re-renders the Classes section. The picker content is built by `_assertedPropPickerItems(_domainExclude, 'ClassEditor.addDomainProperty')`.
+
+---
+
+### REQ-CLS-036 — Adding a restriction on an inherited property (inherited → asserted)
+
+| **If** | the ontologist right-clicks an entry in the *Inherited Properties* section and chooses "Add restriction" with one of the six semantic types (some values from, all values from, has value, exact / minimum / maximum cardinality), |
+|---|---|
+| **Then** | the chosen `restriction` is created on the **current** class for that `property`, and the `property` therefore **moves** from *Inherited Properties* to *Asserted Properties* (Protégé-style behaviour). |
+
+| **If** | the ontologist deletes the last `restriction` of a `property` that is purely inherited (not in the current class's `domain`), |
+|---|---|
+| **Then** | the whole group is removed and the `property` **returns** to *Inherited Properties*, with no residual presence marker left behind. |
+
+**Source code:** `owl_editor.js` → `RestrictionEditor.showInheritedContextMenu(event, prop)` — Builds a context menu of the six restriction types (header "Add restriction (inherited → asserted)"), each entry calling `addInheritedRestriction(prop, type)`. | `RestrictionEditor.addInheritedRestriction(prop, type)` — Removes any local `_marker` for that property from `subClassOf`, pushes the new restriction (`filler`/`value`/`cardinality` depending on the type) and persists via `API.updateClass()`. | `RestrictionEditor.deleteChild(gid)` — When the group becomes empty, removes the whole group (so the property reverts to *Inherited*) only if the property is **not** in the current class's `domain` (`inDomain` test); otherwise an empty group is kept (serialised as a `_marker`, staying asserted).
+
+---
+
+### REQ-CLS-038 — Normalising domain markers and cleaning references on deletion (backend)
+
+| **If** | an `ontology` is loaded/connected, whatever the origin of the data (UI editing or corpus analysis), |
+|---|---|
+| **Then** | a presence marker is guaranteed for every (property, domain class) pair, so the *Inherited* / *Asserted* rendering is consistent regardless of how the data was produced. |
+
+| **If** | a class (and its descendants) is deleted, |
+|---|---|
+| **Then** | the class is removed from every `property` `domain` and all references to the deleted classes are cleaned from the remaining classes (`subClassOf`, `equivalentClass`, `disjointWith`), so no dangling superclass reappears on export/import. |
+
+**Source code:** `main.py` → `_backfill_domain_markers(onto)` — For each object/datatype property, calls `_sync_domain_markers()` to ensure a `_marker` exists in each class listed in the property's `domain`; invoked on connection (and after import). | `delete_class(class_id)` — Collects the class and its descendants, removes them from every property `domain`, deletes the classes, then filters out any reference to the deleted ids from the remaining classes' `subClassOf`, `equivalentClass` and `disjointWith` lists.
+
+---
+
 ## 2. Form — Presentation and UI
 
 > Display-related requirements: layout, visual components, interactions, navigation, styles.
@@ -426,3 +468,17 @@ In all cases, the change is saved automatically.
 | **Then** | the picker presents a `Filter` field at the top and displays the `properties` in tree mode, organised into two successive sections — first an `ObjectProperties` section, then a `DatatypeProperties` section — each respecting the `subPropertyOf` hierarchy, consistent with the homogeneous (filter + tree) pickers used throughout the application. |
 
 **Source code:** `owl_editor.js` → `_assertedPropPickerItems()` (content of the `#restr-prop-picker` picker) + `RestrictionEditor.showPropPicker()` — `_assertedPropPickerItems()` generates two tree sections "ObjectProperties" then "DatatypeProperties" (each built by `_propTreeLines()` following the `subPropertyOf` hierarchy); on open, `showPropPicker()` adds the `Filter` field at the top via `_decoratePickerWithFilter()`.
+
+---
+
+### REQ-CLS-037 — Displaying the range and provenance of a property in the panel
+
+| **If** | a `property` is displayed in the *Inherited* or *Asserted Properties* section, |
+|---|---|
+| **Then** | its `range` is shown in parentheses right after the name with a `→` arrow and the target icon: a brown dot with a navigable link for a target class, or a small green marker for an `xsd:` datatype (non navigable). |
+
+| **If** | the displayed `property` is inherited, |
+|---|---|
+| **Then** | its **provenance** class is also shown, in parentheses with a `↑` arrow and the brown (navigable) class dot, immediately after the property. |
+
+**Source code:** `owl_editor.js` → `renderPanel()` internal helper `_renderDomainPropRow({ p, kind }, showFrom)` — Builds the `(→ …)` range tag (brown `cls-dot` + `APP.navigateTo('classes', …)` link for a class, small `dp-prop-dot` marker for a datatype) and, when `showFrom` is true (inherited property), the `(↑ …)` provenance tag from the property's `domain`. | `RestrictionEditor._renderGroupReadOnly(prop, restrictions)` — For inherited restriction groups, renders the same `(→ …)` range tag and a `(↑ …)` provenance tag derived from each restriction's `_fromClass`, with the brown class dot and a navigation control.

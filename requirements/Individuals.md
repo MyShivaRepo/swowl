@@ -28,6 +28,7 @@
 - [REQ-IND-037 — Hierarchical class depth for ordering](#req-ind-037--hierarchical-class-depth-for-ordering)
 - [REQ-IND-038 — Separate collection of inherited and direct properties](#req-ind-038--separate-collection-of-inherited-and-direct-properties)
 - [REQ-IND-039 — Filtering of candidate individuals by an OP's range](#req-ind-039--filtering-of-candidate-individuals-by-an-ops-range)
+- [REQ-IND-041 — Materialisation of inferred assertions (subPropertyOf / inverseOf)](#req-ind-041--materialisation-of-inferred-assertions-subpropertyof--inverseof)
 
 ### Form
 - [REQ-IND-001 — Three-column layout](#req-ind-001--three-column-layout)
@@ -47,6 +48,8 @@
 - [REQ-IND-034 — Clickable link for URL-type data values](#req-ind-034--clickable-link-for-url-type-data-values)
 - [REQ-IND-035 — "Where Used" panel in the form](#req-ind-035--where-used-panel-in-the-form)
 - [REQ-IND-036 — Column resizing by drag-and-drop](#req-ind-036--column-resizing-by-drag-and-drop)
+- [REQ-IND-042 — Inferred entailments shown as materialised assertions](#req-ind-042--inferred-entailments-shown-as-materialised-assertions)
+- [REQ-IND-043 — Panels for every actually-asserted property](#req-ind-043--panels-for-every-actually-asserted-property)
 
 ---
 
@@ -313,6 +316,24 @@
 
 **Source code:** `owl_editor.js` → `_indsOfRange()` — Returns the list of individuals whose at least one type belongs to the computed set (descendants of range classes included via `ClassEditor.buildTree()`), excluding the individual currently being edited (`_editingId`). If `rangeClasses` is empty or null, returns all individuals except the excluded one.
 
+### REQ-IND-041 — Materialisation of inferred assertions (subPropertyOf / inverseOf)
+
+| **If** | an `individual` carries object or data `property` assertions, |
+|---|---|
+| **Then** | the backend materialises the deductive closure of those assertions under `rdfs:subPropertyOf` (transitive) and `owl:inverseOf` — including their combinations, computed up to a fixed point — by storing the entailed assertions as additional assertions flagged `derived=true`, so that an entailed relationship (e.g. a super-property of an asserted one, or the reciprocal of an `inverseOf` pair on the target `individual`) is persisted explicitly alongside the base assertions. |
+
+| **If** | any `individual` is created, updated or deleted, or an `Object Property` / `Datatype Property` (its `subPropertyOf` / `inverseOf`) is modified, |
+|---|---|
+| **Then** | all previously materialised `derived` assertions are purged and recomputed from scratch from the base assertions only (those entered by the ontologist, `derived=false`), guaranteeing the closure stays consistent with the current axioms. |
+
+| **If** | the form returns an `individual`'s assertions without the `derived` flag (the front sends every visible assertion back, base and entailed alike), |
+|---|---|
+| **Then** | the backend preserves the base/derived distinction by re-flagging as `derived` exactly the incoming assertions that were already derived in the stored individual, so that only genuinely new user assertions remain as base assertions before the closure is recomputed. |
+
+---
+
+**Source code:** `main.py` → `_materialize_inferences()`, `_transitive_supers()`, `_reclassify_base()`; `owl_model.py` → `ObjectPropertyAssertion.derived` / `DataPropertyAssertion.derived`. `_materialize_inferences()` (1) drops every assertion with `derived=True` from all individuals, (2) builds the transitive super-property maps via `_transitive_supers()` and a bidirectional `inverseOf` map, then (3) iterates to a fixed point (`while changed`, guard 100): for each base/derived assertion it appends the super-property assertions on the same individual and, for `inverseOf`, the reciprocal assertion on the target individual, all flagged `derived=True`. It is invoked from `create_individual()`, `update_individual()`, `delete_individual()` (after stripping references to the removed individual) and from the Object/Datatype Property update endpoints. `_reclassify_base()` is called by `update_individual()` before replacing the stored individual: it marks each incoming assertion `derived` iff `(property, target)` (object) or `(property, value, datatype)` (data) matched a previously derived assertion, since the front returns all assertions without the flag. The `derived: bool = False` field on `ObjectPropertyAssertion` / `DataPropertyAssertion` carries this distinction in the model.
+
 ---
 
 ## 2. Form — Presentation and user interface
@@ -511,6 +532,30 @@
 
 **Source code:** `owl_editor.js` → `_initHandle()`, `_initSplitPanes()` — `_initHandle()` handles `mousedown`/`mousemove`/`mouseup` events on `document` to adjust the CSS width of the adjacent panel in real time. Limits: `ind-split-h1` / `ind-tree-panel` between 120 and 520 px; `ind-split-h2` / `ind-list-panel` between 100 and 400 px.
 
+### REQ-IND-042 — Inferred entailments shown as materialised assertions
+
+| **If** | an `individual` carries entailed relationships derived from `rdfs:subPropertyOf` or `owl:inverseOf`, |
+|---|---|
+| **Then** | these entailments appear as ordinary assertions inside the relevant `property` panels, exactly like base assertions, because the backend has materialised them as `derived=true` assertions; the form no longer presents a separate dedicated section for inferences. |
+
+| **If** | the ontologist views the detail form of an `individual`, |
+|---|---|
+| **Then** | the former "🧠 Inferred Properties" section is no longer rendered: it has been removed, and inferred entailments are surfaced solely through the standard property panels. |
+
 ---
 
-*— claude-sonnet-4-6*
+**Source code:** `owl_editor.js` → `renderForm()` — The previous block building a dedicated inferred-properties section has been removed; an inline comment notes that entailments (`subPropertyOf` / `inverseOf`) are now materialised on the backend as `derived=True` assertions. The materialised assertions are therefore listed by `_renderPropPanel()` together with the base ones in the standard panels. `propPanelsHtml` is assembled only from `inhHtml`, `assHtml` and `domHtml` (inherited, asserted/used, and by-domain), with no inferred section.
+
+### REQ-IND-043 — Panels for every actually-asserted property
+
+| **If** | an `individual` actually asserts a `property` that is not covered by any restriction on its types, nor applicable through a domain (for example a `property` with an empty domain), |
+|---|---|
+| **Then** | the form still renders a panel for that `property`, so that the existing assertion remains visible and editable instead of being silently dropped. |
+
+---
+
+**Source code:** `owl_editor.js` → `renderForm()` — After computing the inherited (`inhProps`), asserted (`assProps`) and by-domain (`domProps`) maps, the form gathers the `property` identifiers actually present in the individual's `objectAssertions` / `dataAssertions` that are not already covered (`_coveredPanels`), resolves each one's kind (`op` / `dp`) against `APP.state.object_properties` / `APP.state.datatype_properties`, and builds extra panels (`usedProps`) merged into `assHtml`. These panels are also counted in `hasProps`, ensuring a property with, e.g., an empty domain is still shown.
+
+---
+
+*— claude-opus-4-8*

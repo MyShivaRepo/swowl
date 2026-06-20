@@ -24,6 +24,9 @@
 - [REQ-CLS-017 — Collecte des restrictions pour la sauvegarde](#req-cls-017--collecte-des-restrictions-pour-la-sauvegarde)
 - [REQ-CLS-018 — Création rapide d'une ObjectProperty depuis l'onglet Classes](#req-cls-018--création-rapide-dune-objectproperty-depuis-longlet-classes)
 - [REQ-CLS-019 — Création rapide d'une DatatypeProperty depuis l'onglet Classes](#req-cls-019--création-rapide-dune-datatypeproperty-depuis-longlet-classes)
+- [REQ-CLS-035 — Rattachement d'une propriété existante à la classe via « + Property »](#req-cls-035--rattachement-dune-propriété-existante-à-la-classe-via--property)
+- [REQ-CLS-036 — Ajout d'une restriction sur une propriété héritée (héritée → assertée)](#req-cls-036--ajout-dune-restriction-sur-une-propriété-héritée-héritée--assertée)
+- [REQ-CLS-038 — Normalisation des markers de domaine et nettoyage des références à la suppression (backend)](#req-cls-038--normalisation-des-markers-de-domaine-et-nettoyage-des-références-à-la-suppression-backend)
 
 ### Forme
 - [REQ-CLS-020 — Rendu de l'arbre des classes avec nœud racine owl:Thing](#req-cls-020--rendu-de-larbre-des-classes-avec-nœud-racine-owlthing)
@@ -41,6 +44,7 @@
 - [REQ-CLS-032 — Panneau des super-classes avec hiérarchie ancêtres](#req-cls-032--panneau-des-super-classes-avec-hiérarchie-ancêtres)
 - [REQ-CLS-033 — Panneau « WHERE USED IN RANGE » des propriétés ciblant la classe](#req-cls-033--panneau--where-used-in-range--des-propriétés-ciblant-la-classe)
 - [REQ-CLS-034 — Sélecteur homogène (filtre + arbre) des propriétés assertées](#req-cls-034--sélecteur-homogène-filtre--arbre-des-propriétés-assertées)
+- [REQ-CLS-037 — Affichage du range et de la provenance d'une propriété dans le panneau](#req-cls-037--affichage-du-range-et-de-la-provenance-dune-propriété-dans-le-panneau)
 
 ---
 
@@ -257,6 +261,44 @@ Dans les deux cas, la modification est sauvegardée automatiquement si la classe
 
 ---
 
+### REQ-CLS-035 — Rattachement d'une propriété existante à la classe via « + Property »
+
+| **Si** | l'ontologiste clique sur le bouton « + Property » de la section *Asserted Properties* et sélectionne une `ObjectProperty` ou `DatatypeProperty` existante, |
+|---|---|
+| **Alors** | la `classe` courante est ajoutée au `domain` de cette `propriété`, de sorte que la `propriété` est rattachée à la `classe` et apparaît dans la section *Asserted Properties*, sans avoir à déclarer de `restriction` explicite. Le sélecteur est présenté sous forme d'overlay flottant filtrable. |
+
+**Code source :** `owl_editor.js` → `ClassEditor.showDomainPropPicker()` — Bascule l'overlay `#domain-prop-picker`, le décore d'un champ `Filter` (`_decoratePickerWithFilter`), le positionne sous le bouton « + Property » (`_floatPickerBelow`) et le ferme au clic extérieur. | `ClassEditor.addDomainProperty(propId)` — Retrouve la propriété sélectionnée parmi `object_properties`/`datatype_properties`, ajoute la classe courante à son `domain` (sans effet si déjà présente) via `API.updateOP()` / `API.updateDP()`, puis rafraîchit et re-rend la section Classes. Le contenu du picker est généré par `_assertedPropPickerItems(_domainExclude, 'ClassEditor.addDomainProperty')`.
+
+---
+
+### REQ-CLS-036 — Ajout d'une restriction sur une propriété héritée (héritée → assertée)
+
+| **Si** | l'ontologiste effectue un clic droit sur une entrée de la section *Inherited Properties* et choisit « Add restriction » avec l'un des six types sémantiques (existence, universalité, valeur individuelle, cardinalité exacte / minimale / maximale), |
+|---|---|
+| **Alors** | la `restriction` choisie est créée sur la `classe` **courante** pour cette `propriété`, et la `propriété` **bascule** donc de *Inherited Properties* vers *Asserted Properties* (comportement façon Protégé). |
+
+| **Si** | l'ontologiste supprime la dernière `restriction` d'une `propriété` purement héritée (absente du `domain` de la `classe` courante), |
+|---|---|
+| **Alors** | le groupe entier est retiré et la `propriété` **revient** dans *Inherited Properties*, sans marqueur de présence résiduel. |
+
+**Code source :** `owl_editor.js` → `RestrictionEditor.showInheritedContextMenu(event, prop)` — Construit un menu contextuel des six types de restriction (en-tête « Add restriction (inherited → asserted) »), chaque entrée appelant `addInheritedRestriction(prop, type)`. | `RestrictionEditor.addInheritedRestriction(prop, type)` — Retire un éventuel `_marker` local pour cette propriété de `subClassOf`, ajoute la nouvelle restriction (`filler`/`value`/`cardinality` selon le type) et persiste via `API.updateClass()`. | `RestrictionEditor.deleteChild(gid)` — Lorsque le groupe devient vide, retire le groupe entier (la propriété revient en *Inherited*) uniquement si la propriété n'est **pas** dans le `domain` de la classe courante (test `inDomain`) ; sinon un groupe vide est conservé (sérialisé en `_marker`, reste asserté).
+
+---
+
+### REQ-CLS-038 — Normalisation des markers de domaine et nettoyage des références à la suppression (backend)
+
+| **Si** | une `ontologie` est chargée/connectée, quelle que soit l'origine des données (édition via l'IHM ou analyse de corpus), |
+|---|---|
+| **Alors** | un marqueur de présence est garanti pour chaque couple (propriété, classe de domaine), de sorte que le rendu *Inherited* / *Asserted* est cohérent indépendamment de la façon dont les données ont été produites. |
+
+| **Si** | une `classe` (et ses descendants) est supprimée, |
+|---|---|
+| **Alors** | la `classe` est retirée de tous les `domain` de `propriétés` et toutes les références aux `classes` supprimées sont nettoyées dans les `classes` restantes (`subClassOf`, `equivalentClass`, `disjointWith`), de sorte qu'aucune super-`classe` pendante ne réapparaisse à l'export/import. |
+
+**Code source :** `main.py` → `_backfill_domain_markers(onto)` — Pour chaque ObjectProperty/DatatypeProperty, appelle `_sync_domain_markers()` afin de garantir un `_marker` dans chaque classe listée dans le `domain` de la propriété ; invoqué à la connexion (et après import). | `delete_class(class_id)` — Collecte la classe et ses descendants, les retire de tous les `domain` de propriétés, supprime les classes, puis filtre toute référence aux ids supprimés dans les listes `subClassOf`, `equivalentClass` et `disjointWith` des classes restantes.
+
+---
+
 ## 2. Forme — Présentation et interface utilisateur
 
 > Exigences relatives à l'affichage : layout, composants visuels, interactions, navigation, styles.
@@ -426,3 +468,17 @@ Dans tous les cas, la modification est sauvegardée automatiquement.
 | **Alors** | le sélecteur présente un champ `Filter` en tête et affiche les `propriétés` en mode arbre, organisées en deux sections successives — d'abord une section `ObjectProperties`, puis une section `DatatypeProperties` — chacune respectant la hiérarchie `subPropertyOf`, conformément aux sélecteurs homogènes (filtre + arbre) utilisés dans l'ensemble de l'application. |
 
 **Code source :** `owl_editor.js` → `_assertedPropPickerItems()` (contenu du picker `#restr-prop-picker`) + `RestrictionEditor.showPropPicker()` — `_assertedPropPickerItems()` génère deux sections en arbre « ObjectProperties » puis « DatatypeProperties » (chacune construite par `_propTreeLines()` selon la hiérarchie `subPropertyOf`) ; à l'ouverture, `showPropPicker()` ajoute le champ `Filter` en tête via `_decoratePickerWithFilter()`.
+
+---
+
+### REQ-CLS-037 — Affichage du range et de la provenance d'une propriété dans le panneau
+
+| **Si** | une `propriété` est affichée dans la section *Inherited* ou *Asserted Properties*, |
+|---|---|
+| **Alors** | son `range` est affiché entre parenthèses juste après le nom avec une flèche `→` et l'icône de la cible : un rond marron avec lien navigable pour une `classe` cible, ou un petit marqueur vert pour un type `xsd:` (non navigable). |
+
+| **Si** | la `propriété` affichée est héritée, |
+|---|---|
+| **Alors** | sa `classe` de **provenance** est également affichée, entre parenthèses avec une flèche `↑` et le rond marron (navigable) de la classe, juste après la propriété. |
+
+**Code source :** `owl_editor.js` → helper interne de `renderPanel()` `_renderDomainPropRow({ p, kind }, showFrom)` — Construit le tag de range `(→ …)` (rond marron `cls-dot` + lien `APP.navigateTo('classes', …)` pour une classe, petit marqueur `dp-prop-dot` pour un datatype) et, lorsque `showFrom` est vrai (propriété héritée), le tag de provenance `(↑ …)` issu du `domain` de la propriété. | `RestrictionEditor._renderGroupReadOnly(prop, restrictions)` — Pour les groupes de restrictions héritées, rend le même tag de range `(→ …)` et un tag de provenance `(↑ …)` dérivé du `_fromClass` de chaque restriction, avec le rond marron de la classe et un contrôle de navigation.
