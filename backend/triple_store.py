@@ -239,6 +239,10 @@ class TripleStore:
                 data = json.loads(p.read_text(encoding="utf-8"))
                 data["imports"] = imports
                 data["import_labels"] = labels
+                # L'URI éditée devient l'id (IRI de base) de l'ontologie → se reflète
+                # dans les IRIs affichées de toutes les entités et à l'export.
+                data["id"] = uri
+                data["prefix"] = prefix
                 if ns_prefixes is not None:
                     data["ns_prefixes"] = ns_prefixes
                 p.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
@@ -248,6 +252,8 @@ class TripleStore:
         if was_connected and self._ontology is not None:
             self._ontology.imports = imports
             self._ontology.import_labels = labels
+            self._ontology.id = uri
+            self._ontology.prefix = prefix
             if ns_prefixes is not None:
                 self._ontology.ns_prefixes = ns_prefixes
         return entry

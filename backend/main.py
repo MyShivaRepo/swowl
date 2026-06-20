@@ -635,6 +635,10 @@ def get_current_ontology():
     entry = next((e for e in store._registry.values() if e.connected), None)
     if entry is not None:
         onto.prefix = entry.prefix or ""
+        # L'URI du registre est également autoritaire pour l'id (IRI de base) →
+        # les fiches des entités reflètent l'URI éditée.
+        if entry.uri:
+            onto.id = entry.uri
     return onto
 
 

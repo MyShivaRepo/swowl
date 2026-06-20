@@ -1463,7 +1463,7 @@ const ClassEditor = {
         const comments = c.annotations?.comments || [];
 
         // Full IRI
-        const baseIri  = (APP.state.ontology?.id || '').replace(/#$/, '');
+        const baseIri  = (APP.state.ontology?.id || '').replace(/[#/]+$/, '');
         const classIri = (c.id && baseIri) ? `${baseIri}#${c.id}` : '';
 
         // ── Annotation rows ──
@@ -3716,7 +3716,7 @@ const OPEditor = {
         const chars = p.characteristics || {};
         const ac    = isNew ? 'onblur="if(this.value.trim()) OPEditor.save(true)"'
                            : 'onchange="OPEditor.autoSave()"';
-        const baseIri = (APP.state.ontology?.id || '').replace(/#$/, '');
+        const baseIri = (APP.state.ontology?.id || '').replace(/[#/]+$/, '');
         const propIri = (p.id && baseIri) ? `${baseIri}#${p.id}` : '';
 
         // Annotations
@@ -4599,7 +4599,7 @@ const DPEditor = {
             domain: [], range: [], subPropertyOf: [], functional: false };
         const chars = { functional: p.functional || false };
         const ac    = isNew ? '' : 'onchange="DPEditor.autoSave()"';
-        const baseIri = (APP.state.ontology?.id || '').replace(/#$/, '');
+        const baseIri = (APP.state.ontology?.id || '').replace(/[#/]+$/, '');
         const propIri = (p.id && baseIri) ? `${baseIri}#${p.id}` : '';
 
         // Annotations
@@ -5790,7 +5790,7 @@ const IndividualEditor = {
         const ac = isNew ? '' : 'onchange="IndividualEditor.autoSave()"';
         const ico = `<svg width="9" height="9" viewBox="0 0 9 9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><line x1="4.5" y1="0.5" x2="4.5" y2="8.5"/><line x1="0.5" y1="4.5" x2="8.5" y2="4.5"/></svg>`;
 
-        const baseIri = (APP.state.ontology?.id || '').replace(/#$/, '');
+        const baseIri = (APP.state.ontology?.id || '').replace(/[#/]+$/, '');
         const indIri  = (i.id && baseIri) ? `${baseIri}#${i.id}` : '';
 
         // Annotations
@@ -7245,7 +7245,7 @@ const APEditor = {
         APEditor._editingId = prop?.id || null;
         const p          = prop || { id: '', comment: '', subPropertyOf: [], annotations: { labels: [], comments: [], other: [] } };
         const ac         = `onchange="APEditor.autoSave()"`;
-        const baseIri    = (APP.state.ontology?.id || '').replace(/#$/, '');
+        const baseIri    = (APP.state.ontology?.id || '').replace(/[#/]+$/, '');
         const propIri    = (p.id && baseIri) ? `${baseIri}#${p.id}` : '';
         const allBuiltins = Object.values(AP_BUILTINS).flat();
         const userProps   = (APP.state.annotation_properties || []).filter(q => q.id !== p.id);
