@@ -27,6 +27,7 @@
 - [REQ-CLS-035 — Rattachement d'une propriété existante à la classe via « + Property »](#req-cls-035--rattachement-dune-propriété-existante-à-la-classe-via--property)
 - [REQ-CLS-036 — Ajout d'une restriction sur une propriété héritée (héritée → assertée)](#req-cls-036--ajout-dune-restriction-sur-une-propriété-héritée-héritée--assertée)
 - [REQ-CLS-038 — Normalisation des markers de domaine et nettoyage des références à la suppression (backend)](#req-cls-038--normalisation-des-markers-de-domaine-et-nettoyage-des-références-à-la-suppression-backend)
+- [REQ-CLS-039 — Tri des propriétés héritées par provenance hiérarchique](#req-cls-039--tri-des-propriétés-héritées-par-provenance-hiérarchique)
 
 ### Forme
 - [REQ-CLS-020 — Rendu de l'arbre des classes avec nœud racine owl:Thing](#req-cls-020--rendu-de-larbre-des-classes-avec-nœud-racine-owlthing)
@@ -486,3 +487,11 @@ Dans tous les cas, la modification est sauvegardée automatiquement.
 | **Alors** | sa `classe` de **provenance** est également affichée, entre parenthèses avec une flèche `↑` et le rond marron (navigable) de la classe, juste après la propriété. |
 
 **Code source :** `owl_editor.js` → helper interne de `renderPanel()` `_renderDomainPropRow({ p, kind }, showFrom)` — Construit le tag de range `(→ <mult> …)` (texte italique `single`/`multiple` issu de `p.characteristics?.functional`/`p.functional` ; rond marron `cls-dot` + lien `APP.navigateTo('classes', …)` pour une classe, petit marqueur `dp-prop-dot` pour un datatype) et, lorsque `showFrom` est vrai (propriété héritée), le tag de provenance `(↑ …)` issu du `domain` de la propriété. | `RestrictionEditor._renderGroupReadOnly(prop, restrictions)` (section *Inherited*) — Rend le même tag de range `(→ <mult> …)` (multiplicité issue de la caractéristique `functional` de la propriété ; le lien de classe porte la classe `restr-from-nav` afin de rester cliquable malgré la ligne en lecture seule `pointer-events:none`) et un tag de provenance `(↑ …)` dérivé du `_fromClass` de chaque restriction. | `RestrictionEditor._renderGroup(prop, restrictions)` (section *Asserted*) — Construit le même range `(→ <mult> ● Classe)` via le helper interne `_mkRangeTag(ranges, mult)` (multiplicité issue de `opData.characteristics?.functional` / `dpData.functional`), remplaçant l'ancien texte non navigable « (multiple X) » par le lien de classe navigable.
+
+### REQ-CLS-039 — Tri des propriétés héritées par provenance hiérarchique
+
+| **Si** | la section *Inherited Properties* d'une classe affiche des propriétés provenant de plusieurs classes ancêtres, |
+|---|---|
+| **Alors** | les propriétés sont regroupées par classe de provenance et **ordonnées par profondeur hiérarchique croissante** : d'abord les classes du **haut** de la hiérarchie (ancêtres les plus éloignés, profondeur la plus faible), puis les classes filles, petites-filles, etc. ; à profondeur égale, l'ordre est **alphabétique**. |
+
+**Code source :** `owl_editor.js` → `RestrictionEditor.renderPanel()` — Tri de `_srcOrder` (liste ordonnée des classes de provenance) via une fonction interne autonome `_depthOf(id)` qui calcule la profondeur d'une classe en remontant ses `subClassOf` (avec garde anti-cycle), suivie d'un tie-break `localeCompare`. *(Note : ce tri remplace l'appel erroné `this._classDepth(…)` — méthode absente de `RestrictionEditor` — qui levait une exception interrompant le rendu de toute fiche de classe possédant un parent.)*

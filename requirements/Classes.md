@@ -27,6 +27,7 @@
 - [REQ-CLS-035 — Attaching an existing property to the class via "+ Property"](#req-cls-035--attaching-an-existing-property-to-the-class-via--property)
 - [REQ-CLS-036 — Adding a restriction on an inherited property (inherited → asserted)](#req-cls-036--adding-a-restriction-on-an-inherited-property-inherited--asserted)
 - [REQ-CLS-038 — Normalising domain markers and cleaning references on deletion (backend)](#req-cls-038--normalising-domain-markers-and-cleaning-references-on-deletion-backend)
+- [REQ-CLS-039 — Sorting inherited properties by hierarchical provenance](#req-cls-039--sorting-inherited-properties-by-hierarchical-provenance)
 
 ### Form
 - [REQ-CLS-020 — Rendering the class tree with owl:Thing root node](#req-cls-020--rendering-the-class-tree-with-owlthing-root-node)
@@ -486,3 +487,11 @@ In all cases, the change is saved automatically.
 | **Then** | its **provenance** class is also shown, in parentheses with a `↑` arrow and the brown (navigable) class dot, immediately after the property. |
 
 **Source code:** `owl_editor.js` → `renderPanel()` internal helper `_renderDomainPropRow({ p, kind }, showFrom)` — Builds the `(→ <mult> …)` range tag (italic `single`/`multiple` from `p.characteristics?.functional`/`p.functional`; brown `cls-dot` + `APP.navigateTo('classes', …)` link for a class, small `dp-prop-dot` marker for a datatype) and, when `showFrom` is true (inherited property), the `(↑ …)` provenance tag from the property's `domain`. | `RestrictionEditor._renderGroupReadOnly(prop, restrictions)` (*Inherited* section) — Renders the same `(→ <mult> …)` range tag (multiplicity from the property's `functional` characteristic; class link carries class `restr-from-nav` so it stays clickable despite the read-only row being `pointer-events:none`) and a `(↑ …)` provenance tag derived from each restriction's `_fromClass`. | `RestrictionEditor._renderGroup(prop, restrictions)` (*Asserted* section) — Builds the same `(→ <mult> ● Class)` range chip via the internal `_mkRangeTag(ranges, mult)` helper (multiplicity from `opData.characteristics?.functional` / `dpData.functional`), replacing the former non-navigable “(multiple X)” summary text with the navigable class link.
+
+### REQ-CLS-039 — Sorting inherited properties by hierarchical provenance
+
+| **If** | a class's *Inherited Properties* section displays properties coming from several ancestor classes, |
+|---|---|
+| **Then** | the properties are grouped by provenance class and **ordered by ascending hierarchical depth**: the classes at the **top** of the hierarchy first (the most distant ancestors, shallowest depth), then child classes, grandchildren, etc.; at equal depth the order is **alphabetical**. |
+
+**Source code:** `owl_editor.js` → `RestrictionEditor.renderPanel()` — Sorts `_srcOrder` (the ordered list of provenance classes) via a self-contained internal `_depthOf(id)` function that computes a class's depth by walking up its `subClassOf` chain (with cycle guard), followed by a `localeCompare` tie-break. *(Note: this sort replaces the erroneous `this._classDepth(…)` call — a method absent from `RestrictionEditor` — which threw an exception that aborted the rendering of any class card having a parent.)*

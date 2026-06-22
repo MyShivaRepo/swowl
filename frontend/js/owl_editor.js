@@ -1890,7 +1890,9 @@ const RestrictionEditor = {
         const inherited  = (cls ? this._computeInherited(cls) : [])
             .filter(r => !_localAssertedSet.has(r.property || r._marker));
 
-        // Order source classes: DFS traversal gives closest-parent-first → reverse = highest-ancestor-first
+        // Ordre des classes source = par profondeur de hiérarchie : d'abord les
+        // classes du HAUT (ancêtres les plus éloignés = profondeur faible), puis
+        // les filles, petites-filles… (tie-break alphabétique).
         const _srcOrder = [];
         const _srcSeen  = new Set();
         inherited.forEach(r => {
@@ -1899,7 +1901,21 @@ const RestrictionEditor = {
                 _srcOrder.push(r._fromClass);
             }
         });
-        _srcOrder.reverse();
+        const _clsArr = APP.state.classes || [];
+        const _clsById = {};
+        _clsArr.forEach(c => { _clsById[c.id] = c; });
+        const _depthOf = (id, seen) => {
+            seen = seen || new Set();
+            if (seen.has(id)) return 0;
+            seen.add(id);
+            const c = _clsById[id];
+            const parents = c ? (c.subClassOf || []).filter(s => typeof s === 'string') : [];
+            if (!parents.length) return 0;
+            return 1 + Math.min(...parents.map(p => _depthOf(p, seen)));
+        };
+        _srcOrder.sort((a, b) =>
+            _depthOf(a) - _depthOf(b)
+            || a.localeCompare(b, undefined, { sensitivity: 'base' }));
 
         // Group by (sourceClass → property)
         const _bySource = {};
@@ -3577,9 +3593,9 @@ const OPEditor = {
 
     _generatePropName() {
         const existing = new Set((APP.state.object_properties || []).map(p => p.id));
-        let name = 'NewObjectProperty';
+        let name = 'newObjectProperty';
         let i = 1;
-        while (existing.has(name)) { name = `NewObjectProperty${i++}`; }
+        while (existing.has(name)) { name = `newObjectProperty${i++}`; }
         return name;
     },
 
@@ -3769,7 +3785,7 @@ const OPEditor = {
         <div class="cls-editor">
             <div class="cls-editor-hdr">
                 <div class="cls-editor-title">ID&nbsp;
-                    <input type="text" id="op-id" class="cls-id-inp" value="${p.id}" placeholder="NewProperty" oninput="_sanitizeId(this)" ${ac} title="Local IRI identifier — cannot start with a digit">
+                    <input type="text" id="op-id" class="cls-id-inp" value="${p.id}" placeholder="newObjectProperty" oninput="_sanitizeId(this)" ${ac} title="Local IRI identifier — cannot start with a digit">
                     <span class="cls-editor-meta">(instance of owl:ObjectProperty)</span>
                 </div>
                 ${propIri ? `<div class="cls-editor-iri">For Property:&nbsp;<code>${propIri}</code></div>` : ''}
@@ -4463,9 +4479,9 @@ const DPEditor = {
 
     _generatePropName() {
         const existing = new Set((APP.state.datatype_properties || []).map(p => p.id));
-        let name = 'NewDatatypeProperty';
+        let name = 'newDatatypeProperty';
         let i = 1;
-        while (existing.has(name)) { name = `NewDatatypeProperty${i++}`; }
+        while (existing.has(name)) { name = `newDatatypeProperty${i++}`; }
         return name;
     },
 
@@ -4646,7 +4662,7 @@ const DPEditor = {
         <div class="cls-editor">
             <div class="cls-editor-hdr">
                 <div class="cls-editor-title">ID&nbsp;
-                    <input type="text" id="dp-id" class="cls-id-inp" value="${p.id}" placeholder="NewDatatypeProperty" oninput="_sanitizeId(this)" ${ac} title="Local IRI identifier — cannot start with a digit">
+                    <input type="text" id="dp-id" class="cls-id-inp" value="${p.id}" placeholder="newDatatypeProperty" oninput="_sanitizeId(this)" ${ac} title="Local IRI identifier — cannot start with a digit">
                     <span class="cls-editor-meta">(instance of owl:DatatypeProperty)</span>
                 </div>
                 ${propIri ? `<div class="cls-editor-iri">For Property:&nbsp;<code>${propIri}</code></div>` : ''}
@@ -7282,7 +7298,7 @@ const APEditor = {
             <div class="cls-editor-hdr">
                 <div class="cls-editor-title">ID&nbsp;</div>
                     <input type="text" id="ap-id" class="cls-id-inp" value="${p.id}"
-                           placeholder="NewAnnotationProperty"
+                           placeholder="newAnnotationProperty"
                            oninput="_sanitizeId(this)"
                            onchange="APEditor.autoSave()"
                            title="Local IRI identifier">
@@ -7303,9 +7319,9 @@ const APEditor = {
 
     _generatePropName() {
         const existing = new Set((APP.state.annotation_properties || []).map(p => p.id));
-        let name = 'NewAnnotationProperty';
+        let name = 'newAnnotationProperty';
         let i = 1;
-        while (existing.has(name)) { name = `NewAnnotationProperty${i++}`; }
+        while (existing.has(name)) { name = `newAnnotationProperty${i++}`; }
         return name;
     },
 
