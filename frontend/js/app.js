@@ -2686,8 +2686,13 @@ document.addEventListener('keydown', e => {
         }
     }
 
-    // ArrowUp / ArrowDown — navigate list items
-    if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && !inInput) {
+    // ArrowUp / ArrowDown — navigate list items.
+    // Allowed when no input is focused, OR when a single-line <input> of a detail
+    // panel is focused (e.g. swrl-id auto-focused on rule selection): such inputs
+    // are focused programmatically, so arrows should still navigate the list.
+    // Multi-line <textarea> keeps its native line-by-line behaviour.
+    if ((e.key === 'ArrowUp' || e.key === 'ArrowDown')
+        && (!inInput || (inDetailPanel && active.tagName === 'INPUT'))) {
         e.preventDefault();
         APP._arrowNavSection(e.key === 'ArrowDown' ? 1 : -1);
     }

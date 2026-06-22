@@ -507,14 +507,15 @@ const SWRLEditor = {
                            data-field="var" ${chg}>
                     <span class="swrl-kw">is a</span>
                     <div style="position:relative;flex:0 1 auto;min-width:80px">
-                        <div class="tree-item restr-filler-btn" style="margin:0;padding:2px 6px;cursor:pointer;width:max-content;max-width:200px"
-                             title="${clsId ? 'Left-click: navigate · Right-click: change class' : 'Click to select a class'}"
+                        <div class="tree-item restr-filler-btn" style="margin:0;padding:2px 6px;cursor:pointer;width:max-content;max-width:400px;overflow:hidden"
+                             title="${clsId ? `${clsId} — Left-click: navigate · Right-click: change class` : 'Click to select a class'}"
                              onclick="${clsId && clsExists ? '' : `SWRLEditor.toggleClassPicker('${pickerId}','${path}',this)`}"
                              oncontextmenu="event.preventDefault();SWRLEditor.toggleClassPicker('${pickerId}','${path}',this)">
                             ${clsId
                                 ? (clsExists
                                     ? `<span class="cls-dot tree-cls-dot" style="flex-shrink:0;margin-right:4px"></span>
-                                       <span class="restr-filler-lbl" style="cursor:pointer"
+                                       <span class="restr-filler-lbl" style="cursor:pointer;overflow:hidden;text-overflow:ellipsis;min-width:0"
+                                             title="${clsId}"
                                              onclick="event.stopPropagation();APP.navigateTo('classes','${clsId}')"
                                              onmouseover="this.style.textDecoration='underline';this.style.color='var(--accent,#5f8dd3)'"
                                              onmouseout="this.style.textDecoration='';this.style.color=''">${SWRLEditor._dispRef(clsId, ['classes'])}</span>`
@@ -543,14 +544,15 @@ const SWRLEditor = {
                     <input class="swrl-var" value="${atom.subject||''}" placeholder="?subj"
                            data-field="subject" ${chg}>
                     <div style="position:relative;flex:0 1 auto;min-width:80px">
-                        <div class="tree-item restr-filler-btn" style="margin:0;padding:2px 6px;cursor:pointer;width:max-content;max-width:200px"
-                             title="${propId ? 'Left-click: navigate · Right-click: change property' : 'Click to select a property'}"
+                        <div class="tree-item restr-filler-btn" style="margin:0;padding:2px 6px;cursor:pointer;width:max-content;max-width:400px;overflow:hidden"
+                             title="${propId ? `${propId} — Left-click: navigate · Right-click: change property` : 'Click to select a property'}"
                              onclick="${propId && propExists ? '' : `SWRLEditor.togglePropPicker('${propPickId}','${path}',this)`}"
                              oncontextmenu="event.preventDefault();SWRLEditor.togglePropPicker('${propPickId}','${path}',this)">
                             ${propId
                                 ? (propExists
                                     ? `<span class="${propDot||'op-prop-dot'}" style="flex-shrink:0;margin-right:4px"></span>
-                                       <span style="white-space:nowrap;cursor:pointer"
+                                       <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;cursor:pointer"
+                                             title="${propId}"
                                              onclick="event.stopPropagation();APP.navigateTo('${isOP ? 'object-properties' : 'datatype-properties'}','${propId}')"
                                              onmouseover="this.style.textDecoration='underline';this.style.color='var(--accent,#5f8dd3)'"
                                              onmouseout="this.style.textDecoration='';this.style.color=''">${SWRLEditor._dispRef(propId, ['object_properties','datatype_properties'])}</span>`
