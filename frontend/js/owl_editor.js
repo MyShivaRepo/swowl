@@ -1959,9 +1959,10 @@ const RestrictionEditor = {
             const disp = _displayId(p);
             // ── Range : juste à droite de la propriété, entre parenthèses, icône devant.
             //    OP → classe (rond marron, navigable) ; DP → type xsd: (marqueur, non navigable).
+            const _mult = (p.characteristics?.functional || p.functional) ? 'single' : 'multiple';
             const rangeTag = (p.range || []).length
                 ? `<span style="display:inline-flex;align-items:center;gap:4px;flex-shrink:0;flex-wrap:wrap;margin-left:5px;font-size:10px;color:var(--text-dim)">
-                    <span style="opacity:.7">(→</span>${(p.range || []).map(r => {
+                    <span style="opacity:.7">(→</span><span style="font-style:italic;opacity:.7">${_mult}</span>${(p.range || []).map(r => {
                         const isClass = (APP.state.classes || []).some(c => c.id === r);
                         const dotCls  = isClass ? 'cls-dot' : 'dp-prop-dot';  // datatype (xsd:) → marqueur vert
                         const dotStyle = isClass ? 'width:11px;height:11px' : 'width:8px;height:5px';  // datatype plus petit
@@ -2104,14 +2105,15 @@ const RestrictionEditor = {
         const _propObj = (APP.state.object_properties || []).find(p => p.id === prop)
                       || (APP.state.datatype_properties || []).find(p => p.id === prop);
         const _ranges  = (_propObj && _propObj.range) || [];
+        const _mult    = _propObj ? ((_propObj.characteristics?.functional || _propObj.functional) ? 'single' : 'multiple') : '';
         const rangeTag = _ranges.length
             ? `<span style="display:inline-flex;align-items:center;gap:4px;flex-shrink:0;flex-wrap:wrap;margin-left:5px;font-size:10px;color:var(--text-dim)">
-                <span style="opacity:.7">(→</span>${_ranges.map(r => {
+                <span style="opacity:.7">(→</span>${_mult ? `<span style="font-style:italic;opacity:.7">${_mult}</span>` : ''}${_ranges.map(r => {
                     const isClass = (APP.state.classes || []).some(c => c.id === r);
                     const dotC    = isClass ? 'cls-dot' : 'dp-prop-dot';
                     const dotSt   = isClass ? 'width:11px;height:11px' : 'width:8px;height:5px';
                     const inner   = isClass
-                        ? `<span style="color:var(--text-dim);cursor:pointer" title="Go to class ${_escapeHtml(r)}"
+                        ? `<span class="restr-from-nav" style="color:var(--text-dim);cursor:pointer" title="Go to class ${_escapeHtml(r)}"
                                  onclick="APP.navigateTo('classes','${r}')"
                                  onmouseover="this.style.color='var(--accent,#5f8dd3)';this.style.textDecoration='underline'"
                                  onmouseout="this.style.color='var(--text-dim)';this.style.textDecoration=''">${_escapeHtml(_displayRefId(r))}</span>`
@@ -2243,15 +2245,32 @@ const RestrictionEditor = {
         const dotCls     = isOP ? 'op-prop-dot' : isAnno ? 'anno-prop-dot' : 'dp-prop-dot';
         const navSection = isOP ? 'object-properties' : isDP ? 'datatype-properties' : null;
 
+        // Range : (→ <mult> ● Classe) — icône de la cible (rond marron = classe navigable,
+        // marqueur vert = type xsd:) + ID cliquable, comme la section Inherited.
+        const _mkRangeTag = (ranges, mult) => {
+            if (!ranges || !ranges.length) return '';
+            return `<span style="display:inline-flex;align-items:center;gap:4px;flex-shrink:0;flex-wrap:wrap;margin-left:5px;font-size:10px;color:var(--text-dim)">
+                <span style="opacity:.7">(→</span>${mult ? `<span style="font-style:italic;opacity:.7">${mult}</span>` : ''}${ranges.map(r => {
+                    const isClass = (APP.state.classes || []).some(c => c.id === r);
+                    const dotC  = isClass ? 'cls-dot' : 'dp-prop-dot';
+                    const dotSt = isClass ? 'width:11px;height:11px' : 'width:8px;height:5px';
+                    const inner = isClass
+                        ? `<span style="color:var(--text-dim);cursor:pointer" title="Go to class ${_escapeHtml(r)}"
+                                 onclick="event.stopPropagation();APP.navigateTo('classes','${r}')"
+                                 onmouseover="this.style.color='var(--accent,#5f8dd3)';this.style.textDecoration='underline'"
+                                 onmouseout="this.style.color='var(--text-dim)';this.style.textDecoration=''">${_escapeHtml(_displayRefId(r))}</span>`
+                        : `<span style="color:var(--text-dim)">${_escapeHtml(_displayRefId(r))}</span>`;
+                    return `<span style="display:inline-flex;align-items:center;gap:3px">
+                        <span class="${dotC}" style="flex-shrink:0;${dotSt};margin:0"></span>${inner}
+                    </span>`;
+                }).join('<span style="opacity:.5">,</span>')}<span style="opacity:.7">)</span>
+               </span>`;
+        };
         let rangeChip = '';
         if (opData && opData.range && opData.range.length > 0) {
-            const mult   = opData.characteristics?.functional ? 'single' : 'multiple';
-            const ranges = opData.range.map(_displayRefId).join(' or ');
-            rangeChip = `<span class="restr-range-chip">(${mult} ${ranges})</span>`;
+            rangeChip = _mkRangeTag(opData.range, opData.characteristics?.functional ? 'single' : 'multiple');
         } else if (dpData && dpData.range && dpData.range.length > 0) {
-            const mult   = dpData.functional ? 'single' : 'multiple';
-            const ranges = dpData.range.map(_displayRefId).join(' or ');
-            rangeChip = `<span class="restr-range-chip">(${mult} ${ranges})</span>`;
+            rangeChip = _mkRangeTag(dpData.range, dpData.functional ? 'single' : 'multiple');
         }
 
         return `
