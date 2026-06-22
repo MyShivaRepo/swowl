@@ -475,10 +475,14 @@ In all cases, the change is saved automatically.
 
 | **If** | a `property` is displayed in the *Inherited* or *Asserted Properties* section, |
 |---|---|
-| **Then** | its `range` is shown in parentheses right after the name with a `→` arrow and the target icon: a brown dot with a navigable link for a target class, or a small green marker for an `xsd:` datatype (non navigable). |
+| **Then** | its `range` is shown in parentheses right after the name with a `→` arrow and the target icon: a brown dot (●) with a navigable link (`APP.navigateTo('classes', …)`) for a target class, or a small green marker for an `xsd:` datatype (non navigable). The same `(→ …)` rendering — including the navigable class link — is used in **both** the *Inherited* and the *Asserted* sections. |
+
+| **If** | a `property` with a non-empty `range` is displayed in either section, |
+|---|---|
+| **Then** | the **multiplicity** is shown inside the range parentheses just before the target, as `single` or `multiple` (e.g. `(→ multiple ● Class)`), derived from the property's `functional` characteristic: `functional` ⇒ `single`, otherwise `multiple`. |
 
 | **If** | the displayed `property` is inherited, |
 |---|---|
 | **Then** | its **provenance** class is also shown, in parentheses with a `↑` arrow and the brown (navigable) class dot, immediately after the property. |
 
-**Source code:** `owl_editor.js` → `renderPanel()` internal helper `_renderDomainPropRow({ p, kind }, showFrom)` — Builds the `(→ …)` range tag (brown `cls-dot` + `APP.navigateTo('classes', …)` link for a class, small `dp-prop-dot` marker for a datatype) and, when `showFrom` is true (inherited property), the `(↑ …)` provenance tag from the property's `domain`. | `RestrictionEditor._renderGroupReadOnly(prop, restrictions)` — For inherited restriction groups, renders the same `(→ …)` range tag and a `(↑ …)` provenance tag derived from each restriction's `_fromClass`, with the brown class dot and a navigation control.
+**Source code:** `owl_editor.js` → `renderPanel()` internal helper `_renderDomainPropRow({ p, kind }, showFrom)` — Builds the `(→ <mult> …)` range tag (italic `single`/`multiple` from `p.characteristics?.functional`/`p.functional`; brown `cls-dot` + `APP.navigateTo('classes', …)` link for a class, small `dp-prop-dot` marker for a datatype) and, when `showFrom` is true (inherited property), the `(↑ …)` provenance tag from the property's `domain`. | `RestrictionEditor._renderGroupReadOnly(prop, restrictions)` (*Inherited* section) — Renders the same `(→ <mult> …)` range tag (multiplicity from the property's `functional` characteristic; class link carries class `restr-from-nav` so it stays clickable despite the read-only row being `pointer-events:none`) and a `(↑ …)` provenance tag derived from each restriction's `_fromClass`. | `RestrictionEditor._renderGroup(prop, restrictions)` (*Asserted* section) — Builds the same `(→ <mult> ● Class)` range chip via the internal `_mkRangeTag(ranges, mult)` helper (multiplicity from `opData.characteristics?.functional` / `dpData.functional`), replacing the former non-navigable “(multiple X)” summary text with the navigable class link.

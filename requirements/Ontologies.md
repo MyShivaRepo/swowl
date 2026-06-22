@@ -26,6 +26,7 @@
 - [REQ-ONT-032 — Reading referenced namespaces and imports from a file](#req-ont-032--reading-referenced-namespaces-and-imports-from-a-file)
 - [REQ-ONT-033 — Emitting owl:imports on RDF export](#req-ont-033--emitting-owlimports-on-rdf-export)
 - [REQ-ONT-034 — Persisting imported namespaces and deriving imports](#req-ont-034--persisting-imported-namespaces-and-deriving-imports)
+- [REQ-ONT-038 — Editing the ontology URI reflected in entity IRIs](#req-ont-038--editing-the-ontology-uri-reflected-in-entity-iris)
 
 ### Form
 - [REQ-ONT-036 — Active ontology selector in the title bar](#req-ont-036--active-ontology-selector-in-the-title-bar)
@@ -287,6 +288,24 @@ For a declared import, the suggested prefix is derived from a matching `xmlns` b
 ---
 
 **Source code:** `owl_model.py` → `OWLOntology.ns_prefixes` (persisted field, `[{prefix, namespace}]`). `triple_store.py` → `register()`, `register_json` (via `update_entry`/`register`), and `update_entry()` accept `ns_prefixes` and call `_imports_from_ns()` to derive `imports`/`import_labels`. `main.py` → `register_json()` now receives a JSON body (`RegisterJsonRequest`) instead of query parameters.
+
+### REQ-ONT-038 — Editing the ontology URI reflected in entity IRIs
+
+| **If** | the ontologist edits the URI of an `ontology` via the editor (the pencil button in the `Ontologies` tab) and confirms, |
+|---|---|
+| **Then** | the new URI becomes the `ontology`'s `id` (base IRI): it is updated on the connected `ontology` in memory and persisted in its `.json` file (`data["id"]`, `data["prefix"]`), so that it is reflected in the displayed IRIs of **all** entities (`classes`, `ObjectProperties`, `DatatypeProperties`, `AnnotationProperties`, `individuals`) and on RDF export. |
+
+| **If** | a connected `ontology` is read from its registry entry, |
+|---|---|
+| **Then** | the registry's URI is authoritative for `onto.id` (as was already the case for the `prefix`), overriding the value frozen in the `.json` file. |
+
+| **If** | the base IRI is displayed in front of an entity local id, |
+|---|---|
+| **Then** | it is normalized by stripping trailing `#`/`/` (`replace(/[#/]+$/, '')`), consistent with the export normalization (`rstrip("#/")`) — never `…/#Entity`. |
+
+---
+
+**Source code:** `triple_store.py` → `update_entry()` — When the registry entry is updated, persists `data["id"] = uri` and `data["prefix"] = prefix` into the `.json` file, and reflects `self._ontology.id = uri` / `self._ontology.prefix = prefix` on the connected ontology in memory. `main.py` → `update_ontology_entry` (calls `store.update_entry(...)`) and `get_current_ontology` (makes the registry URI authoritative for `onto.id` at read time, alongside the prefix). `owl_editor.js` → the base IRI is computed as `baseIri = (APP.state.ontology?.id || '').replace(/[#/]+$/, '')`, matching the export normalization in `to_rdf_graph()` (`onto.id.rstrip("#/")`).
 
 ---
 
