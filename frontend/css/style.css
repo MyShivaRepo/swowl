@@ -1965,7 +1965,7 @@ small { color: var(--text-faint); font-size: 10px; }
 
 /* Inputs */
 .swrl-var {
-  width: 52px;
+  width: 104px;
   border: 1px solid var(--border);
   border-radius: 3px;
   background: var(--bg2);

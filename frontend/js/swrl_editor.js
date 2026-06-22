@@ -564,7 +564,7 @@ const SWRLEditor = {
                         <div id="${propPickId}" class="cls-tree-picker" style="display:none"></div>
                     </div>
                     <input class="swrl-inp" value="${atom.object||''}" placeholder="?obj / ?_"
-                           data-field="object" ${chg} style="width:70px;flex:none">
+                           data-field="object" ${chg} style="width:140px;flex:none">
                     ${del}
                 </div>`;
             }
