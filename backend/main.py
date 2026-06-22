@@ -228,6 +228,30 @@ def _backfill_domain_markers(onto: OWLOntology) -> bool:
     return after > before
 
 
+def _purge_orphan_restrictions(onto: OWLOntology) -> bool:
+    """Nettoie les restrictions/markers fantômes : tout objet de `subClassOf`
+    portant un champ `property` qui ne correspond à AUCUNE propriété existante
+    (OP/DP/AP) est supprimé. Corrige les orphelins laissés par la suppression
+    d'une propriété encore référencée dans une restriction.
+    Retourne True si au moins une restriction a été supprimée."""
+    known = (
+        {p.id for p in onto.object_properties}
+        | {p.id for p in onto.datatype_properties}
+        | {p.id for p in (onto.annotation_properties or [])}
+    )
+    removed = False
+    for c in onto.classes:
+        kept = [
+            r for r in (c.subClassOf or [])
+            if isinstance(r, str) or getattr(r, 'property', None) is None
+            or getattr(r, 'property', None) in known
+        ]
+        if len(kept) != len(c.subClassOf or []):
+            removed = True
+            c.subClassOf = kept
+    return removed
+
+
 def require_onto():
     onto = store.get()
     if not onto:
@@ -614,7 +638,10 @@ def connect_ontology(name: str):
     if onto is None:
         raise HTTPException(404, f"Ontologie '{name}' introuvable dans le registre.")
     # Normalisation : garantir un marker pour chaque (propriété, classe de domaine)
-    if _backfill_domain_markers(onto):
+    # + purge des restrictions fantômes référençant une propriété supprimée
+    dirty = _backfill_domain_markers(onto)
+    dirty = _purge_orphan_restrictions(onto) or dirty
+    if dirty:
         store.save()
     return onto
 
@@ -1054,6 +1081,7 @@ def analysis_done():
 
         # Normalisation : marker pour chaque (propriété, classe de domaine)
         _backfill_domain_markers(onto)
+        _purge_orphan_restrictions(onto)
 
         if sum(added.values()) > 0 or pending_cls or pending_ops or pending_dps or pending_inds:
             store.save()
@@ -1791,6 +1819,12 @@ def delete_object_property(prop_id: str):
                 inv.inverseOf = None
         # ── Marqueurs domain → classes ───────────────────────────
         _sync_domain_markers(onto, pid, set(p.domain or []), set())
+    # ── Restrictions/markers orphelins référençant la propriété supprimée ──
+    for c in onto.classes:
+        c.subClassOf = [
+            r for r in (c.subClassOf or [])
+            if isinstance(r, str) or getattr(r, 'property', None) not in to_delete
+        ]
     onto.object_properties = [p for p in onto.object_properties if p.id not in to_delete]
     store.save()
     return {"deleted": sorted(to_delete)}
@@ -1861,6 +1895,12 @@ def delete_datatype_property(prop_id: str):
         p = next((x for x in onto.datatype_properties if x.id == pid), None)
         if p:
             _sync_domain_markers(onto, pid, set(p.domain or []), set())
+    # ── Restrictions/markers orphelins référençant la propriété supprimée ──
+    for c in onto.classes:
+        c.subClassOf = [
+            r for r in (c.subClassOf or [])
+            if isinstance(r, str) or getattr(r, 'property', None) not in to_delete
+        ]
     onto.datatype_properties = [p for p in onto.datatype_properties if p.id not in to_delete]
     store.save()
     return {"deleted": sorted(to_delete)}
