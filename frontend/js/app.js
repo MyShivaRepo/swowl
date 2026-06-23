@@ -752,12 +752,25 @@ const APP = {
         if (!this._ontoImportExpanded) this._ontoImportExpanded = new Set();
 
         const OWL_URI = 'http://www.w3.org/2002/07/owl#';
+        // Dédup des imports par URI normalisée (sans '#'/'/' final) : évite qu'un même
+        // namespace apparaisse deux fois (ex. .../skos/core et .../skos/core#). On garde
+        // de préférence la variante avec séparateur final.
+        const _dedupImports = (uris) => {
+            const byNorm = new Map();
+            for (const u of (uris || [])) {
+                const norm = u.replace(/[#/]+$/, '');
+                const ex = byNorm.get(norm);
+                if (!ex) byNorm.set(norm, u);
+                else if (/[#/]$/.test(u) && !/[#/]$/.test(ex)) byNorm.set(norm, u);
+            }
+            return [...byNorm.values()];
+        };
         // Returns effective imports for any entry: user ontologies always implicitly import OWL
         const effectiveImportsOf = (entry) => {
-            if (!entry || entry.readonly) return entry ? (entry.imports || []) : [];
+            if (!entry || entry.readonly) return entry ? _dedupImports(entry.imports || []) : [];
             const declared = entry.imports || [];
             const hasOwl = declared.some(u => u.startsWith('http://www.w3.org/2002/07/owl'));
-            return hasOwl ? declared : [...declared, OWL_URI];
+            return _dedupImports(hasOwl ? declared : [...declared, OWL_URI]);
         };
 
         // Recursively render import sub-rows with collapsible toggle.

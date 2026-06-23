@@ -16,7 +16,7 @@ from owl_model import (
     OWLOntology, OWLClass, OWLObjectProperty, OWLDatatypeProperty,
     OWLAnnotationProperty,
     OWLIndividual, SWRLRule, SparqlQuery, InferenceResult, PropertyPresence,
-    ObjectPropertyAssertion,
+    ObjectPropertyAssertion, DataPropertyAssertion,
 )
 from triple_store import store
 from inference_engine import InferenceEngine
@@ -1395,28 +1395,40 @@ def peek_ontology(path: str = Query(..., description="Host path to .owl / .ttl /
                         prefix = str(pfx)
                         break
 
-        # Namespaces référencés dans le fichier (hors standards et hors base)
+        # Namespaces référencés dans le fichier (hors standards et hors base).
+        # Déduplication sur le namespace NORMALISÉ (sans '#'/'/' final) pour éviter
+        # qu'un même namespace apparaisse deux fois (ex. .../skos/core et
+        # .../skos/core#). On conserve la variante avec séparateur et un préfixe non vide.
         SKIP_NS = {"owl", "rdf", "rdfs", "xsd", "xml"}
-        namespaces = []
-        seen_ns = set()
+        by_norm = {}   # norm_uri -> {"prefix", "namespace"}
+
+        def _add_ns(pfx, ns):
+            norm = ns.rstrip("#/")
+            if not norm:
+                return
+            if base_norm and norm == base_norm:
+                return  # c'est le namespace de base de l'ontologie elle-même
+            existing = by_norm.get(norm)
+            if existing is None:
+                by_norm[norm] = {"prefix": pfx, "namespace": ns}
+                return
+            # Doublon : préférer la variante avec séparateur final (vrai namespace)…
+            if ns.endswith(("#", "/")) and not existing["namespace"].endswith(("#", "/")):
+                existing["namespace"] = ns
+            # …et un préfixe non vide si on n'en avait pas.
+            if not existing["prefix"] and pfx:
+                existing["prefix"] = pfx
+
         for pfx, ns in g.namespaces():
             pfx_s, ns_s = str(pfx), str(ns)
             if not pfx_s or pfx_s in SKIP_NS:
                 continue
-            if base_norm and ns_s.rstrip("#/") == base_norm:
-                continue  # c'est le namespace de base de l'ontologie elle-même
-            if ns_s in seen_ns:
-                continue
-            seen_ns.add(ns_s)
-            namespaces.append({"prefix": pfx_s, "namespace": ns_s})
+            _add_ns(pfx_s, ns_s)
         # owl:imports déclarés → à proposer dans la section "Imported namespaces"
         # (l'import est un triplet owl:imports, pas forcément un binding xmlns)
         import_uris = [str(o) for s in g.subjects(RDF.type, OWL.Ontology)
                                 for o in g.objects(s, OWL.imports)]
         for iu in import_uris:
-            if iu in seen_ns:
-                continue
-            seen_ns.add(iu)
             # Préfixe : binding xmlns correspondant > dernier segment de l'URI > 'imp'
             pfx_i = None
             for p2, ns2 in g.namespaces():
@@ -1426,7 +1438,8 @@ def peek_ontology(path: str = Query(..., description="Host path to .owl / .ttl /
             if not pfx_i:
                 seg = iu.rstrip("#/").rsplit("/", 1)[-1].rsplit("#", 1)[-1]
                 pfx_i = ("".join(c for c in seg if c.isalnum() or c == "_")[:12].lower()) or "imp"
-            namespaces.append({"prefix": pfx_i, "namespace": iu})
+            _add_ns(pfx_i, iu)
+        namespaces = list(by_norm.values())
         return {"name": name, "prefix": prefix, "uri": uri, "path": path, "namespaces": namespaces}
     except Exception as e:
         raise HTTPException(400, f"Cannot read file: {e}")
