@@ -28,12 +28,22 @@ from owl_model import (
 
 class InferenceEngine:
 
-    def __init__(self, onto: OWLOntology):
+    def __init__(self, onto: OWLOntology, imported: dict | None = None):
         self.onto = onto
+        # Entités importées (schéma réutilisé par une ontologie de données) :
+        # dict {classes, object_properties, datatype_properties, individuals} de
+        # modèles OWL*, fusionnées dans les index pour que les inférences/violations
+        # tiennent compte des classes/propriétés importées.
+        self._imported = imported or {}
         self._build_indexes()
 
     def _build_indexes(self):
         onto = self.onto
+        imp = self._imported
+        all_classes    = list(onto.classes)             + list(imp.get("classes")             or [])
+        all_ops        = list(onto.object_properties)   + list(imp.get("object_properties")   or [])
+        all_dps        = list(onto.datatype_properties) + list(imp.get("datatype_properties") or [])
+        all_individuals = list(onto.individuals)         + list(imp.get("individuals")          or [])
         # class_id → set of direct superclasses
         self.direct_supers: Dict[str, Set[str]] = defaultdict(set)
         # class_id → set of restrictions (direct)
@@ -41,7 +51,7 @@ class InferenceEngine:
         # class_id → set of disjoint classes
         self.disjoint: Dict[str, Set[str]] = defaultdict(set)
 
-        for cls in onto.classes:
+        for cls in all_classes:
             for expr in cls.subClassOf:
                 if isinstance(expr, str):
                     self.direct_supers[cls.id].add(expr)
@@ -58,7 +68,7 @@ class InferenceEngine:
 
         # prop_id → {domain, range, characteristics, inverseOf, chain}
         self.op_index: Dict[str, dict] = {}
-        for prop in onto.object_properties:
+        for prop in all_ops:
             self.op_index[prop.id] = {
                 "domain": set(prop.domain),
                 "range":  set(prop.range),
@@ -69,7 +79,7 @@ class InferenceEngine:
             }
 
         self.dp_index: Dict[str, dict] = {}
-        for prop in onto.datatype_properties:
+        for prop in all_dps:
             self.dp_index[prop.id] = {
                 "domain": set(prop.domain),
                 "range":  set(prop.range),
@@ -78,7 +88,7 @@ class InferenceEngine:
 
         # individual_id → {types, object_assertions[(prop,target)], data_assertions}
         self.ind_index: Dict[str, dict] = {}
-        for ind in onto.individuals:
+        for ind in all_individuals:
             self.ind_index[ind.id] = {
                 "types": set(ind.types),
                 "obj":   [(a.property, a.target) for a in ind.objectAssertions],
@@ -91,7 +101,8 @@ class InferenceEngine:
 
     def compute_subclass_closure(self) -> Dict[str, Set[str]]:
         """Retourne pour chaque classe l'ensemble de TOUS ses ancêtres."""
-        all_classes = {cls.id for cls in self.onto.classes}
+        all_classes = ({cls.id for cls in self.onto.classes}
+                       | {c.id for c in (self._imported.get("classes") or [])})
         closure: Dict[str, Set[str]] = {c: set() for c in all_classes}
 
         def ancestors(cls_id: str, visited: Set[str]) -> Set[str]:

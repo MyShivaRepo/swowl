@@ -902,6 +902,25 @@ class TripleStore:
 
         _EXT_PREFIX_NS = {"xsd:": XSD, "owl:": OWL, "rdfs:": RDFS, "rdf:": RDF, "skos:": SKOS}
 
+        # Table {id (nu) → espace de noms du schéma importé} : les entités importées
+        # sont référencées par leur id nu (ex. « Organization », « affiliates ») mais
+        # appartiennent au namespace de l'ontologie SOURCE, pas à celui des données.
+        # Sans cela, l'export crée des classes/propriétés fantômes dans le namespace local.
+        imported_ns: dict = {}
+        try:
+            conn_name = next((k for k, e in self._registry.items() if e.connected), None)
+            if conn_name:
+                for imp in self.load_imported_entities(conn_name):
+                    ns_i = (imp.get("uri") or "").rstrip("#/") + "#"
+                    for key in ("classes", "object_properties",
+                                "datatype_properties", "individuals"):
+                        for ent in (imp.get(key) or []):
+                            eid = ent.get("id")
+                            if eid and eid not in imported_ns:
+                                imported_ns[eid] = ns_i
+        except Exception:
+            imported_ns = {}
+
         def iri(local_id: str) -> URIRef:
             if local_id.startswith("http"):
                 return URIRef(local_id)
@@ -910,6 +929,9 @@ class TripleStore:
             for pfx, ns in _EXT_PREFIX_NS.items():
                 if local_id.startswith(pfx):
                     return ns[local_id[len(pfx):]]
+            # Entité importée → namespace du schéma source (et non celui des données).
+            if local_id in imported_ns:
+                return URIRef(imported_ns[local_id] + local_id)
             return NS[local_id]
 
         def dt_iri(r: str) -> URIRef:

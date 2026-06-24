@@ -219,7 +219,10 @@ def _backfill_domain_markers(onto: OWLOntology) -> bool:
         1 for c in onto.classes for r in c.subClassOf
         if hasattr(r, 'type') and r.type == '_marker'
     )
-    for prop in list(onto.object_properties) + list(onto.datatype_properties):
+    # Propriétés propres + importées (schéma) : un domain visant une classe locale
+    # doit faire apparaître la propriété dans la fiche de cette classe.
+    imp_ops, imp_dps = _imported_props(onto)
+    for prop in list(onto.object_properties) + list(onto.datatype_properties) + imp_ops + imp_dps:
         _sync_domain_markers(onto, prop.id, set(), set(prop.domain or []))
     after = sum(
         1 for c in onto.classes for r in c.subClassOf
@@ -239,6 +242,10 @@ def _purge_orphan_restrictions(onto: OWLOntology) -> bool:
         | {p.id for p in onto.datatype_properties}
         | {p.id for p in (onto.annotation_properties or [])}
     )
+    # Inclure les propriétés IMPORTÉES : une restriction/marker sur une classe locale
+    # peut légitimement référencer une propriété d'un schéma importé — ne pas la purger.
+    imp_ops, imp_dps = _imported_props(onto)
+    known |= {p.id for p in imp_ops} | {p.id for p in imp_dps}
     removed = False
     for c in onto.classes:
         kept = [
@@ -390,9 +397,27 @@ def merge_duplicates(req: MergeDupReq):
     return summary
 
 
+def _build_inference_engine(onto: OWLOntology) -> InferenceEngine:
+    """Instancie le moteur d'inférence en lui fournissant les entités IMPORTÉES
+    (converties en modèles OWL*) afin que les inférences/violations tiennent compte
+    des classes/propriétés d'un schéma importé réutilisé par une ontologie de données."""
+    imported = None
+    try:
+        _imp = get_imported_entities()
+        imported = {
+            "classes":             [OWLClass.model_validate(c)            for c in (_imp.get("classes")             or [])],
+            "object_properties":   [OWLObjectProperty.model_validate(p)   for p in (_imp.get("object_properties")   or [])],
+            "datatype_properties": [OWLDatatypeProperty.model_validate(p) for p in (_imp.get("datatype_properties") or [])],
+            "individuals":         [OWLIndividual.model_validate(i)       for i in (_imp.get("individuals")          or [])],
+        }
+    except Exception:
+        imported = None
+    return InferenceEngine(onto, imported=imported)
+
+
 def run_inferences() -> InferenceResult:
     onto = require_onto()
-    engine = InferenceEngine(onto)
+    engine = _build_inference_engine(onto)
     return engine.run()
 
 
@@ -968,6 +993,16 @@ def analysis_done():
         dpset = {p.id for p in onto.datatype_properties}
         iset  = {i.id for i in onto.individuals}
         rset  = {r.id for r in onto.swrl_rules}
+        # Entités IMPORTÉES (schéma) : considérées comme « existantes » → ni recréées
+        # localement, ni filtrées comme cibles de relations (subClassOf/domain/range/types).
+        try:
+            _imp = get_imported_entities()
+        except Exception:
+            _imp = {}
+        cset  |= {c.get("id") for c in (_imp.get("classes")              or []) if c.get("id")}
+        opset |= {p.get("id") for p in (_imp.get("object_properties")    or []) if p.get("id")}
+        dpset |= {p.get("id") for p in (_imp.get("datatype_properties")  or []) if p.get("id")}
+        iset  |= {i.get("id") for i in (_imp.get("individuals")          or []) if i.get("id")}
 
         # ── Passe 1 : créer toutes les entités (sans relations inter-entités) ──
         # Les relations référencent d'autres entités qui peuvent apparaître plus tard
@@ -2070,10 +2105,12 @@ def _imported_props(onto: OWLOntology):
             continue
         for op in (d.get('object_properties') or []):
             ops.append(SimpleNamespace(id=op.get('id'), inverseOf=op.get('inverseOf'),
-                                       subPropertyOf=op.get('subPropertyOf') or []))
+                                       subPropertyOf=op.get('subPropertyOf') or [],
+                                       domain=op.get('domain') or []))
         for dp in (d.get('datatype_properties') or []):
             dps.append(SimpleNamespace(id=dp.get('id'),
-                                       subPropertyOf=dp.get('subPropertyOf') or []))
+                                       subPropertyOf=dp.get('subPropertyOf') or [],
+                                       domain=dp.get('domain') or []))
     return ops, dps
 
 
@@ -2240,7 +2277,7 @@ def get_violations():
 def get_subclass_closure():
     """Retourne la fermeture transitive de subClassOf pour toutes les classes."""
     onto = require_onto()
-    engine = InferenceEngine(onto)
+    engine = _build_inference_engine(onto)
     return engine.compute_subclass_closure()
 
 

@@ -5385,9 +5385,11 @@ const IndividualEditor = {
     async deleteSelected() {
         // Repli : si l'ensemble multi-sélection est vide mais qu'un individu est
         // sélectionné (col 3), on le supprime — cohérent avec l'état du bouton.
-        const toDelete = this._selectedIndIds.size
+        const _impSet = new Set((APP.state.individuals || []).filter(i => i._imported).map(i => i.id));
+        const toDelete = (this._selectedIndIds.size
             ? [...this._selectedIndIds]
-            : (this._selectedIndId ? [this._selectedIndId] : []);
+            : (this._selectedIndId ? [this._selectedIndId] : []))
+            .filter(id => !_impSet.has(id));   // jamais supprimer un individu importé (lecture seule)
         if (!toDelete.length) return;
         const n = toDelete.length;
         const label = n === 1
@@ -6724,6 +6726,11 @@ const IndividualEditor = {
 
     async save(isNew) {
         const originalId = isNew ? null : this._editingId;
+        // Garde read-only : un individu importé ne peut pas être modifié (il serait
+        // de toute façon retiré à la persistance → édition silencieusement perdue).
+        if (!isNew && (APP.state.individuals || []).find(x => x.id === originalId)?._imported) {
+            return UI.error('Cet individu est importé (lecture seule) et ne peut pas être modifié.');
+        }
         const idRaw = document.getElementById('ind-id')?.value.trim() || '';
         const id    = idRaw.replace(/\s+/g, '_');   // spaces → underscore
         // Update the field if the value has changed
@@ -6815,6 +6822,9 @@ const IndividualEditor = {
     },
 
     async delete(id) {
+        if ((APP.state.individuals || []).find(x => x.id === id)?._imported) {
+            return UI.error('Cet individu est importé (lecture seule) et ne peut pas être supprimé.');
+        }
         if (!await UI.confirm(`Delete individual <strong>${id}</strong>?`)) return;
         try {
             await API.deleteIndividual(id);
