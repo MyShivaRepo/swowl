@@ -709,12 +709,25 @@ def test_llm_key(req: LlmTestReq):
                 if 200 <= resp.status < 300:
                     import json as _json
                     data = _json.loads(resp.read().decode("utf-8", "replace"))
-                    models = [m.get("name", "") for m in (data.get("models") or [])]
-                    models = [m for m in models if m]
+                    models_full = data.get("models") or []
+                    models = [m.get("name", "") for m in models_full if m.get("name")]
+                    # Détails par modèle (déjà fournis par /api/tags) : params, quantization, contexte
+                    models_detail = []
+                    for m in models_full:
+                        nm = m.get("name", "")
+                        if not nm:
+                            continue
+                        det = m.get("details") or {}
+                        models_detail.append({
+                            "name":  nm,
+                            "params": det.get("parameter_size") or "",
+                            "quant":  det.get("quantization_level") or "",
+                            "ctx":    det.get("context_length"),
+                        })
                     msg = f"Ollama reachable — {len(models)} model(s) available"
                     if models:
                         msg += f": {', '.join(models[:5])}"
-                    return {"ok": True, "message": msg, "models": models}
+                    return {"ok": True, "message": msg, "models": models, "models_detail": models_detail}
                 return {"ok": False, "message": f"HTTP {resp.status}"}
         except Exception as e:  # noqa: BLE001
             return {"ok": False, "message": f"Cannot reach Ollama: {type(e).__name__}: {e}"}

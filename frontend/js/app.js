@@ -4205,7 +4205,7 @@ APP._llmCtxKey  = function (base) { const n = this._ontoName(); return n ? base 
 APP._LLM_PROVIDERS = [
     { id: 'anthropic', name: 'Anthropic', sub: 'Claude',                icon: '🤖', hint: 'sk-ant-api03-…' },
     { id: 'openai',    name: 'OpenAI',    sub: 'GPT',                   icon: '🤖', hint: 'sk-…' },
-    { id: 'meta',      name: 'Meta',      sub: 'Llama',                 icon: '🤖', hint: 'LLM|…' },
+    { id: 'meta',      name: 'Ollama',    sub: 'local — Llama, Mistral…', icon: '💻' },
     { id: 'claude-code', name: 'Claude Code', sub: 'CLI agent',         icon: '🧑‍💻' },
 ];
 
@@ -4214,7 +4214,7 @@ APP._LLM_MODES = [
     { key: 'online',     label: 'On-Line LLMs',  badge: 'built-in',   icon: '🌐',
       desc: 'Cloud LLMs called directly by SWOWL (an API key is required).', providers: ['anthropic', 'openai'] },
     { key: 'offline',    label: 'Off-Line LLMs', badge: 'built-in',   icon: '💻',
-      desc: 'Local LLM running on your machine — no data leaves your computer.', providers: ['meta'] },
+      desc: 'Local LLM served by Ollama on your machine — no data leaves your computer. Pick any pulled model (Llama, Mistral…).', providers: ['meta'] },
     { key: 'interfaced', label: 'Interfaced',    badge: 'agent',      icon: '🔌',
       desc: 'The analysis is delegated to an external agent driving SWOWL.', providers: ['claude-code'] },
 ];
@@ -4276,7 +4276,7 @@ APP._llmActiveLabel = function () {
     return {
         anthropic:     'On-Line — Anthropic Claude',
         openai:        'On-Line — OpenAI GPT',
-        meta:          metaMode === 'local' ? 'Off-Line — Meta Llama (Ollama local)' : 'Off-Line — Meta Llama (Cloud)',
+        meta:          `Off-Line — Ollama local (${this._llmOllamaModelLabel(this._llmOllamaModel())})`,
         'claude-code': 'Interfaced — Claude Code',
     }[p] || p;
 };
@@ -4321,6 +4321,21 @@ APP._llmOllamaModels = function () {
     try { const a = JSON.parse(localStorage.getItem(this._llmCtxKey('swowl_llm_ollama_models')) || '[]'); return Array.isArray(a) ? a : []; }
     catch { return []; }
 };
+// Détails par modèle Ollama découverts au Test : [{name, params, quant, ctx}]
+APP._llmOllamaModelsDetail = function () {
+    try { const a = JSON.parse(localStorage.getItem(this._llmCtxKey('swowl_llm_ollama_models_detail')) || '[]'); return Array.isArray(a) ? a : []; }
+    catch { return []; }
+};
+// Libellé enrichi d'un modèle Ollama : "name — 7.2B · Q4_K_M · 32k"
+APP._llmOllamaModelLabel = function (name) {
+    const d = (this._llmOllamaModelsDetail() || []).find(x => x.name === name);
+    if (!d) return name;
+    const bits = [];
+    if (d.params) bits.push(d.params);
+    if (d.quant)  bits.push(d.quant);
+    if (d.ctx)    bits.push(Math.round(d.ctx / 1024) + 'k');
+    return bits.length ? `${name} — ${bits.join(' · ')}` : name;
+};
 
 // ── Test Ollama local ──
 APP._llmTestOllama = async function () {
@@ -4333,6 +4348,7 @@ APP._llmTestOllama = async function () {
         if (r && r.ok) {
             const models = (r.models || []).filter(Boolean);
             localStorage.setItem(this._llmCtxKey('swowl_llm_ollama_models'), JSON.stringify(models));
+            localStorage.setItem(this._llmCtxKey('swowl_llm_ollama_models_detail'), JSON.stringify(r.models_detail || []));
             // Si le modèle courant n'est pas dans la liste, présélectionne le 1er disponible
             if (models.length && !models.includes(this._llmOllamaModel())) {
                 this._llmSetOllamaModel(models[0]);
@@ -4489,7 +4505,7 @@ APP._renderLLMs = function () {
                     const found = this._llmOllamaModels();
                     const cur = this._llmOllamaModel();
                     if (found.length) {
-                        const opts = found.map(m => `<option value="${this._esc(m)}"${m === cur ? ' selected' : ''}>${this._esc(m)}</option>`).join('');
+                        const opts = found.map(m => `<option value="${this._esc(m)}"${m === cur ? ' selected' : ''}>${this._esc(this._llmOllamaModelLabel(m))}</option>`).join('');
                         return `<div style="display:flex;align-items:center;gap:8px;margin-top:10px">
                             <span style="font-size:12px;color:var(--text-dim);white-space:nowrap">Model:</span>
                             <select id="llm-model-ollama" onchange="APP._llmSetOllamaModel(this.value)"
@@ -4503,8 +4519,9 @@ APP._renderLLMs = function () {
                 })()}
                 <p style="margin:8px 0 0;font-size:11px;color:var(--text-faint);font-style:italic">
                     Ollama doit tourner localement et être accessible depuis le conteneur Docker.
-                    Installez Ollama depuis <a href="https://ollama.com" target="_blank" style="color:var(--accent)">ollama.com</a>
-                    puis lancez : <code>ollama pull llama3.3</code> (puissant) ou <code>ollama pull llama3.2</code> (rapide)
+                    Installez Ollama depuis <a href="https://ollama.com" target="_blank" style="color:var(--accent)">ollama.com</a>,
+                    tirez un modèle — ex. <code>ollama pull llama3.2</code>, <code>ollama pull mistral</code> —
+                    puis cliquez <b>🧪 Test</b> et choisissez-le dans la liste <b>Model</b>.
                 </p>`;
 
         } else if (p.id === 'claude-code') {
@@ -4525,7 +4542,7 @@ APP._renderLLMs = function () {
             <div class="cls-frame-bar" style="gap:8px">
                 <span style="font-size:16px;line-height:1;flex-shrink:0">${p.icon}</span>
                 <span style="font-size:13px;font-weight:600;color:var(--text1)">${p.name}</span>
-                <span style="font-size:11px;color:var(--text-dim)">${p.sub}${p.id==='meta' ? ' — Ollama local' : ''}</span>
+                <span style="font-size:11px;color:var(--text-dim)">${p.sub}</span>
                 ${isActive
                     ? `<span style="margin-left:auto;font-size:11px;font-weight:600;color:var(--accent)">✓ Active</span>`
                     : `<button class="btn-sm" style="margin-left:auto"
