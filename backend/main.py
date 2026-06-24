@@ -641,8 +641,10 @@ def connect_ontology(name: str):
     # + purge des restrictions fantômes référençant une propriété supprimée
     dirty = _backfill_domain_markers(onto)
     dirty = _purge_orphan_restrictions(onto) or dirty
-    if dirty:
-        store.save()
+    # Recalcule les assertions dérivées (inverseOf / subPropertyOf, y compris via
+    # propriétés importées) pour les ontologies de données.
+    _materialize_inferences(onto)
+    store.save()
     return onto
 
 
@@ -2025,23 +2027,78 @@ def _transitive_supers(props) -> dict:
     return {pid: supers(pid, set()) for pid in direct}
 
 
+def _imported_props(onto: OWLOntology):
+    """Collecte les ObjectProperties / DatatypeProperties importées transitivement
+    (lecture des .json des ontologies importées). Retourne (ops, dps) sous forme
+    d'objets exposant id / inverseOf / subPropertyOf — utilisable par
+    _transitive_supers et la table inverseOf de _materialize_inferences.
+    Indispensable quand une ontologie de DONNÉES n'a aucune propriété propre et
+    réutilise les propriétés (et leurs inverseOf) d'une ontologie de SCHÉMA importée."""
+    import json as _json
+    from pathlib import Path as FPath
+    from types import SimpleNamespace
+    ops, dps = [], []
+    root = next((e for e in store._registry.values() if e.connected), None)
+    if not root:
+        return ops, dps
+
+    def _resolve(uri: str):
+        for e in store._registry.values():
+            if e.uri == uri or e.uri == uri.rstrip('#') or uri == e.uri.rstrip('#'):
+                return e
+        return None
+
+    visited: set = set()
+    queue: list = list(root.imports or [])
+    while queue:
+        uri = queue.pop(0)
+        if uri in visited:
+            continue
+        visited.add(uri)
+        ent = _resolve(uri)
+        if not ent:
+            continue
+        queue.extend(ent.imports or [])
+        if ent.readonly:
+            continue  # builtins W3C : pas de propriétés métier à charger
+        p = FPath(host_to_container(ent.path))
+        if not p.exists():
+            continue
+        try:
+            d = _json.loads(p.read_text(encoding='utf-8'))
+        except Exception:
+            continue
+        for op in (d.get('object_properties') or []):
+            ops.append(SimpleNamespace(id=op.get('id'), inverseOf=op.get('inverseOf'),
+                                       subPropertyOf=op.get('subPropertyOf') or []))
+        for dp in (d.get('datatype_properties') or []):
+            dps.append(SimpleNamespace(id=dp.get('id'),
+                                       subPropertyOf=dp.get('subPropertyOf') or []))
+    return ops, dps
+
+
 def _materialize_inferences(onto: OWLOntology) -> None:
     """Matérialise (comme assertions `derived=True`) la clôture déductive des
     ObjectAssertions / DataAssertions d'un individu sous owl:inverseOf et
     rdfs:subPropertyOf. Les assertions de base (derived=False) saisies par
     l'utilisateur sont la source ; les dérivées sont recalculées intégralement.
+    Prend en compte les propriétés importées (schéma) en plus des propriétés propres.
     """
     # 1. Purge des dérivées précédentes (on repart de la base utilisateur)
     for ind in onto.individuals:
         ind.objectAssertions = [a for a in ind.objectAssertions if not getattr(a, 'derived', False)]
         ind.dataAssertions   = [a for a in ind.dataAssertions   if not getattr(a, 'derived', False)]
 
-    # 2. Cartes subPropertyOf (transitif) et inverseOf (bidirectionnel)
-    op_supers = _transitive_supers(onto.object_properties)
-    dp_supers = _transitive_supers(onto.datatype_properties)
+    # 2. Cartes subPropertyOf (transitif) et inverseOf (bidirectionnel),
+    #    propriétés propres + importées (schéma réutilisé par une ontologie de données)
+    imp_ops, imp_dps = _imported_props(onto)
+    all_ops = list(onto.object_properties) + imp_ops
+    all_dps = list(onto.datatype_properties) + imp_dps
+    op_supers = _transitive_supers(all_ops)
+    dp_supers = _transitive_supers(all_dps)
     inverse: dict = {}
-    for p in onto.object_properties:
-        if p.inverseOf:
+    for p in all_ops:
+        if getattr(p, 'inverseOf', None):
             inverse.setdefault(p.id, p.inverseOf)
             inverse.setdefault(p.inverseOf, p.id)
     ind_by_id = {i.id: i for i in onto.individuals}

@@ -1916,6 +1916,11 @@ const APP = {
             (p.domain || []).filter(x => gNodeIds.has(x)).forEach(d => gEdges.push({ s: p.id, t: d, lbl: 'domain', k: 'dom' }));
             (p.range || []).filter(x => gNodeIds.has(x)).forEach(r => gEdges.push({ s: p.id, t: r, lbl: 'range', k: 'rng' }));
         });
+        // DatatypeProperties : arête 'domain' vers leur classe (leur range est un
+        // type de données, pas une classe → pas d'arête de range).
+        (s.datatype_properties || []).forEach(p => {
+            (p.domain || []).filter(x => gNodeIds.has(x)).forEach(d => gEdges.push({ s: p.id, t: d, lbl: 'domain', k: 'dom' }));
+        });
         (s.individuals || []).forEach(i => {
             (i.types || []).filter(x => gNodeIds.has(x)).forEach(t => gEdges.push({ s: i.id, t, lbl: 'type', k: 'type' }));
             (i.objectAssertions || []).filter(a => gNodeIds.has(a.target)).forEach(a => gEdges.push({ s: i.id, t: a.target, lbl: _displayRefId(a.property), k: 'oa' }));
@@ -3250,7 +3255,8 @@ APP.renderViews = function() {
 
 // ── Libellé d'affichage d'une classe (utilisé par TreeMap & Ontology Hyperbolic) ──
 APP._hypBestLabel = function(cls) {
-    return cls ? (cls.id || '') : '';
+    // Préfixe d'affichage cohérent avec la vue Network (préfixe d'import / d'ontologie).
+    return cls && cls.id ? _displayRefId(cls.id) : '';
 };
 
 // ── Ontology (Hyperbolic) — disque de Poincaré maison (canvas + Möbius) ───────
@@ -3281,7 +3287,7 @@ APP._buildOntologyTreeData = function() {
         const next = new Set(ancestors); next.add(id);
         count++;
         const kids = (childrenOf[id] || []).map(cid => buildNode(cid, next)).filter(Boolean);
-        const node = { name: id, id };
+        const node = { name: APP._hypBestLabel(classMap[id]), id };
         if (kids.length) node.children = kids;
         return node;
     };
