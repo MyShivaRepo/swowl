@@ -2935,7 +2935,7 @@ const GlobalSearch = {
             'annotation-properties':'Annotation Properties',
             'individuals':          'Individuals',
             'swrl-rules':           'SWRL Rules',
-            'sparql-vizq':          'SPARQL VizQ',
+            'sparql-vizq':          'Queries',
         };
 
         results.forEach(r => { if (r.section in groups) groups[r.section].push(r); });
@@ -2980,26 +2980,26 @@ const GlobalSearch = {
                         inner = `<span class="lbl-dot"></span>
                             <span class="gs-item-label">${_escapeHtml(r.label)}${r.lang ? ` <span class="gs-lang-tag">(${_escapeHtml(r.lang)})</span>` : ''}</span>
                             ${this._dot(r.kind)}
-                            <span class="gs-item-sub">${_escapeHtml(r.id)}</span>`;
+                            <span class="gs-item-sub">${_escapeHtml(_displayRefId(r.id))}</span>`;
                         break;
                     case 'swrl-labels':
                         inner = `<span style="flex-shrink:0;font-size:11px">⚙️</span>
                             <span class="gs-item-label">${_escapeHtml(r.label)}</span>
-                            <span class="gs-item-sub">${_escapeHtml(r.id)}</span>`;
+                            <span class="gs-item-sub">${_escapeHtml(_displayRefId(r.id))}</span>`;
                         break;
                     case 'sparql-labels':
                         inner = `<span style="flex-shrink:0;font-size:11px">🔎</span>
                             <span class="gs-item-label">${_escapeHtml(r.label)}</span>
-                            <span class="gs-item-sub">${_escapeHtml(r.id)}</span>`;
+                            <span class="gs-item-sub">${_escapeHtml(_displayRefId(r.id))}</span>`;
                         break;
                     case 'individual-names':
                         inner = `<span class="xsd-dot" style="flex-shrink:0;margin:0"></span>
                             <span class="gs-item-label">${_escapeHtml(r.label)}</span>
-                            <span class="gs-item-sub">${_escapeHtml(r.id)}</span>`;
+                            <span class="gs-item-sub">${_escapeHtml(_displayRefId(r.id))}</span>`;
                         break;
                     default:
                         inner = `${this._dot(sec)}
-                            <span class="gs-item-label">${_escapeHtml(r.label)}</span>`;
+                            <span class="gs-item-label">${_escapeHtml(_displayRefId(r.id))}</span>`;
                 }
                 html.push(_row(r, inner));
             });

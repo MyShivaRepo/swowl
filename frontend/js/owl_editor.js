@@ -472,12 +472,12 @@ function _displayId(entity) {
     return p ? `${p}:${id}` : id;
 }
 
-/** Display form of a referenced entity id (class, OP, DP, AP, individual) :
+/** Display form of a referenced entity id (class, OP, DP, AP, individual, rule, query) :
  *  résout l'entité dans APP.state et applique _displayId (préfixe d'import /
  *  d'ontologie / namespace complet). Id non trouvé : préfixe d'ontologie si nu. */
 function _displayRefId(id) {
     if (!id) return id;
-    for (const key of ['classes','object_properties','datatype_properties','annotation_properties','individuals']) {
+    for (const key of ['classes','object_properties','datatype_properties','annotation_properties','individuals','swrl_rules','queries']) {
         const e = (APP.state[key] || []).find(x => x.id === id);
         if (e) return _displayId(e);
     }
