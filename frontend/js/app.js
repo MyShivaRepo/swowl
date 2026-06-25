@@ -5574,7 +5574,7 @@ APP.renderSettings = function() {
                     </p>
                     ${fmtOption('individual_counter', 'Individual_Counter',  'Individual_123',        'Generic prefix + sequential number based on the number of existing individuals.')}
                     ${fmtOption('class_counter',      'ClassName_Counter','Part_456',             'Name of the selected class + sequential number. Falls back to Individual_N if no class is selected.')}
-                    ${fmtOption('alphanumeric',       'Alphanumeric string', 'rgu8j-7t32z-oh7g5-mq78t','4 groups of 5 random alphanumeric characters separated by dashes.')}
+                    ${fmtOption('alphanumeric',       'Alphanumeric string', 'rgu8j-7t32z-oh7g5-mq78t','4 groups of 5 random alphanumeric characters separated by dashes. The first character is always a letter — an ID must not start with a digit (NCName rule).')}
                 </div>
             </div>
         </div>`;
