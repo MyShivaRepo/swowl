@@ -24,7 +24,8 @@ const SparqlEditor = {
         if (!this._editingQuery || this._editingQuery._imported) return;
         const q = this._editingQuery;
         const all = APP.state.queries || [];
-        const idx = all.findIndex(x => x.id === q.id);
+        // Cible l'entrée PROPRE (jamais l'homonyme importé, sinon il perd son préfixe).
+        const idx = all.findIndex(x => x.id === q.id && !x._imported);
         if (idx >= 0) {
             APP.state.queries[idx] = q;
             API.updateQuery(q.id, q).catch(() => {});
@@ -93,11 +94,13 @@ const SparqlEditor = {
             const importedPrefix = isImported ? `${x._importPrefix}:` : '';
             const mainText = x.label || x.id;
             const subText  = x.label ? x.id : '';
+            const key      = this._queryKey(x);
+            const isSel    = this._selectedKey ? this._selectedKey === key : this._selectedIds.has(x.id);
             return `
-            <div class="tree-item${this._selectedIds.has(x.id) ? ' selected' : ''}${isImported ? ' imported-entity' : ''}"
-                 data-id="${x.id}" style="align-items:center"
-                 onclick="SparqlEditor.selectQuery('${x.id}', event)"
-                 oncontextmenu="event.preventDefault();SparqlEditor.showContextMenu(event,'${x.id}')">
+            <div class="tree-item${isSel ? ' selected' : ''}${isImported ? ' imported-entity' : ''}"
+                 data-id="${x.id}" data-key="${this._esc(key)}" style="align-items:center"
+                 onclick="SparqlEditor.selectQuery('${x.id}', event, ${isImported})"
+                 oncontextmenu="event.preventDefault();SparqlEditor.showContextMenu(event,'${x.id}', ${isImported})">
                 <span style="font-size:13px;flex-shrink:0;line-height:1">🔎</span>
                 <span style="flex:1;overflow:hidden;min-width:0">
                     <span class="tree-label" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block">${importedPrefix}${this._esc(mainText)}</span>
@@ -140,9 +143,17 @@ const SparqlEditor = {
         };
     },
 
-    selectQuery(id, evtOrHist = true) {
-        const q = this._loadAll().find(x => x.id === id);
+    /** Clé de sélection unique (désambiguïse une requête propre d'une importée de même id). */
+    _queryKey(q) { return q ? (q._imported ? q.id + '␟I' : q.id) : ''; },
+
+    selectQuery(id, evtOrHist = true, imported) {
+        const all = this._loadAll();
+        const _wantImp = (imported !== undefined) ? imported : this._pendingImported;
+        this._pendingImported = undefined;
+        const q = (_wantImp !== undefined ? all.find(x => x.id === id && !!x._imported === _wantImp) : null)
+               || all.find(x => x.id === id);
         if (!q) return;
+        const key = this._queryKey(q);
 
         const isShift = evtOrHist && typeof evtOrHist === 'object' && evtOrHist.shiftKey;
         const isCtrl  = evtOrHist && typeof evtOrHist === 'object' && (evtOrHist.ctrlKey || evtOrHist.metaKey);
@@ -158,6 +169,7 @@ const SparqlEditor = {
             } else {
                 this._selectedIds.add(id);
             }
+            this._selectedKey = null;
         } else if (isCtrl) {
             if (this._selectedIds.has(id)) {
                 this._selectedIds.delete(id);
@@ -165,14 +177,17 @@ const SparqlEditor = {
                 this._selectedIds.add(id);
                 this._anchorId = id;
             }
+            this._selectedKey = null;
         } else {
             this._selectedIds = new Set([id]);
             this._anchorId    = id;
+            this._selectedKey = key;
         }
 
         this._selectedId = id;
+        const _single = this._selectedKey && this._selectedIds.size === 1;
         document.querySelectorAll('#sparql-list .tree-item[data-id]').forEach(el =>
-            el.classList.toggle('selected', this._selectedIds.has(el.dataset.id)));
+            el.classList.toggle('selected', _single ? (el.dataset.key === this._selectedKey) : this._selectedIds.has(el.dataset.id)));
         this._updateToolbar();
 
         if (this._selectedIds.size === 1) {
@@ -186,10 +201,8 @@ const SparqlEditor = {
     _updateToolbar() {
         const btn = document.getElementById('sparql-btn-delete');
         if (!btn) return;
-        const n = [...this._selectedIds].filter(id => {
-            const x = this._loadAll().find(q => q.id === id);
-            return x && !x._imported;
-        }).length;
+        const all = this._loadAll();
+        const n = [...this._selectedIds].filter(id => all.some(q => q.id === id && !q._imported)).length;
         btn.disabled = n === 0;
         btn.title = n > 1 ? `Delete ${n} selected queries` : 'Delete selected query';
     },
@@ -210,17 +223,16 @@ const SparqlEditor = {
     },
 
     async deleteSelected() {
-        const ids = [...this._selectedIds].filter(id => {
-            const x = this._loadAll().find(q => q.id === id);
-            return x && !x._imported;
-        });
+        const all = this._loadAll();
+        const ids = [...this._selectedIds].filter(id => all.some(q => q.id === id && !q._imported));
         if (!ids.length) return;
         const confirmed = await UI.confirm(
             `Delete <strong>${ids.length}</strong> quer${ids.length > 1 ? 'ies' : 'y'}?<br>
              <small style="color:var(--text-dim)">${ids.join(', ')}</small>`);
         if (!confirmed) return;
         for (const id of ids) {
-            APP.state.queries = (APP.state.queries || []).filter(x => x.id !== id);
+            // Ne retirer que l'entrée PROPRE (préserver l'homonyme importé).
+            APP.state.queries = (APP.state.queries || []).filter(x => !(x.id === id && !x._imported));
             API.deleteQuery(id).catch(() => {});
         }
         UI.success(`${ids.length} quer${ids.length > 1 ? 'ies' : 'y'} deleted`);
@@ -237,9 +249,11 @@ const SparqlEditor = {
     },
 
     deleteQuery(id) {
-        const q = this._loadAll().find(x => x.id === id);
-        if (q?._imported) { UI.error('Cannot delete an imported query.'); return; }
-        APP.state.queries = (APP.state.queries || []).filter(x => x.id !== id);
+        // Cible la query PROPRE (supprimable) ; ne bloque que si seule l'importée existe.
+        const own = this._loadAll().find(x => x.id === id && !x._imported);
+        if (!own) { UI.error('Cannot delete an imported query.'); return; }
+        // Ne retirer que l'entrée PROPRE (préserver l'homonyme importé).
+        APP.state.queries = (APP.state.queries || []).filter(x => !(x.id === id && !x._imported));
         API.deleteQuery(id).catch(() => {});
         this._selectedIds.delete(id);
         this._updateToolbar();
@@ -687,8 +701,8 @@ const SparqlEditor = {
         const old = this._editingQuery?.id;
         if (!val || val === old) return;
         const all = APP.state.queries || [];
-        const entry = all.find(q => q.id === old);
-        if (entry) {
+        const entry = all.find(q => q.id === old && !q._imported) || all.find(q => q.id === old);
+        if (entry && !entry._imported) {
             const oldId = entry.id;
             entry.id = val;
             this._editingQuery.id = val;
@@ -1380,10 +1394,12 @@ const SparqlEditor = {
     },
 
     // ── Menu contextuel (clic droit sur une requête) ──────────
-    showContextMenu(event, id) {
+    showContextMenu(event, id, imported) {
         this._closeContextMenu();
-        if (!this._selectedIds.has(id)) this.selectQuery(id);
-        const q = this._loadAll().find(x => x.id === id);
+        if (!this._selectedIds.has(id)) this.selectQuery(id, true, imported);
+        const all = this._loadAll();
+        const q = (imported !== undefined ? all.find(x => x.id === id && !!x._imported === imported) : null)
+               || all.find(x => x.id === id);
         const isImported = !!q?._imported;
         const multiCount = [...this._selectedIds].filter(i => !this._loadAll().find(x => x.id === i)?._imported).length;
         const menu = document.createElement('div');

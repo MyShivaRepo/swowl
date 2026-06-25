@@ -143,12 +143,13 @@ const SWRLEditor = {
             const idText     = _displayId(r);
             const mainText   = r.label || idText;
             const subText    = r.label ? idText : '';
-            const isSel      = this._selectedIds.has(r.id);
+            const key        = this._ruleKey(r);
+            const isSel      = this._selectedKey ? this._selectedKey === key : this._selectedIds.has(r.id);
             return `
-            <div class="tree-item${isSel ? ' selected' : ''}${isImported ? ' imported-entity' : ''}" data-id="${r.id}"
+            <div class="tree-item${isSel ? ' selected' : ''}${isImported ? ' imported-entity' : ''}" data-id="${r.id}" data-key="${_escapeHtml(key)}"
                  style="align-items:center${broken ? ';color:var(--red,#ef4444)' : ''}"
-                 onclick="SWRLEditor.selectRule('${r.id}', event)"
-                 oncontextmenu="event.preventDefault();SWRLEditor.showContextMenu(event,'${r.id}')">
+                 onclick="SWRLEditor.selectRule('${r.id}', event, ${isImported})"
+                 oncontextmenu="event.preventDefault();SWRLEditor.showContextMenu(event,'${r.id}', ${isImported})">
                 <span style="font-size:13px;flex-shrink:0;line-height:1;${broken ? 'color:var(--red,#ef4444)' : 'color:var(--text-dim)'}">⚙️</span>
                 <span style="flex:1;overflow:hidden;min-width:0">
                     <span class="tree-label" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block${broken ? ';color:var(--red,#ef4444)' : ''}">${mainText}</span>
@@ -177,10 +178,18 @@ const SWRLEditor = {
         }
     },
 
+    /** Clé de sélection unique (désambiguïse une règle propre d'une importée de même id). */
+    _ruleKey(r) { return r ? (r._imported ? r.id + '␟I' : r.id) : ''; },
+
     // ── Selection / creation ─────────────────────────────────────
-    selectRule(id, evtOrHist = true) {
-        const rule = (APP.state.swrl_rules || []).find(r => r.id === id);
+    selectRule(id, evtOrHist = true, imported) {
+        const rules = APP.state.swrl_rules || [];
+        const _wantImp = (imported !== undefined) ? imported : this._pendingImported;
+        this._pendingImported = undefined;
+        const rule = (_wantImp !== undefined ? rules.find(r => r.id === id && !!r._imported === _wantImp) : null)
+                  || rules.find(r => r.id === id);
         if (!rule) return;
+        const key = this._ruleKey(rule);
 
         const isShift = evtOrHist && typeof evtOrHist === 'object' && evtOrHist.shiftKey;
         const isCtrl  = evtOrHist && typeof evtOrHist === 'object' && (evtOrHist.ctrlKey || evtOrHist.metaKey);
@@ -196,6 +205,7 @@ const SWRLEditor = {
             } else {
                 this._selectedIds.add(id);
             }
+            this._selectedKey = null;
         } else if (isCtrl) {
             if (this._selectedIds.has(id)) {
                 this._selectedIds.delete(id);
@@ -203,14 +213,17 @@ const SWRLEditor = {
                 this._selectedIds.add(id);
                 this._anchorId = id;
             }
+            this._selectedKey = null;
         } else {
             this._selectedIds = new Set([id]);
             this._anchorId    = id;
+            this._selectedKey = key;
         }
 
         this._selectedId = id;
+        const _single = this._selectedKey && this._selectedIds.size === 1;
         document.querySelectorAll('#swrl-list .tree-item[data-id]').forEach(el =>
-            el.classList.toggle('selected', this._selectedIds.has(el.dataset.id)));
+            el.classList.toggle('selected', _single ? (el.dataset.key === this._selectedKey) : this._selectedIds.has(el.dataset.id)));
         this._updateToolbar();
 
         // Afficher le détail seulement si une seule règle sélectionnée
@@ -228,10 +241,8 @@ const SWRLEditor = {
     _updateToolbar() {
         const btn = document.getElementById('swrl-btn-delete');
         if (!btn) return;
-        const n = [...this._selectedIds].filter(id => {
-            const r = (APP.state.swrl_rules || []).find(x => x.id === id);
-            return r && !r._imported;
-        }).length;
+        const rules = APP.state.swrl_rules || [];
+        const n = [...this._selectedIds].filter(id => rules.some(r => r.id === id && !r._imported)).length;
         btn.disabled = n === 0;
         btn.title = n > 1 ? `Delete ${n} selected rules` : 'Delete selected rule';
     },
@@ -252,10 +263,8 @@ const SWRLEditor = {
     },
 
     async deleteSelected() {
-        const ids = [...this._selectedIds].filter(id => {
-            const r = (APP.state.swrl_rules || []).find(x => x.id === id);
-            return r && !r._imported;
-        });
+        const rules = APP.state.swrl_rules || [];
+        const ids = [...this._selectedIds].filter(id => rules.some(r => r.id === id && !r._imported));
         if (!ids.length) return;
         const confirmed = await UI.confirm(
             `Delete <strong>${ids.length}</strong> SWRL rule${ids.length > 1 ? 's' : ''}?<br>
@@ -1240,8 +1249,9 @@ const SWRLEditor = {
     },
 
     async delete(id) {
-        const rule = (APP.state.swrl_rules || []).find(r => r.id === id);
-        if (rule?._imported) { UI.error('Cannot delete an imported rule.'); return; }
+        // Cible la règle PROPRE ; ne bloque que si seule l'importée existe.
+        const own = (APP.state.swrl_rules || []).find(r => r.id === id && !r._imported);
+        if (!own) { UI.error('Cannot delete an imported rule.'); return; }
         if (!await UI.confirm(`Delete SWRL rule <strong>${id}</strong>?`)) return;
         try {
             await API.deleteSWRLRule(id);
@@ -1291,14 +1301,17 @@ const SWRLEditor = {
     },
 
     // ── Menu contextuel (clic droit sur une règle) ────────────
-    showContextMenu(event, id) {
+    showContextMenu(event, id, imported) {
         this._closeContextMenu();
         // Si l'id cliqué n'est pas dans la multi-sélection courante, on recentre sur lui
-        if (!this._selectedIds.has(id)) this.selectRule(id);
+        if (!this._selectedIds.has(id)) this.selectRule(id, true, imported);
         const menu = document.createElement('div');
         menu.id = 'swrl-ctx-menu';
         menu.className = 'ctx-menu';
-        const isImported = _isImportedId('swrl_rules', id);
+        // « importé » selon la règle cliquée (désambiguïse les homonymes) :
+        // read-only seulement s'il n'existe PAS de règle propre pour cet id.
+        const _hasOwn = (APP.state.swrl_rules || []).some(r => r.id === id && !r._imported);
+        const isImported = (imported !== undefined) ? imported : !_hasOwn;
         const multiCount = [...this._selectedIds].filter(i => !_isImportedId('swrl_rules', i)).length;
         menu.innerHTML = isImported
             ? _importedCtxBanner()

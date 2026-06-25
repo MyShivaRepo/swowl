@@ -458,7 +458,8 @@ const APP = {
                 APEditor._expanded.add(entityId);
                 break;
             case 'swrl-rules':
-                SWRLEditor._selectedId = entityId;
+                SWRLEditor._selectedId      = entityId;
+                SWRLEditor._pendingImported = opts.imported;
                 break;
             case 'individuals': {
                 const targetInd = (APP.state.individuals || []).find(x => x.id === entityId);
@@ -3057,7 +3058,7 @@ const GlobalSearch = {
             if (typeof SparqlEditor !== 'undefined') {
                 const all = SparqlEditor._loadAll();
                 const found = all.find(q => q.id === item.id);
-                if (found) SparqlEditor.selectQuery(item.id);
+                if (found) { SparqlEditor._pendingImported = item.imported; SparqlEditor.selectQuery(item.id); }
             }
             APP.renderSection('queries');
             return;
