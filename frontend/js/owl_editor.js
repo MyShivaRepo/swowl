@@ -44,15 +44,16 @@ function classOptions(selectedIds = []) {
 function classHierarchyOptions(selectedId = '') {
     const classes = APP.state.classes || [];
     if (!classes.length) return '';
-    const { roots, childrenOf } = ClassEditor.buildTree(classes);
+    const { roots, childrenOf, byKey } = ClassEditor.buildTree(classes);
     const lines = [];
-    const visit = (id, depth) => {
+    const visit = (key, depth) => {
+        const id = (byKey[key] || {}).id; if (id === undefined) return;
         const pad   = '   '.repeat(depth);   // non-breaking spaces for indentation
         const arrow = depth > 0 ? '▸ ' : '';       // ▸ + non-breaking space
-        lines.push(`<option value="${id}" ${id === selectedId ? 'selected' : ''}>${pad}${arrow}${id}</option>`);
-        (childrenOf[id] || []).forEach(child => visit(child, depth + 1));
+        lines.push(`<option value="${id}" ${id === selectedId ? 'selected' : ''}>${pad}${arrow}${_displayId(byKey[key])}</option>`);
+        (childrenOf[key] || []).forEach(child => visit(child, depth + 1));
     };
-    roots.forEach(id => visit(id, 0));
+    roots.forEach(key => visit(key, 0));
     return lines.join('');
 }
 
@@ -68,7 +69,7 @@ function classHierarchyOptions(selectedId = '') {
 function _classTreePickerItems(callExpr, excludeIds = []) {
     const excluded = new Set(excludeIds);
     const classes  = APP.state.classes || [];
-    const { roots, childrenOf } = ClassEditor.buildTree(classes);
+    const { roots, childrenOf, byKey } = ClassEditor.buildTree(classes);
     const lines = [];
 
     if (!excluded.has('owl:Thing')) {
@@ -80,22 +81,23 @@ function _classTreePickerItems(callExpr, excludeIds = []) {
         </div>`);
     }
 
-    const visit = (id, depth) => {
-        if (excluded.has(id)) {
+    const visit = (key, depth) => {
+        const c = byKey[key]; if (!c) return;
+        if (excluded.has(c.id)) {
             // Still show children (class is excluded but not its sub-classes)
-            (childrenOf[id] || []).forEach(child => visit(child, depth + 1));
+            (childrenOf[key] || []).forEach(child => visit(child, depth + 1));
             return;
         }
         const pl = depth * 16 + 6;
-        lines.push(`<div class="tree-item" data-id="${id}"
-            style="padding-left:${pl}px" onclick="${callExpr}('${id}')">
+        lines.push(`<div class="tree-item" data-id="${c.id}"
+            style="padding-left:${pl}px" onclick="${callExpr}('${c.id}')">
             <span class="tree-leaf">◦</span>
             <span class="cls-dot tree-cls-dot"></span>
-            <span class="tree-label">${_displayRefId(id)}</span>
+            <span class="tree-label">${_displayId(c)}</span>
         </div>`);
-        (childrenOf[id] || []).forEach(child => visit(child, depth + 1));
+        (childrenOf[key] || []).forEach(child => visit(child, depth + 1));
     };
-    roots.forEach(id => visit(id, 1));
+    roots.forEach(key => visit(key, 1));
     return lines.join('');
 }
 
@@ -196,7 +198,7 @@ function _fillerHl(text, q) {
  *  mode 'ind'   : classe = navigation seule (clic → charge ses individus). */
 function _fillerClassRows(gid, selectedId, activeId, q, mode) {
     const classes = APP.state.classes || [];
-    const { roots, childrenOf } = ClassEditor.buildTree(classes);
+    const { roots, childrenOf, byKey } = ClassEditor.buildTree(classes);
     const lines = [];
     const match = (id) => !q || id.toLowerCase().includes(q)
         || (mode === 'ind' && _individualsOfClass(id).some(i => i.id.toLowerCase().includes(q)));
@@ -218,11 +220,13 @@ function _fillerClassRows(gid, selectedId, activeId, q, mode) {
     };
 
     if (match('owl:Thing')) lines.push(row('owl:Thing', 0, true));
-    const visit = (id, depth) => {
-        if (match(id) || (childrenOf[id] || []).some(c => match(c))) lines.push(row(id, depth, false));
-        (childrenOf[id] || []).forEach(c => visit(c, depth + 1));
+    const visit = (key, depth) => {
+        const cid = (byKey[key] || {}).id; if (cid === undefined) return;
+        const childIds = (childrenOf[key] || []).map(k => (byKey[k] || {}).id).filter(x => x !== undefined);
+        if (match(cid) || childIds.some(c => match(c))) lines.push(row(cid, depth, false));
+        (childrenOf[key] || []).forEach(c => visit(c, depth + 1));
     };
-    roots.forEach(id => visit(id, 1));
+    roots.forEach(key => visit(key, 1));
     return lines.join('') || '<div class="rfs-empty">No class</div>';
 }
 
@@ -682,66 +686,91 @@ const ClassEditor = {
 
     // ── Tree construction ──────────────────────────────────
 
-    buildTree(classes) {
-        const allIds = new Set(classes.map(c => c.id));
-        const childrenOf = {};
-        classes.forEach(c => { childrenOf[c.id] = []; });
+    // Clés de nœud uniques (= id, ou id+sep+provenance pour les HOMONYMES propre/importé)
+    _TREE_SEP: '␟',
+    _dupIds(items) {
+        const seen = {}, dup = new Set();
+        items.forEach(c => { seen[c.id] = (seen[c.id] || 0) + 1; });
+        Object.keys(seen).forEach(id => { if (seen[id] > 1) dup.add(id); });
+        return dup;
+    },
+    _nkey(c, dup) {
+        return dup.has(c.id)
+            ? c.id + this._TREE_SEP + (c._imported ? 'I:' + (c._importPrefix || c._importNamespace || 'imp') : 'O')
+            : c.id;
+    },
+    _keyFor(id, imported) {
+        const classes = APP.state.classes || [];
+        const dup = this._dupIds(classes);
+        const cands = classes.filter(c => c.id === id);
+        if (!cands.length) return id;
+        const chosen = (imported !== undefined ? cands.find(c => !!c._imported === imported) : null) || cands[0];
+        return this._nkey(chosen, dup);
+    },
 
-        const hasKnownParent   = new Set(); // has an internal parent (in allIds)
-        const hasExternalParent = new Set(); // has a prefixed external parent (!owl:Thing)
+    buildTree(classes) {
+        const dup = this._dupIds(classes);
+        const allIds = new Set(classes.map(c => c.id));
+        const byKey = {}, idToKeys = {};
+        classes.forEach(c => { const k = this._nkey(c, dup); byKey[k] = c; (idToKeys[c.id] = idToKeys[c.id] || []).push(k); });
+        const childrenOf = {};
+        Object.keys(byKey).forEach(k => { childrenOf[k] = []; });
+
+        const hasKnownParent    = new Set(); // key has an internal parent
+        const hasExternalParent = new Set(); // key has a prefixed external parent (!classRoot)
+        const classRoot = APP.getOntologyRootLabels().classRoot;
 
         classes.forEach(c => {
+            const ck = this._nkey(c, dup);
             const allParents   = (c.subClassOf || []).filter(s => typeof s === 'string');
             const knownParents = [...new Set(allParents.filter(s => allIds.has(s)))];
-            const classRoot = APP.getOntologyRootLabels().classRoot;
-            const externalParents = allParents.filter(s =>
-                !allIds.has(s) && s !== classRoot && s.includes(':')
-            );
-            if (knownParents.length > 0)   hasKnownParent.add(c.id);
-            if (externalParents.length > 0) hasExternalParent.add(c.id);
-            knownParents.forEach(p => {
-                if (!childrenOf[p].includes(c.id)) childrenOf[p].push(c.id);
+            const externalParents = allParents.filter(s => !allIds.has(s) && s !== classRoot && s.includes(':'));
+            if (knownParents.length > 0)    hasKnownParent.add(ck);
+            if (externalParents.length > 0) hasExternalParent.add(ck);
+            knownParents.forEach(parId => {
+                const pks = idToKeys[parId] || [];
+                const pk = pks.find(k => !!byKey[k]._imported === !!c._imported) || pks[0];
+                if (pk && !childrenOf[pk].includes(ck)) childrenOf[pk].push(ck);
             });
         });
 
-        const alpha = (a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' });
-
-        // owlRoots   → no known parent AND no external parent → shown under owl:Thing
-        // externalRoots → no known parent BUT has external parent → shown as independent roots
-        const owlRoots      = classes.filter(c => !hasKnownParent.has(c.id) && !hasExternalParent.has(c.id)).map(c => c.id).sort(alpha);
-        const externalRoots = classes.filter(c => !hasKnownParent.has(c.id) &&  hasExternalParent.has(c.id)).map(c => c.id).sort(alpha);
-
-        Object.keys(childrenOf).forEach(id => childrenOf[id].sort(alpha));
-        return { roots: owlRoots, externalRoots, childrenOf };
+        const alpha = (a, b) => byKey[a].id.localeCompare(byKey[b].id, undefined, { sensitivity: 'base' });
+        const owlRoots      = Object.keys(byKey).filter(k => !hasKnownParent.has(k) && !hasExternalParent.has(k)).sort(alpha);
+        const externalRoots = Object.keys(byKey).filter(k => !hasKnownParent.has(k) &&  hasExternalParent.has(k)).sort(alpha);
+        Object.keys(childrenOf).forEach(k => childrenOf[k].sort(alpha));
+        return { roots: owlRoots, externalRoots, childrenOf, byKey };
     },
 
-    /** Expands all ancestors of classId in _expanded to unfold the tree down to it */
-    _expandAncestors(classId, visited = new Set()) {
-        if (visited.has(classId)) return;
-        visited.add(classId);
-        const classes = APP.state.classes || [];
-        const allIds  = new Set(classes.map(c => c.id));
-        const cls     = classes.find(c => c.id === classId);
-        if (!cls) return;
-        (cls.subClassOf || [])
-            .filter(s => typeof s === 'string' && allIds.has(s))
-            .forEach(par => { this._expanded.add(par); this._expandAncestors(par, visited); });
+    /** Expands all ancestors of a node key in _expanded to unfold the tree down to it */
+    _expandAncestors(keyOrId, visited = new Set()) {
+        const { childrenOf, byKey } = this.buildTree(APP.state.classes || []);
+        const parentOf = {};
+        Object.entries(childrenOf).forEach(([pk, kids]) => kids.forEach(ck => { (parentOf[ck] = parentOf[ck] || []).push(pk); }));
+        const key = byKey[keyOrId] ? keyOrId : this._keyFor(keyOrId);
+        const walk = (k) => {
+            if (visited.has(k)) return;
+            visited.add(k);
+            (parentOf[k] || []).forEach(pk => { this._expanded.add(pk); walk(pk); });
+        };
+        walk(key);
     },
 
     // ── Tree rendering ──────────────────────────────────────────
 
-    _renderNode(id, childrenOf, depth, visited = new Set()) {
-        if (visited.has(id)) return ''; // cycle guard
-        const cls = (APP.state.classes || []).find(c => c.id === id);
+    _renderNode(key, childrenOf, depth, visited = new Set()) {
+        if (visited.has(key)) return ''; // cycle guard
+        const cls = (this._byKey || {})[key];
         if (!cls) return '';
-        const children = childrenOf[id] || [];
-        const nextVisited = new Set(visited); nextVisited.add(id);
+        const id = cls.id;
+        const children = childrenOf[key] || [];
+        const nextVisited = new Set(visited); nextVisited.add(key);
         const hasChildren = children.length > 0;
-        const isSelected = this._selectedIds.has(id);
-        const isOpen = this._expanded.has(id);
+        const isSelected = this._selectedKey ? this._selectedKey === key : this._selectedIds.has(id);
+        const isOpen = this._expanded.has(key);
         const isImported = !!cls._imported;
         const displayId = _displayId(cls);
         const importedClass = isImported ? ' imported-entity' : '';
+        const kJs = key.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
         const dragAttrs = `${isImported ? '' : `draggable="true" ondragstart="ClassEditor.onDragStart(event,'${id}')" ondragend="ClassEditor.onDragEnd(event)"`}
                  ondragover="ClassEditor.onDragOver(event,'${id}')"
                  ondragleave="ClassEditor.onDragLeave(event)"
@@ -751,25 +780,26 @@ const ClassEditor = {
         <div class="tree-root-node">
             <div class="tree-item${isSelected ? ' selected' : ''}${importedClass}"
                  style="padding-left:${depth * 16 + 6}px"
-                 data-id="${id}"
+                 data-id="${id}" data-key="${_escapeHtml(key)}"
                  ${dragAttrs}
-                 onclick="ClassEditor.selectClass('${id}', event)"
+                 onclick="ClassEditor.selectClass('${id}', event, ${isImported})"
                  oncontextmenu="ClassEditor.showContextMenu(event,'${id}')">
                 ${hasChildren
                     ? `<span class="tree-toggle${isOpen ? ' open' : ''}"
-                             onclick="event.stopPropagation();ClassEditor.toggleNode('${id}')">▶</span>`
+                             onclick="event.stopPropagation();ClassEditor.toggleNode('${kJs}')">▶</span>`
                     : `<span class="tree-leaf">◦</span>`}
                 <span class="cls-dot tree-cls-dot"></span>
                 <span class="tree-label">${_escapeHtml(displayId)}</span>
             </div>
-            <div id="tcn-${id}" style="display:${isOpen ? 'block' : 'none'}">
+            <div id="tcn-${_escapeHtml(key)}" style="display:${isOpen ? 'block' : 'none'}">
                 ${children.map(cid => this._renderNode(cid, childrenOf, depth + 1, nextVisited)).join('')}
             </div>
         </div>`;
     },
 
     renderTree(classes) {
-        const { roots, externalRoots, childrenOf } = this.buildTree(classes);
+        const { roots, externalRoots, childrenOf, byKey } = this.buildTree(classes);
+        this._byKey = byKey;
         const { classRoot } = APP.getOntologyRootLabels();
         const owlSel = this._owlThingSelected ? ' selected' : '';
         return `
@@ -976,9 +1006,12 @@ const ClassEditor = {
         this._updateTreeButtons();
     },
 
-    async selectClass(id, evtOrHist = true) {
+    async selectClass(id, evtOrHist = true, imported) {
         const isShift = (evtOrHist && typeof evtOrHist === 'object') ? evtOrHist.shiftKey : false;
         const _hist   = (evtOrHist && typeof evtOrHist === 'object') ? true : evtOrHist;
+        const _wantImp = (imported !== undefined) ? imported : this._pendingImported;
+        this._pendingImported = undefined;
+        const key = this._keyFor(id, _wantImp);
 
         if (isShift && this._anchorId) {
             // ── Shift+Click: range selection ─────────────────
@@ -992,6 +1025,7 @@ const ClassEditor = {
             } else {
                 this._selectedIds.add(id);
             }
+            this._selectedKey = null;
         } else {
             // ── Single click: single selection ────────────────
             if (this._editingId !== null && id !== this._editingId) {
@@ -1000,6 +1034,7 @@ const ClassEditor = {
             }
             this._selectedIds = new Set([id]);
             this._anchorId    = id;
+            this._selectedKey = key;
             if (_hist && !isShift) APP._pushNav('classes', id);
         }
 
@@ -1011,24 +1046,30 @@ const ClassEditor = {
         // On ne re-rend l'arbre que si le dépliage change réellement quelque chose.
         if (!isShift) {
             const _expBefore = this._expanded.size;
-            this._expandAncestors(id);
+            this._expandAncestors(key);
             if (this._expanded.size !== _expBefore) {
                 const treeEl = document.getElementById('class-tree');
                 if (treeEl) treeEl.innerHTML = this.renderTree(APP.state.classes);
             }
         }
 
-        // Surbrillance (toutes les occurrences ayant ce data-id)
+        // Surbrillance : par clé en sélection simple (toutes les occurrences multi-héritage
+        // de CETTE classe, sans les homonymes), sinon par id.
+        const _single = this._selectedKey && this._selectedIds.size === 1;
+        let _scrollEl = null;
         document.querySelectorAll('#class-tree .tree-item[data-id]').forEach(el => {
-            el.classList.toggle('selected', this._selectedIds.has(el.dataset.id));
+            const sel = _single ? (el.dataset.key === this._selectedKey) : this._selectedIds.has(el.dataset.id);
+            el.classList.toggle('selected', sel);
+            if (sel && !_scrollEl) _scrollEl = el;
         });
+        _scrollEl?.scrollIntoView({ block: 'nearest' });
 
         // Formulaire dans le panneau droit
         const detail = document.getElementById('class-detail');
         if (!detail) return;
 
         if (this._selectedIds.size === 1) {
-            const cls = (APP.state.classes || []).find(c => c.id === id);
+            const cls = (this._byKey && this._byKey[key]) || (APP.state.classes || []).find(c => c.id === id);
             const isImp = _applyImportedView(detail, cls, cls ? this.renderForm(cls) : this.renderForm(null));
             _initHResizers('class-detail');
             this._updateSuperPanel(cls || null);   // affiche aussi les super-classes des classes importées (lecture seule)
@@ -1827,9 +1868,12 @@ const ClassEditor = {
         collect(id);
 
         // ── Check individuals BEFORE confirmation ──────────
+        // Exception « namespace-aware » : un type couvert par une classe IMPORTÉE de même
+        // id ne bloque pas (l'individual retombe sur l'importée, son type n'est pas orphelin).
         const toDelete   = new Set([id, ...descendants]);
+        const importedClsIds = new Set((APP.state.classes || []).filter(c => c._imported).map(c => c.id));
         const blocking   = (APP.state.individuals || []).filter(
-            ind => (ind.types || []).some(t => toDelete.has(t))
+            ind => (ind.types || []).some(t => toDelete.has(t) && !importedClsIds.has(t))
         );
         if (blocking.length > 0) {
             const names = blocking.slice(0, 3).map(x => `<strong>${x.id}</strong>`).join(', ')
@@ -7054,30 +7098,58 @@ const APEditor = {
 
     /** Build tree maps for user-defined props.
      *  builtinChildrenOf: builtinId → [userPropId] for props whose direct parent is a built-in. */
+    // Clés de nœud uniques (= id, ou id+sep+provenance pour les homonymes) — cf. autres éditeurs.
+    _TREE_SEP: '␟',
+    _dupIds(items) {
+        const seen = {}, dup = new Set();
+        items.forEach(p => { seen[p.id] = (seen[p.id] || 0) + 1; });
+        Object.keys(seen).forEach(id => { if (seen[id] > 1) dup.add(id); });
+        return dup;
+    },
+    _nkey(p, dup) {
+        return dup.has(p.id)
+            ? p.id + this._TREE_SEP + (p._imported ? 'I:' + (p._importPrefix || p._importNamespace || 'imp') : 'O')
+            : p.id;
+    },
+    _keyFor(id, imported) {
+        const props = APP.state.annotation_properties || [];
+        const dup = this._dupIds(props);
+        const cands = props.filter(p => p.id === id);
+        if (!cands.length) return id;
+        const chosen = (imported !== undefined ? cands.find(p => !!p._imported === imported) : null) || cands[0];
+        return this._nkey(chosen, dup);
+    },
+
     _buildUserTree(props) {
+        const dup          = this._dupIds(props);
         const allUserIds   = new Set(props.map(p => p.id));
         const allBuiltins  = this._allBuiltinIds();
-        const childrenOf        = {};   // user → user children
-        const builtinChildrenOf = {};   // builtinId → [userPropId]
-        props.forEach(p => { childrenOf[p.id] = []; });
+        const byKey = {}, idToKeys = {};
+        props.forEach(p => { const k = this._nkey(p, dup); byKey[k] = p; (idToKeys[p.id] = idToKeys[p.id] || []).push(k); });
+        const childrenOf        = {};   // userKey → [userKey]
+        const builtinChildrenOf = {};   // builtinId → [userKey]
+        Object.keys(byKey).forEach(k => { childrenOf[k] = []; });
         const hasParent = new Set();
         props.forEach(p => {
+            const ck = this._nkey(p, dup);
             (p.subPropertyOf || []).forEach(par => {
                 if (allUserIds.has(par)) {
-                    if (!childrenOf[par].includes(p.id)) childrenOf[par].push(p.id);
-                    hasParent.add(p.id);
+                    const pks = idToKeys[par] || [];
+                    const pk = pks.find(k => !!byKey[k]._imported === !!p._imported) || pks[0];
+                    if (pk && !childrenOf[pk].includes(ck)) childrenOf[pk].push(ck);
+                    hasParent.add(ck);
                 } else if (allBuiltins.has(par)) {
                     if (!builtinChildrenOf[par]) builtinChildrenOf[par] = [];
-                    if (!builtinChildrenOf[par].includes(p.id)) builtinChildrenOf[par].push(p.id);
-                    hasParent.add(p.id);
+                    if (!builtinChildrenOf[par].includes(ck)) builtinChildrenOf[par].push(ck);
+                    hasParent.add(ck);
                 }
             });
         });
-        const alpha = (a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' });
-        const roots = props.filter(p => !hasParent.has(p.id)).map(p => p.id).sort(alpha);
-        Object.keys(childrenOf).forEach(id => childrenOf[id].sort(alpha));
+        const alpha = (a, b) => byKey[a].id.localeCompare(byKey[b].id, undefined, { sensitivity: 'base' });
+        const roots = Object.keys(byKey).filter(k => !hasParent.has(k)).sort(alpha);
+        Object.keys(childrenOf).forEach(k => childrenOf[k].sort(alpha));
         Object.keys(builtinChildrenOf).forEach(id => builtinChildrenOf[id].sort(alpha));
-        return { roots, childrenOf, builtinChildrenOf };
+        return { roots, childrenOf, builtinChildrenOf, byKey };
     },
 
     // ── Rendering ─────────────────────────────────────────────
@@ -7108,17 +7180,19 @@ const APEditor = {
         </div>`;
     },
 
-    _renderUserNode(id, childrenOf, depth, props) {
-        const prop = props.find(p => p.id === id);
+    _renderUserNode(key, childrenOf, depth, props) {
+        const prop = (this._byKey || {})[key];
         if (!prop) return '';
-        const children = childrenOf[id] || [];
+        const id = prop.id;
+        const children = childrenOf[key] || [];
         const hasChildren = children.length > 0;
-        const isSel = this._selectedIds.has(id);
-        const isOpen = this._expanded.has(id);
+        const isSel = this._selectedKey ? this._selectedKey === key : this._selectedIds.has(id);
+        const isOpen = this._expanded.has(key);
         const isImported = !!prop._imported;
         const displayId = _displayId(prop);
         const importedClass = isImported ? ' imported-entity' : '';
         const sid = id.replace(/'/g, "\\'");
+        const kJs = key.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
         const dragAttrs = `${isImported ? '' : `draggable="true" ondragstart="APEditor.onDragStart(event,'${sid}')" ondragend="APEditor.onDragEnd(event)"`}
                  ondragover="APEditor.onDragOver(event,'${sid}')"
                  ondragleave="APEditor.onDragLeave(event)"
@@ -7126,13 +7200,13 @@ const APEditor = {
         return `
         <div class="tree-root-node">
             <div class="tree-item${isSel ? ' selected' : ''}${importedClass}" style="padding-left:${depth * 16 + 6}px"
-                 data-id="${id}"
+                 data-id="${id}" data-key="${_escapeHtml(key)}"
                  ${dragAttrs}
-                 onclick="APEditor.selectProp('${sid}', event)"
+                 onclick="APEditor.selectProp('${sid}', event, ${isImported})"
                  oncontextmenu="event.preventDefault();APEditor.showContextMenu(event,'${sid}')">
                 ${hasChildren
                     ? `<span class="tree-toggle${isOpen ? ' open' : ''}"
-                             onclick="event.stopPropagation();APEditor.toggleNode('${sid}')">▶</span>`
+                             onclick="event.stopPropagation();APEditor.toggleNode('${kJs}')">▶</span>`
                     : `<span class="tree-leaf">◦</span>`}
                 <span class="anno-prop-dot tree-ap-dot"></span>
                 <span class="tree-label">${_escapeHtml(displayId)}</span>
@@ -7144,14 +7218,15 @@ const APEditor = {
     },
 
     _renderTree(props) {
-        const { roots, childrenOf, builtinChildrenOf } = this._buildUserTree(props);
+        const { roots, childrenOf, builtinChildrenOf, byKey } = this._buildUserTree(props);
+        this._byKey = byKey;
         // Only show rdfs:/owl: namespace roots for OWL-based ontologies
         const showBuiltins = APP.getOntologyRootLabels().classRoot === 'owl:Thing';
 
         const renderNsRoot = (ns) => {
             const builtins  = showBuiltins ? AP_BUILTINS[ns] : [];
             // User props with no parent whose IRI starts with this namespace
-            const userUnder = roots.filter(id => this._rootOf(id) === ns);
+            const userUnder = roots.filter(key => this._rootOf(byKey[key].id) === ns);
             const isOpen    = this._expanded.has(ns);
             const isSel     = this._selectedId === ns;
             const hasChildren = builtins.length + userUnder.length > 0;
@@ -7177,11 +7252,11 @@ const APEditor = {
         };
 
         // User props with no parent and no namespace match → orphans at root level
-        const orphans = roots.filter(id => !this._rootOf(id));
+        const orphans = roots.filter(key => !this._rootOf(byKey[key].id));
 
         return `
         ${Object.keys(AP_BUILTINS).map(ns => renderNsRoot(ns)).join('')}
-        ${orphans.map(id => this._renderUserNode(id, childrenOf, 1, props)).join('')}`;
+        ${orphans.map(key => this._renderUserNode(key, childrenOf, 1, props)).join('')}`;
     },
 
     // ── Split layout ──────────────────────────────────────────
@@ -7266,11 +7341,14 @@ const APEditor = {
 
     // ── Selection ────────────────────────────────────────────
 
-    async selectProp(id, evtOrHist = true) {
+    async selectProp(id, evtOrHist = true, imported) {
         const isShift = (evtOrHist && typeof evtOrHist === 'object') ? evtOrHist.shiftKey : false;
         const _hist   = (evtOrHist && typeof evtOrHist === 'object') ? true : evtOrHist;
 
         const isUserProp = id && !this._isRoot(id) && !this._isBuiltin(id);
+        const _wantImp = (imported !== undefined) ? imported : this._pendingImported;
+        this._pendingImported = undefined;
+        const _key = isUserProp ? this._keyFor(id, _wantImp) : null;
 
         if (!isShift && this._editingId !== null && id !== this._editingId) {
             clearTimeout(this._autoSaveTimer);
@@ -7289,9 +7367,11 @@ const APEditor = {
             } else {
                 this._selectedIds.add(id);
             }
+            this._selectedKey = null;
         } else {
             // ── Single click ──────────────────────────────────────────
             this._selectedIds = isUserProp ? new Set([id]) : new Set();
+            this._selectedKey = (isUserProp && this._selectedIds.size === 1) ? _key : null;
             if (isUserProp) this._anchorId = id;
             if (_hist && !isShift) APP._pushNav('annotation-properties', id);
         }
@@ -7317,7 +7397,8 @@ const APEditor = {
             detail.innerHTML = this._renderBuiltinDetail(id);
             this._updateSuperPanel(id);
         } else {
-            const prop = (APP.state.annotation_properties || []).find(p => p.id === id);
+            const prop = (_key && this._byKey && this._byKey[_key])
+                || (APP.state.annotation_properties || []).find(p => p.id === id);
             const isImp = _applyImportedView(detail, prop, prop ? this._renderForm(prop) : '');
             this._updateSuperPanel(id);   // affiche aussi les super-propriétés des AP importées (lecture seule)
             _markImportedRefs(detail);

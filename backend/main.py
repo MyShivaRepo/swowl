@@ -1760,9 +1760,17 @@ def delete_class(class_id: str):
     to_delete = _collect_class_descendants(onto, class_id)
     to_delete.add(class_id)
     # ── Bloquer si des individus appartiennent à ces classes ─────
+    # Exception « namespace-aware » : si une classe IMPORTÉE porte le même id local,
+    # l'individual typé par cet id retombe sur l'importée → supprimer la classe propre
+    # ne le laisse pas orphelin → non bloquant.
+    try:
+        _imp = get_imported_entities()
+        imported_cls_ids = {c.get("id") for c in (_imp.get("classes") or [])}
+    except Exception:
+        imported_cls_ids = set()
     blocking = []
     for ind in onto.individuals:
-        used = [c for c in to_delete if c in (ind.types or [])]
+        used = [c for c in to_delete if c in (ind.types or []) and c not in imported_cls_ids]
         if used:
             blocking.append(f"'{ind.id}' (type : {', '.join(used)})")
     if blocking:

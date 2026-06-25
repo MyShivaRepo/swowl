@@ -436,6 +436,7 @@ const APP = {
                 } else {
                     ClassEditor._selectedId       = entityId;
                     ClassEditor._owlThingSelected = false;
+                    ClassEditor._pendingImported  = opts.imported;   // désambiguïse les homonymes
                     ClassEditor._expandAncestors(entityId);
                 }
                 break;
@@ -452,7 +453,8 @@ const APP = {
                 DPEditor._expandAncestors(entityId);
                 break;
             case 'annotation-properties':
-                APEditor._selectedId = entityId;
+                APEditor._selectedId      = entityId;
+                APEditor._pendingImported = opts.imported;
                 APEditor._expanded.add(entityId);
                 break;
             case 'swrl-rules':
