@@ -1319,7 +1319,7 @@ const SparqlEditor = {
                             // Internal entity → dot icon + display name + optional id sub-line
                             const uriEsc   = cell.value.replace(/'/g, "\\'");
                             const dotHtml  = match.dot
-                                ? `<span class="${match.dot}" style="flex-shrink:0;margin-right:4px;margin-top:1px;align-self:flex-start"></span>`
+                                ? `<span class="${match.dot}" style="flex-shrink:0;margin-right:4px"></span>`
                                 : '';
                             const mainText = match.displayName || match.entityId;
                             const subText  = match.displayName

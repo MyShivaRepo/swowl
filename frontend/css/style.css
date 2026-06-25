@@ -2240,7 +2240,7 @@ small { color: var(--text-faint); font-size: 10px; }
 /* ── SPARQL VizQ — navigable result cell ───────────────────────── */
 .sq-res-nav {
   display: inline-flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 3px;
   cursor: pointer;
 }

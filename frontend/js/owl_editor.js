@@ -3515,10 +3515,27 @@ const OPEditor = {
         this._selectedId = id;
         this._topPropSelected = false;
 
+        // Déplie l'arbre jusqu'à la propriété (chemins de super-propriétés) et re-rend
+        // si nécessaire, afin que la propriété ciblée soit visible (ex. navigation depuis
+        // les résultats SWRL/Query).
+        if (!isShift) {
+            const _expBefore = this._expanded.size;
+            this._expandAncestors(id);
+            if (this._expanded.size !== _expBefore) {
+                const treeEl = document.getElementById('op-tree');
+                if (treeEl) treeEl.innerHTML = this.renderTree(APP.state.object_properties);
+            }
+        }
+
         // Highlight
         document.querySelectorAll('#op-tree .tree-item[data-id]').forEach(el => {
             el.classList.toggle('selected', this._selectedIds.has(el.dataset.id));
         });
+        // Scroll la propriété sélectionnée dans la vue
+        try {
+            document.querySelector(`#op-tree .tree-item[data-id="${(window.CSS && CSS.escape) ? CSS.escape(id) : id}"]`)
+                ?.scrollIntoView({ block: 'nearest' });
+        } catch (_) { /* sélecteur invalide → ignore */ }
 
         const detail = document.getElementById('op-detail');
         if (!detail) return;
@@ -4403,9 +4420,24 @@ const DPEditor = {
         this._selectedId = id;
         this._topPropSelected = false;
 
+        // Déplie l'arbre jusqu'à la propriété et re-rend si besoin (navigation depuis
+        // les résultats SWRL/Query).
+        if (!isShift) {
+            const _expBefore = this._expanded.size;
+            this._expandAncestors(id);
+            if (this._expanded.size !== _expBefore) {
+                const treeEl = document.getElementById('dp-tree');
+                if (treeEl) treeEl.innerHTML = this.renderTree(APP.state.datatype_properties);
+            }
+        }
+
         document.querySelectorAll('#dp-tree .tree-item[data-id]').forEach(el => {
             el.classList.toggle('selected', this._selectedIds.has(el.dataset.id));
         });
+        try {
+            document.querySelector(`#dp-tree .tree-item[data-id="${(window.CSS && CSS.escape) ? CSS.escape(id) : id}"]`)
+                ?.scrollIntoView({ block: 'nearest' });
+        } catch (_) { /* sélecteur invalide → ignore */ }
 
         const detail = document.getElementById('dp-detail');
         if (!detail) return;

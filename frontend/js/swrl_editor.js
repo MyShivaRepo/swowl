@@ -495,6 +495,18 @@ const SWRLEditor = {
         const news   = inf.filter(f => !f.already);
         const esc    = (s) => { const d = document.createElement('div'); d.textContent = String(s ?? ''); return d.innerHTML; };
         const dref   = (id) => (typeof _displayRefId === 'function' ? _displayRefId(id) : id);
+        // Cellule navigable (comme l'onglet Queries) : lien si l'id résout vers une
+        // entité, sinon texte brut (littéraux de DatatypeProperty).
+        const navCell = (id) => {
+            if (id == null || id === '') return '';
+            const m = (typeof SparqlEditor !== 'undefined' && SparqlEditor._resolveEntity)
+                ? SparqlEditor._resolveEntity(id) : null;
+            if (!m) return esc(dref(id));
+            const dot = m.dot ? `<span class="${m.dot}" style="flex-shrink:0;margin-right:4px"></span>` : '';
+            return `<span class="sq-res-nav" title="${esc(id)}"
+                          onclick="SparqlEditor.navigateToEntity('${String(id).replace(/'/g, "\\'")}')"
+                    >${dot}<span class="sq-res-nav-lbl">${esc(dref(id))}</span></span>`;
+        };
         if (status) status.innerHTML =
             `<span style="color:var(--text1)">${data.match_count} match(es)</span> · `
             + `<span style="color:#10b981;font-weight:600">${news.length} new fact(s)</span>`
@@ -505,14 +517,14 @@ const SWRLEditor = {
             return;
         }
         const rows = inf.map(f => {
-            const pred  = f.kind === 'type' ? '<span style="color:var(--text-dim)">a</span>' : esc(dref(f.property));
+            const pred  = f.kind === 'type' ? '<span style="color:var(--text-dim)">a</span>' : navCell(f.property);
             const badge = f.already
                 ? '<span style="font-size:9px;color:var(--text-faint);border:1px solid var(--border);border-radius:4px;padding:1px 5px">already</span>'
                 : '<span style="font-size:9px;color:#10b981;border:1px solid #10b981;border-radius:4px;padding:1px 5px">NEW</span>';
             return `<tr>
-                <td style="padding:3px 8px">${esc(dref(f.subject))}</td>
-                <td style="padding:3px 8px;color:var(--accent)">${pred}</td>
-                <td style="padding:3px 8px">${esc(dref(f.value))}</td>
+                <td style="padding:3px 8px">${navCell(f.subject)}</td>
+                <td style="padding:3px 8px">${pred}</td>
+                <td style="padding:3px 8px">${navCell(f.value)}</td>
                 <td style="padding:3px 8px;text-align:right">${badge}</td>
             </tr>`;
         }).join('');
