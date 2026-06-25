@@ -5491,6 +5491,27 @@ const IndividualEditor = {
             ?.scrollIntoView({ block: 'nearest' });
     },
 
+    /** Supprime un triple inféré par owl:inverseOf en détruisant son assertion SOURCE
+     *  (suppression directe). `indId --propId--> target` (inféré) → supprime `target --P⁻¹--> indId`. */
+    async retractInverse(indId, propId, target) {
+        try {
+            const r = await fetch(`/api/individuals/${encodeURIComponent(indId)}/retract-inverse`, {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify({ property: propId, target }),
+            });
+            if (!r.ok) {
+                const e = await r.json().catch(() => ({}));
+                throw new Error(e.detail || ('HTTP ' + r.status));
+            }
+            await APP.refresh();
+            this.selectIndividual(indId, false, false);   // ré-affiche la fiche à jour
+            if (typeof UI !== 'undefined' && UI.success) UI.success('Inferred triple removed (source assertion deleted).');
+        } catch (e) {
+            if (typeof UI !== 'undefined' && UI.error) UI.error('Retract failed: ' + e.message);
+        }
+    },
+
     newIndividual() {
         this._selectedIndId  = null;
         this._selectedIndIds.clear();
@@ -5888,9 +5909,14 @@ const IndividualEditor = {
                 const dispTarget = _displayRefId(a.target);
                 const lbl = rawLbl !== a.target ? rawLbl : dispTarget;
                 const sub = rawLbl !== a.target ? `<span style="font-size:10px;color:var(--text-dim);display:block">${dispTarget}</span>` : '';
-                const derivedBadge = a.derived
-                    ? `<span class="ind-derived-badge" title="Inferred assertion (owl:inverseOf / rdfs:subPropertyOf). To remove it, delete the source assertion." style="flex-shrink:0;font-size:10px;font-weight:600;color:#fff;background:var(--accent,#5f8dd3);border:1px solid var(--accent,#5f8dd3);border-radius:4px;padding:1px 6px;letter-spacing:.02em">⊢ inferred</span>`
-                    : `<button class="btn-frame-del" onclick="${delOnclick}">✕</button>`;
+                const _tEsc = (a.target || '').replace(/'/g, "\\'");
+                const derivedBadge = !a.derived
+                    ? `<button class="btn-frame-del" onclick="${delOnclick}">✕</button>`
+                    : (a.derived_via === 'inverse'
+                        // Inféré par owl:inverseOf → ✕ qui supprime DIRECTEMENT l'assertion source
+                        ? `<button class="btn-frame-del" title="Inferred via owl:inverseOf — deletes its source assertion" onclick="IndividualEditor.retractInverse('${(ind?.id||'').replace(/'/g,"\\'")}','${propId}','${_tEsc}')">⊢✕</button>`
+                        // Inféré par rdfs:subPropertyOf → badge lecture seule (inchangé)
+                        : `<span class="ind-derived-badge" title="Inferred (rdfs:subPropertyOf). To remove it, delete the source assertion." style="flex-shrink:0;font-size:10px;font-weight:600;color:#fff;background:var(--accent,#5f8dd3);border:1px solid var(--accent,#5f8dd3);border-radius:4px;padding:1px 6px;letter-spacing:.02em">⊢ inferred</span>`);
                 return `
                 <div class="ind-prop-row${a.derived ? ' ind-derived-row' : ''}"${a.derived ? ' data-derived="1"' : ''} data-id="${a.target}" style="display:flex;align-items:center;gap:4px;padding:2px 4px${a.derived ? ';opacity:0.7' : ''}">
                     <span class="xsd-dot" style="flex-shrink:0;margin:0"></span>

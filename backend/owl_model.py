@@ -161,6 +161,7 @@ class ObjectPropertyAssertion(BaseModel):
     property: str
     target: str   # IRI individu
     derived: bool = False   # True = matérialisé par inférence (inverseOf / subPropertyOf)
+    derived_via: Optional[str] = None   # 'inverse' | 'subPropertyOf' (provenance de l'inférence)
 
 
 class DataPropertyAssertion(BaseModel):
@@ -168,6 +169,7 @@ class DataPropertyAssertion(BaseModel):
     value: str
     datatype: str = "xsd:string"
     derived: bool = False   # True = matérialisé par inférence (subPropertyOf)
+    derived_via: Optional[str] = None   # 'subPropertyOf'
 
 
 class OWLIndividual(BaseModel):

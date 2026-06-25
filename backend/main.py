@@ -2160,7 +2160,7 @@ def _materialize_inferences(onto: OWLOntology) -> None:
             for a in list(ind.objectAssertions):
                 for q in op_supers.get(a.property, ()):
                     if (q, a.target) not in obj_keys:
-                        ind.objectAssertions.append(ObjectPropertyAssertion(property=q, target=a.target, derived=True))
+                        ind.objectAssertions.append(ObjectPropertyAssertion(property=q, target=a.target, derived=True, derived_via='subPropertyOf'))
                         obj_keys.add((q, a.target)); changed = True
             # inverseOf (object) → assertion réciproque sur l'individu cible
             for a in list(ind.objectAssertions):
@@ -2171,14 +2171,14 @@ def _materialize_inferences(onto: OWLOntology) -> None:
                 if not tgt:
                     continue
                 if not any(x.property == inv and x.target == ind.id for x in tgt.objectAssertions):
-                    tgt.objectAssertions.append(ObjectPropertyAssertion(property=inv, target=ind.id, derived=True))
+                    tgt.objectAssertions.append(ObjectPropertyAssertion(property=inv, target=ind.id, derived=True, derived_via='inverse'))
                     changed = True
             # subPropertyOf (data) sur le même individu
             data_keys = {(a.property, a.value, a.datatype) for a in ind.dataAssertions}
             for a in list(ind.dataAssertions):
                 for q in dp_supers.get(a.property, ()):
                     if (q, a.value, a.datatype) not in data_keys:
-                        ind.dataAssertions.append(DataPropertyAssertion(property=q, value=a.value, datatype=a.datatype, derived=True))
+                        ind.dataAssertions.append(DataPropertyAssertion(property=q, value=a.value, datatype=a.datatype, derived=True, derived_via='subPropertyOf'))
                         data_keys.add((q, a.value, a.datatype)); changed = True
 
 
@@ -2261,6 +2261,45 @@ def delete_individual(ind_id: str):
     _materialize_inferences(onto)
     store.save()
     return {"deleted": ind_id}
+
+
+class RetractInverseReq(PydanticModel):
+    property: str   # propriété du triple INFÉRÉ (ind_id --property--> target)
+    target: str     # cible du triple inféré
+
+
+@app.post("/api/individuals/{ind_id}/retract-inverse", tags=["Individus"])
+def retract_inverse(ind_id: str, req: RetractInverseReq):
+    """Supprime un triple inféré par owl:inverseOf en détruisant son assertion SOURCE.
+    Triple inféré : `ind_id --property--> target` (property = inverse de Q).
+    Source de base : `target --Q--> ind_id` (sur l'individu cible) → supprimée, puis
+    re-matérialisation (l'inférée disparaît). Suppression directe (sans confirmation)."""
+    onto = require_onto()
+    if not any(i.id == ind_id for i in onto.individuals):
+        raise HTTPException(404, f"Individual '{ind_id}' not found")
+    # Q = inverse de `property` (propriétés propres + importées)
+    imp_ops, _ = _imported_props(onto)
+    inv_map: dict = {}
+    for p in list(onto.object_properties) + imp_ops:
+        if getattr(p, 'inverseOf', None):
+            inv_map.setdefault(p.id, p.inverseOf)
+            inv_map.setdefault(p.inverseOf, p.id)
+    q = inv_map.get(req.property)
+    if not q:
+        raise HTTPException(400, f"Property '{req.property}' has no inverse")
+    tgt = next((i for i in onto.individuals if i.id == req.target), None)
+    if not tgt:
+        raise HTTPException(404, f"Target individual '{req.target}' not found")
+    before = len(tgt.objectAssertions)
+    tgt.objectAssertions = [a for a in tgt.objectAssertions
+                            if not (a.property == q and a.target == ind_id
+                                    and not getattr(a, 'derived', False))]
+    removed = before - len(tgt.objectAssertions)
+    if removed == 0:
+        raise HTTPException(404, f"Source assertion '{req.target} {q} {ind_id}' not found")
+    _materialize_inferences(onto)
+    store.save()
+    return {"retracted": {"subject": req.target, "property": q, "object": ind_id}, "count": removed}
 
 
 
