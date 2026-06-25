@@ -3120,7 +3120,7 @@ function _annoPickerItems(editorName) {
         : { childrenOf: {}, builtinChildrenOf: {} };
 
     const itemHtml = (id, depth, isBuiltin) => `
-        <div class="tree-item" style="padding:3px 8px;padding-left:${8 + depth * 14}px"
+        <div class="tree-item" data-id="${id}" style="padding:3px 8px;padding-left:${8 + depth * 14}px"
              onclick="${editorName}.addOtherAnnotRow('${id}')">
             <span class="anno-prop-dot" style="margin-right:4px;flex-shrink:0"></span>
             <span class="tree-label" style="font-size:12px;color:var(--text2);font-family:var(--font-mono)">${_displayRefId(id)}</span>
@@ -3153,13 +3153,14 @@ function _annoPickerItems(editorName) {
     };
 
     // Orphan user props (no namespace match, no parent)
-    const allBuiltinIds = new Set(Object.values(AP_BUILTINS).flat().map(q => q.id));
+    const nsKeys        = Object.keys(AP_BUILTINS);   // rdfs:, owl:, skos:, dc:…
     const hasParent     = new Set(Object.values(childrenOf).flat().concat(Object.values(builtinChildrenOf).flat()));
     const orphans = userProps
-        .filter(q => !hasParent.has(q.id) && !q.id.startsWith('rdfs:') && !q.id.startsWith('owl:'))
+        .filter(q => !hasParent.has(q.id) && !nsKeys.some(ns => q.id.startsWith(ns)))
         .map(q => renderUserNode(q.id, 0)).join('');
 
-    return renderNs('rdfs:') + renderNs('owl:') + orphans;
+    // Tous les namespaces builtin (et non plus seulement rdfs:/owl:)
+    return nsKeys.map(ns => renderNs(ns)).join('') + orphans;
 }
 
 /** Collects data-id values from a list */
