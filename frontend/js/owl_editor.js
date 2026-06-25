@@ -7339,6 +7339,34 @@ const APEditor = {
         this._highlightSelected();
     },
 
+    /** Déplie les ancêtres (racine de namespace + parents builtin/user) pour rendre
+     *  visible une AP utilisateur dans l'arbre (ex. navigation depuis la recherche). */
+    _revealUserProp(id) {
+        const props = APP.state.annotation_properties || [];
+        const seen  = new Set();
+        const walk = (pid) => {
+            if (seen.has(pid)) return; seen.add(pid);
+            const p = props.find(x => x.id === pid);
+            const parents = ((p && p.subPropertyOf) || []).filter(s => typeof s === 'string');
+            let structural = false;
+            parents.forEach(par => {
+                if (this._isBuiltin(par)) {
+                    this._expanded.add(par);                         // parent builtin
+                    const ns = this._rootOf(par); if (ns) this._expanded.add(ns);  // sa racine de namespace
+                    structural = true;
+                } else if (props.some(x => x.id === par)) {
+                    this._expanded.add(this._keyFor(par));           // parent utilisateur (par clé)
+                    structural = true;
+                    walk(par);
+                }
+            });
+            if (!structural) {
+                const ns = this._rootOf(pid); if (ns) this._expanded.add(ns);
+            }
+        };
+        walk(id);
+    },
+
     // ── Selection ────────────────────────────────────────────
 
     async selectProp(id, evtOrHist = true, imported) {
@@ -7377,7 +7405,9 @@ const APEditor = {
         }
 
         this._selectedId = id;
+        if (isUserProp) this._revealUserProp(id);   // déplie les ancêtres → nœud visible
         this._highlightSelected();
+        document.querySelector('#ap-tree .tree-item.selected')?.scrollIntoView({ block: 'nearest' });
         this._updateTreeButtons();
 
         const detail = document.getElementById('ap-detail');

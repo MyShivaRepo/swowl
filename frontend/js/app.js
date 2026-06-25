@@ -355,7 +355,13 @@ const APP = {
     },
 
     async refresh() {
+        const _prevOnto = this.state?.ontology?.name ?? null;
         await this.loadState();
+        const _newOnto = this.state?.ontology?.name ?? null;
+        // Changement d'ontologie active (pas un simple refresh après édition) →
+        // réinitialiser l'état de sélection/dépliage des éditeurs (évite toute
+        // sélection/clé résiduelle issue de l'ontologie précédente).
+        if (_newOnto !== _prevOnto) this._resetEditorSelections();
         _TreeCommon.invalidateCaches();   // hierarchy trees changed → drop buildTree caches
         this.updateStats();
         Settings.load();        // recharge les settings contextuels de l'ontologie connectée
@@ -363,6 +369,43 @@ const APP = {
         this._applyTabVisibility();
         // Keep the topbar ontology selector in sync
         API.listOntologies().then(list => { this._ontoList = list; this._updateTopbarOntology(); }).catch(() => {});
+    },
+
+    /** Réinitialise l'état de sélection/dépliage/édition de tous les éditeurs.
+     *  Appelée au CHANGEMENT d'ontologie active (pas après une simple édition). */
+    _resetEditorSelections() {
+        [ClassEditor, OPEditor, DPEditor, APEditor].forEach(ed => {
+            if (!ed) return;
+            ed._selectedId      = null;
+            ed._selectedIds     = new Set();
+            ed._selectedKey     = null;
+            ed._anchorId        = null;
+            ed._expanded        = new Set();
+            ed._editingId       = null;
+            ed._byKey           = null;
+            ed._pendingImported = undefined;
+            if ('_owlThingSelected'  in ed) ed._owlThingSelected  = false;
+            if ('_topPropSelected'   in ed) ed._topPropSelected   = false;
+        });
+        if (typeof SWRLEditor !== 'undefined') {
+            SWRLEditor._selectedId = null; SWRLEditor._selectedIds = new Set();
+            SWRLEditor._selectedKey = null; SWRLEditor._anchorId = null;
+            SWRLEditor._editingId = null; SWRLEditor._editingRule = null;
+            SWRLEditor._pendingImported = undefined;
+        }
+        if (typeof SparqlEditor !== 'undefined') {
+            SparqlEditor._selectedId = null; SparqlEditor._selectedIds = new Set();
+            SparqlEditor._selectedKey = null; SparqlEditor._anchorId = null;
+            SparqlEditor._editingQuery = null; SparqlEditor._pendingImported = undefined;
+        }
+        if (typeof IndividualEditor !== 'undefined') {
+            IndividualEditor._selectedIndId   = null;
+            IndividualEditor._selectedIndIds  = new Set();
+            IndividualEditor._anchorIndId     = null;
+            IndividualEditor._selectedClassId = null;
+            IndividualEditor._editingId       = null;
+            IndividualEditor._pendingImported = undefined;
+        }
     },
 
     updateStats() {
@@ -2911,6 +2954,13 @@ const GlobalSearch = {
         (s.object_properties     || []).forEach(p => { if (_idMatch(p)) results.push({ section: 'object-properties',     id: p.id, label: p.id, disp: _displayId(p), imported: !!p._imported }); });
         (s.datatype_properties   || []).forEach(p => { if (_idMatch(p)) results.push({ section: 'datatype-properties',   id: p.id, label: p.id, disp: _displayId(p), imported: !!p._imported }); });
         (s.annotation_properties || []).forEach(p => { if (_idMatch(p)) results.push({ section: 'annotation-properties', id: p.id, label: p.id, disp: _displayId(p), imported: !!p._imported }); });
+        // Annotation properties BUILT-IN (rdfs:/owl:/skos:/dc:…) — affichées dans l'onglet
+        // mais absentes de state.annotation_properties → sinon « comment », « seeAlso »… ne remontent pas.
+        if (typeof AP_BUILTINS !== 'undefined') {
+            Object.values(AP_BUILTINS).flat().forEach(p => {
+                if (_idMatch(p)) results.push({ section: 'annotation-properties', id: p.id, label: p.id, disp: p.id, imported: false });
+            });
+        }
         (s.individuals           || []).forEach(i => { if (_idMatch(i)) results.push({ section: 'individuals',           id: i.id, label: i.id, disp: _displayId(i), imported: !!i._imported }); });
         (s.swrl_rules            || []).forEach(r => { if (_idMatch(r)) results.push({ section: 'swrl-rules',            id: r.id, label: r.id, disp: _displayId(r), imported: !!r._imported }); });
         sparqlQueries.forEach(sq => {
@@ -3052,18 +3102,24 @@ const GlobalSearch = {
             'individual-names': 'individuals',
         };
         const navSection = navMap[item.section] || item.section;
-        // SPARQL VizQ : sélectionner la requête et switcher sur l'onglet vizq
-        if (navSection === 'sparql-vizq') {
-            APP._queriesTab = 'vizq';
-            if (typeof SparqlEditor !== 'undefined') {
-                const all = SparqlEditor._loadAll();
-                const found = all.find(q => q.id === item.id);
-                if (found) { SparqlEditor._pendingImported = item.imported; SparqlEditor.selectQuery(item.id); }
+        // Différé d'un tick : le clic est déclenché sur `mousedown` ; naviguer/sélectionner
+        // SYNCHRONEMENT pendant l'événement installe le listener de désélection au mauvais
+        // moment et défait la sélection. On exécute donc la navigation une fois l'événement
+        // souris terminé (cohérent avec les autres chemins de navigation).
+        setTimeout(() => {
+            // SPARQL VizQ : sélectionner la requête et switcher sur l'onglet vizq
+            if (navSection === 'sparql-vizq') {
+                APP._queriesTab = 'vizq';
+                if (typeof SparqlEditor !== 'undefined') {
+                    const all = SparqlEditor._loadAll();
+                    const found = all.find(q => q.id === item.id);
+                    if (found) { SparqlEditor._pendingImported = item.imported; SparqlEditor.selectQuery(item.id); }
+                }
+                APP.renderSection('queries');
+                return;
             }
-            APP.renderSection('queries');
-            return;
-        }
-        APP.navigateTo(navSection, item.id, { imported: item.imported });
+            APP.navigateTo(navSection, item.id, { imported: item.imported });
+        }, 0);
     },
 
     onKey(e) {
