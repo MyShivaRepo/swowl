@@ -444,7 +444,13 @@ function _importedBannerHtml(entity) {
 
 /** Disables all interactive elements inside a detail panel to make it read-only. */
 function _applyReadOnly(detail) {
-    detail.querySelectorAll('input, select, textarea, button').forEach(el => { el.disabled = true; });
+    // Les éléments marqués « keep-enabled » restent actifs même en vue importée :
+    // ce sont des actions LECTURE SEULE (ex. exécuter une requête SPARQL, afficher
+    // l'aperçu) qui ne modifient pas l'entité importée.
+    detail.querySelectorAll('input, select, textarea, button').forEach(el => {
+        if (el.classList.contains('keep-enabled')) return;
+        el.disabled = true;
+    });
 }
 
 /** Display id of an entity, préfixé :

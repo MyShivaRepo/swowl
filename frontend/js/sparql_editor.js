@@ -421,7 +421,7 @@ const SparqlEditor = {
                 <!-- ── Run ── -->
                 <div style="padding:8px 12px;border-top:1px solid var(--border);
                             display:flex;align-items:center;gap:10px;flex-shrink:0;background:var(--bg2)">
-                    <button class="btn-primary" style="padding:5px 18px;font-size:13px"
+                    <button class="btn-primary keep-enabled" style="padding:5px 18px;font-size:13px"
                             onclick="SparqlEditor.runQuery()">▶ Run</button>
                     <span id="sq-status" style="font-size:11px;color:var(--text-dim)"></span>
                 </div>
@@ -743,6 +743,21 @@ const SparqlEditor = {
         const pfxName = onto?.prefix || 'ex';
         const pfxUri  = onto?.id     || '';   // OWLOntology.id = base IRI
 
+        // Entités IMPORTÉES : id nu → {prefix, ns} du schéma source. Un id importé
+        // (ex. « Organization ») appartient au namespace de l'ontologie importée,
+        // PAS à celui des données → sinon l'IRI générée ne matche aucun triplet.
+        const impMap = {};
+        ['classes', 'object_properties', 'datatype_properties',
+         'annotation_properties', 'individuals'].forEach(k => {
+            (APP.state?.[k] || []).forEach(e => {
+                if (e && e._imported && e._importNamespace && !impMap[e.id]) {
+                    const ns = e._importNamespace.replace(/[#/]+$/, '') + '#';
+                    impMap[e.id] = { prefix: e._importPrefix || '', ns };
+                }
+            });
+        });
+        const usedImpPrefixes = {};   // prefix → ns (pour émettre les PREFIX nécessaires)
+
         const iriOf = id => {
             if (!id || id === '')              return '[]';
             if (id.startsWith('?'))            return id;
@@ -750,6 +765,12 @@ const SparqlEditor = {
             if (id.startsWith('http://') ||
                 id.startsWith('https://'))     return `<${id}>`;
             if (id.includes(':'))              return id;   // already prefixed
+            // Entité importée → namespace du schéma source
+            const imp = impMap[id];
+            if (imp) {
+                if (imp.prefix) { usedImpPrefixes[imp.prefix] = imp.ns; return `${imp.prefix}:${id}`; }
+                return `<${imp.ns}${id}>`;
+            }
             return pfxUri ? `${pfxName}:${id}` : `<${id}>`;
         };
 
@@ -813,6 +834,10 @@ const SparqlEditor = {
             pfxUri
                 ? `PREFIX ${pfxName}: <${pfxUri}${pfxUri.match(/[#/]$/) ? '' : '#'}>`
                 : null,
+            // PREFIX des schémas importés réellement utilisés dans la requête
+            ...Object.entries(usedImpPrefixes)
+                .filter(([p]) => p && p !== pfxName)
+                .map(([p, ns]) => `PREFIX ${p}: <${ns}>`),
         ].filter(Boolean).join('\n');
 
         const select  = `SELECT ${q.distinct ? 'DISTINCT ' : ''}${selectVars}`;
@@ -1095,7 +1120,9 @@ const SparqlEditor = {
         if (isVar) return `<span class="sq-atom-var">${this._esc(value)}</span>`;
         const entity = this._resolveEntity(value);
         if (entity) {
-            const lbl = entity.displayName || entity.entityId;
+            // Préfixe import-aware (ex. « pair:Organization ») au lieu de l'id nu.
+            const lbl = entity.displayName
+                || (typeof _displayRefId === 'function' ? _displayRefId(entity.entityId) : entity.entityId);
             return `<span class="${entity.dot}" style="flex-shrink:0"></span>`
                  + `<span class="sq-atom-lbl">${this._esc(lbl)}</span>`;
         }
