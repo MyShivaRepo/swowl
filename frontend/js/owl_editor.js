@@ -106,20 +106,21 @@ function _classTreePickerItems(callExpr, excludeIds = []) {
 function _opTreePickerItems(onSelectExpr, excludeIds = []) {
     const excluded = new Set(excludeIds);
     const props = (APP.state.object_properties || []).filter(p => !excluded.has(p.id));
-    const { roots, childrenOf } = OPEditor.buildTree(props);
+    const { roots, childrenOf, byKey } = OPEditor.buildTree(props);
     const lines = [];
-    const visit = (id, depth) => {
-        if (excluded.has(id)) return;
+    const visit = (key, depth) => {
+        const prop = byKey[key]; if (!prop) return;
+        if (excluded.has(prop.id)) return;
         const pl = depth * 16 + 6;
-        lines.push(`<div class="tree-item" data-id="${id}"
+        lines.push(`<div class="tree-item" data-id="${prop.id}"
             style="padding-left:${pl}px" onclick="${onSelectExpr}">
             <span class="tree-leaf">◦</span>
             <span class="op-prop-dot"></span>
-            <span class="tree-label">${_displayRefId(id)}</span>
+            <span class="tree-label">${_displayId(prop)}</span>
         </div>`);
-        (childrenOf[id] || []).forEach(child => visit(child, depth + 1));
+        (childrenOf[key] || []).forEach(child => visit(child, depth + 1));
     };
-    roots.forEach(id => visit(id, 1));
+    roots.forEach(key => visit(key, 1));
     return lines.join('') || '<div class="cls-list-empty" style="padding:4px 8px">—</div>';
 }
 
@@ -3225,47 +3226,81 @@ const OPEditor = {
 
     // ── Tree construction ──────────────────────────────────
 
+    // Clé de nœud UNIQUE : = id pour les ids uniques, = id+sep+provenance pour les
+    // HOMONYMES (deux propriétés de même id local : propre vs importée). Garde le
+    // comportement identique (clé=id) pour tout sauf les homonymes.
+    _TREE_SEP: '␟',
+    _dupIds(props) {
+        const seen = {}, dup = new Set();
+        props.forEach(p => { seen[p.id] = (seen[p.id] || 0) + 1; });
+        Object.keys(seen).forEach(id => { if (seen[id] > 1) dup.add(id); });
+        return dup;
+    },
+    _nkey(p, dup) {
+        return dup.has(p.id)
+            ? p.id + this._TREE_SEP + (p._imported ? 'I:' + (p._importPrefix || p._importNamespace || 'imp') : 'O')
+            : p.id;
+    },
+    /** Résout la clé de nœud pour (id, importedHint). Sans hint → 1ʳᵉ clé pour cet id. */
+    _keyFor(id, imported) {
+        const props = APP.state.object_properties || [];
+        const dup = this._dupIds(props);
+        const cands = props.filter(p => p.id === id);
+        if (!cands.length) return id;
+        const chosen = (imported !== undefined ? cands.find(p => !!p._imported === imported) : null) || cands[0];
+        return this._nkey(chosen, dup);
+    },
+
     buildTree(props) {
-        const allIds = new Set(props.map(p => p.id));
+        const dup = this._dupIds(props);
+        const byKey = {}, idToKeys = {};
+        props.forEach(p => { const k = this._nkey(p, dup); byKey[k] = p; (idToKeys[p.id] = idToKeys[p.id] || []).push(k); });
         const childrenOf = {};
-        props.forEach(p => { childrenOf[p.id] = []; });
+        Object.keys(byKey).forEach(k => { childrenOf[k] = []; });
         const hasParent = new Set();
         props.forEach(p => {
-            [...new Set((p.subPropertyOf || []).filter(s => typeof s === 'string' && allIds.has(s)))].forEach(par => {
-                if (!childrenOf[par].includes(p.id)) childrenOf[par].push(p.id);
-                hasParent.add(p.id);
+            const ck = this._nkey(p, dup);
+            [...new Set((p.subPropertyOf || []).filter(s => typeof s === 'string' && idToKeys[s]))].forEach(parId => {
+                const pks = idToKeys[parId];
+                const pk = pks.find(k => !!byKey[k]._imported === !!p._imported) || pks[0];
+                if (!childrenOf[pk].includes(ck)) childrenOf[pk].push(ck);
+                hasParent.add(ck);
             });
         });
-        const alpha = (a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' });
-        const roots = props.filter(p => !hasParent.has(p.id)).map(p => p.id).sort(alpha);
-        Object.keys(childrenOf).forEach(id => childrenOf[id].sort(alpha));
-        return { roots, childrenOf };
+        const alpha = (a, b) => byKey[a].id.localeCompare(byKey[b].id, undefined, { sensitivity: 'base' });
+        const roots = Object.keys(byKey).filter(k => !hasParent.has(k)).sort(alpha);
+        Object.keys(childrenOf).forEach(k => childrenOf[k].sort(alpha));
+        return { roots, childrenOf, byKey };
     },
 
-    _expandAncestors(propId, visited = new Set()) {
-        if (visited.has(propId)) return;
-        visited.add(propId);
-        const props  = APP.state.object_properties || [];
-        const allIds = new Set(props.map(p => p.id));
-        const prop   = props.find(p => p.id === propId);
-        if (!prop) return;
-        (prop.subPropertyOf || [])
-            .filter(s => typeof s === 'string' && allIds.has(s))
-            .forEach(par => { this._expanded.add(par); this._expandAncestors(par, visited); });
+    /** Déplie les ancêtres d'une clé de nœud (clés parentes de même provenance). */
+    _expandAncestors(keyOrId, visited = new Set()) {
+        const { childrenOf, byKey } = this.buildTree(APP.state.object_properties || []);
+        const parentOf = {};
+        Object.entries(childrenOf).forEach(([pk, kids]) => kids.forEach(ck => { (parentOf[ck] = parentOf[ck] || []).push(pk); }));
+        const key = byKey[keyOrId] ? keyOrId : this._keyFor(keyOrId);
+        const walk = (k) => {
+            if (visited.has(k)) return;
+            visited.add(k);
+            (parentOf[k] || []).forEach(pk => { this._expanded.add(pk); walk(pk); });
+        };
+        walk(key);
     },
 
-    _renderNode(id, childrenOf, depth, visited = new Set()) {
-        if (visited.has(id)) return ''; // cycle guard
-        const prop = (APP.state.object_properties || []).find(p => p.id === id);
+    _renderNode(key, childrenOf, depth, visited = new Set()) {
+        if (visited.has(key)) return ''; // cycle guard
+        const prop = (this._byKey || {})[key];
         if (!prop) return '';
-        const children = childrenOf[id] || [];
-        const nextVisited = new Set(visited); nextVisited.add(id);
+        const id = prop.id;
+        const children = childrenOf[key] || [];
+        const nextVisited = new Set(visited); nextVisited.add(key);
         const hasChildren = children.length > 0;
-        const isSelected = this._selectedIds.has(id);
-        const isOpen = this._expanded.has(id);
+        const isSelected = this._selectedKey ? this._selectedKey === key : this._selectedIds.has(id);
+        const isOpen = this._expanded.has(key);
         const isImported = !!prop._imported;
         const displayId = _displayId(prop);
         const importedClass = isImported ? ' imported-entity' : '';
+        const kJs = key.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
         const dragAttrs = `${isImported ? '' : `draggable="true" ondragstart="OPEditor.onDragStart(event,'${id}')" ondragend="OPEditor.onDragEnd(event)"`}
                  ondragover="OPEditor.onDragOver(event,'${id}')"
                  ondragleave="OPEditor.onDragLeave(event)"
@@ -3274,13 +3309,13 @@ const OPEditor = {
         <div class="tree-root-node">
             <div class="tree-item${isSelected ? ' selected' : ''}${importedClass}"
                  style="padding-left:${depth * 16 + 6}px"
-                 data-id="${id}"
+                 data-id="${id}" data-key="${_escapeHtml(key)}"
                  ${dragAttrs}
-                 onclick="OPEditor.selectProp('${id}', event)"
+                 onclick="OPEditor.selectProp('${id}', event, ${isImported})"
                  oncontextmenu="OPEditor.showContextMenu(event,'${id}')">
                 ${hasChildren
                     ? `<span class="tree-toggle${isOpen ? ' open' : ''}"
-                             onclick="event.stopPropagation();OPEditor.toggleNode('${id}')">▶</span>`
+                             onclick="event.stopPropagation();OPEditor.toggleNode('${kJs}')">▶</span>`
                     : `<span class="tree-leaf">◦</span>`}
                 <span class="op-prop-dot tree-op-dot"></span>
                 <span class="tree-label">${_escapeHtml(displayId)}</span>
@@ -3289,14 +3324,15 @@ const OPEditor = {
                       onmouseover="this.style.color='var(--accent)';this.style.textDecoration='underline'"
                       onmouseout="this.style.color='';this.style.textDecoration='';">${_displayRefId(prop.inverseOf)}</span>)</span>` : ''}
             </div>
-            <div id="op-tcn-${id}" style="display:${isOpen ? 'block' : 'none'}">
+            <div id="op-tcn-${_escapeHtml(key)}" style="display:${isOpen ? 'block' : 'none'}">
                 ${children.map(cid => this._renderNode(cid, childrenOf, depth + 1, nextVisited)).join('')}
             </div>
         </div>`;
     },
 
     renderTree(props) {
-        const { roots, childrenOf } = this.buildTree(props);
+        const { roots, childrenOf, byKey } = this.buildTree(props);
+        this._byKey = byKey;   // résolution clé→propriété pour _renderNode
         const { propRoot } = APP.getOntologyRootLabels();
         const topSel = this._topPropSelected ? ' selected' : '';
         return `
@@ -3485,9 +3521,13 @@ const OPEditor = {
         this._updateTreeButtons();
     },
 
-    async selectProp(id, evtOrHist = true) {
+    async selectProp(id, evtOrHist = true, imported) {
         const isShift = (evtOrHist && typeof evtOrHist === 'object') ? evtOrHist.shiftKey : false;
         const _hist   = (evtOrHist && typeof evtOrHist === 'object') ? true : evtOrHist;
+        // Indice de provenance pour désambiguïser les homonymes (propre vs importé)
+        const _wantImp = (imported !== undefined) ? imported : this._pendingImported;
+        this._pendingImported = undefined;
+        const key = this._keyFor(id, _wantImp);
 
         if (isShift && this._anchorId) {
             // ── Shift+Click: range selection ─────────────────
@@ -3501,6 +3541,7 @@ const OPEditor = {
             } else {
                 this._selectedIds.add(id);
             }
+            this._selectedKey = null;   // multi-sélection : pas de clé unique
         } else {
             // ── Single click: single selection ────────────────
             if (this._editingId !== null && id !== this._editingId) {
@@ -3509,6 +3550,7 @@ const OPEditor = {
             }
             this._selectedIds = new Set([id]);
             this._anchorId    = id;
+            this._selectedKey = key;
             if (_hist && !isShift) APP._pushNav('object-properties', id);
         }
 
@@ -3520,28 +3562,28 @@ const OPEditor = {
         // les résultats SWRL/Query).
         if (!isShift) {
             const _expBefore = this._expanded.size;
-            this._expandAncestors(id);
+            this._expandAncestors(key);
             if (this._expanded.size !== _expBefore) {
                 const treeEl = document.getElementById('op-tree');
                 if (treeEl) treeEl.innerHTML = this.renderTree(APP.state.object_properties);
             }
         }
 
-        // Highlight
+        // Highlight : par clé en sélection simple (désambiguïse les homonymes), sinon par id
+        const _single = this._selectedKey && this._selectedIds.size === 1;
+        let _scrollEl = null;
         document.querySelectorAll('#op-tree .tree-item[data-id]').forEach(el => {
-            el.classList.toggle('selected', this._selectedIds.has(el.dataset.id));
+            const sel = _single ? (el.dataset.key === this._selectedKey) : this._selectedIds.has(el.dataset.id);
+            el.classList.toggle('selected', sel);
+            if (sel && !_scrollEl) _scrollEl = el;
         });
-        // Scroll la propriété sélectionnée dans la vue
-        try {
-            document.querySelector(`#op-tree .tree-item[data-id="${(window.CSS && CSS.escape) ? CSS.escape(id) : id}"]`)
-                ?.scrollIntoView({ block: 'nearest' });
-        } catch (_) { /* sélecteur invalide → ignore */ }
+        _scrollEl?.scrollIntoView({ block: 'nearest' });
 
         const detail = document.getElementById('op-detail');
         if (!detail) return;
 
         if (this._selectedIds.size === 1) {
-            const prop = (APP.state.object_properties || []).find(p => p.id === id);
+            const prop = (this._byKey && this._byKey[key]) || (APP.state.object_properties || []).find(p => p.id === id);
             const isImp = _applyImportedView(detail, prop, this.renderForm(prop));
             _initHResizers('op-detail');
             this._updateSuperPanel(prop || null);
@@ -4120,47 +4162,77 @@ const DPEditor = {
 
     // ── Tree construction ──────────────────────────────────
 
+    // Clés de nœud uniques (id, ou id+sep+provenance pour les homonymes) — cf. OPEditor.
+    _TREE_SEP: '␟',
+    _dupIds(props) {
+        const seen = {}, dup = new Set();
+        props.forEach(p => { seen[p.id] = (seen[p.id] || 0) + 1; });
+        Object.keys(seen).forEach(id => { if (seen[id] > 1) dup.add(id); });
+        return dup;
+    },
+    _nkey(p, dup) {
+        return dup.has(p.id)
+            ? p.id + this._TREE_SEP + (p._imported ? 'I:' + (p._importPrefix || p._importNamespace || 'imp') : 'O')
+            : p.id;
+    },
+    _keyFor(id, imported) {
+        const props = APP.state.datatype_properties || [];
+        const dup = this._dupIds(props);
+        const cands = props.filter(p => p.id === id);
+        if (!cands.length) return id;
+        const chosen = (imported !== undefined ? cands.find(p => !!p._imported === imported) : null) || cands[0];
+        return this._nkey(chosen, dup);
+    },
+
     buildTree(props) {
-        const allIds = new Set(props.map(p => p.id));
+        const dup = this._dupIds(props);
+        const byKey = {}, idToKeys = {};
+        props.forEach(p => { const k = this._nkey(p, dup); byKey[k] = p; (idToKeys[p.id] = idToKeys[p.id] || []).push(k); });
         const childrenOf = {};
-        props.forEach(p => { childrenOf[p.id] = []; });
+        Object.keys(byKey).forEach(k => { childrenOf[k] = []; });
         const hasParent = new Set();
         props.forEach(p => {
-            [...new Set((p.subPropertyOf || []).filter(s => typeof s === 'string' && allIds.has(s)))].forEach(par => {
-                if (!childrenOf[par].includes(p.id)) childrenOf[par].push(p.id);
-                hasParent.add(p.id);
+            const ck = this._nkey(p, dup);
+            [...new Set((p.subPropertyOf || []).filter(s => typeof s === 'string' && idToKeys[s]))].forEach(parId => {
+                const pks = idToKeys[parId];
+                const pk = pks.find(k => !!byKey[k]._imported === !!p._imported) || pks[0];
+                if (!childrenOf[pk].includes(ck)) childrenOf[pk].push(ck);
+                hasParent.add(ck);
             });
         });
-        const alpha = (a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' });
-        const roots = props.filter(p => !hasParent.has(p.id)).map(p => p.id).sort(alpha);
-        Object.keys(childrenOf).forEach(id => childrenOf[id].sort(alpha));
-        return { roots, childrenOf };
+        const alpha = (a, b) => byKey[a].id.localeCompare(byKey[b].id, undefined, { sensitivity: 'base' });
+        const roots = Object.keys(byKey).filter(k => !hasParent.has(k)).sort(alpha);
+        Object.keys(childrenOf).forEach(k => childrenOf[k].sort(alpha));
+        return { roots, childrenOf, byKey };
     },
 
-    _expandAncestors(propId, visited = new Set()) {
-        if (visited.has(propId)) return;
-        visited.add(propId);
-        const props  = APP.state.datatype_properties || [];
-        const allIds = new Set(props.map(p => p.id));
-        const prop   = props.find(p => p.id === propId);
-        if (!prop) return;
-        (prop.subPropertyOf || [])
-            .filter(s => typeof s === 'string' && allIds.has(s))
-            .forEach(par => { this._expanded.add(par); this._expandAncestors(par, visited); });
+    _expandAncestors(keyOrId, visited = new Set()) {
+        const { childrenOf, byKey } = this.buildTree(APP.state.datatype_properties || []);
+        const parentOf = {};
+        Object.entries(childrenOf).forEach(([pk, kids]) => kids.forEach(ck => { (parentOf[ck] = parentOf[ck] || []).push(pk); }));
+        const key = byKey[keyOrId] ? keyOrId : this._keyFor(keyOrId);
+        const walk = (k) => {
+            if (visited.has(k)) return;
+            visited.add(k);
+            (parentOf[k] || []).forEach(pk => { this._expanded.add(pk); walk(pk); });
+        };
+        walk(key);
     },
 
-    _renderNode(id, childrenOf, depth, visited = new Set()) {
-        if (visited.has(id)) return ''; // cycle guard
-        const prop = (APP.state.datatype_properties || []).find(p => p.id === id);
+    _renderNode(key, childrenOf, depth, visited = new Set()) {
+        if (visited.has(key)) return ''; // cycle guard
+        const prop = (this._byKey || {})[key];
         if (!prop) return '';
-        const children = childrenOf[id] || [];
-        const nextVisited = new Set(visited); nextVisited.add(id);
+        const id = prop.id;
+        const children = childrenOf[key] || [];
+        const nextVisited = new Set(visited); nextVisited.add(key);
         const hasChildren = children.length > 0;
-        const isSelected = this._selectedIds.has(id);
-        const isOpen = this._expanded.has(id);
+        const isSelected = this._selectedKey ? this._selectedKey === key : this._selectedIds.has(id);
+        const isOpen = this._expanded.has(key);
         const isImported = !!prop._imported;
         const displayId = _displayId(prop);
         const importedClass = isImported ? ' imported-entity' : '';
+        const kJs = key.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
         const dragAttrs = `${isImported ? '' : `draggable="true" ondragstart="DPEditor.onDragStart(event,'${id}')" ondragend="DPEditor.onDragEnd(event)"`}
                  ondragover="DPEditor.onDragOver(event,'${id}')"
                  ondragleave="DPEditor.onDragLeave(event)"
@@ -4169,25 +4241,26 @@ const DPEditor = {
         <div class="tree-root-node">
             <div class="tree-item${isSelected ? ' selected' : ''}${importedClass}"
                  style="padding-left:${depth * 16 + 6}px"
-                 data-id="${id}"
+                 data-id="${id}" data-key="${_escapeHtml(key)}"
                  ${dragAttrs}
-                 onclick="DPEditor.selectProp('${id}', event)"
+                 onclick="DPEditor.selectProp('${id}', event, ${isImported})"
                  oncontextmenu="DPEditor.showContextMenu(event,'${id}')">
                 ${hasChildren
                     ? `<span class="tree-toggle${isOpen ? ' open' : ''}"
-                             onclick="event.stopPropagation();DPEditor.toggleNode('${id}')">▶</span>`
+                             onclick="event.stopPropagation();DPEditor.toggleNode('${kJs}')">▶</span>`
                     : `<span class="tree-leaf">◦</span>`}
                 <span class="dp-prop-dot tree-dp-dot"></span>
                 <span class="tree-label">${_escapeHtml(displayId)}</span>
             </div>
-            <div id="dp-tcn-${id}" style="display:${isOpen ? 'block' : 'none'}">
+            <div id="dp-tcn-${_escapeHtml(key)}" style="display:${isOpen ? 'block' : 'none'}">
                 ${children.map(cid => this._renderNode(cid, childrenOf, depth + 1, nextVisited)).join('')}
             </div>
         </div>`;
     },
 
     renderTree(props) {
-        const { roots, childrenOf } = this.buildTree(props);
+        const { roots, childrenOf, byKey } = this.buildTree(props);
+        this._byKey = byKey;
         const { propRoot } = APP.getOntologyRootLabels();
         const dpRoot = propRoot === 'rdf:Property' ? 'rdf:Property' : 'owl:topDataProperty';
         const topSel = this._topPropSelected ? ' selected' : '';
@@ -4392,9 +4465,12 @@ const DPEditor = {
         this._updateTreeButtons();
     },
 
-    async selectProp(id, evtOrHist = true) {
+    async selectProp(id, evtOrHist = true, imported) {
         const isShift = (evtOrHist && typeof evtOrHist === 'object') ? evtOrHist.shiftKey : false;
         const _hist   = (evtOrHist && typeof evtOrHist === 'object') ? true : evtOrHist;
+        const _wantImp = (imported !== undefined) ? imported : this._pendingImported;
+        this._pendingImported = undefined;
+        const key = this._keyFor(id, _wantImp);
 
         if (isShift && this._anchorId) {
             const items = [...document.querySelectorAll('#dp-tree .tree-item[data-id]')];
@@ -4407,6 +4483,7 @@ const DPEditor = {
             } else {
                 this._selectedIds.add(id);
             }
+            this._selectedKey = null;
         } else {
             if (this._editingId !== null && id !== this._editingId) {
                 clearTimeout(this._autoSaveTimer);
@@ -4414,6 +4491,7 @@ const DPEditor = {
             }
             this._selectedIds = new Set([id]);
             this._anchorId    = id;
+            this._selectedKey = key;
             if (_hist && !isShift) APP._pushNav('datatype-properties', id);
         }
 
@@ -4424,26 +4502,27 @@ const DPEditor = {
         // les résultats SWRL/Query).
         if (!isShift) {
             const _expBefore = this._expanded.size;
-            this._expandAncestors(id);
+            this._expandAncestors(key);
             if (this._expanded.size !== _expBefore) {
                 const treeEl = document.getElementById('dp-tree');
                 if (treeEl) treeEl.innerHTML = this.renderTree(APP.state.datatype_properties);
             }
         }
 
+        const _single = this._selectedKey && this._selectedIds.size === 1;
+        let _scrollEl = null;
         document.querySelectorAll('#dp-tree .tree-item[data-id]').forEach(el => {
-            el.classList.toggle('selected', this._selectedIds.has(el.dataset.id));
+            const sel = _single ? (el.dataset.key === this._selectedKey) : this._selectedIds.has(el.dataset.id);
+            el.classList.toggle('selected', sel);
+            if (sel && !_scrollEl) _scrollEl = el;
         });
-        try {
-            document.querySelector(`#dp-tree .tree-item[data-id="${(window.CSS && CSS.escape) ? CSS.escape(id) : id}"]`)
-                ?.scrollIntoView({ block: 'nearest' });
-        } catch (_) { /* sélecteur invalide → ignore */ }
+        _scrollEl?.scrollIntoView({ block: 'nearest' });
 
         const detail = document.getElementById('dp-detail');
         if (!detail) return;
 
         if (this._selectedIds.size === 1) {
-            const prop = (APP.state.datatype_properties || []).find(p => p.id === id);
+            const prop = (this._byKey && this._byKey[key]) || (APP.state.datatype_properties || []).find(p => p.id === id);
             const isImp = _applyImportedView(detail, prop, this.renderForm(prop));
             _initHResizers('dp-detail');
             this._updateSuperPanel(prop || null);
@@ -5765,15 +5844,18 @@ const IndividualEditor = {
                 const dispTarget = _displayRefId(a.target);
                 const lbl = rawLbl !== a.target ? rawLbl : dispTarget;
                 const sub = rawLbl !== a.target ? `<span style="font-size:10px;color:var(--text-dim);display:block">${dispTarget}</span>` : '';
+                const derivedBadge = a.derived
+                    ? `<span class="ind-derived-badge" title="Inferred assertion (owl:inverseOf / rdfs:subPropertyOf). To remove it, delete the source assertion." style="flex-shrink:0;font-size:10px;font-weight:600;color:#fff;background:var(--accent,#5f8dd3);border:1px solid var(--accent,#5f8dd3);border-radius:4px;padding:1px 6px;letter-spacing:.02em">⊢ inferred</span>`
+                    : `<button class="btn-frame-del" onclick="${delOnclick}">✕</button>`;
                 return `
-                <div class="ind-prop-row" data-id="${a.target}" style="display:flex;align-items:center;gap:4px;padding:2px 4px">
+                <div class="ind-prop-row${a.derived ? ' ind-derived-row' : ''}"${a.derived ? ' data-derived="1"' : ''} data-id="${a.target}" style="display:flex;align-items:center;gap:4px;padding:2px 4px${a.derived ? ';opacity:0.7' : ''}">
                     <span class="xsd-dot" style="flex-shrink:0;margin:0"></span>
                     <span class="ind-op-label" style="flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;font-family:var(--font-mono);cursor:pointer"
                           onclick="APP.navigateTo('individuals','${a.target}')"
                           onmouseover="this.style.textDecoration='underline';this.style.color='var(--accent,#5f8dd3)'"
                           onmouseout="this.style.textDecoration='';this.style.color=''">${lbl}${sub}</span>
                     <input type="hidden" class="ind-op-target" value="${a.target}">
-                    <button class="btn-frame-del" onclick="${delOnclick}">✕</button>
+                    ${derivedBadge}
                 </div>`;
             }).join('') || '<div class="cls-list-empty">—</div>';
         } else {
@@ -5787,6 +5869,20 @@ const IndividualEditor = {
                           style="flex-shrink:0;font-size:14px;line-height:1;opacity:0.65;text-decoration:none;cursor:pointer"
                           title="Open URL" onclick="event.stopPropagation()">🔗</a>`
                     : '';
+                const derivedBadge = a.derived
+                    ? `<span class="ind-derived-badge" title="Inferred assertion (rdfs:subPropertyOf). To remove it, delete the source assertion." style="flex-shrink:0;font-size:10px;font-weight:600;color:#fff;background:var(--accent,#5f8dd3);border:1px solid var(--accent,#5f8dd3);border-radius:4px;padding:1px 6px;letter-spacing:.02em">⊢ inferred</span>`
+                    : `<button class="btn-frame-del" onclick="${delOnclick}">✕</button>`;
+                if (a.derived) {
+                    // Valeur inférée : span compact + badge JUSTE APRÈS la valeur (pas en fin de ligne)
+                    return `
+                    <div class="ind-prop-row ind-derived-row" data-derived="1" style="display:flex;align-items:center;gap:6px;padding:2px 4px;opacity:0.85">
+                        <span class="ind-dp-value" style="flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;font-family:var(--font-mono);color:var(--text1)">${_escapeHtml(a.value||'')}</span>
+                        ${derivedBadge}
+                        ${urlBtn}
+                        <span class="ind-dp-type" data-dtype="${a.datatype || defDtype}"
+                              style="font-size:10px;color:var(--text-dim);flex-shrink:0;margin-left:auto">${a.datatype || defDtype}</span>
+                    </div>`;
+                }
                 return `
                 <div class="ind-prop-row" style="display:flex;align-items:center;gap:4px;padding:2px 4px">
                     <input type="text" class="ind-dp-value"
@@ -6771,6 +6867,9 @@ const IndividualEditor = {
         document.querySelectorAll('.ind-prop-panel[data-kind="op"]').forEach(panel => {
             const prop = panel.dataset.prop;
             panel.querySelectorAll('.ind-op-target').forEach(sel => {
+                // Les assertions dérivées (inférées) ne sont pas persistées en base :
+                // le backend les re-matérialise depuis leur source.
+                if (sel.closest('.ind-prop-row')?.dataset.derived) return;
                 if (sel.value) objAssertions.push({ property: prop, target: sel.value });
             });
         });
@@ -6779,6 +6878,7 @@ const IndividualEditor = {
         document.querySelectorAll('.ind-prop-panel[data-kind="dp"]').forEach(panel => {
             const prop = panel.dataset.prop;
             panel.querySelectorAll('.ind-prop-row').forEach(row => {
+                if (row.dataset.derived) return;   // inférée → non persistée en base
                 const value = row.querySelector('.ind-dp-value')?.value?.trim() || '';
                 const dtype = row.querySelector('.ind-dp-type')?.dataset?.dtype || 'xsd:string';
                 if (value !== '') dataAssertions.push({ property: prop, value, datatype: dtype });

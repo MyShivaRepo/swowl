@@ -426,7 +426,7 @@ const APP = {
     },
 
     /** Positionne les éditeurs sur section+entityId sans rendre ni pousser */
-    _applyEntityId(section, entityId) {
+    _applyEntityId(section, entityId, opts = {}) {
         if (!entityId) return;
         switch (section) {
             case 'classes':
@@ -442,11 +442,13 @@ const APP = {
             case 'object-properties':
                 OPEditor._selectedId      = entityId;
                 OPEditor._topPropSelected = false;
+                OPEditor._pendingImported = opts.imported;   // désambiguïse les homonymes propre/importé
                 OPEditor._expandAncestors(entityId);
                 break;
             case 'datatype-properties':
                 DPEditor._selectedId      = entityId;
                 DPEditor._topPropSelected = false;
+                DPEditor._pendingImported = opts.imported;
                 DPEditor._expandAncestors(entityId);
                 break;
             case 'annotation-properties':
@@ -511,9 +513,9 @@ const APP = {
     },
 
     /** Navigation cross-onglet avec entité cible */
-    navigateTo(section, entityId) {
+    navigateTo(section, entityId, opts = {}) {
         this._pushNav(section, entityId);
-        this._applyEntityId(section, entityId);
+        this._applyEntityId(section, entityId, opts);
         this.renderSection(section);
         if (section === 'individuals') {
             IndividualEditor.focusIndividual(entityId, false);
@@ -2900,15 +2902,17 @@ const GlobalSearch = {
         });
 
         // ── B. SYSTEM IDs ────────────────────────────────────────────────────
-        (s.classes               || []).forEach(c => { if (_idMatch(c)) results.push({ section: 'classes',               id: c.id, label: c.id }); });
-        (s.object_properties     || []).forEach(p => { if (_idMatch(p)) results.push({ section: 'object-properties',     id: p.id, label: p.id }); });
-        (s.datatype_properties   || []).forEach(p => { if (_idMatch(p)) results.push({ section: 'datatype-properties',   id: p.id, label: p.id }); });
-        (s.annotation_properties || []).forEach(p => { if (_idMatch(p)) results.push({ section: 'annotation-properties', id: p.id, label: p.id }); });
-        (s.individuals           || []).forEach(i => { if (_idMatch(i)) results.push({ section: 'individuals',           id: i.id, label: i.id }); });
-        (s.swrl_rules            || []).forEach(r => { if (_idMatch(r)) results.push({ section: 'swrl-rules',            id: r.id, label: r.id }); });
+        // disp = forme préfixée de l'entité SPÉCIFIQUE (gère les homonymes propre/importé,
+        // ex. deux ObjectProperties « about ») via _displayId(entity).
+        (s.classes               || []).forEach(c => { if (_idMatch(c)) results.push({ section: 'classes',               id: c.id, label: c.id, disp: _displayId(c), imported: !!c._imported }); });
+        (s.object_properties     || []).forEach(p => { if (_idMatch(p)) results.push({ section: 'object-properties',     id: p.id, label: p.id, disp: _displayId(p), imported: !!p._imported }); });
+        (s.datatype_properties   || []).forEach(p => { if (_idMatch(p)) results.push({ section: 'datatype-properties',   id: p.id, label: p.id, disp: _displayId(p), imported: !!p._imported }); });
+        (s.annotation_properties || []).forEach(p => { if (_idMatch(p)) results.push({ section: 'annotation-properties', id: p.id, label: p.id, disp: _displayId(p), imported: !!p._imported }); });
+        (s.individuals           || []).forEach(i => { if (_idMatch(i)) results.push({ section: 'individuals',           id: i.id, label: i.id, disp: _displayId(i), imported: !!i._imported }); });
+        (s.swrl_rules            || []).forEach(r => { if (_idMatch(r)) results.push({ section: 'swrl-rules',            id: r.id, label: r.id, disp: _displayId(r), imported: !!r._imported }); });
         sparqlQueries.forEach(sq => {
             if ((sq.id || '').toLowerCase().includes(lq))
-                results.push({ section: 'sparql-vizq', id: sq.id, label: sq.id });
+                results.push({ section: 'sparql-vizq', id: sq.id, label: sq.id, disp: _displayId(sq), imported: !!sq._imported });
         });
 
         return results;
@@ -2980,26 +2984,26 @@ const GlobalSearch = {
                         inner = `<span class="lbl-dot"></span>
                             <span class="gs-item-label">${_escapeHtml(r.label)}${r.lang ? ` <span class="gs-lang-tag">(${_escapeHtml(r.lang)})</span>` : ''}</span>
                             ${this._dot(r.kind)}
-                            <span class="gs-item-sub">${_escapeHtml(_displayRefId(r.id))}</span>`;
+                            <span class="gs-item-sub">${_escapeHtml(r.disp || _displayRefId(r.id))}</span>`;
                         break;
                     case 'swrl-labels':
                         inner = `<span style="flex-shrink:0;font-size:11px">⚙️</span>
                             <span class="gs-item-label">${_escapeHtml(r.label)}</span>
-                            <span class="gs-item-sub">${_escapeHtml(_displayRefId(r.id))}</span>`;
+                            <span class="gs-item-sub">${_escapeHtml(r.disp || _displayRefId(r.id))}</span>`;
                         break;
                     case 'sparql-labels':
                         inner = `<span style="flex-shrink:0;font-size:11px">🔎</span>
                             <span class="gs-item-label">${_escapeHtml(r.label)}</span>
-                            <span class="gs-item-sub">${_escapeHtml(_displayRefId(r.id))}</span>`;
+                            <span class="gs-item-sub">${_escapeHtml(r.disp || _displayRefId(r.id))}</span>`;
                         break;
                     case 'individual-names':
                         inner = `<span class="xsd-dot" style="flex-shrink:0;margin:0"></span>
                             <span class="gs-item-label">${_escapeHtml(r.label)}</span>
-                            <span class="gs-item-sub">${_escapeHtml(_displayRefId(r.id))}</span>`;
+                            <span class="gs-item-sub">${_escapeHtml(r.disp || _displayRefId(r.id))}</span>`;
                         break;
                     default:
                         inner = `${this._dot(sec)}
-                            <span class="gs-item-label">${_escapeHtml(_displayRefId(r.id))}</span>`;
+                            <span class="gs-item-label">${_escapeHtml(r.disp || _displayRefId(r.id))}</span>`;
                 }
                 html.push(_row(r, inner));
             });
@@ -3056,7 +3060,7 @@ const GlobalSearch = {
             APP.renderSection('queries');
             return;
         }
-        APP.navigateTo(navSection, item.id);
+        APP.navigateTo(navSection, item.id, { imported: item.imported });
     },
 
     onKey(e) {
