@@ -457,8 +457,72 @@ const SWRLEditor = {
                     ${head || '<div class="cls-list-empty" style="font-style:italic">— add consequents —</div>'}
                 </div>
             </div>
+
+            <!-- RUN (évaluation de la règle) -->
+            <div class="cls-frame">
+                <div class="cls-frame-bar" style="gap:10px">
+                    <button class="btn-primary keep-enabled" style="padding:5px 18px;font-size:13px"
+                            onclick="SWRLEditor.runRule()">▶ Run</button>
+                    <span id="swrl-run-status" style="font-size:11px;color:var(--text-dim)"></span>
+                </div>
+                <div class="cls-frame-body" id="swrl-run-results"></div>
+            </div>
             ${_whereExtractedFrame('swrl_rule', rule.id)}
         </div>`;
+    },
+
+    // ── Run : évalue la règle et affiche les faits inférés ───────────
+    async runRule() {
+        const rule = this._editingRule;
+        if (!rule || !rule.id) return;
+        const status = document.getElementById('swrl-run-status');
+        const out    = document.getElementById('swrl-run-results');
+        if (status) status.innerHTML = '<span style="font-style:italic">Running…</span>';
+        if (out) out.innerHTML = '';
+        try {
+            const r = await fetch('/api/swrl-rules/' + encodeURIComponent(rule.id) + '/run');
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            this._renderRunResults(await r.json());
+        } catch (e) {
+            if (status) status.innerHTML = `<span style="color:#ef4444">❌ ${e.message}</span>`;
+        }
+    },
+
+    _renderRunResults(data) {
+        const status = document.getElementById('swrl-run-status');
+        const out    = document.getElementById('swrl-run-results');
+        const inf    = data.inferred || [];
+        const news   = inf.filter(f => !f.already);
+        const esc    = (s) => { const d = document.createElement('div'); d.textContent = String(s ?? ''); return d.innerHTML; };
+        const dref   = (id) => (typeof _displayRefId === 'function' ? _displayRefId(id) : id);
+        if (status) status.innerHTML =
+            `<span style="color:var(--text1)">${data.match_count} match(es)</span> · `
+            + `<span style="color:#10b981;font-weight:600">${news.length} new fact(s)</span>`
+            + (inf.length - news.length ? ` · <span style="color:var(--text-faint)">${inf.length - news.length} already asserted</span>` : '');
+        if (!out) return;
+        if (!inf.length) {
+            out.innerHTML = '<div class="cls-list-empty" style="font-style:italic;padding:8px">No inferred fact — the body is not satisfied by the data.</div>';
+            return;
+        }
+        const rows = inf.map(f => {
+            const pred  = f.kind === 'type' ? '<span style="color:var(--text-dim)">a</span>' : esc(dref(f.property));
+            const badge = f.already
+                ? '<span style="font-size:9px;color:var(--text-faint);border:1px solid var(--border);border-radius:4px;padding:1px 5px">already</span>'
+                : '<span style="font-size:9px;color:#10b981;border:1px solid #10b981;border-radius:4px;padding:1px 5px">NEW</span>';
+            return `<tr>
+                <td style="padding:3px 8px">${esc(dref(f.subject))}</td>
+                <td style="padding:3px 8px;color:var(--accent)">${pred}</td>
+                <td style="padding:3px 8px">${esc(dref(f.value))}</td>
+                <td style="padding:3px 8px;text-align:right">${badge}</td>
+            </tr>`;
+        }).join('');
+        out.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:12px;font-family:var(--font-mono)">
+            <thead><tr style="color:var(--text-dim);font-size:9px;text-transform:uppercase;letter-spacing:.04em">
+                <th style="text-align:left;padding:3px 8px">Subject</th>
+                <th style="text-align:left;padding:3px 8px">Property</th>
+                <th style="text-align:left;padding:3px 8px">Object</th>
+                <th></th></tr></thead>
+            <tbody>${rows}</tbody></table>`;
     },
 
     // ── Rendu des listes d'atomes ────────────────────────────────

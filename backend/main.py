@@ -2324,6 +2324,28 @@ def get_sword_rule(rule_id: str):
     return rule
 
 
+@app.get("/api/swrl-rules/{rule_id}/run", tags=["SWRL"])
+def run_swrl_rule(rule_id: str):
+    """Évalue une règle SWRL contre les faits de l'ontologie courante (avec clôture
+    des sous-classes et inverses, schéma importé inclus). Retourne les liaisons du
+    corps et les faits inférés par la tête. Gère aussi les règles importées."""
+    onto = require_onto()
+    rule = next((r for r in onto.swrl_rules if r.id == rule_id), None)
+    if rule is None:
+        # Règle importée (schéma) → la charger depuis les entités importées
+        try:
+            imp = get_imported_entities()
+            rd = next((r for r in (imp.get("swrl_rules") or []) if r.get("id") == rule_id), None)
+            if rd is not None:
+                rule = SWRLRule.model_validate(rd)
+        except Exception:
+            rule = None
+    if rule is None:
+        raise HTTPException(404, f"SWRL rule '{rule_id}' not found")
+    engine = _build_inference_engine(onto)
+    return engine.evaluate_rule(rule)
+
+
 @app.put("/api/swrl-rules/{rule_id}", tags=["SWRL"])
 def update_sword_rule(rule_id: str, rule: SWRLRule):
     onto = require_onto()

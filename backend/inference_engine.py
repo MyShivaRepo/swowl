@@ -498,3 +498,181 @@ class InferenceEngine:
             inferred_inverse_properties=inv_props,
             inferred_inverse_restrictions=inv_restr,
         )
+
+    # ── Évaluation d'une règle SWRL (« Run rule ») ───────────────────
+    def evaluate_rule(self, rule) -> dict:
+        """Évalue une règle SWRL contre les faits (types via clôture des sous-classes,
+        assertions objet/data — base + dérivées). Retourne les liaisons de variables
+        satisfaisant le corps et les faits inférés par la tête.
+        Couvre : type_atom, property_atom (objet & data), equality_atom (comparaisons
+        =,!=,>,>=,<,<=), naf_block (négation par échec), conditional (tête conditionnelle).
+        """
+        import re as _re
+
+        def _attr(a, k, d=None):
+            return getattr(a, k, d) if not isinstance(a, dict) else a.get(k, d)
+        def _ty(a):
+            return _attr(a, 'type')
+
+        closure = self.compute_subclass_closure()
+        # Appartenance de type (asserté + ancêtres)
+        typed: Dict[str, Set[str]] = {}
+        for iid, info in self.ind_index.items():
+            ts = set(info["types"])
+            for t in list(ts):
+                ts |= closure.get(t, set())
+            typed[iid] = ts
+        _members_cache: Dict[str, Set[str]] = {}
+        def members(cls):
+            if cls not in _members_cache:
+                _members_cache[cls] = {i for i, ts in typed.items() if cls in ts}
+            return _members_cache[cls]
+
+        # Faits (s, prop, o) : assertions objet + data unifiées
+        facts = []
+        for iid, info in self.ind_index.items():
+            for (prop, tgt) in info["obj"]:
+                facts.append((iid, prop, tgt))
+            for (prop, val, _dt) in info["data"]:
+                facts.append((iid, prop, val))
+
+        def is_var(x):
+            return isinstance(x, str) and x.startswith('?')
+        def resolve(x, b):
+            return b.get(x, x) if is_var(x) else x
+        def _num(x):
+            try:
+                return float(str(x).strip().strip('"').strip("'"))
+            except (ValueError, TypeError):
+                return None
+        def _const_eq(c, fo):
+            c2 = c.strip('"').strip("'") if isinstance(c, str) else c
+            fo2 = fo.strip('"').strip("'") if isinstance(fo, str) else fo
+            return c2 == fo2 or c == fo
+        def _compare(lhs, op, rhs):
+            ln, rn = _num(lhs), _num(rhs)
+            if ln is not None and rn is not None:
+                a, b = ln, rn
+            else:
+                a = str(lhs).strip('"').strip("'"); b = str(rhs).strip('"').strip("'")
+            return {
+                '=':  a == b, '!=': a != b, '>': a > b,
+                '>=': a >= b, '<': a < b, '<=': a <= b,
+            }.get(op, False)
+
+        def eval_atoms(atoms, bindings):
+            for atom in (atoms or []):
+                bindings = eval_atom(atom, bindings)
+                if not bindings:
+                    break
+            return bindings
+
+        def eval_atom(atom, bindings):
+            ty = _ty(atom)
+            out = []
+            if ty == "type_atom":
+                var, cls = _attr(atom, 'var', ''), _attr(atom, 'class_id', '')
+                if not cls:
+                    return bindings
+                for b in bindings:
+                    if is_var(var):
+                        if var in b:
+                            if cls in typed.get(b[var], set()):
+                                out.append(b)
+                        else:
+                            for i in members(cls):
+                                nb = dict(b); nb[var] = i; out.append(nb)
+                    else:
+                        if cls in typed.get(var, set()):
+                            out.append(b)
+            elif ty == "property_atom":
+                subj = _attr(atom, 'subject', ''); prop = _attr(atom, 'property_id', '')
+                obj  = _attr(atom, 'object', '?_'); wildcard = (obj == "?_")
+                for b in bindings:
+                    for (fs, fp, fo) in facts:
+                        if fp != prop:
+                            continue
+                        nb = dict(b)
+                        # sujet
+                        if is_var(subj):
+                            if subj in nb:
+                                if nb[subj] != fs: continue
+                            else:
+                                nb[subj] = fs
+                        elif subj != fs:
+                            continue
+                        # objet
+                        if wildcard:
+                            pass
+                        elif is_var(obj):
+                            if obj in nb:
+                                if nb[obj] != fo: continue
+                            else:
+                                nb[obj] = fo
+                        elif not _const_eq(obj, fo):
+                            continue
+                        out.append(nb)
+            elif ty == "equality_atom":
+                var = _attr(atom, 'var', ''); op = _attr(atom, 'operator', '=')
+                val = _attr(atom, 'value', '')
+                for b in bindings:
+                    lhs, rhs = resolve(var, b), resolve(val, b)
+                    if is_var(lhs) or is_var(rhs):   # variable non liée → indécidable
+                        continue
+                    if _compare(lhs, op, rhs):
+                        out.append(b)
+            elif ty == "naf_block":
+                inner = _attr(atom, 'atoms', []) or []
+                for b in bindings:
+                    if not eval_atoms(inner, [b]):   # NAF : garder si non satisfiable
+                        out.append(b)
+            else:
+                out = bindings   # atome inconnu : ne filtre pas
+            return out
+
+        body_bindings = eval_atoms(rule.body, [{}])
+
+        inferred = []
+        seen = set()
+        def add_inf(kind, subject, prop=None, value=None):
+            if is_var(subject) or (value is not None and is_var(value)):
+                return
+            if kind == "type":
+                already = value in typed.get(subject, set())
+                key = ("type", subject, value)
+            else:
+                already = (subject, prop, value) in facts
+                key = ("obj", subject, prop, value)
+            if key in seen:
+                return
+            seen.add(key)
+            inferred.append({"kind": kind, "subject": subject,
+                             "property": prop, "value": value, "already": already})
+
+        def apply_head(atoms, bindings):
+            for atom in (atoms or []):
+                ty = _ty(atom)
+                if ty == "type_atom":
+                    for b in bindings:
+                        add_inf("type", resolve(_attr(atom, 'var', ''), b),
+                                value=_attr(atom, 'class_id', ''))
+                elif ty == "property_atom":
+                    for b in bindings:
+                        add_inf("object", resolve(_attr(atom, 'subject', ''), b),
+                                prop=_attr(atom, 'property_id', ''),
+                                value=resolve(_attr(atom, 'object', ''), b))
+                elif ty == "conditional":
+                    cond = _attr(atom, 'condition', []); cons = _attr(atom, 'consequent', [])
+                    for b in bindings:
+                        if eval_atoms(cond, [b]):
+                            apply_head(cons, [b])
+                # equality_atom / naf_block en tête : pas de fait produit
+
+        apply_head(rule.head, body_bindings)
+
+        return {
+            "rule_id": getattr(rule, 'id', ''),
+            "match_count": len(body_bindings),
+            "bindings": [dict(b) for b in body_bindings],
+            "inferred": inferred,
+        }

@@ -5609,10 +5609,10 @@ const IndividualEditor = {
         const depth     = (id) => { if (depthCache[id] === undefined) depthCache[id] = this._classDepth(id, classes); return depthCache[id]; };
         const alpha     = (a, b) => a.localeCompare(b);
 
-        const addProp = (map, r) => {
+        const addProp = (map, r, fromClass) => {
             if (!map.has(r.property)) {
                 const kind = (APP.state.object_properties || []).some(p => p.id === r.property) ? 'op' : 'dp';
-                map.set(r.property, { kind, fillers: new Set() });
+                map.set(r.property, { kind, fillers: new Set(), _fromClass: fromClass || null });
             }
             if (r.filler && (r.type === 'someValuesFrom' || r.type === 'allValuesFrom'))
                 map.get(r.property).fillers.add(r.filler);
@@ -5631,10 +5631,10 @@ const IndividualEditor = {
         });
         // Sort: ascending depth, then alpha on typeId for tie-breaking
         assertedByClass.sort((a, b) => a.d - b.d || alpha(a.typeId, b.typeId));
-        assertedByClass.forEach(({ props }) => {
+        assertedByClass.forEach(({ typeId, props }) => {
             // Alpha dans la classe courante
             [...props].sort((a, b) => alpha(a.property, b.property))
-                      .forEach(r => addProp(asserted, r));
+                      .forEach(r => addProp(asserted, r, typeId));
         });
 
         // ── Inherited: ancestors, ordered from highest to lowest ──────────────
@@ -5659,9 +5659,9 @@ const IndividualEditor = {
         // Sort ancestors by ascending depth, then alpha
         [...ancMap.entries()]
             .sort((a, b) => depth(a[0]) - depth(b[0]) || alpha(a[0], b[0]))
-            .forEach(([, props]) => {
+            .forEach(([clsId, props]) => {
                 [...props].sort((a, b) => alpha(a.property, b.property))
-                          .forEach(r => { if (!inh.has(r.property)) addProp(inh, r); });
+                          .forEach(r => { if (!inh.has(r.property)) addProp(inh, r, clsId); });
             });
 
         return { inherited: inh, asserted };
@@ -5794,33 +5794,6 @@ const IndividualEditor = {
     },
 
 
-    /** Propriétés applicables par DOMAINE pour les types donnés (et leurs ancêtres),
-     *  hors propriétés déjà couvertes par les restrictions de la classe.
-     *  Permet d'afficher des panneaux d'assertion même sans axiome de restriction
-     *  (cohérent avec le picker _buildPropOptions / _openDisplayPropModal). */
-    _getDomainProperties(types, covered) {
-        const map = new Map();
-        if (!types || !types.length) return map;
-        const classes  = APP.state.classes || [];
-        const relevant = new Set();
-        const addAnc = (id) => {
-            if (relevant.has(id)) return;
-            relevant.add(id);
-            const cls = classes.find(c => c.id === id);
-            if (!cls) return;
-            (cls.subClassOf || []).filter(s => typeof s === 'string').forEach(addAnc);
-        };
-        types.forEach(addAnc);
-        const ops = APP.state.object_properties || [];
-        [...ops, ...(APP.state.datatype_properties || [])].forEach(p => {
-            if (covered.has(p.id) || map.has(p.id)) return;
-            if ((p.domain || []).some(d => relevant.has(d))) {
-                map.set(p.id, { kind: ops.some(o => o.id === p.id) ? 'op' : 'dp', fillers: new Set() });
-            }
-        });
-        return map;
-    },
-
     renderForm(ind = null, defaultClassId = null) {
         const isNew = !ind;
         IndividualEditor._editingId = isNew ? null : ind.id;
@@ -5855,15 +5828,33 @@ const IndividualEditor = {
 
         // Panels dynamiques : inherited d'abord (alpha), puis asserted (alpha)
         const { inherited: inhProps, asserted: assProps } = this._getClassProperties(i.types || []);
-        // Propriétés applicables par domaine (non couvertes par les restrictions).
-        const domProps = this._getDomainProperties(i.types || [], new Set([...inhProps.keys(), ...assProps.keys()]));
-        const makePanels = (map) => [...map.entries()]
-            .map(([propId, propInfo]) => this._renderPropPanel(propId, propInfo, i, ac, ico))
-            .join('<div class="h-resizer"></div>');
+        // Séparateur indiquant la classe de provenance d'un groupe de propriétés.
+        const originSep = (clsId) => `
+            <div style="display:flex;align-items:center;gap:8px;padding:6px 4px 2px;user-select:none">
+                <span style="flex:1;height:1px;background:var(--border)"></span>
+                <span class="cls-dot" style="flex-shrink:0"></span>
+                <span style="font-size:10px;color:var(--text-faint);font-style:italic;white-space:nowrap">
+                    from ${_displayRefId(clsId)}
+                </span>
+                <span style="flex:1;height:1px;background:var(--border)"></span>
+            </div>`;
+        // Construit les panneaux en insérant un séparateur à chaque changement de
+        // classe d'origine (_fromClass) ; sinon un h-resizer entre panneaux du même groupe.
+        const makePanels = (map) => {
+            let last = null, first = true, html = '';
+            for (const [propId, propInfo] of map.entries()) {
+                const from = propInfo._fromClass || null;
+                if (from && from !== last) { html += originSep(from); last = from; }
+                else if (!first)           { html += '<div class="h-resizer"></div>'; }
+                html += this._renderPropPanel(propId, propInfo, i, ac, ico);
+                first = false;
+            }
+            return html;
+        };
         // Propriétés réellement assertées par l'individu mais NON couvertes par les
         // restrictions/domaines ci-dessus (ex. MemberOf avec domaine vide) → sinon
         // l'assertion existante serait invisible.
-        const _coveredPanels = new Set([...inhProps.keys(), ...assProps.keys(), ...domProps.keys()]);
+        const _coveredPanels = new Set([...inhProps.keys(), ...assProps.keys()]);
         const _opSet = new Set((APP.state.object_properties   || []).map(p => p.id));
         const _dpSet = new Set((APP.state.datatype_properties || []).map(p => p.id));
         const usedProps = new Map();
@@ -5875,20 +5866,11 @@ const IndividualEditor = {
         });
         const inhHtml  = makePanels(inhProps);
         const assHtml  = [makePanels(assProps), makePanels(usedProps)].filter(Boolean).join('<div class="h-resizer"></div>');
-        const domHtml  = makePanels(domProps);
-        const domSeparator = domProps.size ? `
-            <div style="display:flex;align-items:center;gap:8px;padding:6px 4px 2px;user-select:none">
-                <span style="flex:1;height:1px;background:var(--border)"></span>
-                <span style="font-size:10px;color:var(--text-faint);font-style:italic;white-space:nowrap">
-                    🧩 Applicable Properties (by domain)
-                </span>
-                <span style="flex:1;height:1px;background:var(--border)"></span>
-            </div>` : '';
 
         // Plus de section « inférée » : les entailments (subPropertyOf / inverseOf)
         // sont désormais matérialisés côté backend (assertions derived=True).
-        const propPanelsHtml = [inhHtml, assHtml, domSeparator + domHtml].filter(Boolean).join('<div class="h-resizer"></div>');
-        const hasProps = inhProps.size + assProps.size + domProps.size + usedProps.size > 0;
+        const propPanelsHtml = [inhHtml, assHtml].filter(Boolean).join('<div class="h-resizer"></div>');
+        const hasProps = inhProps.size + assProps.size + usedProps.size > 0;
 
         return `
         <div class="cls-editor">

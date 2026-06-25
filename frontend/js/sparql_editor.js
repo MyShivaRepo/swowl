@@ -969,8 +969,43 @@ const SparqlEditor = {
                     </div>
                     <div class="sq-dd-list"
                          onmousedown="event.preventDefault()"
-                         onclick="event.stopPropagation();SparqlEditor._ddListClick('${ddId}',event,'${cbName}',${idxJson})">${rows}</div>
+                         onclick="event.stopPropagation();SparqlEditor._ddListClick('${ddId}',event,'${cbName}',${idxJson})"
+                    ><input type="text" class="sq-dd-search" placeholder="Search…"
+                            autocomplete="off" spellcheck="false"
+                            style="width:calc(100% - 12px);margin:4px 6px 6px;padding:4px 8px;
+                                   box-sizing:border-box;font-size:11px;font-family:var(--font-mono);
+                                   background:var(--bg3);border:1px solid var(--border);
+                                   border-radius:5px;color:var(--text1)"
+                            onmousedown="event.stopPropagation()"
+                            onclick="event.stopPropagation()"
+                            oninput="SparqlEditor._ddFilter('${ddId}',this.value)">${rows}</div>
                 </div>`;
+    },
+
+    /** Filtre le menu déroulant : masque les items hors recherche et les en-têtes
+     *  de groupe devenus vides. */
+    _ddFilter(ddId, val) {
+        const el = document.getElementById(ddId);
+        if (!el) return;
+        const list = el.querySelector('.sq-dd-list');
+        if (!list) return;
+        const q = (val || '').trim().toLowerCase();
+        list.querySelectorAll('.tree-item').forEach(it => {
+            const lbl = (it.querySelector('.tree-label')?.textContent || '').toLowerCase();
+            it.style.display = (!q || lbl.includes(q)) ? '' : 'none';
+        });
+        // En-têtes de groupe : masqués si aucun item visible jusqu'au groupe suivant
+        const children = [...list.children];
+        children.forEach((node, i) => {
+            if (!node.classList.contains('sq-dd-grp')) return;
+            let anyVisible = false;
+            for (let j = i + 1; j < children.length; j++) {
+                if (children[j].classList.contains('sq-dd-grp')) break;
+                if (children[j].classList.contains('tree-item')
+                    && children[j].style.display !== 'none') { anyVisible = true; break; }
+            }
+            node.style.display = anyVisible ? '' : 'none';
+        });
     },
 
 
@@ -1024,7 +1059,8 @@ const SparqlEditor = {
         // Small delay so onmousedown on items fires before blur
         setTimeout(() => {
             const el = document.getElementById(id);
-            if (el) el.classList.remove('sq-dd-open');
+            // Ne pas fermer si le focus est resté dans le menu (ex. champ de recherche)
+            if (el && !el.contains(document.activeElement)) el.classList.remove('sq-dd-open');
         }, 120);
     },
 
@@ -1132,15 +1168,17 @@ const SparqlEditor = {
     // Chip + hidden text input
     _atomFieldText(value, chipId, edId, idx, field, placeholder, width, flex) {
         const entity  = value && !value.startsWith('?') ? this._resolveEntity(value) : null;
+        // Entité navigable → clic gauche = naviguer (clic droit = éditer).
+        // Sinon (variable, valeur libre) → clic gauche = éditer directement.
         const navAttr = entity
             ? `onclick="SparqlEditor.navigateToEntity('${this._esc(value)}')" `
-            : `onclick="" `;
+            : `onclick="SparqlEditor._atomEdit('${chipId}','${edId}',null,event)" `;
         const navCls  = entity ? ' sq-atom-nav' : '';
         const wStyle  = flex ? `flex:1` : `width:${width}`;
         return `<span class="sq-atom-chip${navCls}" id="${chipId}"
                       ${navAttr}
                       oncontextmenu="SparqlEditor._atomEdit('${chipId}','${edId}',null,event)"
-                      title="Right-click to edit">${this._atomChipHtml(value)}</span
+                      title="${entity ? 'Left-click: navigate · Right-click: edit' : 'Click to edit'}">${this._atomChipHtml(value)}</span
                ><input id="${edId}" type="text" class="cls-id-inp"
                        style="display:none;${wStyle};font-family:var(--font-mono);font-size:11px;flex-shrink:0"
                        value="${this._esc(value)}"
@@ -1158,12 +1196,12 @@ const SparqlEditor = {
                         ? this._resolveEntity(value) : null;
         const navAttr = entity
             ? `onclick="SparqlEditor.navigateToEntity('${this._esc(value)}')" `
-            : `onclick="" `;
+            : `onclick="SparqlEditor._atomEdit('${chipId}','${edId}','${ddId}',event)" `;
         const navCls  = entity ? ' sq-atom-nav' : '';
         return `<span class="sq-atom-chip${navCls}" id="${chipId}"
                       ${navAttr}
                       oncontextmenu="SparqlEditor._atomEdit('${chipId}','${edId}','${ddId}',event)"
-                      title="Right-click to edit">${this._atomChipHtml(value)}</span
+                      title="${entity ? 'Left-click: navigate · Right-click: change' : 'Click to change'}">${this._atomChipHtml(value)}</span
                ><span id="${edId}" style="display:none">${ddHtml}</span>`;
     },
 
