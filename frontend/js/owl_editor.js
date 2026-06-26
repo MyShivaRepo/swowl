@@ -73,12 +73,9 @@ function _classTreePickerItems(callExpr, excludeIds = []) {
     const lines = [];
 
     if (!excluded.has('owl:Thing')) {
-        lines.push(`<div class="tree-item" data-id="owl:Thing"
-            style="padding-left:6px" onclick="${callExpr}('owl:Thing')">
-            <span class="tree-leaf">◦</span>
-            <span class="cls-dot tree-thing-dot"></span>
-            <span class="tree-label" style="font-style:italic">owl:Thing</span>
-        </div>`);
+        lines.push(_pickerItem('owl:Thing',
+            `<span class="tree-leaf">◦</span><span class="cls-dot tree-thing-dot"></span><span class="tree-label" style="font-style:italic">owl:Thing</span>`,
+            { style: 'padding-left:6px', onclick: `${callExpr}('owl:Thing')` }));
     }
 
     const visit = (key, depth) => {
@@ -89,12 +86,9 @@ function _classTreePickerItems(callExpr, excludeIds = []) {
             return;
         }
         const pl = depth * 16 + 6;
-        lines.push(`<div class="tree-item" data-id="${c.id}"
-            style="padding-left:${pl}px" onclick="${callExpr}('${c.id}')">
-            <span class="tree-leaf">◦</span>
-            <span class="cls-dot tree-cls-dot"></span>
-            <span class="tree-label">${_displayId(c)}</span>
-        </div>`);
+        lines.push(_pickerItem(c.id,
+            `<span class="tree-leaf">◦</span><span class="cls-dot tree-cls-dot"></span><span class="tree-label">${_displayId(c)}</span>`,
+            { style: `padding-left:${pl}px`, onclick: `${callExpr}('${c.id}')` }));
         (childrenOf[key] || []).forEach(child => visit(child, depth + 1));
     };
     roots.forEach(key => visit(key, 1));
@@ -114,12 +108,9 @@ function _opTreePickerItems(onSelectExpr, excludeIds = []) {
         const prop = byKey[key]; if (!prop) return;
         if (excluded.has(prop.id)) return;
         const pl = depth * 16 + 6;
-        lines.push(`<div class="tree-item" data-id="${prop.id}"
-            style="padding-left:${pl}px" onclick="${onSelectExpr}">
-            <span class="tree-leaf">◦</span>
-            <span class="op-prop-dot"></span>
-            <span class="tree-label">${_displayId(prop)}</span>
-        </div>`);
+        lines.push(_pickerItem(prop.id,
+            `<span class="tree-leaf">◦</span><span class="op-prop-dot"></span><span class="tree-label">${_displayId(prop)}</span>`,
+            { style: `padding-left:${pl}px`, onclick: onSelectExpr }));
         (childrenOf[key] || []).forEach(child => visit(child, depth + 1));
     };
     roots.forEach(key => visit(key, 1));
@@ -144,11 +135,9 @@ function _propTreeLines(props, excluded, dotCls, callExpr) {
     const visit = (id, depth) => {
         if (!excluded.has(id)) {
             const pl = depth * 16 + 6;
-            lines.push(`<div class="tree-item restr-prop-item" data-id="${id}"
-                style="padding:3px 8px;padding-left:${pl}px" onclick="${callExpr}('${id}')">
-                <span class="${dotCls}" style="flex-shrink:0"></span>
-                <span class="tree-label" style="margin-left:4px">${_displayRefId(id)}</span>
-            </div>`);
+            lines.push(_pickerItem(id,
+                `<span class="${dotCls}" style="flex-shrink:0"></span><span class="tree-label" style="margin-left:4px">${_displayRefId(id)}</span>`,
+                { extraClass: 'restr-prop-item', style: `padding:3px 8px;padding-left:${pl}px`, onclick: `${callExpr}('${id}')` }));
         }
         (childrenOf[id] || []).forEach(c => visit(c, depth + 1));
     };
@@ -3034,6 +3023,16 @@ function _filterPicker(input) {
     });
 }
 
+/** COUCHE 1 — Fabrique UNIQUE d'item de picker filtrable.
+ *  Garantit structurellement `class="tree-item"` + `data-id` (que `_filterPicker`
+ *  cible). `inner` = contenu libre (dot + label + badge…). Empêche l'oubli de
+ *  data-id (cause du bug du picker d'annotations). */
+function _pickerItem(id, inner, { extraClass = '', style = '', onclick = '' } = {}) {
+    const did = String(id == null ? '' : id).replace(/"/g, '&quot;');
+    return `<div class="tree-item${extraClass ? ' ' + extraClass : ''}" data-id="${did}"`
+         + ` style="${style}" onclick="${onclick}">${inner}</div>`;
+}
+
 /** Ajoute (à la première ouverture) un champ filtre en tête d'un .cls-tree-picker,
  *  enveloppe les items dans une zone scrollable, puis remet à zéro et focus le filtre. */
 /** Affiche un picker en overlay flottant (position:fixed) juste sous le bouton
@@ -3078,6 +3077,11 @@ function _decoratePickerWithFilter(el) {
     filter.value = '';
     _filterPicker(filter);
     setTimeout(() => filter.focus(), 0);
+    // COUCHE 3 — garde-fou runtime : un item .tree-item sans data-id serait invisible
+    // au filtre (cause du bug du picker d'annotations). On le signale immédiatement.
+    const orphan = el.querySelector('.tree-item:not([data-id]):not([data-cls])');
+    if (orphan && typeof console !== 'undefined')
+        console.warn('[picker] .tree-item sans data-id — il sera ignoré par le filtre.', orphan);
 }
 
 function _togglePicker(id) {
@@ -3119,13 +3123,11 @@ function _annoPickerItems(editorName) {
         ? APEditor._buildUserTree(userProps)
         : { childrenOf: {}, builtinChildrenOf: {} };
 
-    const itemHtml = (id, depth, isBuiltin) => `
-        <div class="tree-item" data-id="${id}" style="padding:3px 8px;padding-left:${8 + depth * 14}px"
-             onclick="${editorName}.addOtherAnnotRow('${id}')">
-            <span class="anno-prop-dot" style="margin-right:4px;flex-shrink:0"></span>
-            <span class="tree-label" style="font-size:12px;color:var(--text2);font-family:var(--font-mono)">${_displayRefId(id)}</span>
-            ${isBuiltin ? '<span style="font-size:10px;color:var(--text-faint);font-style:italic;margin-left:4px">built-in</span>' : ''}
-        </div>`;
+    const itemHtml = (id, depth, isBuiltin) => _pickerItem(id,
+        `<span class="anno-prop-dot" style="margin-right:4px;flex-shrink:0"></span>`
+        + `<span class="tree-label" style="font-size:12px;color:var(--text2);font-family:var(--font-mono)">${_displayRefId(id)}</span>`
+        + (isBuiltin ? '<span style="font-size:10px;color:var(--text-faint);font-style:italic;margin-left:4px">built-in</span>' : ''),
+        { style: `padding:3px 8px;padding-left:${8 + depth * 14}px`, onclick: `${editorName}.addOtherAnnotRow('${id}')` });
 
     const renderUserNode = (id, depth) => {
         const children = childrenOf[id] || [];
