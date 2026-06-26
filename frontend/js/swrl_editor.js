@@ -511,10 +511,17 @@ const SWRLEditor = {
             const m = (typeof SparqlEditor !== 'undefined' && SparqlEditor._resolveEntity)
                 ? SparqlEditor._resolveEntity(id) : null;
             if (!m) return esc(dref(id));
+            // Display Name prioritaire (ex. individu) + ID préfixé en sous-ligne (plus petit/sombre),
+            // comme l'onglet Queries.
+            const mainText = m.displayName || dref(id);
+            const subText  = m.displayName ? `<span class="sq-res-nav-id">${esc(dref(id))}</span>` : '';
+            // Icône centrée verticalement entre les 2 textes (via .sq-res-nav align-items:center), comme Queries.
             const dot = m.dot ? `<span class="${m.dot}" style="flex-shrink:0;margin-right:4px"></span>` : '';
             return `<span class="sq-res-nav" title="${esc(id)}"
                           onclick="SparqlEditor.navigateToEntity('${String(id).replace(/'/g, "\\'")}')"
-                    >${dot}<span class="sq-res-nav-lbl">${esc(dref(id))}</span></span>`;
+                    >${dot}<span style="display:flex;flex-direction:column;min-width:0">
+                        <span class="sq-res-nav-lbl">${esc(mainText)}</span>${subText}
+                    </span></span>`;
         };
         if (status) status.innerHTML =
             `<span style="color:var(--text1)">${data.match_count} match(es)</span> · `
