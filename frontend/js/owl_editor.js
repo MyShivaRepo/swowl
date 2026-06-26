@@ -5905,6 +5905,12 @@ const IndividualEditor = {
         if (kind === 'op') {
             const current = (ind?.objectAssertions || []).filter(a => a.property === propId);
             const ctxClass = effectiveRange[0] || null;
+            // Tri alphabétique par libellé affiché (Display Name prioritaire, sinon ID préfixé)
+            const _sortKey = a => {
+                const rl = this._labelForId(a.target, ctxClass);
+                return (rl !== a.target ? rl : _displayRefId(a.target)).toLowerCase();
+            };
+            current.sort((x, y) => _sortKey(x).localeCompare(_sortKey(y), undefined, { sensitivity: 'base' }));
             rows = current.map(a => {
                 const rawLbl = this._labelForId(a.target, ctxClass);
                 const dispTarget = _displayRefId(a.target);
