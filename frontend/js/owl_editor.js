@@ -1245,21 +1245,8 @@ const ClassEditor = {
 
     /** Ouvre/ferme le picker « + Property » (rattacher une OP/DP existante au domaine). */
     showDomainPropPicker() {
-        const el = document.getElementById('domain-prop-picker');
-        if (!el) return;
-        const v = el.style.display !== 'none';
-        el.style.display = v ? 'none' : '';
-        if (!v) {
-            if (typeof _decoratePickerWithFilter === 'function') _decoratePickerWithFilter(el);
-            _floatPickerBelow(el, '[onclick*="showDomainPropPicker"]');
-            const _close = (e) => {
-                if (!el.contains(e.target) && !e.target.closest('[onclick*="showDomainPropPicker"]')) {
-                    el.style.display = 'none';
-                    document.removeEventListener('mousedown', _close, true);
-                }
-            };
-            document.addEventListener('mousedown', _close, true);
-        }
+        _openPicker(document.getElementById('domain-prop-picker'),
+            { anchor: '[onclick*="showDomainPropPicker"]', guard: '[onclick*="showDomainPropPicker"]' });
     },
 
     /** Rattache la propriété sélectionnée à la classe courante : ajoute la classe
@@ -1657,23 +1644,7 @@ const ClassEditor = {
 
     // ── Superclass helpers ─────────────────────────────────────
 
-    showPicker(id) {
-        const el = document.getElementById(id);
-        if (!el) return;
-        const visible = el.style.display !== 'none';
-        el.style.display = visible ? 'none' : '';
-        if (!visible) {
-            _decoratePickerWithFilter(el);
-            el.focus();
-            const close = (e) => {
-                if (!el.contains(e.target) && !e.target.closest('[onclick*="showPicker"]')) {
-                    el.style.display = 'none';
-                    document.removeEventListener('click', close, true);
-                }
-            };
-            setTimeout(() => document.addEventListener('click', close, true), 0);
-        }
-    },
+    showPicker(id) { _togglePicker(id); },
 
     addSuperClass(id) {
         if (!id) return;
@@ -2377,22 +2348,8 @@ const RestrictionEditor = {
 
     // ── Toolbar actions ──────────────────────────────────────────
     showPropPicker() {
-        const el = document.getElementById('restr-prop-picker');
-        if (!el) return;
-        const v = el.style.display !== 'none';
-        el.style.display = v ? 'none' : '';
-        if (!v) {
-            _decoratePickerWithFilter(el);   // champ filtre + liste scrollable (homogène)
-            _floatPickerBelow(el, '[onclick*="showPropPicker"]');
-            // Fermer si clic en dehors du picker
-            const _close = (e) => {
-                if (!el.contains(e.target) && !e.target.closest('[onclick*="showPropPicker"]')) {
-                    el.style.display = 'none';
-                    document.removeEventListener('mousedown', _close, true);
-                }
-            };
-            document.addEventListener('mousedown', _close, true);
-        }
+        _openPicker(document.getElementById('restr-prop-picker'),
+            { anchor: '[onclick*="showPropPicker"]', guard: '[onclick*="showPropPicker"]' });
     },
 
     addProperty(propId) {
@@ -3084,22 +3041,34 @@ function _decoratePickerWithFilter(el) {
         console.warn('[picker] .tree-item sans data-id — il sera ignoré par le filtre.', orphan);
 }
 
-function _togglePicker(id) {
-    const el = document.getElementById(id);
+/** COUCHE 2 — Point d'ouverture UNIQUE d'un picker filtrable.
+ *  Bascule la visibilité, et à l'ouverture garantit TOUJOURS : champ de recherche
+ *  (_decoratePickerWithFilter), positionnement (flottant si `anchor`, sinon inline),
+ *  et fermeture au clic extérieur (avec garde anti-fermeture sur le bouton déclencheur).
+ *  → impossible d'ouvrir un picker sans recherche ; supprime ~4 copies de ce code.
+ *  @param {Element} el
+ *  @param {{anchor?:string, guard?:string, closeOn?:'click'|'mousedown'}} [opts]
+ */
+function _openPicker(el, { anchor = null, guard = '', closeOn = (anchor ? 'mousedown' : 'click') } = {}) {
     if (!el) return;
     const visible = el.style.display !== 'none';
     el.style.display = visible ? 'none' : '';
-    if (!visible) {
-        _decoratePickerWithFilter(el);
-        el.focus();
-        const close = (e) => {
-            if (!el.contains(e.target) && !e.target.closest('[onclick*="_togglePicker"],[onclick*="showPicker"]')) {
-                el.style.display = 'none';
-                document.removeEventListener('click', close, true);
-            }
-        };
-        setTimeout(() => document.addEventListener('click', close, true), 0);
-    }
+    if (visible) return;                       // c'était une fermeture (toggle)
+    _decoratePickerWithFilter(el);             // champ recherche garanti
+    if (anchor) _floatPickerBelow(el, anchor); // overlay positionné
+    else el.focus();
+    const close = (e) => {
+        if (!el.contains(e.target) && !(guard && e.target.closest(guard))) {
+            el.style.display = 'none';
+            document.removeEventListener(closeOn, close, true);
+        }
+    };
+    setTimeout(() => document.addEventListener(closeOn, close, true), 0);
+}
+
+function _togglePicker(id) {
+    _openPicker(document.getElementById(id),
+        { guard: '[onclick*="_togglePicker"],[onclick*="showPicker"]' });
 }
 
 /** Collects annotations from a tbody (label, comment, and others) */

@@ -757,6 +757,12 @@ const SparqlEditor = {
         const pfxName = onto?.prefix || 'ex';
         const pfxUri  = onto?.id     || '';   // OWLOntology.id = base IRI
 
+        // Variable SPARQL valide : un nom ne peut contenir que [A-Za-z0-9_].
+        // Les autres caractères (ex. '-' dans « ?super-p ») sont remplacés par '_'.
+        const sVar = v => (typeof v === 'string' && v.startsWith('?'))
+            ? '?' + (v.slice(1).replace(/[^A-Za-z0-9_]/g, '_') || '_')
+            : v;
+
         // Entités IMPORTÉES : id nu → {prefix, ns} du schéma source. Un id importé
         // (ex. « Organization ») appartient au namespace de l'ontologie importée,
         // PAS à celui des données → sinon l'IRI générée ne matche aucun triplet.
@@ -774,7 +780,7 @@ const SparqlEditor = {
 
         const iriOf = id => {
             if (!id || id === '')              return '[]';
-            if (id.startsWith('?'))            return id;
+            if (id.startsWith('?'))            return sVar(id);
             if (id.startsWith('<'))            return id;
             if (id.startsWith('http://') ||
                 id.startsWith('https://'))     return `<${id}>`;
@@ -819,7 +825,7 @@ const SparqlEditor = {
 
                     // Objet : variable, déjà quoté, ou IRI
                     const ob = rawObj.startsWith('?')
-                        ? rawObj
+                        ? sVar(rawObj)
                         : (rawObj.startsWith('"') || rawObj.startsWith("'"))
                         ? rawObj
                         : iriOf(rawObj);
@@ -838,7 +844,7 @@ const SparqlEditor = {
         };
 
         const whereLines = patToLines(q.patterns, '  ');
-        const vars       = [...this._collectVars(q.patterns)];
+        const vars       = [...this._collectVars(q.patterns)].map(sVar);
         const selectVars = vars.length ? vars.join(' ') : '*';
 
         const prefixes = [
@@ -856,7 +862,7 @@ const SparqlEditor = {
 
         const select  = `SELECT ${q.distinct ? 'DISTINCT ' : ''}${selectVars}`;
         const where   = `WHERE {\n${whereLines.join('\n') || '  # aucun triplet'}\n}`;
-        const orderBy = q.order_by ? `ORDER BY ${q.order_dir || 'ASC'}(${q.order_by})` : '';
+        const orderBy = q.order_by ? `ORDER BY ${q.order_dir || 'ASC'}(${sVar(q.order_by)})` : '';
         const limit   = q.limit    ? `LIMIT ${q.limit}` : '';
 
         return [prefixes, '', select, where, orderBy, limit]
@@ -1278,7 +1284,10 @@ const SparqlEditor = {
         // For text fields, `editor` IS the <input> (edId points to it directly);
         // for other editors the input is a descendant.
         if (chip && editor) {
-            const inp = editor.tagName === 'INPUT' ? editor : editor.querySelector('input');
+            // Uniquement pour un éditeur TEXTE (edId == l'<input>). Pour un dropdown,
+            // le chip est mis à jour par la sélection (_ddListClick) — surtout PAS par le
+            // champ de recherche du dropdown (sinon le chip serait réécrit vide).
+            const inp = editor.tagName === 'INPUT' ? editor : null;
             if (inp) {
                 // Re-render chip content in-place
                 chip.innerHTML = this._atomChipHtml(inp.value);

@@ -80,7 +80,7 @@
       <span class="tab-hide-btn" onclick="event.stopPropagation();TabVisibility.hide('swrl-rules')" title="Hide this tab">✕</span>
     </div>
     <div class="nav-item" data-section="queries" onclick="APP.navigate('queries')">
-      🔎 Queries
+      🔎 Queries <span class="nav-count" id="nc-queries">0</span>
       <span class="tab-hide-btn" onclick="event.stopPropagation();TabVisibility.hide('queries')" title="Hide this tab">✕</span>
     </div>
     <div class="nav-item" data-section="views" onclick="APP.navigate('views')">
@@ -103,9 +103,9 @@
 
 <!-- ── Scripts ── -->
 <script src="/js/api.js?v=272"></script>
-<script src="/js/owl_editor.js?v=365"></script>
+<script src="/js/owl_editor.js?v=366"></script>
 <script src="/js/swrl_editor.js?v=322"></script>
-<script src="/js/sparql_editor.js?v=318"></script>
+<script src="/js/sparql_editor.js?v=320"></script>
 <script src="/js/app.js?v=334"></script>
 
 <script>
@@ -116,6 +116,7 @@ function _updateNavCounters() {
   document.getElementById('nc-dps').textContent     = APP.state.datatype_properties.length;
   document.getElementById('nc-inds').textContent    = APP.state.individuals.length;
   const _ncSword = document.getElementById('nc-swrl'); if (_ncSword) _ncSword.textContent = (APP.state.swrl_rules||[]).length;
+  const _ncQ = document.getElementById('nc-queries'); if (_ncQ) _ncQ.textContent = (APP.state.queries||[]).length;
   document.getElementById('nc-annos').textContent   = ALL_ANNO_PROPS.length + (APP.state.annotation_properties || []).length;
 }
 
