@@ -3804,6 +3804,16 @@ APP._kbClassColor = function(classId) {
 };
 
 APP._kbBestLabel = function(ind) {
+    // Display Name (règles d'affichage) en priorité — cohérent avec la liste Individuals,
+    // la recherche et la vue Network.
+    if (typeof IndividualEditor !== 'undefined' && IndividualEditor._resolveDisplayLabel) {
+        if (!Object.keys(IndividualEditor._displayProps || {}).length
+            && !Object.keys(IndividualEditor._displayPropsMulti || {}).length) {
+            IndividualEditor._loadDisplayRules?.();
+        }
+        const dn = IndividualEditor._resolveDisplayLabel(ind, null);
+        if (dn && dn !== ind.id) return dn;
+    }
     const pref  = (typeof Settings !== 'undefined') ? Settings.preferredLang : 'en';
     const labels = (ind.annotations && ind.annotations.labels) ? ind.annotations.labels : [];
     const found  = labels.find(l => l.lang === pref) || labels[0];
