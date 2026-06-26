@@ -83,6 +83,18 @@ const Settings = {
         { code: 'sv', name: 'Svenska',    nameEn: 'Swedish' },
     ],
 
+    // Pays (ISO 3166) associé à chaque langue → drapeau emoji pour l'affichage
+    _langCountry: {
+        bg: 'BG', cs: 'CZ', da: 'DK', de: 'DE', el: 'GR', en: 'GB', es: 'ES', et: 'EE',
+        fi: 'FI', fr: 'FR', ga: 'IE', hr: 'HR', hu: 'HU', it: 'IT', lt: 'LT', lv: 'LV',
+        mt: 'MT', nl: 'NL', nb: 'NO', pl: 'PL', pt: 'PT', ro: 'RO', sk: 'SK', sl: 'SI', sv: 'SE',
+    },
+    /** Drapeau emoji (regional indicators) du pays de la langue, ou '' si inconnu. */
+    langFlag(code) {
+        const cc = this._langCountry[code];
+        return cc ? cc.replace(/./g, c => String.fromCodePoint(0x1F1E6 + c.charCodeAt(0) - 65)) : '';
+    },
+
     activeLangs:   ['fr', 'en'],   // active languages (subset of available)
     preferredLang: 'fr',           // preferred language (1 among active)
     namingFormat:  'individual_counter', // default ID format for individuals
@@ -5542,37 +5554,38 @@ APP.renderSettings = function() {
     const avail   = Settings.availableLangs;
 
     // ── Stage 1: Preferred language ────────────────────────────
-    const prefHtml = active.map(code => {
+    const prefHtml = [...active].sort((a, b) => (a === pref ? -1 : b === pref ? 1 : 0)).map(code => {
         const name = avail.find(x => x.code === code)?.name || '';
         const isPref = code === pref;
         return `<button class="btn-${isPref ? 'primary' : 'secondary'} btn-sm"
                         onclick="Settings.setPreferred('${code}')"
                         style="min-width:60px;gap:4px"
                         title="${name}">
-                    ${isPref ? '★' : '☆'} ${code}
+                    ${isPref ? '★' : '☆'} ${code} ${Settings.langFlag(code)}
                 </button>`;
     }).join('');
 
     // ── Stage 2: Active languages ───────────────────────────
-    const activeHtml = active.map(code => {
+    const activeHtml = [...active].sort((a, b) => a.localeCompare(b)).map(code => {
         const name = avail.find(x => x.code === code)?.name || '';
         const isPref = code === pref;
         return `<div style="display:inline-flex;align-items:center;gap:2px;
                     background:var(--bg3);border:1px solid var(--border);border-radius:4px;
                     padding:3px 8px;font-size:12px;font-family:var(--font-mono)">
-                    <span title="${name}">${code}</span>
+                    <span title="${name}">${code} ${Settings.langFlag(code)}</span>
                     ${!isPref ? `<button class="btn-frame-del" style="margin-left:4px;font-size:10px"
                         onclick="Settings.toggleActive('${code}')" title="Remove">✕</button>` : ''}
                 </div>`;
     }).join('');
 
     // ── Stage 3: Available languages ──────────────────────
-    const availHtml = avail.map(({ code, name }) => {
+    const availHtml = avail.map(({ code, name, nameEn }) => {
         const isActive = active.includes(code);
+        const flag = Settings.langFlag(code);
         return `<button class="btn-${isActive ? 'primary' : 'secondary'} btn-sm"
                         onclick="Settings.toggleActive('${code}')"
-                        style="min-width:48px;font-size:11px"
-                        title="${name}${isActive ? ' — active' : ''}">${code}</button>`;
+                        style="font-size:11px;gap:5px"
+                        title="${name}${isActive ? ' — active' : ''}">${code} ${flag} ${nameEn}</button>`;
     }).join('');
 
     // ── Active tab content ─────────────────────────────
@@ -5586,7 +5599,7 @@ APP.renderSettings = function() {
                 <div class="cls-frame-bar"><span class="cls-frame-tag">★ Preferred language</span></div>
                 <div class="cls-frame-body" style="padding:10px 14px">
                     <p style="margin:0 0 8px;font-size:11px;color:var(--text-dim)">
-                        Language applied by default to new <code>rdfs:label</code> and <code>rdfs:comment</code>.
+                        Language applied by default to new annotation properties.
                         Select one among the active languages.
                     </p>
                     <div style="display:flex;flex-wrap:wrap;gap:6px">

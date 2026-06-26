@@ -2769,29 +2769,19 @@ function _annoRow(type, value, lang, editor, ac, prop = null) {
  *  type = 'label' | 'comment' | 'other'
  *  propId : requis si type === 'other' */
 function _makeAnnotRow(type, editor, ac, propId = null) {
-    let propLabel, langHtml;
-    if (type === 'other') {
-        propLabel = `<span class="anno-prop-dot"></span>
-                     <span class="nav-link" onclick="APP.navigateTo('annotation-properties','${propId}')"
-                           title="Go to ${propId}">${propId}</span>`;
-        langHtml  = `<div style="display:flex;align-items:center;gap:1px">
-                        <input type="text" class="anno-lang-inp" value="${Settings.defaultLang}" ${ac}
-                               style="width:36px;min-width:0">
-                        <button class="btn-ftool" style="padding:1px 3px;font-size:9px;flex-shrink:0"
-                                onclick="Settings.showLangDropdown(this)" title="Choose language">▼</button>
-                    </div>`;
-    } else {
-        const propName = type === 'label' ? 'rdfs:label' : 'rdfs:comment';
-        propLabel = `<span class="anno-prop-dot"></span>
+    // Propriété d'annotation : rdfs:label / rdfs:comment, ou une « other » choisie
+    const propName = type === 'other' ? propId
+                   : type === 'label' ? 'rdfs:label' : 'rdfs:comment';
+    const propLabel = `<span class="anno-prop-dot"></span>
                      <span class="nav-link" onclick="APP.navigateTo('annotation-properties','${propName}')"
                            title="Go to ${propName}">${propName}</span>`;
-        langHtml  = `<div style="display:flex;align-items:center;gap:1px">
+    // Langue par défaut appliquée à TOUTE nouvelle annotation property (= langue préférée)
+    const langHtml  = `<div style="display:flex;align-items:center;gap:1px">
                         <input type="text" class="anno-lang-inp" value="${Settings.defaultLang}" ${ac}
                                style="width:36px;min-width:0">
                         <button class="btn-ftool" style="padding:1px 3px;font-size:9px;flex-shrink:0"
                                 onclick="Settings.showLangDropdown(this)" title="Choose language">▼</button>
                     </div>`;
-    }
     const tr = document.createElement('tr');
     tr.className = 'anno-row';
     tr.dataset.type = type;
@@ -6651,23 +6641,6 @@ const IndividualEditor = {
                       || this._getEffectiveDisplayMulti(classId)
                       || [{ sep: '', propId: '' }];
 
-        // Build the list of available properties (same logic as the simple modal)
-        const propOpts = this._buildPropOptions(classId);
-
-        const rowHtml = (r, i) => `
-            <div class="disp-multi-row" data-idx="${i}" style="display:flex;align-items:center;gap:4px;margin-bottom:4px">
-                <input type="text" class="disp-sep" maxlength="5" value="${(r.sep||'').replace(/"/g,'&quot;')}"
-                       style="width:44px;padding:2px 4px;font-size:11px;border:1px solid var(--border);border-radius:3px;background:var(--bg2);color:var(--text1);text-align:center"
-                       placeholder="text">
-                <select class="disp-prop" style="flex:1;font-size:11px">
-                    <option value="">— property —</option>
-                    ${propOpts.map(({ id, kind, label }) =>
-                        `<option value="${id}" ${id === r.propId ? 'selected' : ''}>${label || id}</option>`
-                    ).join('')}
-                </select>
-                <button class="btn-frame-del" onclick="this.closest('.disp-multi-row').remove()">✕</button>
-            </div>`;
-
         const modal = document.createElement('div');
         modal.id = 'ind-disp-multi-modal';
         modal.className = 'ind-picker-overlay';
@@ -6680,7 +6653,7 @@ const IndividualEditor = {
                 <button class="btn-sm" onclick="document.getElementById('ind-disp-multi-modal').remove()">✕</button>
             </div>
             <div style="padding:8px;overflow-y:auto;flex:1" id="disp-multi-rows">
-                ${existing.map((r, i) => rowHtml(r, i)).join('')}
+                ${existing.map(r => this._dispRowHtml(r)).join('')}
             </div>
             <div style="padding:4px 8px;border-top:1px solid var(--border)">
                 <button class="btn-sm" style="width:100%"
@@ -6695,29 +6668,53 @@ const IndividualEditor = {
         document.body.appendChild(modal);
     },
 
+    /** HTML d'une ligne du modal multi : séparateur + chip de propriété (ouvre le picker standard). */
+    _dispRowHtml(r) {
+        return `
+            <div class="disp-multi-row" style="display:flex;align-items:center;gap:4px;margin-bottom:4px">
+                <input type="text" class="disp-sep" maxlength="5" value="${(r.sep||'').replace(/"/g,'&quot;')}"
+                       style="width:44px;padding:2px 4px;font-size:11px;border:1px solid var(--border);border-radius:3px;background:var(--bg2);color:var(--text1);text-align:center"
+                       placeholder="text">
+                <div class="disp-prop-chip tree-item" data-prop="${(r.propId||'').replace(/"/g,'&quot;')}"
+                     style="flex:1;cursor:pointer;border:1px solid var(--border);border-radius:3px;padding:3px 6px;display:flex;align-items:center"
+                     onclick="IndividualEditor._openRowPropPicker(this)">
+                    ${this._dispChipInner(r.propId)}
+                </div>
+                <button class="btn-frame-del" onclick="this.closest('.disp-multi-row').remove()">✕</button>
+            </div>`;
+    },
+
     /** Ajoute une ligne dans le modal multi */
     _addDisplayMultiRow(defaultPropId) {
         const container = document.getElementById('disp-multi-rows');
         if (!container) return;
-        const classId  = this._selectedClassId;
-        const propOpts = this._buildPropOptions(classId);
-        const idx = container.querySelectorAll('.disp-multi-row').length;
         const div = document.createElement('div');
-        div.className = 'disp-multi-row';
-        div.dataset.idx = idx;
-        div.style.cssText = 'display:flex;align-items:center;gap:4px;margin-bottom:4px';
-        div.innerHTML = `
-            <input type="text" class="disp-sep" maxlength="5" value=""
-                   style="width:44px;padding:2px 4px;font-size:11px;border:1px solid var(--border);border-radius:3px;background:var(--bg2);color:var(--text1);text-align:center"
-                   placeholder="text">
-            <select class="disp-prop" style="flex:1;font-size:11px">
-                <option value="">— property —</option>
-                ${propOpts.map(({ id }) =>
-                    `<option value="${id}" ${id === defaultPropId ? 'selected' : ''}>${id}</option>`
-                ).join('')}
-            </select>
-            <button class="btn-frame-del" onclick="this.closest('.disp-multi-row').remove()">✕</button>`;
-        container.appendChild(div);
+        div.innerHTML = this._dispRowHtml({ sep: '', propId: defaultPropId || '' });
+        container.appendChild(div.firstElementChild);
+    },
+
+    /** Ouvre le picker standard (flottant) pour choisir la propriété d'une ligne. */
+    _openRowPropPicker(chipEl) {
+        this._activeDispRow = chipEl;
+        let picker = document.getElementById('disp-row-picker');
+        if (!picker) {
+            picker = document.createElement('div');
+            picker.id = 'disp-row-picker';
+            picker.className = 'cls-tree-picker';
+            document.body.appendChild(picker);
+        }
+        picker.style.display = 'none';   // pour que _openPicker bascule en "ouvert"
+        picker.innerHTML = this._displayPropPickerItems(this._selectedClassId, 'IndividualEditor._pickRowProp');
+        _openPicker(picker, { anchor: chipEl, guard: '.disp-prop-chip' });
+        picker.style.zIndex = '4100';    // au-dessus de l'overlay du modal (z-index 4000)
+    },
+
+    /** Callback de sélection d'une propriété dans le picker de ligne. */
+    _pickRowProp(id) {
+        const chip = this._activeDispRow;
+        if (chip) { chip.dataset.prop = id; chip.innerHTML = this._dispChipInner(id); }
+        const picker = document.getElementById('disp-row-picker');
+        if (picker) picker.style.display = 'none';
     },
 
     /** Confirms and saves the composite rule */
@@ -6725,14 +6722,15 @@ const IndividualEditor = {
         const rows = [];
         document.querySelectorAll('#disp-multi-rows .disp-multi-row').forEach(row => {
             const sep    = row.querySelector('.disp-sep')?.value || '';
-            const propId = row.querySelector('.disp-prop')?.value || '';
+            const propId = row.querySelector('.disp-prop-chip')?.dataset.prop || '';
             rows.push({ sep, propId });
         });
         this.setDisplayPropsMulti(rows);
     },
 
-    /** Builds the property option list for the modals */
-    _buildPropOptions(classId) {
+    /** OP/DP pertinents pour la classe (restrictions héritées/posées + domain hérité).
+     *  Retourne { opIds, dpIds } (Set d'ids). */
+    _relevantClassProps(classId) {
         const relevantClasses = new Set();
         if (classId) {
             const classes = APP.state.classes || [];
@@ -6747,131 +6745,93 @@ const IndividualEditor = {
         }
         const { inherited: inh, asserted: ass } = this._getClassProperties(classId ? [classId] : []);
         const covered = new Set([...inh.keys(), ...ass.keys()]);
-        const extras = [];
         if (classId) {
             [...(APP.state.object_properties || []), ...(APP.state.datatype_properties || [])].forEach(p => {
-                if (!covered.has(p.id) && (p.domain || []).some(d => relevantClasses.has(d))) {
-                    covered.add(p.id); extras.push(p.id);
-                }
+                if (!covered.has(p.id) && (p.domain || []).some(d => relevantClasses.has(d))) covered.add(p.id);
             });
-            extras.sort((a, b) => a.localeCompare(b));
         }
-        const toOpt = (id) => ({
-            id,
-            kind: (APP.state.object_properties || []).some(p => p.id === id) ? 'op' : 'dp',
-            label: id,
-        });
-        const activeLangs = Settings.activeLangs || [];
-        const labelOpts = activeLangs.length
-            ? activeLangs.map(l => ({ id: `rdfs:label@${l}`, kind: 'anno', label: `rdfs:label (${l})` }))
-            : [{ id: 'rdfs:label', kind: 'anno', label: 'rdfs:label' }];
-        return [
-            ...labelOpts,
-            { id: 'rdfs:comment', kind: 'anno', label: 'rdfs:comment' },
-            ...[...inh.keys()].filter(id => id !== 'rdfs:label' && id !== 'rdfs:comment').map(toOpt),
-            ...[...ass.keys()].filter(id => id !== 'rdfs:label' && id !== 'rdfs:comment').map(toOpt),
-            ...extras.filter(id => id !== 'rdfs:label' && id !== 'rdfs:comment').map(toOpt),
-        ];
+        covered.delete('rdfs:label'); covered.delete('rdfs:comment');
+        const opSet = new Set((APP.state.object_properties || []).map(p => p.id));
+        return {
+            opIds: new Set([...covered].filter(id => opSet.has(id))),
+            dpIds: new Set([...covered].filter(id => !opSet.has(id))),
+        };
     },
 
-    /** Opens the display property selection modal */
+    /** Liste {id, subPropertyOf} de TOUTES les annotation properties (une seule rdfs:label,
+     *  comment, utilisateur, built-ins) — pour `_propTreeLines` (hiérarchie subPropertyOf). */
+    _displayAnnoProps() {
+        const seen = new Set(), out = [];
+        const add = (id, sub) => { if (!seen.has(id)) { seen.add(id); out.push({ id, subPropertyOf: sub || [] }); } };
+        add('rdfs:label'); add('rdfs:comment');
+        (APP.state.annotation_properties || []).forEach(p =>
+            add(p.id, (p.subPropertyOf || []).filter(x => typeof x === 'string')));
+        ALL_ANNO_PROPS.forEach(id => add(id));
+        return out;
+    },
+
+    /** Items de picker STANDARD (mêmes composants que les autres pickers : `_propTreeLines`,
+     *  pastilles CSS, indentation `padding-left`, en-têtes `picker-section-hdr`).
+     *  Ordre : Annotation → Datatype → Object. `callExpr('id')` est invoqué au clic. */
+    _displayPropPickerItems(classId, callExpr) {
+        const { opIds, dpIds } = this._relevantClassProps(classId);
+        const dps = (APP.state.datatype_properties || []).filter(p => dpIds.has(p.id));
+        const ops = (APP.state.object_properties   || []).filter(p => opIds.has(p.id));
+        const empty = new Set();
+        const hdr = (txt, dot) => `<div class="picker-section-hdr"
+            style="padding:5px 8px 2px;font-size:10px;font-weight:600;color:var(--text-dim);
+                   letter-spacing:.05em;user-select:none;display:flex;align-items:center;gap:5px">
+            <span class="${dot}" style="flex-shrink:0"></span>${txt}</div>`;
+        const none = '<div class="cls-list-empty" style="padding:3px 8px;font-size:11px;font-style:italic;color:var(--text-faint)">—</div>';
+        const annoLines = _propTreeLines(this._displayAnnoProps(), empty, 'anno-prop-dot', callExpr);
+        const dpLines   = _propTreeLines(dps, empty, 'dp-prop-dot', callExpr);
+        const opLines   = _propTreeLines(ops, empty, 'op-prop-dot', callExpr);
+        return hdr('Annotation Properties', 'anno-prop-dot') + (annoLines || none)
+             + hdr('Datatype Properties',   'dp-prop-dot')   + (dpLines   || none)
+             + hdr('Object Properties',     'op-prop-dot')   + (opLines   || none);
+    },
+
+    /** Contenu d'un chip de propriété (pastille + label) ou placeholder. */
+    _dispChipInner(propId) {
+        if (!propId) return '<span class="tree-label" style="color:var(--text-faint)">— property —</span>';
+        const dot = (APP.state.object_properties || []).some(p => p.id === propId) ? 'op-prop-dot'
+                  : (APP.state.datatype_properties || []).some(p => p.id === propId) ? 'dp-prop-dot'
+                  : 'anno-prop-dot';
+        return `<span class="${dot}" style="flex-shrink:0;margin-right:4px"></span><span class="tree-label">${_displayRefId(propId)}</span>`;
+    },
+
+    /** Opens the display property selection modal — picker STANDARD (filtrable). */
     _openDisplayPropModal() {
         const classId = this._selectedClassId;
 
-        // Collect the class and all its ancestors
-        const relevantClasses = new Set();
-        if (classId) {
-            const classes = APP.state.classes || [];
-            const addAnc = (id) => {
-                if (relevantClasses.has(id)) return;
-                relevantClasses.add(id);
-                const cls = classes.find(c => c.id === id);
-                if (!cls) return;
-                (cls.subClassOf || []).filter(s => typeof s === 'string').forEach(addAnc);
-            };
-            addAnc(classId);
-        }
-
-        // Properties via restrictions (same order as the individual form)
-        const { inherited: inh, asserted: ass } = this._getClassProperties(classId ? [classId] : []);
-
-        // Additional properties via domain (not covered by restrictions)
-        // Only if a concrete class is selected (not owl:Thing)
-        const alreadyCovered = new Set([...inh.keys(), ...ass.keys()]);
-        const domainExtras = [];
-        if (classId) {
-            [...(APP.state.object_properties || []), ...(APP.state.datatype_properties || [])].forEach(p => {
-                if (!alreadyCovered.has(p.id) && (p.domain || []).some(d => relevantClasses.has(d))) {
-                    alreadyCovered.add(p.id);
-                    domainExtras.push(p.id);
-                }
-            });
-            domainExtras.sort((a, b) => a.localeCompare(b));
-        }
-
-        const toItem = (id) => ({
-            id,
-            kind: (APP.state.object_properties || []).some(p => p.id === id) ? 'op' : 'dp',
-        });
-
-        // Order: inherited (same order as the form) → asserted → domain extras
-        const classProps = [
-            ...[...inh.keys()].map(toItem),
-            ...[...ass.keys()].map(toItem),
-            ...domainExtras.map(toItem),
-        ].filter(({ id }) => id !== 'rdfs:label' && id !== 'rdfs:comment');
-
-        const activeLangs = Settings.activeLangs || [];
-        const labelItems = activeLangs.length
-            ? activeLangs.map(l => ({ id: `rdfs:label@${l}`, kind: 'anno', label: `rdfs:label (${l})` }))
-            : [{ id: 'rdfs:label', kind: 'anno', label: 'rdfs:label' }];
-        const items = [
-            // Annotations : rdfs:label (par langue) et rdfs:comment
-            ...labelItems,
-            { id: 'rdfs:comment', kind: 'anno', label: 'rdfs:comment' },
-            // Class properties (OP + DP via domain)
-            ...classProps,
-        ];
-
-        const dotFor = (kind) => kind === 'op' ? 'op-prop-dot' : kind === 'dp' ? 'dp-prop-dot' : 'anno-prop-dot';
-
-        // Effective rule: own to this class or inherited
         const ownRule       = this._displayProps[classId || '__root__'] || null;
         const effectiveProp = this._getEffectiveDisplayProp(classId);
-        const hasOwn        = !!ownRule;
-
-        const listHtml = items.map(({ id, kind, label }) => {
-            const isActive   = effectiveProp === id;
-            const isOwn      = ownRule === id;
-            const isInherited = isActive && !isOwn;
-            return `
-            <div class="tree-item${isOwn ? ' selected' : ''}" style="padding:4px 12px;cursor:pointer"
-                 onclick="IndividualEditor.setDisplayProp('${id}')">
-                <span class="${dotFor(kind)}" style="flex-shrink:0;margin-right:6px"></span>
-                <span class="tree-label">${label || _displayRefId(id)}</span>
-                ${isOwn      ? '<span style="margin-left:auto;color:var(--accent)">✓</span>' : ''}
-                ${isInherited ? '<span style="margin-left:auto;font-size:10px;color:var(--text-faint)">(inherited)</span>' : ''}
-            </div>`;
-        }).join('');
+        const inheritedHint = (!ownRule && effectiveProp)
+            ? `<div style="padding:4px 8px;font-size:10px;color:var(--text-faint)">inherited: ${_displayRefId(effectiveProp)}</div>`
+            : '';
 
         const modal = document.createElement('div');
         modal.id = 'ind-disp-modal';
         modal.className = 'ind-picker-overlay';
         modal.innerHTML = `
-        <div class="ind-picker-modal" style="width:320px;max-height:420px">
+        <div class="ind-picker-modal" style="width:360px;max-height:480px">
             <div class="ind-picker-hdr">
                 <span style="font-weight:600">Set Display Property
                     ${classId ? `<span style="font-weight:400;font-size:11px;color:var(--text-dim)"> — ${classId}</span>` : ''}
                 </span>
                 <button class="btn-sm" onclick="document.getElementById('ind-disp-modal').remove()">✕</button>
             </div>
-            <div style="overflow-y:auto;flex:1">${listHtml}</div>
+            ${inheritedHint}
+            <div id="ind-disp-picker" class="cls-tree-picker" style="margin:4px;flex:1;min-height:0">
+                ${this._displayPropPickerItems(classId, 'IndividualEditor.setDisplayProp')}
+            </div>
             <div class="ind-picker-ftr">
-                ${hasOwn ? `<button class="btn-secondary btn-sm" onclick="IndividualEditor.setDisplayProp(null)">Clear (use inherited)</button>` : ''}
+                <button class="btn-secondary btn-sm" onclick="IndividualEditor.setDisplayProp(null)">Clear</button>
                 <button class="btn-secondary btn-sm" onclick="document.getElementById('ind-disp-modal').remove()">Cancel</button>
             </div>
         </div>`;
         document.body.appendChild(modal);
+        _decoratePickerWithFilter(document.getElementById('ind-disp-picker'));
     },
 
     openEdit(id) {
