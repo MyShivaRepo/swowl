@@ -2735,9 +2735,10 @@ const RestrictionEditor = {
 function _annoRow(type, value, lang, editor, ac, prop = null) {
     let propLabel, langCell, dataProp;
     if (type === 'other') {
+        const propDisp = _displayRefId(prop);   // forme préfixée (ext:firstName) — data-prop reste l'id brut
         propLabel = `<span class="anno-prop-dot"></span>
                      <span class="nav-link" onclick="APP.navigateTo('annotation-properties','${prop}')"
-                           title="Go to ${prop}">${prop}</span>`;
+                           title="Go to ${propDisp}">${_escapeHtml(propDisp)}</span>`;
         langCell  = `<div style="display:flex;align-items:center;gap:1px">
                         <input type="text" class="anno-lang-inp" value="${lang||Settings.defaultLang}" ${ac}
                                style="width:36px;min-width:0">
@@ -2773,9 +2774,10 @@ function _makeAnnotRow(type, editor, ac, propId = null) {
     // Propriété d'annotation : rdfs:label / rdfs:comment, ou une « other » choisie
     const propName = type === 'other' ? propId
                    : type === 'label' ? 'rdfs:label' : 'rdfs:comment';
+    const propDisp = _displayRefId(propName);   // forme préfixée (ext:firstName) ; navigateTo garde l'id brut
     const propLabel = `<span class="anno-prop-dot"></span>
                      <span class="nav-link" onclick="APP.navigateTo('annotation-properties','${propName}')"
-                           title="Go to ${propName}">${propName}</span>`;
+                           title="Go to ${propDisp}">${_escapeHtml(propDisp)}</span>`;
     // Langue par défaut appliquée à TOUTE nouvelle annotation property (= langue préférée)
     const langHtml  = `<div style="display:flex;align-items:center;gap:1px">
                         <input type="text" class="anno-lang-inp" value="${Settings.defaultLang}" ${ac}
@@ -3082,12 +3084,17 @@ function _annoPickerItems(editorName) {
     const { childrenOf, builtinChildrenOf } = typeof APEditor !== 'undefined'
         ? APEditor._buildUserTree(userProps)
         : { childrenOf: {}, builtinChildrenOf: {} };
+    // APs importées → couleurs atténuées (classe imported-entity), comme dans l'arbre AP.
+    const importedIds = new Set(userProps.filter(p => p._imported).map(p => p.id));
 
     const itemHtml = (id, depth, isBuiltin) => _pickerItem(id,
         `<span class="anno-prop-dot" style="margin-right:4px;flex-shrink:0"></span>`
         + `<span class="tree-label" style="font-size:12px;color:var(--text2);font-family:var(--font-mono)">${_displayRefId(id)}</span>`
         + (isBuiltin ? '<span style="font-size:10px;color:var(--text-faint);font-style:italic;margin-left:4px">built-in</span>' : ''),
-        { style: `padding:3px 8px;padding-left:${8 + depth * 14}px`, onclick: `${editorName}.addOtherAnnotRow('${id}')` });
+        // Mêmes classes que l'arbre Annotation Properties : built-in → builtin-ap (olive délavé),
+        // importée → imported-entity (olive délavé). Sinon AP locale = jaune vif.
+        { extraClass: isBuiltin ? 'builtin-ap' : (importedIds.has(id) ? 'imported-entity' : ''),
+          style: `padding:3px 8px;padding-left:${8 + depth * 14}px`, onclick: `${editorName}.addOtherAnnotRow('${id}')` });
 
     const renderUserNode = (id, depth) => {
         const children = childrenOf[id] || [];
