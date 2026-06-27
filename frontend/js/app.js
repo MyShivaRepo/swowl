@@ -56,6 +56,7 @@ const Settings = {
 
     // ── Available European languages ──────────────────────────
     availableLangs: [
+        { code: 'zxx', name: '—',         nameEn: 'Neutral' },   // ISO 639-2 zxx = no linguistic content
         { code: 'bg', name: 'Български',  nameEn: 'Bulgarian' },
         { code: 'cs', name: 'Čeština',    nameEn: 'Czech' },
         { code: 'da', name: 'Dansk',      nameEn: 'Danish' },
@@ -89,11 +90,22 @@ const Settings = {
         fi: 'FI', fr: 'FR', ga: 'IE', hr: 'HR', hu: 'HU', it: 'IT', lt: 'LT', lv: 'LV',
         mt: 'MT', nl: 'NL', nb: 'NO', pl: 'PL', pt: 'PT', ro: 'RO', sk: 'SK', sl: 'SI', sv: 'SE',
     },
-    /** Drapeau emoji (regional indicators) du pays de la langue, ou '' si inconnu. */
+    /** Drapeau de la langue : symbole RDF pour la langue neutre (zxx), sinon emoji du pays. */
     langFlag(code) {
+        if (code === 'zxx') return this.RDF_ICON;
         const cc = this._langCountry[code];
         return cc ? cc.replace(/./g, c => String.fromCodePoint(0x1F1E6 + c.charCodeAt(0) - 65)) : '';
     },
+
+    // Symbole RDF (3 boules bleues connectées en triangle) — « drapeau » de la langue neutre
+    RDF_ICON: `<svg width="13" height="13" viewBox="0 0 24 24" style="vertical-align:middle;flex-shrink:0" aria-label="RDF (neutral)">
+        <line x1="6" y1="17" x2="18" y2="17" stroke="#3a7bd5" stroke-width="2"/>
+        <line x1="6" y1="17" x2="12" y2="6"  stroke="#3a7bd5" stroke-width="2"/>
+        <line x1="18" y1="17" x2="12" y2="6" stroke="#3a7bd5" stroke-width="2"/>
+        <circle cx="12" cy="6"  r="3.4" fill="#3a7bd5"/>
+        <circle cx="6"  cy="17" r="3.4" fill="#3a7bd5"/>
+        <circle cx="18" cy="17" r="3.4" fill="#3a7bd5"/>
+    </svg>`,
 
     activeLangs:   ['fr', 'en'],   // active languages (subset of available)
     preferredLang: 'fr',           // preferred language (1 among active)
@@ -2916,6 +2928,11 @@ const GlobalSearch = {
         const lq = q.toLowerCase();
         const results = [];
 
+        // Les Display Names des individuals dépendent des règles d'affichage : les charger
+        // ici car la recherche peut être lancée depuis n'importe quel onglet (pas seulement
+        // Individuals, seul endroit qui les charge habituellement).
+        if (typeof IndividualEditor !== 'undefined') IndividualEditor._loadDisplayRules();
+
         // ── helpers ─────────────────────────────────────────────────────────
         const _idMatch    = (e) => (e.id || '').toLowerCase().includes(lq);
         const _lblMatches = (e) => (e.annotations?.labels || []).filter(l =>
@@ -2973,7 +2990,12 @@ const GlobalSearch = {
                 if (_idMatch(p)) results.push({ section: 'annotation-properties', id: p.id, label: p.id, disp: p.id, imported: false });
             });
         }
-        (s.individuals           || []).forEach(i => { if (_idMatch(i)) results.push({ section: 'individuals',           id: i.id, label: i.id, disp: _displayId(i), imported: !!i._imported }); });
+        (s.individuals           || []).forEach(i => {
+            if (!_idMatch(i)) return;
+            const dn = (typeof IndividualEditor !== 'undefined') ? IndividualEditor._resolveDisplayLabel(i, null) : '';
+            results.push({ section: 'individuals', id: i.id, label: i.id, disp: _displayId(i),
+                           imported: !!i._imported, displayName: (dn && dn !== i.id) ? dn : '' });
+        });
         (s.swrl_rules            || []).forEach(r => { if (_idMatch(r)) results.push({ section: 'swrl-rules',            id: r.id, label: r.id, disp: _displayId(r), imported: !!r._imported }); });
         sparqlQueries.forEach(sq => {
             if ((sq.id || '').toLowerCase().includes(lq))
@@ -3065,6 +3087,11 @@ const GlobalSearch = {
                         inner = `<span class="xsd-dot" style="flex-shrink:0;margin:0"></span>
                             <span class="gs-item-label">${_escapeHtml(r.label)}</span>
                             <span class="gs-item-sub">${_escapeHtml(r.disp || _displayRefId(r.id))}</span>`;
+                        break;
+                    case 'individuals':
+                        inner = `${this._dot(sec)}
+                            <span class="gs-item-label">${_escapeHtml(r.disp || _displayRefId(r.id))}</span>
+                            ${r.displayName ? `<span class="gs-item-sub">${_escapeHtml(r.displayName)}</span>` : ''}`;
                         break;
                     default:
                         inner = `${this._dot(sec)}
