@@ -561,6 +561,7 @@ const _TreeCommon = {
             if (e.target.closest(ed._cfg.detail))        return;  // detail panel (forms, nav links…)
             if (e.target.closest(ed._cfg.ctxMenu))       return;
             if (e.target.closest('.ind-picker-overlay')) return;  // shared modals
+            if (e.target.closest('#lang-dropdown'))      return;  // language picker (appended to body)
             if (e.target.closest('.btn-icon, .btn-sm'))  return;
             ed._selectedIds.clear();
             ed._anchorId = null;
@@ -5585,6 +5586,7 @@ const IndividualEditor = {
             if (e.target.closest('.tree-item[data-id]')) return;
             if (e.target.closest('#ind-detail'))         return;  // property panels, navigation links…
             if (e.target.closest('.ind-picker-overlay')) return;  // picker modal + display modals
+            if (e.target.closest('#lang-dropdown'))      return;  // language picker (appended to body)
             if (e.target.closest('#ind-ctx-menu'))       return;
             if (e.target.closest('.btn-icon, .btn-sm, .btn-tool')) return;
             // Tout autre clic → désélectionner
