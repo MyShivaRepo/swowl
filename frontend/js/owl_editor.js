@@ -5150,17 +5150,19 @@ const IndividualEditor = {
         const classes = APP.state.classes || [];
         const inds    = individuals || APP.state.individuals || [];
         const sel     = this._selectedClassId;
-        const { roots, childrenOf } = ClassEditor.buildTree(classes);
+        // Arbre key-aware (homonymes) : childrenOf/roots/externalRoots sont indexés par
+        // clé de nœud (_nkey), résolues via byKey. Idem que l'onglet Classes.
+        const { roots, externalRoots, childrenOf, byKey } = ClassEditor.buildTree(classes);
 
         const dropAttrs = (clsId) =>
             `ondragover="IndividualEditor._onClassDragOver(event,this)"
              ondragleave="IndividualEditor._onClassDragLeave(this)"
              ondrop="IndividualEditor._onClassDrop(event,this,'${clsId}')"`;
 
-        // Recursive collection of all sub-classes of a node (including itself)
-        const allDescendants = (id) => {
-            const set   = new Set([id]);
-            const queue = [...(childrenOf[id] || [])];
+        // Récupère toutes les clés descendantes d'un nœud (lui inclus)
+        const allDescendants = (key) => {
+            const set   = new Set([key]);
+            const queue = [...(childrenOf[key] || [])];
             while (queue.length) {
                 const c = queue.shift();
                 if (!set.has(c)) { set.add(c); (childrenOf[c] || []).forEach(gc => queue.push(gc)); }
@@ -5168,15 +5170,19 @@ const IndividualEditor = {
             return set;
         };
 
-        const renderNode = (id, depth) => {
+        const renderNode = (key, depth) => {
+            const clsObj = byKey[key];
+            if (!clsObj) return '';
+            const id          = clsObj.id;
             const pl          = depth * 16 + 6;
-            const children    = childrenOf[id] || [];
+            const children    = childrenOf[key] || [];
             const hasChildren = children.length > 0;
             const isOpen      = this._expandedClasses.has(id);
-            const desc        = allDescendants(id);
-            const count       = inds.filter(x => (x.types || []).some(t => desc.has(t))).length;
-            const clsObj      = classes.find(c => c.id === id);
-            const isImported  = !!clsObj?._imported;
+            // Individus comptés par id de classe (un individu est typé par id) → on mappe
+            // les clés descendantes vers leurs ids.
+            const descIds     = new Set([...allDescendants(key)].map(k => byKey[k]?.id).filter(Boolean));
+            const count       = inds.filter(x => (x.types || []).some(t => descIds.has(t))).length;
+            const isImported  = !!clsObj._imported;
             const displayId   = _displayId(clsObj);
             const importedCls = isImported ? ' imported-entity' : '';
             const dragDrop    = dropAttrs(id);
@@ -5214,7 +5220,8 @@ const IndividualEditor = {
             <span class="nav-count" style="margin-left:auto;margin-right:6px">${inds.length}</span>
         </div>`;
 
-        const treeHtml = roots.map(id => renderNode(id, 1)).join('');
+        // roots (sous owl:Thing) + externalRoots (sous une classe importée non présente, ex. ext:Document)
+        const treeHtml = [...roots, ...externalRoots].map(k => renderNode(k, 1)).join('');
         return treeHtml
             ? thingHtml + treeHtml
             : '<div class="cls-list-empty">No classes defined</div>';
