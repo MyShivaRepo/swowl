@@ -108,8 +108,10 @@ const API = {
 
     importFromPath: (data) => API._fetch('POST', '/ontologies/import-from-path', data),
 
+    fsHome:   () => API._fetch('GET', `/fs/home`),
     fsBrowse: (path, ext = '.json') => API._fetch('GET', `/fs/browse?path=${encodeURIComponent(path)}&ext=${encodeURIComponent(ext)}`),
 
-    fetchBuiltins:  () => API._fetch('POST', '/builtins/fetch'),
+    builtinsCatalog: () => API._fetch('GET', '/builtins/catalog'),
+    fetchBuiltins:  (names = null) => API._fetch('POST', '/builtins/fetch', names ? { names } : null),
     revealInFinder: (path) => API._fetch('POST', `/reveal?path=${encodeURIComponent(path)}`),
 };

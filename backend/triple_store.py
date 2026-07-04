@@ -60,8 +60,15 @@ ANNO_PROP_MAP = {
 # Table inverse {predicate URIRef: id préfixé} — pour capturer les annotations « other » à l'import.
 ANNO_PRED_TO_ID = {pred: pid for pid, pred in ANNO_PROP_MAP.items()}
 
+# Préfixe pour traduire les chemins hôte ↔ conteneur.
+#   - HOST_PREFIX_CONTAINER : emplacement FIXE où le home est monté (cf. docker-compose).
+#   - HOST_PREFIX_HOST      : chemin hôte réel de ce home (HOST_HOME), ex. /Users/thomas
+#                             ou /home/thomas. Repli sur le home du process si non fourni.
+HOST_PREFIX_CONTAINER = "/host/home"
+HOST_PREFIX_HOST      = (os.environ.get("HOST_HOME") or str(Path.home())).rstrip("/\\")
+
 # Répertoire de configuration utilisateur (persistant, indépendant du volume projet)
-SWOWL_DIR = Path(os.environ.get("SWOWL_DIR", "/host/Users/bernard/.swowl"))
+SWOWL_DIR = Path(os.environ.get("SWOWL_DIR", HOST_PREFIX_CONTAINER + "/.swowl"))
 SWOWL_DIR.mkdir(parents=True, exist_ok=True)
 
 REGISTRY_FILE = SWOWL_DIR / "registry.json"
@@ -73,13 +80,8 @@ try:
 except Exception:
     pass  # non critique — l'utilisateur peut spécifier n'importe quel chemin
 
-# Préfixe pour traduire les chemins hôte → container
-HOST_PREFIX_CONTAINER = "/host/Users/bernard"
-HOST_PREFIX_HOST       = "/Users/bernard"
-
-
 def host_to_container(path: str) -> str:
-    """Traduit un chemin hôte Mac en chemin container Docker."""
+    """Traduit un chemin hôte (macOS/Linux) en chemin conteneur Docker."""
     if path.startswith(HOST_PREFIX_HOST):
         return HOST_PREFIX_CONTAINER + path[len(HOST_PREFIX_HOST):]
     return path

@@ -7,7 +7,7 @@ import logging
 from contextlib import asynccontextmanager
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException, UploadFile, File, Query, Request
+from fastapi import FastAPI, HTTPException, UploadFile, File, Query, Request, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from pydantic import BaseModel as PydanticModel
@@ -859,7 +859,7 @@ from pathlib import Path as _AnalPath
 import json as _json_analysis
 
 _ANALYSIS_DIR = _AnalPath(
-    __import__("os").environ.get("SWOWL_DIR", "/host/Users/bernard/.swowl")
+    __import__("os").environ.get("SWOWL_DIR", "/host/home/.swowl")
 ) / "analysis"
 _ANALYSIS_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -2478,10 +2478,22 @@ def delete_query(query_id: str):
 from pathlib import Path as FSPath
 from triple_store import host_to_container, container_to_host
 
+@app.get("/api/fs/home", tags=["Système"])
+def fs_home():
+    """Renvoie le home de l'utilisateur courant (chemin hôte réel), point de départ
+    de la navigation filesystem — dépend de HOST_HOME (cf. docker-compose)."""
+    from triple_store import HOST_PREFIX_HOST
+    return {"home": HOST_PREFIX_HOST}
+
+
 @app.get("/api/fs/browse", tags=["Système"])
-def fs_browse(path: str = Query("/Users/bernard"),
+def fs_browse(path: str = Query(None),
               ext: str = Query(".json", description="Extensions séparées par virgule")):
-    """Liste le contenu d'un répertoire (traduit chemin hôte → container)."""
+    """Liste le contenu d'un répertoire (traduit chemin hôte → container).
+    Sans `path`, démarre au home de l'utilisateur courant (HOST_PREFIX_HOST)."""
+    from triple_store import HOST_PREFIX_HOST
+    if not path:
+        path = HOST_PREFIX_HOST
     container_path = host_to_container(path)
     p = FSPath(container_path)
     if not p.exists() or not p.is_dir():
@@ -2530,48 +2542,77 @@ def fs_browse(path: str = Query("/Users/bernard"),
 
 
 
+# Catalogue des vocabulaires « prêts à charger ». Extensible ; chaque entrée peut être
+# cochée/décochée individuellement dans l'UI. url = source de téléchargement (rdflib gère
+# redirections + négociation de contenu), uri = namespace, forced_imports = imports non
+# déclarés formellement dans le fichier W3C mais réellement requis.
+BUILTIN_CATALOG = [
+    {"name": "rdf",     "prefix": "rdf",     "uri": "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
+     "url": "http://www.w3.org/1999/02/22-rdf-syntax-ns", "file": "rdf.ttl",
+     "group": "Core", "description": "RDF — concepts & abstract syntax"},
+    {"name": "rdfs",    "prefix": "rdfs",    "uri": "http://www.w3.org/2000/01/rdf-schema#",
+     "url": "http://www.w3.org/2000/01/rdf-schema", "file": "rdfs.ttl",
+     "group": "Core", "description": "RDF Schema",
+     "forced_imports": ["http://www.w3.org/1999/02/22-rdf-syntax-ns"]},
+    {"name": "owl",     "prefix": "owl",     "uri": "http://www.w3.org/2002/07/owl#",
+     "url": "http://www.w3.org/2002/07/owl", "file": "owl.ttl",
+     "group": "Core", "description": "Web Ontology Language"},
+    {"name": "skos",    "prefix": "skos",    "uri": "http://www.w3.org/2004/02/skos/core#",
+     "url": "http://www.w3.org/2004/02/skos/core", "file": "skos.ttl",
+     "group": "W3C", "description": "Simple Knowledge Organization System",
+     "forced_imports": ["http://www.w3.org/2002/07/owl"]},
+    {"name": "prov-o",  "prefix": "prov",    "uri": "http://www.w3.org/ns/prov#",
+     "url": "http://www.w3.org/ns/prov-o", "file": "prov-o.ttl",
+     "group": "W3C", "description": "PROV-O — provenance ontology"},
+    {"name": "org",     "prefix": "org",     "uri": "http://www.w3.org/ns/org#",
+     "url": "http://www.w3.org/ns/org", "file": "org.ttl",
+     "group": "W3C", "description": "Organization ontology"},
+    {"name": "shacl",   "prefix": "sh",      "uri": "http://www.w3.org/ns/shacl#",
+     "url": "https://www.w3.org/ns/shacl.ttl", "file": "shacl.ttl",
+     "group": "W3C", "description": "SHACL — Shapes Constraint Language",
+     # SHACL est défini avec RDF/RDFS (rdfs:Class, rdf:Property) et ne déclare pas d'owl:imports
+     # formel → on force l'import de rdfs (qui chaîne vers rdf). Il n'utilise PAS OWL.
+     "forced_imports": ["http://www.w3.org/2000/01/rdf-schema"]},
+    {"name": "dcterms", "prefix": "dcterms", "uri": "http://purl.org/dc/terms/",
+     "url": "http://purl.org/dc/terms/", "file": "dcterms.ttl",
+     "group": "Community", "description": "Dublin Core Terms (RDFS)"},
+    {"name": "foaf",    "prefix": "foaf",    "uri": "http://xmlns.com/foaf/0.1/",
+     "url": "http://xmlns.com/foaf/spec/index.rdf", "file": "foaf.ttl",
+     "group": "Community", "description": "FOAF — Friend of a Friend"},
+]
+
+
+class BuiltinsFetchRequest(PydanticModel):
+    # Liste des `name` du catalogue à récupérer ; None/absent → tout le catalogue (rétro-compat).
+    names: Optional[list] = None
+
+
+@app.get("/api/builtins/catalog", tags=["Système"])
+def builtins_catalog():
+    """Catalogue des vocabulaires proposés au « Fetch », avec indicateur `registered`."""
+    from triple_store import store
+    registered = {e["name"] for e in store.list_registry()}
+    return {"catalog": [
+        {"name": b["name"], "prefix": b["prefix"], "uri": b["uri"],
+         "group": b.get("group", ""), "description": b.get("description", ""),
+         "registered": b["name"] in registered}
+        for b in BUILTIN_CATALOG
+    ]}
+
+
 @app.post("/api/builtins/fetch", tags=["Système"])
-def fetch_builtins():
-    """Download the 3 core W3C ontologies (RDF, RDFS, OWL) and register them as read-only.
-    Uses rdflib to fetch & parse (handles redirects and content negotiation automatically).
-    Files are cached as Turtle in the data directory."""
+def fetch_builtins(req: Optional[BuiltinsFetchRequest] = Body(default=None)):
+    """Télécharge et enregistre (read-only) les vocabulaires sélectionnés du catalogue.
+    Corps `{names:[...]}` → sous-ensemble ; corps absent → tout le catalogue (rétro-compat).
+    rdflib gère redirections + négociation de contenu ; fichiers cachés en Turtle."""
     import rdflib
     from triple_store import DATA_DIR, container_to_host, store
 
-    BUILTINS = [
-        {
-            "name":   "rdf",
-            "prefix": "rdf",
-            "uri":    "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
-            "url":    "http://www.w3.org/1999/02/22-rdf-syntax-ns",
-            "file":   "rdf.ttl",
-        },
-        {
-            "name":   "rdfs",
-            "prefix": "rdfs",
-            "uri":    "http://www.w3.org/2000/01/rdf-schema#",
-            "url":    "http://www.w3.org/2000/01/rdf-schema",
-            "file":   "rdfs.ttl",
-            # RDFS uses RDF but doesn't formally declare owl:imports in its W3C file
-            "forced_imports": ["http://www.w3.org/1999/02/22-rdf-syntax-ns"],
-        },
-        {
-            "name":   "owl",
-            "prefix": "owl",
-            "uri":    "http://www.w3.org/2002/07/owl#",
-            "url":    "http://www.w3.org/2002/07/owl",
-            "file":   "owl.ttl",
-        },
-        {
-            "name":   "skos",
-            "prefix": "skos",
-            "uri":    "http://www.w3.org/2004/02/skos/core#",
-            "url":    "http://www.w3.org/2004/02/skos/core",
-            "file":   "skos.ttl",
-            # SKOS s'appuie sur OWL (qui chaîne vers RDFS → RDF) — pas d'owl:imports formel dans le fichier W3C
-            "forced_imports": ["http://www.w3.org/2002/07/owl"],
-        },
-    ]
+    if req and req.names:
+        wanted = set(req.names)
+        BUILTINS = [b for b in BUILTIN_CATALOG if b["name"] in wanted]
+    else:
+        BUILTINS = list(BUILTIN_CATALOG)
 
     # Store builtins in ~/.swowl/builtins/ — correctly mapped via container_to_host()
     from triple_store import SWOWL_DIR
@@ -2597,7 +2638,7 @@ def fetch_builtins():
                 results.append({"name": b["name"], "status": f"download failed: {e}"})
                 continue
 
-        # host path for the registry (container /host/Users/bernard/... → /Users/bernard/...)
+        # host path for the registry (container /host/home/... → ${HOST_HOME}/...)
         # Extract owl:imports declarations from the TTL
         imported_uris = list(b.get("forced_imports", []))
         try:

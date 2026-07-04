@@ -2,15 +2,23 @@ services:
   backend:
     build: ./backend
     container_name: owl-editor-backend
+    # Tourne sous l'utilisateur hôte (pas root) → les fichiers écrits sur les volumes
+    # montés (./data, ./backend, ${HOST_HOME}/.swowl) appartiennent à l'utilisateur courant,
+    # jamais à root. UID/GID depuis .env (cf. .env.example) ; repli 1000:1000.
+    user: "${UID:-1000}:${GID:-1000}"
     ports:
       - "8001:8000"
     volumes:
       - ./data:/app/data
       - ./backend:/app
-      - /Users/bernard:/host/Users/bernard
+      # Home de l'utilisateur courant, monté à un emplacement fixe dans le conteneur.
+      # ${HOST_HOME} (fichier .env) prime ; repli sur ${HOME} (défini sous macOS/Linux).
+      - ${HOST_HOME:-${HOME}}:/host/home
     environment:
       - DATA_DIR=/app/data/ontologies
       - PYTHONUNBUFFERED=1
+      # Chemin hôte réel du home monté ci-dessus (pour la traduction hôte↔conteneur).
+      - HOST_HOME=${HOST_HOME:-${HOME}}
     restart: unless-stopped
 
   frontend:

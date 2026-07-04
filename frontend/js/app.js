@@ -767,8 +767,8 @@ const APP = {
                 </button>
                 <button class="btn-onto-action" onclick="APP._fetchBuiltins()" id="btn-fetch-builtins">
                     <span class="btn-onto-w3c-badge">W3C</span>
-                    <span class="btn-onto-label">Fetch W3C Ontologies</span>
-                    <span class="btn-onto-desc">Download RDF, RDFS, OWL, SKOS from w3.org</span>
+                    <span class="btn-onto-label">Fetch Ontologies</span>
+                    <span class="btn-onto-desc">Pick vocabularies: RDF, RDFS, OWL, SHACL, SKOS, PROV-O, ORG, DC, FOAF…</span>
                 </button>
             </div>
 
@@ -1454,18 +1454,105 @@ const APP = {
         APP.renderOntologies();
     },
 
+    /** Ouvre la modal de sélection des vocabulaires à récupérer (toutes cochables/décochables). */
     async _fetchBuiltins() {
+        let data;
+        try { data = await API.builtinsCatalog(); }
+        catch (e) { UI.error(`Cannot load catalog: ${e.message}`); return; }
+        const cat = data.catalog || [];
+        this._biCatalog = cat;   // conservé pour calculer add/remove à l'application
+        const groups = {};
+        cat.forEach(c => { (groups[c.group || 'Other'] = groups[c.group || 'Other'] || []).push(c); });
+        // Core garde son ordre logique (rdf → rdfs → owl) ; les autres sections : ordre alphabétique.
+        Object.keys(groups).forEach(g => {
+            if (g !== 'Core') groups[g].sort((a, b) => a.name.localeCompare(b.name));
+        });
+        const order = ['Core', 'W3C', 'Community', 'Other'];
+        const groupNames = [...new Set([...order.filter(g => groups[g]), ...Object.keys(groups)])];
+
+        const row = (c) => `
+            <label class="bi-row" style="display:flex;align-items:center;gap:8px;padding:5px 8px;cursor:pointer;border-radius:4px">
+                <input type="checkbox" class="bi-chk" data-name="${_escapeHtml(c.name)}" ${c.registered ? 'checked' : ''}>
+                <span style="font-family:var(--font-mono);font-size:12px;color:var(--accent);min-width:66px;flex-shrink:0">${_escapeHtml(c.prefix)}:</span>
+                <span style="flex:1;min-width:0">
+                    <span style="font-size:12px;color:var(--text1)">${_escapeHtml(c.description || c.name)}</span>
+                    <span style="display:block;font-size:10px;color:var(--text-faint);font-family:var(--font-mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${_escapeHtml(c.uri)}</span>
+                </span>
+                ${c.registered ? '<span style="font-size:10px;color:var(--accent2);font-style:italic;flex-shrink:0">registered</span>' : ''}
+            </label>`;
+        const body = groupNames.map(g => `
+            <div class="cls-picker-hdr" style="margin:6px 0 2px">${_escapeHtml(g)}</div>
+            ${groups[g].map(row).join('')}`).join('');
+
+        document.getElementById('builtins-modal')?.remove();
+        const modal = document.createElement('div');
+        modal.id = 'builtins-modal';
+        modal.className = 'ind-picker-overlay';
+        modal.innerHTML = `
+            <div class="ind-picker-modal" style="width:480px;max-height:540px">
+                <div class="ind-picker-hdr">
+                    <span style="font-weight:600">Fetch Ontologies</span>
+                    <button class="btn-sm" onclick="document.getElementById('builtins-modal').remove()">✕</button>
+                </div>
+                <div style="padding:4px 10px 6px;font-size:10px;color:var(--text-dim)">
+                    Checked = present in the registry. Check to add, <strong>uncheck to remove</strong>.
+                </div>
+                <div style="padding:0 8px 5px;display:flex;gap:6px;border-bottom:1px solid var(--border)">
+                    <button class="btn-sm" onclick="APP._biSelectAll(true)">Select all</button>
+                    <button class="btn-sm" onclick="APP._biSelectAll(false)">Select none</button>
+                </div>
+                <div style="padding:6px 8px;overflow-y:auto;flex:1" id="bi-list">${body}</div>
+                <div class="ind-picker-ftr">
+                    <button class="btn-primary btn-sm" onclick="APP._applyBuiltins()">Apply</button>
+                    <button class="btn-secondary btn-sm" onclick="document.getElementById('builtins-modal').remove()">Cancel</button>
+                </div>
+            </div>`;
+        modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+        document.body.appendChild(modal);
+    },
+
+    _biSelectAll(v) {
+        document.querySelectorAll('#bi-list .bi-chk').forEach(c => { c.checked = v; });
+    },
+
+    /** Applique la sélection : coche→ajoute (fetch), décoche→retire (unregister). */
+    async _applyBuiltins() {
+        const checked = new Set(
+            [...document.querySelectorAll('#bi-list .bi-chk:checked')].map(c => c.dataset.name));
+        const cat = this._biCatalog || [];
+        const toFetch  = cat.filter(c =>  checked.has(c.name) && !c.registered).map(c => c.name);
+        const toRemove = cat.filter(c => !checked.has(c.name) &&  c.registered).map(c => c.name);
+        if (!toFetch.length && !toRemove.length) { UI.error('No changes to apply.'); return; }
+
+        document.getElementById('builtins-modal')?.remove();
         const btn = document.getElementById('btn-fetch-builtins');
         if (btn) btn.disabled = true;
-        UI.success('Fetching W3C ontologies… this may take a few seconds.');
         try {
-            const res = await API.fetchBuiltins();
-            const fetched = res.results.filter(r => r.status.includes('fetched')).length;
-            UI.success(`Done — ${fetched} ontology(ies) fetched & registered.`);
+            // Retraits d'abord (fichier caché conservé → re-fetchable)
+            const removed = [];
+            for (const name of toRemove) {
+                try { await API.unregisterOntology(name, false); removed.push(name); }
+                catch (e) { UI.error(`Cannot remove ${name}: ${e.message}`); }
+            }
+            // Ajouts
+            let fetched = 0; let failed = [];
+            if (toFetch.length) {
+                UI.success(`Fetching ${toFetch.length} ontology(ies)… this may take a few seconds.`);
+                const res = await API.fetchBuiltins(toFetch);
+                fetched = res.results.filter(r => r.status.includes('fetched')).length;
+                failed  = res.results.filter(r => r.status.includes('failed'));
+            }
+            const parts = [];
+            if (fetched)        parts.push(`${fetched} added`);
+            if (removed.length) parts.push(`${removed.length} removed`);
+            if (failed.length)
+                UI.error(`${parts.join(', ') || 'Applied'} — ${failed.length} failed: ${failed.map(f => f.name).join(', ')}`);
+            else
+                UI.success(parts.length ? `Done — ${parts.join(', ')}.` : 'No changes.');
             await this.refresh();
             this.renderOntologies();
         } catch (e) {
-            UI.error(`Fetch failed: ${e.message}`);
+            UI.error(`Apply failed: ${e.message}`);
         } finally {
             if (btn) btn.disabled = false;
         }
@@ -2492,25 +2579,39 @@ const UI = {
 
 const FsBrowser = {
     _targetFieldId: null,
-    _currentPath: '/Users/bernard',
+    _currentPath: '',
+    _home: null,            // home de l'utilisateur courant (récupéré du backend)
     _pendingFilename: '',   // filename typed in the bottom bar
     _fileTypes: null,       // accepted extensions (null = .json only)
+
+    /** Récupère (une fois) le home de l'utilisateur courant depuis le backend. */
+    async _ensureHome() {
+        if (this._home) return this._home;
+        try {
+            const data = await API.fsHome();
+            this._home = data.home || '';
+        } catch (_) {
+            this._home = '';   // le backend retombera sur son propre défaut
+        }
+        return this._home;
+    },
 
     open(targetFieldId, fileTypes = null) {
         this._fileTypes = fileTypes;
         return this._open(targetFieldId);
     },
 
-    _open(targetFieldId) {
+    async _open(targetFieldId) {
         this._targetFieldId = targetFieldId;
+        const home = await this._ensureHome();
         const current = document.getElementById(targetFieldId)?.value.trim();
         if (current && current.startsWith('/')) {
             const parts = current.split('/');
             parts.pop();
-            this._currentPath = parts.join('/') || '/Users/bernard/AppData';
+            this._currentPath = parts.join('/') || home;
             this._pendingFilename = current.split('/').pop() || '';
         } else {
-            this._currentPath = '/Users/bernard';
+            this._currentPath = home;
             this._pendingFilename = '';
         }
         this._renderModal();
@@ -2573,15 +2674,16 @@ const FsBrowser = {
                     const p = built;
                     return `<span class="fs-crumb" onclick="FsBrowser._load('${p}')">${part}</span>`;
                 });
+                const homePath = (this._home || '').replace(/'/g, "\\'");
                 breadcrumb.innerHTML =
-                    `<span class="fs-crumb" onclick="FsBrowser._load('/Users/bernard')">🏠</span>` +
+                    `<span class="fs-crumb" onclick="FsBrowser._load('${homePath}')">🏠</span>` +
                     (crumbs.length ? ' / ' + crumbs.join(' / ') : '');
             }
 
             // List
             if (!list) return;
             let html = '';
-            if (data.parent && data.current !== '/Users/bernard') {
+            if (data.parent && data.current !== this._home) {
                 html += `<div class="fs-item fs-item-dir" onclick="FsBrowser._load('${data.parent}')">
                     <span class="fs-icon">⬆️</span><span>..</span></div>`;
             }

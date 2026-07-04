@@ -7,3 +7,4 @@ __pycache__/
 !.claude/skills/**
 !.claude/launch.json
 data/
+.env
