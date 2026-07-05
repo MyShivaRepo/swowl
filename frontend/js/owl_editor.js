@@ -11,6 +11,10 @@ const ALL_ANNO_PROPS = [
     'skos:prefLabel', 'skos:altLabel', 'skos:hiddenLabel', 'skos:definition',
     'skos:note', 'skos:scopeNote', 'skos:example', 'skos:editorialNote',
     'skos:historyNote', 'skos:changeNote',
+    'dcterms:title', 'dcterms:description', 'dcterms:created', 'dcterms:modified',
+    'dcterms:issued', 'dcterms:creator', 'dcterms:contributor', 'dcterms:publisher',
+    'dcterms:license', 'dcterms:rights',
+    'vann:preferredNamespacePrefix', 'vann:preferredNamespaceUri',
 ];
 
 // ── OWL ID validation ───────────────────────────────────────
@@ -3121,15 +3125,15 @@ function _annoPickerItems(editorName) {
         return nsLabel + builtinHtml + nsRoots;
     };
 
-    // Orphan user props (no namespace match, no parent)
-    const nsKeys        = Object.keys(AP_BUILTINS);   // rdfs:, owl:, skos:, dc:…
+    // Orphan user props : détection sur TOUS les namespaces (résolution correcte)…
+    const nsKeys        = Object.keys(AP_BUILTINS);   // rdfs:, owl:, skos:, dcterms:, vann:
     const hasParent     = new Set(Object.values(childrenOf).flat().concat(Object.values(builtinChildrenOf).flat()));
     const orphans = userProps
         .filter(q => !hasParent.has(q.id) && !nsKeys.some(ns => q.id.startsWith(ns)))
         .map(q => renderUserNode(q.id, 0)).join('');
 
-    // Tous les namespaces builtin (et non plus seulement rdfs:/owl:)
-    return nsKeys.map(ns => renderNs(ns)).join('') + orphans;
+    // …mais rendu uniquement des namespaces dont l'ontologie est enregistrée (System Registry).
+    return _activeBuiltinNsKeys().map(ns => renderNs(ns)).join('') + orphans;
 }
 
 /** Collects data-id values from a list */
@@ -7028,7 +7032,45 @@ const AP_BUILTINS = {
         { id: 'skos:historyNote',   comment: 'Note about changes to a concept' },
         { id: 'skos:changeNote',    comment: 'Note about a fine-grained change' },
     ],
+    'dcterms:': [
+        { id: 'dcterms:title',        comment: 'A name given to the resource' },
+        { id: 'dcterms:description',  comment: 'An account of the resource' },
+        { id: 'dcterms:created',      comment: 'Date of creation' },
+        { id: 'dcterms:modified',     comment: 'Date on which the resource was changed' },
+        { id: 'dcterms:issued',       comment: 'Date of formal issuance' },
+        { id: 'dcterms:creator',      comment: 'An entity responsible for making the resource' },
+        { id: 'dcterms:contributor',  comment: 'An entity that contributed to the resource' },
+        { id: 'dcterms:publisher',    comment: 'An entity responsible for making it available' },
+        { id: 'dcterms:license',      comment: 'A legal document giving official permission' },
+        { id: 'dcterms:rights',       comment: 'Information about rights held in and over the resource' },
+    ],
+    'vann:': [
+        { id: 'vann:preferredNamespacePrefix', comment: 'Preferred namespace prefix for a vocabulary' },
+        { id: 'vann:preferredNamespaceUri',    comment: 'Preferred namespace URI for a vocabulary' },
+    ],
 };
+
+// Chaque namespace de built-in AP correspond à une ontologie de la System Registry.
+// Les sections AP (arbre, picker, recherche, compteur) ne s'affichent que si l'ontologie
+// correspondante est enregistrée → l'onglet Annotation Properties reste « en phase » avec
+// les fetch de la System Registry (retirer skos ⇒ la section skos disparaît).
+// Les checks d'appartenance (_isBuiltin, _nsOf…) restent complets, pour continuer à
+// résoudre d'éventuelles références existantes.
+const AP_BUILTIN_ONTO = {
+    'rdfs:': 'rdfs', 'owl:': 'owl', 'skos:': 'skos', 'dcterms:': 'dcterms', 'vann:': 'vann',
+};
+function _activeBuiltinNsKeys() {
+    const list = (typeof APP !== 'undefined') ? APP._ontoList : null;
+    if (!Array.isArray(list)) return Object.keys(AP_BUILTINS);   // registry pas encore chargée → tout
+    const reg = new Set(list.map(o => o.name));
+    return Object.keys(AP_BUILTINS).filter(ns => {
+        const name = AP_BUILTIN_ONTO[ns];
+        return !name || reg.has(name);   // namespace sans mapping connu → toujours affiché
+    });
+}
+function _activeBuiltinAnnoIds() {
+    return _activeBuiltinNsKeys().flatMap(ns => (AP_BUILTINS[ns] || []).map(p => p.id));
+}
 
 const APEditor = {
 
@@ -7235,7 +7277,7 @@ const APEditor = {
         const orphans = roots.filter(key => !this._rootOf(byKey[key].id));
 
         return `
-        ${Object.keys(AP_BUILTINS).map(ns => renderNsRoot(ns)).join('')}
+        ${_activeBuiltinNsKeys().map(ns => renderNsRoot(ns)).join('')}
         ${orphans.map(key => this._renderUserNode(key, childrenOf, 1, props)).join('')}`;
     },
 

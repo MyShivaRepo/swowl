@@ -102,11 +102,11 @@
 
 
 <!-- ── Scripts ── -->
-<script src="/js/api.js?v=274"></script>
-<script src="/js/owl_editor.js?v=375"></script>
+<script src="/js/api.js?v=275"></script>
+<script src="/js/owl_editor.js?v=377"></script>
 <script src="/js/swrl_editor.js?v=322"></script>
 <script src="/js/sparql_editor.js?v=320"></script>
-<script src="/js/app.js?v=351"></script>
+<script src="/js/app.js?v=353"></script>
 
 <script>
 // Update navigation counters
@@ -117,7 +117,8 @@ function _updateNavCounters() {
   document.getElementById('nc-inds').textContent    = APP.state.individuals.length;
   const _ncSword = document.getElementById('nc-swrl'); if (_ncSword) _ncSword.textContent = (APP.state.swrl_rules||[]).length;
   const _ncQ = document.getElementById('nc-queries'); if (_ncQ) _ncQ.textContent = (APP.state.queries||[]).length;
-  document.getElementById('nc-annos').textContent   = ALL_ANNO_PROPS.length + (APP.state.annotation_properties || []).length;
+  const _builtinAnnoCount = (typeof _activeBuiltinAnnoIds === 'function') ? _activeBuiltinAnnoIds().length : ALL_ANNO_PROPS.length;
+  document.getElementById('nc-annos').textContent   = _builtinAnnoCount + (APP.state.annotation_properties || []).length;
 }
 
 // Patch APP.refresh to update counters after each refresh

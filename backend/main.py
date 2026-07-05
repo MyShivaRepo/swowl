@@ -17,6 +17,7 @@ from owl_model import (
     OWLAnnotationProperty,
     OWLIndividual, SWRLRule, SparqlQuery, InferenceResult, PropertyPresence,
     ObjectPropertyAssertion, DataPropertyAssertion,
+    EntityAnnotations, Annotation, OtherAnnotation,
 )
 from triple_store import store
 from inference_engine import InferenceEngine
@@ -700,6 +701,25 @@ def get_current_ontology():
 def update_ontology_meta(onto: OWLOntology):
     store.set(onto)
     return onto
+
+
+class OntoAnnotationsRequest(PydanticModel):
+    labels:   list = []
+    comments: list = []
+    other:    list = []
+
+
+@app.put("/api/ontologies/current/annotations", tags=["Ontologie"])
+def update_ontology_annotations(req: OntoAnnotationsRequest):
+    """Met à jour les annotations de l'entité owl:Ontology (label/comment/other)."""
+    onto = require_onto()
+    onto.annotations = EntityAnnotations(
+        labels=[Annotation(**l) for l in req.labels],
+        comments=[Annotation(**c) for c in req.comments],
+        other=[OtherAnnotation(**o) for o in req.other],
+    )
+    store.save()
+    return onto.annotations
 
 
 @app.put("/api/display-rules", tags=["Ontologie"])

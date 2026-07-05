@@ -39,6 +39,7 @@ const API = {
     disconnectOntology: ()           => API._fetch('POST',   '/ontologies/disconnect'),
     getCurrentOntology: ()           => API._fetch('GET',    '/ontologies/current'),
     updateOntology:     (data)       => API._fetch('PUT',    '/ontologies/current', data),
+    updateOntologyAnnotations: (data) => API._fetch('PUT',   '/ontologies/current/annotations', data),
     updateDisplayRules: (rules)      => API._fetch('PUT',    '/display-rules', rules),
     testLlmKey: (provider, api_key, base_url) => API._fetch('POST', '/llm/test', { provider, api_key: api_key || '', base_url: base_url || '' }),
     analyseCorpus: (api_key, model, documents, system_prompt) => {

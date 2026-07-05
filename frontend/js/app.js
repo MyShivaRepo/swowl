@@ -2591,6 +2591,88 @@ const UI = {
 };
 
 
+// ── owl:Ontology header editor (Settings → owl:Ontology) ─────
+// Réutilise les composants ANNOTATIONS des éditeurs (owl_editor.js) : _annoRow,
+// _makeAnnotRow, _annoPickerItems, _collectAnnotations, _togglePicker.
+
+const OntologyMeta = {
+    _tbody:  'onto-annotations-body',
+    _picker: 'onto-anno-picker',
+    _timer:  null,
+
+    render() {
+        const onto = APP.state.ontology;
+        if (!onto || !onto.name) {
+            return `<div style="padding:24px;color:var(--text-dim);font-size:13px">
+                No ontology connected. Connect one from the <strong>Ontologies</strong> tab
+                to edit its header annotations.</div>`;
+        }
+        const anns = onto.annotations || {};
+        const ac   = 'onchange="OntologyMeta.autoSave()"';
+        const rows = [
+            ...(anns.labels   || []).map(l => _annoRow('label',   l.value, l.lang || Settings.defaultLang, 'OntologyMeta', ac)),
+            ...(anns.comments || []).map(c => _annoRow('comment', c.value, c.lang || Settings.defaultLang, 'OntologyMeta', ac)),
+            ...(anns.other    || []).map(a => _annoRow('other',   a.value, '', 'OntologyMeta', ac, a.property)),
+        ].join('');
+        const dispName = onto.prefix ? `${onto.prefix}:${onto.name}` : onto.name;
+        const iri = onto.id || '';
+        const plus = '＋';
+        return `
+        <div style="display:flex;flex-direction:column;gap:16px;padding:16px;flex:1;overflow-y:auto">
+            <div class="cls-frame" style="padding:0">
+                <div class="cls-frame-bar"><span class="cls-frame-tag">🦉 owl:Ontology</span></div>
+                <div class="cls-frame-body" style="padding:10px 14px">
+                    <div style="font-size:13px;font-weight:600">${_escapeHtml(dispName)}</div>
+                    ${iri ? `<div style="font-size:11px;color:var(--text-dim);font-family:var(--font-mono);margin-top:2px">${_escapeHtml(iri)}</div>` : ''}
+                    <p style="margin:8px 0 0;font-size:11px;color:var(--text-dim)">
+                        Annotations of the ontology entity itself (labels, descriptions, version, dates, creator…).
+                        <code>dcterms:</code> &amp; <code>vann:</code> properties are available without importing them.
+                    </p>
+                </div>
+            </div>
+            <div class="cls-frame" style="padding:0">
+                <div class="cls-frame-bar">
+                    <span class="cls-frame-tag">Annotations</span>
+                    <button class="btn-ftool" onclick="OntologyMeta.addAnnotRow('label')">${plus}&thinsp;label</button>
+                    <button class="btn-ftool" onclick="OntologyMeta.addAnnotRow('comment')">${plus}&thinsp;comment</button>
+                    <button class="btn-ftool" onclick="_togglePicker('${this._picker}')" title="Add annotation property">${plus}&thinsp;Annotation Property</button>
+                </div>
+                <div class="cls-frame-body">
+                    <table class="cls-anno-table">
+                        <thead><tr><th>Property</th><th>Value</th><th>Lang</th><th></th></tr></thead>
+                        <tbody id="${this._tbody}">${rows}</tbody>
+                    </table>
+                    <div id="${this._picker}" class="cls-tree-picker" style="display:none">
+                        ${_annoPickerItems('OntologyMeta')}
+                    </div>
+                </div>
+            </div>
+        </div>`;
+    },
+
+    addAnnotRow(type) {
+        document.getElementById(this._tbody)?.appendChild(
+            _makeAnnotRow(type, 'OntologyMeta', 'onchange="OntologyMeta.autoSave()"'));
+    },
+    addOtherAnnotRow(prop) {
+        document.getElementById(this._tbody)?.appendChild(
+            _makeAnnotRow('other', 'OntologyMeta', 'onchange="OntologyMeta.autoSave()"', prop));
+        document.getElementById(this._picker)?.style.setProperty('display', 'none');
+    },
+    removeAnnotRow(btn) { btn.closest('tr')?.remove(); this.autoSave(); },
+    autoSave() { clearTimeout(this._timer); this._timer = setTimeout(() => this.save(), 500); },
+    async save() {
+        const onto = APP.state.ontology;
+        if (!onto || !onto.name) return;
+        const { labels, comments, other } = _collectAnnotations(this._tbody);
+        try {
+            await API.updateOntologyAnnotations({ labels, comments, other });
+            if (APP.state.ontology) APP.state.ontology.annotations = { labels, comments, other };
+        } catch (e) { UI.error(e.message); }
+    },
+};
+
+
 // ── Filesystem Browser ───────────────────────────────────────
 
 const FsBrowser = {
@@ -3101,10 +3183,10 @@ const GlobalSearch = {
         (s.object_properties     || []).forEach(p => { if (_idMatch(p)) results.push({ section: 'object-properties',     id: p.id, label: p.id, disp: _displayId(p), imported: !!p._imported }); });
         (s.datatype_properties   || []).forEach(p => { if (_idMatch(p)) results.push({ section: 'datatype-properties',   id: p.id, label: p.id, disp: _displayId(p), imported: !!p._imported }); });
         (s.annotation_properties || []).forEach(p => { if (_idMatch(p)) results.push({ section: 'annotation-properties', id: p.id, label: p.id, disp: _displayId(p), imported: !!p._imported }); });
-        // Annotation properties BUILT-IN (rdfs:/owl:/skos:/dc:…) — affichées dans l'onglet
-        // mais absentes de state.annotation_properties → sinon « comment », « seeAlso »… ne remontent pas.
-        if (typeof AP_BUILTINS !== 'undefined') {
-            Object.values(AP_BUILTINS).flat().forEach(p => {
+        // Annotation properties BUILT-IN — seulement celles dont l'ontologie est enregistrée
+        // (System Registry), pour rester en phase avec l'onglet Annotation Properties.
+        if (typeof _activeBuiltinNsKeys === 'function' && typeof AP_BUILTINS !== 'undefined') {
+            _activeBuiltinNsKeys().flatMap(ns => AP_BUILTINS[ns] || []).forEach(p => {
                 if (_idMatch(p)) results.push({ section: 'annotation-properties', id: p.id, label: p.id, disp: p.id, imported: false });
             });
         }
@@ -5690,6 +5772,7 @@ APP.renderSettings = function() {
     const sidebar = `
         <div style="width:160px;flex-shrink:0;border-right:1px solid var(--border);padding:8px 0">
             ${tabBtn('gui-tabs',      '🗂️ GUI Tabs')}
+            ${tabBtn('owl-ontology',  '🦉 owl:Ontology')}
             ${tabBtn('languages',     '🌐 Languages')}
             ${tabBtn('naming-rules',  '🏷 IDs Rules')}
         </div>`;
@@ -5780,6 +5863,8 @@ APP.renderSettings = function() {
         </div>`;
     } else if (tab === 'gui-tabs') {
         tabContent = APP.renderGuiTabs();
+    } else if (tab === 'owl-ontology') {
+        tabContent = OntologyMeta.render();
     } else if (tab === 'naming-rules') {
         const fmt = Settings.namingFormat;
         const fmtOption = (id, label, example, desc) => `

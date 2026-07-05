@@ -13,6 +13,11 @@ from typing import Optional
 from rdflib import Graph, Namespace, RDF, RDFS, OWL, XSD, Literal, URIRef, BNode
 from rdflib.namespace import SKOS
 
+# Namespaces additionnels (métadonnées d'ontologie fréquentes — disponibles sans import).
+DCTERMS = Namespace("http://purl.org/dc/terms/")
+DC      = Namespace("http://purl.org/dc/elements/1.1/")
+VANN    = Namespace("http://purl.org/vocab/vann/")
+
 from owl_model import (
     OWLOntology, OWLClass, OWLObjectProperty, OWLDatatypeProperty,
     OWLIndividual, ObjectPropertyAssertion, DataPropertyAssertion,
@@ -55,6 +60,25 @@ ANNO_PROP_MAP = {
     'skos:editorialNote':         SKOS.editorialNote,
     'skos:historyNote':           SKOS.historyNote,
     'skos:changeNote':            SKOS.changeNote,
+    # Dublin Core Terms — métadonnées d'ontologie
+    'dcterms:title':              DCTERMS.title,
+    'dcterms:description':        DCTERMS.description,
+    'dcterms:created':            DCTERMS.created,
+    'dcterms:modified':           DCTERMS.modified,
+    'dcterms:issued':             DCTERMS.issued,
+    'dcterms:creator':            DCTERMS.creator,
+    'dcterms:contributor':        DCTERMS.contributor,
+    'dcterms:publisher':          DCTERMS.publisher,
+    'dcterms:license':            DCTERMS.license,
+    'dcterms:rights':             DCTERMS.rights,
+    # Dublin Core (legacy elements 1.1)
+    'dc:title':                   DC.title,
+    'dc:description':             DC.description,
+    'dc:creator':                 DC.creator,
+    'dc:date':                    DC.date,
+    # VANN — métadonnées de vocabulaire
+    'vann:preferredNamespacePrefix': VANN.preferredNamespacePrefix,
+    'vann:preferredNamespaceUri':    VANN.preferredNamespaceUri,
 }
 
 # Table inverse {predicate URIRef: id préfixé} — pour capturer les annotations « other » à l'import.
@@ -901,6 +925,12 @@ class TripleStore:
             g.add((onto_uri, RDFS.label, Literal(ann.value, lang=ann.lang)))
         for ann in onto.annotations.comments:
             g.add((onto_uri, RDFS.comment, Literal(ann.value, lang=ann.lang)))
+        # Annotations « other » de l'en-tête d'ontologie (owl:versionInfo, dcterms:*, vann:*…)
+        for ann in (getattr(onto.annotations, "other", None) or []):
+            pred = ANNO_PROP_MAP.get(ann.property)
+            if pred is not None and ann.value:
+                g.add((onto_uri, pred, Literal(ann.value)))
+        g.bind("dcterms", DCTERMS); g.bind("dc", DC); g.bind("vann", VANN)
 
         _EXT_PREFIX_NS = {"xsd:": XSD, "owl:": OWL, "rdfs:": RDFS, "rdf:": RDF, "skos:": SKOS}
 
