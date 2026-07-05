@@ -768,7 +768,7 @@ const APP = {
                 <button class="btn-onto-action" onclick="APP._fetchBuiltins()" id="btn-fetch-builtins">
                     <span class="btn-onto-w3c-badge">W3C</span>
                     <span class="btn-onto-label">Fetch Ontologies</span>
-                    <span class="btn-onto-desc">Pick vocabularies: RDF, RDFS, OWL, SHACL, SKOS, PROV-O, ORG, DC, FOAF…</span>
+                    <span class="btn-onto-desc">Pick vocabularies: RDF, RDFS, OWL, SHACL, SKOS, PROV-O, ORG, DC, FOAF, VANN, CIDOC-CRM, RiC-O…</span>
                 </button>
             </div>
 
@@ -909,7 +909,7 @@ const APP = {
             const dirPath    = o.path.substring(0, o.path.lastIndexOf('/') + 1);
             const actions    = isReadonly
                 ? `${connBtn}
-                   <span title="Read-only W3C ontology" style="font-size:13px;opacity:0.5;margin-left:2px">🔒</span>`
+                   <button class="btn-sm btn-del" onclick="APP.doUnregister('${safe}')" title="Remove from registry">✕</button>`
                 : `<button class="btn-sm" onclick="APP.doEditOntology('${safe}')" title="Edit attributes">✏️</button>
                    ${connBtn}
                    <button class="btn-sm" onclick="APP._ontoExportDropdown(this,'${safe}','onto')" title="Export ontology">↓ Ontology</button>
@@ -1467,7 +1467,7 @@ const APP = {
         Object.keys(groups).forEach(g => {
             if (g !== 'Core') groups[g].sort((a, b) => a.name.localeCompare(b.name));
         });
-        const order = ['Core', 'W3C', 'Community', 'Other'];
+        const order = ['Core', 'W3C', 'Transversal', 'Vertical', 'Community', 'Other'];
         const groupNames = [...new Set([...order.filter(g => groups[g]), ...Object.keys(groups)])];
 
         const row = (c) => `

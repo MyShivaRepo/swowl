@@ -2575,10 +2575,21 @@ BUILTIN_CATALOG = [
      "forced_imports": ["http://www.w3.org/2000/01/rdf-schema"]},
     {"name": "dcterms", "prefix": "dcterms", "uri": "http://purl.org/dc/terms/",
      "url": "http://purl.org/dc/terms/", "file": "dcterms.ttl",
-     "group": "Community", "description": "Dublin Core Terms (RDFS)"},
+     "group": "Transversal", "description": "Dublin Core Terms (RDFS)"},
     {"name": "foaf",    "prefix": "foaf",    "uri": "http://xmlns.com/foaf/0.1/",
      "url": "http://xmlns.com/foaf/spec/index.rdf", "file": "foaf.ttl",
-     "group": "Community", "description": "FOAF — Friend of a Friend"},
+     "group": "Transversal", "description": "FOAF — Friend of a Friend"},
+    {"name": "vann",    "prefix": "vann",    "uri": "http://purl.org/vocab/vann/",
+     "url": "https://vocab.org/vann/vann-vocab-20100607.rdf", "file": "vann.ttl",
+     "group": "Transversal", "description": "VANN — annotate vocabularies"},
+    {"name": "cidoc-crm", "prefix": "crm",   "uri": "http://www.cidoc-crm.org/cidoc-crm/",
+     "url": "https://cidoc-crm.org/rdfs/7.1.3/CIDOC_CRM_v7.1.3.rdfs", "file": "cidoc-crm.ttl",
+     "group": "Vertical", "description": "CIDOC-CRM — cultural heritage (v7.1.3)"},
+    {"name": "ric-o",   "prefix": "rico",    "uri": "https://www.ica.org/standards/RiC/ontology#",
+     "url": "https://raw.githubusercontent.com/ICA-EGAD/RiC-O/master/ontology/current-version/RiC-O_1-1.rdf",
+     "file": "ric-o.ttl", "format": "xml",
+     "group": "Vertical", "description": "RiC-O — Records in Contexts, archives (v1.1)"},
+    # LRM-oo (bibliothèques) : à ajouter quand cidoc-crm.org/lrmoo répondra (site down / HTTP 500).
 ]
 
 
@@ -2632,7 +2643,12 @@ def fetch_builtins(req: Optional[BuiltinsFetchRequest] = Body(default=None)):
         if not ttl_path.exists():
             try:
                 g = rdflib.Graph()
-                g.parse(b["url"])
+                # `format` optionnel : certains serveurs renvoient text/plain et rdflib
+                # ne devine pas le format (ex. RiC-O sur raw.githubusercontent → "xml").
+                if b.get("format"):
+                    g.parse(b["url"], format=b["format"])
+                else:
+                    g.parse(b["url"])
                 ttl_path.write_text(g.serialize(format="turtle"), encoding="utf-8")
             except Exception as e:
                 results.append({"name": b["name"], "status": f"download failed: {e}"})
