@@ -328,18 +328,32 @@ const APP = {
         }, 120);
     },
 
-    _topbarOntoDropdown() {
+    async _topbarOntoDropdown() {
         const dropdown = document.getElementById('topbar-onto-dropdown');
         if (!dropdown) return;
         if (dropdown.style.display !== 'none') { dropdown.style.display = 'none'; return; }
 
-        // User ontologies only (exclude readonly/system)
-        const userList = (this._ontoList || []).filter(o => !o.readonly).sort((a, b) => a.name.localeCompare(b.name));
-        if (userList.length === 0) return;
+        // Charge la liste à la demande si pas encore disponible (robustesse).
+        if (!this._ontoList) {
+            try { this._ontoList = await API.listOntologies(); } catch { this._ontoList = []; }
+        }
+        // Les DEUX sections : User Registry (éditables) puis System Registry (readonly).
+        const all      = this._ontoList || [];
+        const userList = all.filter(o => !o.readonly).sort((a, b) => a.name.localeCompare(b.name));
+        const sysList  = all.filter(o =>  o.readonly).sort((a, b) => a.name.localeCompare(b.name));
+        if (!userList.length && !sysList.length) return;
 
         const current = (this.state.ontology && this.state.ontology.name) || null;
         dropdown.innerHTML = '';
-        userList.forEach(o => {
+
+        const addHeader = (txt) => {
+            const h = document.createElement('div');
+            h.textContent = txt;
+            h.style.cssText = 'padding:4px 10px 2px;font-size:9px;font-weight:600;color:var(--text-dim);'
+                + 'text-transform:uppercase;letter-spacing:.05em;user-select:none';
+            dropdown.appendChild(h);
+        };
+        const addItem = (o) => {
             const btn = document.createElement('button');
             btn.className = 'topbar-onto-dropdown-item' + (o.name === current ? ' active' : '');
             btn.textContent = (o.name === current ? '● ' : '○ ') + o.name;
@@ -350,7 +364,6 @@ const APP = {
                     await API.connectOntology(o.name);
                     UI.success(`Ontology "${o.name}" connected.`);
                     await this.refresh();
-                    // Si l'onglet courant est maintenant caché pour cette ontologie → retour à Ontologies
                     const sec = this.currentSection;
                     if (sec && sec !== 'ontologies' && TabVisibility.isHidden(sec)) {
                         this.navigate('ontologies');
@@ -365,7 +378,10 @@ const APP = {
                 } catch (e) { UI.error(e.message); }
             };
             dropdown.appendChild(btn);
-        });
+        };
+
+        if (userList.length) { addHeader('User Registry');   userList.forEach(addItem); }
+        if (sysList.length)  { addHeader('System Registry'); sysList.forEach(addItem); }
         dropdown.style.display = '';
 
         // Ferme le dropdown si on clique ailleurs
