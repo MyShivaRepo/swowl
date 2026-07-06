@@ -84,6 +84,43 @@ ANNO_PROP_MAP = {
 # Table inverse {predicate URIRef: id préfixé} — pour capturer les annotations « other » à l'import.
 ANNO_PRED_TO_ID = {pred: pid for pid, pred in ANNO_PROP_MAP.items()}
 
+# ── Type de valeur des annotations (langue / datatype / IRI) ─────────────────
+_DT_NS = {"xsd": XSD, "rdf": RDF, "owl": OWL, "rdfs": RDFS}
+
+def _datatype_uri(dt):
+    """'xsd:date' / 'rdf:HTML' / 'owl:real' → URIRef ; URL absolue → URIRef ; sinon None."""
+    if not dt:
+        return None
+    if dt.startswith("http"):
+        return URIRef(dt)
+    if ":" in dt:
+        pfx, local = dt.split(":", 1)
+        ns = _DT_NS.get(pfx)
+        if ns is not None:
+            return ns[local]
+    return None
+
+def _datatype_id(uri):
+    """URIRef d'un datatype → id préfixé ('xsd:date') si connu, sinon l'URI brute."""
+    s = str(uri)
+    for pfx, ns in _DT_NS.items():
+        if s.startswith(str(ns)):
+            return f"{pfx}:{s[len(str(ns)):]}"
+    return s
+
+def _anno_object(value, lang=None, datatype=None, is_iri=False):
+    """Construit l'objet RDF d'une annotation selon son type de valeur.
+       IRI > datatype > langue > xsd:string (défaut)."""
+    if is_iri:
+        return URIRef(value)
+    if datatype:
+        u = _datatype_uri(datatype)
+        if u is not None and str(u) != str(XSD.string):
+            return Literal(value, datatype=u)
+    if lang:
+        return Literal(value, lang=lang)
+    return Literal(value)   # xsd:string par défaut (littéral nu)
+
 # Préfixe pour traduire les chemins hôte ↔ conteneur.
 #   - HOST_PREFIX_CONTAINER : emplacement FIXE où le home est monté (cf. docker-compose).
 #   - HOST_PREFIX_HOST      : chemin hôte réel de ce home (HOST_HOME), ex. /Users/thomas
@@ -465,12 +502,26 @@ class TripleStore:
         onto = OWLOntology(id=onto_id, name=name, prefix=prefix, ns_prefixes=ns_prefixes or [])
 
         # ── Helper: collect labels & comments for any URI ───────
+        def _lit_dict(lit):
+            """Littéral RDF → dict {value, lang, datatype?} (langue OU datatype, jamais les deux)."""
+            dt = getattr(lit, "datatype", None)
+            d = {"value": str(lit), "lang": lit.language or ""}
+            if dt is not None and str(dt) not in (str(XSD.string), str(RDF.langString)):
+                d["datatype"] = _datatype_id(dt)
+            return d
+
+        def _obj_dict(obj):
+            """Objet RDF (littéral OU IRI) → dict pour Annotation."""
+            if isinstance(obj, URIRef):
+                return {"value": str(obj), "lang": "", "is_iri": True}
+            return _lit_dict(obj)
+
         def _collect_labels(uri_ref):
             labels, comments = [], []
             for lbl in g.objects(uri_ref, RDFS.label):
-                labels.append({"lang": lbl.language or "en", "value": str(lbl)})
+                labels.append(_obj_dict(lbl))
             for cmt in g.objects(uri_ref, RDFS.comment):
-                comments.append({"lang": cmt.language or "en", "value": str(cmt)})
+                comments.append(_obj_dict(cmt))
             return labels, comments
 
         # ── Helper: collect "other" annotations (rdfs:seeAlso, skos:*, owl:*…) ───
@@ -478,7 +529,14 @@ class TripleStore:
             other = []
             for pred, pid in ANNO_PRED_TO_ID.items():
                 for obj in g.objects(uri_ref, pred):
-                    other.append(OtherAnnotation(property=pid, value=str(obj)))
+                    if isinstance(obj, URIRef):           # IRI (ressource)
+                        other.append(OtherAnnotation(property=pid, value=str(obj), is_iri=True))
+                    else:                                  # littéral : langue OU datatype
+                        dt = getattr(obj, "datatype", None)
+                        datatype = _datatype_id(dt) if (dt is not None and
+                                    str(dt) not in (str(XSD.string), str(RDF.langString))) else None
+                        other.append(OtherAnnotation(property=pid, value=str(obj),
+                                                     lang=(obj.language or None), datatype=datatype))
             return other
 
         # ── Helper: extract local name with prefix fallback ──────
@@ -922,14 +980,16 @@ class TripleStore:
             if pfx:
                 g.bind(pfx, Namespace(imp_uri.rstrip("#/") + "#"))
         for ann in onto.annotations.labels:
-            g.add((onto_uri, RDFS.label, Literal(ann.value, lang=ann.lang)))
+            g.add((onto_uri, RDFS.label, _anno_object(ann.value, lang=ann.lang, datatype=getattr(ann, "datatype", None), is_iri=getattr(ann, "is_iri", False))))
         for ann in onto.annotations.comments:
-            g.add((onto_uri, RDFS.comment, Literal(ann.value, lang=ann.lang)))
+            g.add((onto_uri, RDFS.comment, _anno_object(ann.value, lang=ann.lang, datatype=getattr(ann, "datatype", None), is_iri=getattr(ann, "is_iri", False))))
         # Annotations « other » de l'en-tête d'ontologie (owl:versionInfo, dcterms:*, vann:*…)
         for ann in (getattr(onto.annotations, "other", None) or []):
             pred = ANNO_PROP_MAP.get(ann.property)
             if pred is not None and ann.value:
-                g.add((onto_uri, pred, Literal(ann.value)))
+                obj = _anno_object(ann.value, lang=getattr(ann, "lang", None),
+                                   datatype=getattr(ann, "datatype", None), is_iri=getattr(ann, "is_iri", False))
+                g.add((onto_uri, pred, obj))
         g.bind("dcterms", DCTERMS); g.bind("dc", DC); g.bind("vann", VANN)
 
         _EXT_PREFIX_NS = {"xsd:": XSD, "owl:": OWL, "rdfs:": RDFS, "rdf:": RDF, "skos:": SKOS}
@@ -979,13 +1039,15 @@ class TripleStore:
 
         def add_anns(subject: URIRef, anns) -> None:
             for a in anns.labels:
-                g.add((subject, RDFS.label, Literal(a.value, lang=a.lang)))
+                g.add((subject, RDFS.label, _anno_object(a.value, lang=a.lang, datatype=getattr(a, "datatype", None), is_iri=getattr(a, "is_iri", False))))
             for a in anns.comments:
-                g.add((subject, RDFS.comment, Literal(a.value, lang=a.lang)))
+                g.add((subject, RDFS.comment, _anno_object(a.value, lang=a.lang, datatype=getattr(a, "datatype", None), is_iri=getattr(a, "is_iri", False))))
             for a in (anns.other if hasattr(anns, 'other') else []):
                 pred = ANNO_PROP_MAP.get(a.property)
                 if pred is not None and a.value:
-                    g.add((subject, pred, Literal(a.value)))
+                    obj = _anno_object(a.value, lang=getattr(a, "lang", None),
+                                       datatype=getattr(a, "datatype", None), is_iri=getattr(a, "is_iri", False))
+                    g.add((subject, pred, obj))
 
         def class_expr_node(expr) -> URIRef | BNode:
             if isinstance(expr, str):

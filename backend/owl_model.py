@@ -9,14 +9,25 @@ from pydantic import BaseModel, Field, field_validator
 # ── Annotations ──────────────────────────────────────────────
 
 class Annotation(BaseModel):
+    # Type de valeur (mutuellement exclusifs) :
+    #   lang non vide            → littéral avec langue  ("…"@lang)
+    #   datatype non nul         → littéral typé         ("…"^^datatype)
+    #   ni l'un ni l'autre       → littéral xsd:string
     lang: str = "fr"
     value: str
+    datatype: Optional[str] = None   # ex: "xsd:date" — prime sur lang si renseigné
+    is_iri: bool = False             # True → l'objet est une IRI (URIRef)
 
 
 class OtherAnnotation(BaseModel):
     """Annotation OWL 2 autre que rdfs:label / rdfs:comment."""
     property: str   # ex: "rdfs:seeAlso", "owl:deprecated"
     value: str
+    # Type de valeur (mutuellement exclusifs) : is_iri → IRI ; datatype → littéral typé ;
+    # lang → littéral avec langue ; sinon → xsd:string.
+    is_iri: bool = False
+    lang: Optional[str] = None
+    datatype: Optional[str] = None
 
 
 class EntityAnnotations(BaseModel):

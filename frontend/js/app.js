@@ -939,7 +939,7 @@ const APP = {
                 class="${isConn ? 'onto-current-row' : ''}${isReadonly ? ' onto-readonly-row' : ''}${isSel ? ' onto-selected-row' : ''}">
                 <td style="text-align:center">${dot}</td>
                 <td ${!isReadonly ? `oncontextmenu="event.preventDefault();event.stopPropagation();APP._showImportPicker('${safe}',event)" title="Right-click to manage imports"` : ''}>
-                    <strong>${o.name}</strong>${isReadonly ? ' <span style="font-size:10px;color:var(--text-faint);font-style:italic">W3C</span>' : ''}
+                    <strong>${o.name}</strong>
                 </td>
                 <td class="onto-iri-cell onto-path-cell"
                     title="Click to open in Finder"
@@ -2610,9 +2610,9 @@ const OntologyMeta = {
         const anns = onto.annotations || {};
         const ac   = 'onchange="OntologyMeta.autoSave()"';
         const rows = [
-            ...(anns.labels   || []).map(l => _annoRow('label',   l.value, l.lang || Settings.defaultLang, 'OntologyMeta', ac)),
-            ...(anns.comments || []).map(c => _annoRow('comment', c.value, c.lang || Settings.defaultLang, 'OntologyMeta', ac)),
-            ...(anns.other    || []).map(a => _annoRow('other',   a.value, '', 'OntologyMeta', ac, a.property)),
+            ...(anns.labels   || []).map(l => _annoRow('label',   l.value, l.lang || '', 'OntologyMeta', ac, null, false, l.datatype)),
+            ...(anns.comments || []).map(c => _annoRow('comment', c.value, c.lang || '', 'OntologyMeta', ac, null, false, c.datatype)),
+            ...(anns.other    || []).map(a => _annoRow('other',   a.value, a.lang || '', 'OntologyMeta', ac, a.property, a.is_iri, a.datatype)),
         ].join('');
         const dispName = onto.prefix ? `${onto.prefix}:${onto.name}` : onto.name;
         const iri = onto.id || '';
@@ -2626,7 +2626,6 @@ const OntologyMeta = {
                     ${iri ? `<div style="font-size:11px;color:var(--text-dim);font-family:var(--font-mono);margin-top:2px">${_escapeHtml(iri)}</div>` : ''}
                     <p style="margin:8px 0 0;font-size:11px;color:var(--text-dim)">
                         Annotations of the ontology entity itself (labels, descriptions, version, dates, creator…).
-                        <code>dcterms:</code> &amp; <code>vann:</code> properties are available without importing them.
                     </p>
                 </div>
             </div>

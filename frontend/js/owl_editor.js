@@ -17,6 +17,21 @@ const ALL_ANNO_PROPS = [
     'vann:preferredNamespacePrefix', 'vann:preferredNamespaceUri',
 ];
 
+// Datatypes proposés pour une valeur d'annotation (namespaces XSD/RDF/RDFS/OWL).
+// xsd:string est le défaut (valeur sans langue ni datatype explicite).
+const ANNO_DATATYPES = [
+    'xsd:string', 'xsd:boolean', 'xsd:decimal', 'xsd:integer', 'xsd:double', 'xsd:float',
+    'xsd:date', 'xsd:dateTime', 'xsd:dateTimeStamp', 'xsd:time', 'xsd:duration',
+    'xsd:anyURI', 'xsd:base64Binary', 'xsd:hexBinary', 'xsd:language',
+    'xsd:normalizedString', 'xsd:token', 'xsd:Name', 'xsd:NCName', 'xsd:NMTOKEN',
+    'xsd:long', 'xsd:int', 'xsd:short', 'xsd:byte',
+    'xsd:nonNegativeInteger', 'xsd:positiveInteger', 'xsd:nonPositiveInteger', 'xsd:negativeInteger',
+    'xsd:unsignedLong', 'xsd:unsignedInt', 'xsd:unsignedShort', 'xsd:unsignedByte',
+    'xsd:gYear', 'xsd:gMonth', 'xsd:gDay', 'xsd:gYearMonth', 'xsd:gMonthDay',
+    'rdf:PlainLiteral', 'rdf:XMLLiteral', 'rdf:HTML', 'rdfs:Literal',
+    'owl:real', 'owl:rational',
+];
+
 // ── OWL ID validation ───────────────────────────────────────
 
 /** Sanitize an ID input: replace spaces with _ and remove leading digits.
@@ -565,7 +580,7 @@ const _TreeCommon = {
             if (e.target.closest(ed._cfg.detail))        return;  // detail panel (forms, nav links…)
             if (e.target.closest(ed._cfg.ctxMenu))       return;
             if (e.target.closest('.ind-picker-overlay')) return;  // shared modals
-            if (e.target.closest('#lang-dropdown'))      return;  // language picker (appended to body)
+            if (e.target.closest('#lang-dropdown') || e.target.closest('#anno-type-dropdown')) return;  // language / value-type picker (body)
             if (e.target.closest('.btn-icon, .btn-sm'))  return;
             ed._selectedIds.clear();
             ed._anchorId = null;
@@ -1497,9 +1512,9 @@ const ClassEditor = {
 
         // ── Annotation rows ──
         const annoRows = [
-            ...labels.map(l   => _annoRow('label',   l.value,  l.lang  || Settings.defaultLang, 'ClassEditor', ac)),
-            ...comments.map(cm => _annoRow('comment', cm.value, cm.lang || Settings.defaultLang, 'ClassEditor', ac)),
-            ...(c.annotations?.other || []).map(a => _annoRow('other', a.value, '', 'ClassEditor', ac, a.property)),
+            ...labels.map(l   => _annoRow('label',   l.value,  l.lang || '', 'ClassEditor', ac, null, false, l.datatype)),
+            ...comments.map(cm => _annoRow('comment', cm.value, cm.lang || '', 'ClassEditor', ac, null, false, cm.datatype)),
+            ...(c.annotations?.other || []).map(a => _annoRow('other', a.value, a.lang || '', 'ClassEditor', ac, a.property, a.is_iri, a.datatype)),
         ].join('');
 
         // ── Superclass list ──
@@ -2733,70 +2748,187 @@ const RestrictionEditor = {
 // Used by OPEditor and DPEditor
 // ════════════════════════════════════════════════════════════════
 
-/** HTML d'une ligne d'annotation (pour rendu initial).
- *  type = 'label' | 'comment' | 'other'
- *  prop : requis si type === 'other' (ex: 'rdfs:seeAlso') */
-function _annoRow(type, value, lang, editor, ac, prop = null) {
-    let propLabel, langCell, dataProp;
+// ── Type de valeur d'une annotation : langue | datatype | IRI ──────────────
+/** Libellé affiché sur le bouton de type de valeur. */
+function _annoTypeLabel(kind, lang, datatype) {
+    if (kind === 'iri')      return '🔗 IRI';
+    if (kind === 'datatype') return _escapeHtml(datatype || 'xsd:string');
+    return `${_escapeHtml(lang || '')} ${lang ? Settings.langFlag(lang) : ''}`.trim() || 'xsd:string';
+}
+/** Cellule « type de valeur » (bouton ouvrant le menu langues/datatypes/IRI). */
+function _annoTypeCellHtml(kind, lang, datatype, allowIri) {
+    return `<button class="btn-ftool anno-type-btn" data-allowiri="${allowIri ? '1' : ''}"
+                    style="padding:1px 6px;font-size:10px;flex-shrink:0;white-space:nowrap"
+                    onclick="_showAnnoTypeDropdown(this)"
+                    title="Value type — language, datatype or IRI">${_annoTypeLabel(kind, lang, datatype)} ▾</button>`;
+}
+/** Applique un type de valeur à une ligne + auto-save. */
+function _setAnnoType(row, kind, lang, datatype) {
+    row.dataset.vkind     = kind;
+    row.dataset.vlang     = lang || '';
+    row.dataset.vdatatype = datatype || '';
+    const btn = row.querySelector('.anno-type-btn');
+    if (btn) btn.innerHTML = _annoTypeLabel(kind, lang, datatype) + ' ▾';
+    const inp = row.querySelector('.anno-value');
+    if (inp) {
+        inp.style.fontFamily = (kind === 'iri') ? 'var(--font-mono)' : '';
+        inp.dispatchEvent(new Event('change', { bubbles: true }));   // → auto-save
+    }
+    _refreshAnnoValueDisplay(row);
+}
+
+/** True si la valeur est une URL cliquable (http/https/ftp). */
+function _annoIsUrl(v) { return /^(https?|ftp):\/\//i.test((v || '').trim()); }
+
+/** Cellule « valeur » : lien cliquable (mode IRI + URL) OU input éditable.
+ *  Clic simple sur le lien = ouvre ; double-clic = édite. */
+function _annoValueCellHtml(value, kind, ac) {
+    const v = value || '';
+    const asLink = (kind === 'iri') && _annoIsUrl(v);
+    const mono = (kind === 'iri') ? 'font-family:var(--font-mono)' : '';
+    return `<div class="anno-val-wrap" style="display:flex;align-items:center;min-width:0">
+        <a class="anno-iri-link" href="${_escapeHtml(v)}" target="_blank" rel="noopener"
+           title="Click to open · double-click to edit"
+           onclick="_annoLinkClick(this,event)" ondblclick="_editAnnoIri(this)"
+           style="${asLink ? '' : 'display:none'};flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--font-mono);color:var(--accent);text-decoration:underline;cursor:pointer">${_escapeHtml(v)}</a>
+        <input type="text" class="anno-value" value="${_escapeHtml(v)}" ${ac}
+               onblur="_syncAnnoIriLink(this)"
+               style="flex:1;min-width:0;${asLink ? 'display:none' : ''};${mono}">
+    </div>`;
+}
+
+let _annoLinkTimer = null;
+/** Clic simple sur un lien IRI → ouvre (annulable par un double-clic imminent). */
+function _annoLinkClick(a, e) {
+    e.preventDefault();
+    clearTimeout(_annoLinkTimer);
+    const href = a.getAttribute('href');
+    _annoLinkTimer = setTimeout(() => { if (href) window.open(href, '_blank', 'noopener'); }, 220);
+}
+/** Double-clic → passe le lien en mode édition (input). */
+function _editAnnoIri(a) {
+    clearTimeout(_annoLinkTimer);            // annule l'ouverture en attente
+    const wrap = a.closest('.anno-val-wrap');
+    const inp = wrap?.querySelector('.anno-value');
+    a.style.display = 'none';
+    if (inp) { inp.style.display = ''; inp.focus(); inp.select(); }
+}
+/** À la sortie de l'input : re-affiche le lien si c'est une URL en mode IRI. */
+function _syncAnnoIriLink(inp) { _refreshAnnoValueDisplay(inp.closest('tr')); }
+
+/** Affiche lien vs input selon (mode IRI + URL). L'input reste la source de vérité. */
+function _refreshAnnoValueDisplay(row) {
+    if (!row) return;
+    const inp = row.querySelector('.anno-value');
+    const a   = row.querySelector('.anno-iri-link');
+    if (!inp || !a) return;
+    const v = inp.value.trim();
+    if (row.dataset.vkind === 'iri' && _annoIsUrl(v)) {
+        a.href = v; a.textContent = v;
+        a.style.display = ''; inp.style.display = 'none';
+    } else {
+        a.style.display = 'none'; inp.style.display = '';
+    }
+}
+/** Menu déroulant du type de valeur : Languages / Resource (IRI) / Datatypes. */
+function _showAnnoTypeDropdown(btn) {
+    document.getElementById('anno-type-dropdown')?.remove();
+    const row = btn.closest('tr');
+    if (!row) return;
+    const allowIri = btn.dataset.allowiri === '1';
+    const curKind = row.dataset.vkind || 'lang';
+    const curLang = row.dataset.vlang || '';
+    const curDt   = row.dataset.vdatatype || '';
+    const r = btn.getBoundingClientRect();
+    const dd = document.createElement('div');
+    dd.id = 'anno-type-dropdown';
+    dd.style.cssText = `position:fixed;z-index:9999;background:var(--bg2);border:1px solid var(--border);
+        border-radius:4px;box-shadow:0 4px 12px rgba(0,0,0,.3);min-width:150px;max-height:320px;overflow-y:auto;
+        top:${r.bottom+2}px;left:${Math.max(8, r.left)}px`;
+    const hdr = (txt) => { const h = document.createElement('div'); h.textContent = txt;
+        h.style.cssText = 'padding:4px 10px 2px;font-size:9px;font-weight:600;color:var(--text-dim);text-transform:uppercase;letter-spacing:.05em;user-select:none';
+        dd.appendChild(h); };
+    const item = (html, active, pick) => {
+        const it = document.createElement('div'); it.innerHTML = html;
+        it.style.cssText = `padding:5px 12px;cursor:pointer;font-size:12px;font-family:var(--font-mono);${active?'background:var(--accent);color:#fff':''}`;
+        it.onmouseenter = () => { if (!active) it.style.background = 'var(--bg3)'; };
+        it.onmouseleave = () => { if (!active) it.style.background = ''; };
+        it.onmousedown  = (e) => { e.preventDefault(); pick(); dd.remove(); };
+        dd.appendChild(it);
+    };
+    hdr('Languages');
+    (Settings.activeLangs || []).forEach(l =>
+        item(`${l} ${Settings.langFlag(l)}`, curKind === 'lang' && curLang === l,
+             () => _setAnnoType(row, 'lang', l, '')));
+    if (allowIri) {
+        hdr('Resource');
+        item('🔗 IRI', curKind === 'iri', () => _setAnnoType(row, 'iri', '', ''));
+    }
+    hdr('Datatypes');
+    ANNO_DATATYPES.forEach(dt =>
+        item(dt, curKind === 'datatype' && curDt === dt, () => _setAnnoType(row, 'datatype', '', dt)));
+    document.body.appendChild(dd);
+    const close = (e) => {
+        if (!dd.contains(e.target) && e.target !== btn) {
+            dd.remove(); document.removeEventListener('mousedown', close, true);
+        }
+    };
+    setTimeout(() => document.addEventListener('mousedown', close, true), 0);
+}
+
+/** HTML d'une ligne d'annotation (rendu initial).
+ *  type = 'label' | 'comment' | 'other' ; prop requis si 'other'.
+ *  Le type de valeur est déduit de (isIri, datatype, lang). */
+function _annoRow(type, value, lang, editor, ac, prop = null, isIri = false, datatype = null) {
+    const allowIri = true;   // langue / datatype / IRI disponibles pour toute annotation
+    const kind  = isIri ? 'iri' : (datatype ? 'datatype' : (lang ? 'lang' : 'datatype'));
+    const vlang = kind === 'lang' ? lang : '';
+    const vdt   = kind === 'datatype' ? (datatype || 'xsd:string') : '';
+    let propLabel, dataProp = '';
     if (type === 'other') {
-        const propDisp = _displayRefId(prop);   // forme préfixée (ext:firstName) — data-prop reste l'id brut
+        const propDisp = _displayRefId(prop);   // forme préfixée — data-prop reste l'id brut
         propLabel = `<span class="anno-prop-dot"></span>
                      <span class="nav-link" onclick="APP.navigateTo('annotation-properties','${prop}')"
                            title="Go to ${propDisp}">${_escapeHtml(propDisp)}</span>`;
-        langCell  = `<div style="display:flex;align-items:center;gap:1px">
-                        <input type="text" class="anno-lang-inp" value="${lang||Settings.defaultLang}" ${ac}
-                               style="width:36px;min-width:0">
-                        <button class="btn-ftool" style="padding:1px 3px;font-size:9px;flex-shrink:0"
-                                onclick="Settings.showLangDropdown(this)" title="Choose language">▼</button>
-                    </div>`;
-        dataProp  = ` data-prop="${prop}"`;
+        dataProp = ` data-prop="${prop}"`;
     } else {
         const propName = type === 'label' ? 'rdfs:label' : 'rdfs:comment';
         propLabel = `<span class="anno-prop-dot"></span>
                      <span class="nav-link" onclick="APP.navigateTo('annotation-properties','${propName}')"
                            title="Go to ${propName}">${propName}</span>`;
-        langCell  = `<div style="display:flex;align-items:center;gap:1px">
-                        <input type="text" class="anno-lang-inp" value="${lang||Settings.defaultLang}" ${ac}
-                               style="width:36px;min-width:0">
-                        <button class="btn-ftool" style="padding:1px 3px;font-size:9px;flex-shrink:0"
-                                onclick="Settings.showLangDropdown(this)" title="Choose language">▼</button>
-                    </div>`;
-        dataProp  = '';
     }
-    return `<tr class="anno-row" data-type="${type}"${dataProp}>
+    return `<tr class="anno-row" data-type="${type}"${dataProp}
+                data-vkind="${kind}" data-vlang="${_escapeHtml(vlang||'')}" data-vdatatype="${_escapeHtml(vdt||'')}">
         <td class="anno-prop">${propLabel}</td>
-        <td class="anno-val"><input type="text" class="anno-value" value="${_escapeHtml(value||'')}" ${ac}></td>
-        <td class="anno-lang-cell">${langCell}</td>
+        <td class="anno-val">${_annoValueCellHtml(value, kind, ac)}</td>
+        <td class="anno-lang-cell">${_annoTypeCellHtml(kind, vlang, vdt, allowIri)}</td>
         <td><button class="btn-frame-del" onclick="${editor}.removeAnnotRow(this)">✕</button></td>
     </tr>`;
 }
 
-/** Annotation TR element (DOM) for dynamic insertion.
- *  type = 'label' | 'comment' | 'other'
- *  propId : requis si type === 'other' */
+/** Annotation TR element (DOM) pour insertion dynamique.
+ *  Défaut : label/comment → langue préférée ; « other » → xsd:string. */
 function _makeAnnotRow(type, editor, ac, propId = null) {
-    // Propriété d'annotation : rdfs:label / rdfs:comment, ou une « other » choisie
     const propName = type === 'other' ? propId
                    : type === 'label' ? 'rdfs:label' : 'rdfs:comment';
-    const propDisp = _displayRefId(propName);   // forme préfixée (ext:firstName) ; navigateTo garde l'id brut
+    const propDisp = _displayRefId(propName);
     const propLabel = `<span class="anno-prop-dot"></span>
                      <span class="nav-link" onclick="APP.navigateTo('annotation-properties','${propName}')"
                            title="Go to ${propDisp}">${_escapeHtml(propDisp)}</span>`;
-    // Langue par défaut appliquée à TOUTE nouvelle annotation property (= langue préférée)
-    const langHtml  = `<div style="display:flex;align-items:center;gap:1px">
-                        <input type="text" class="anno-lang-inp" value="${Settings.defaultLang}" ${ac}
-                               style="width:36px;min-width:0">
-                        <button class="btn-ftool" style="padding:1px 3px;font-size:9px;flex-shrink:0"
-                                onclick="Settings.showLangDropdown(this)" title="Choose language">▼</button>
-                    </div>`;
+    const allowIri = true;   // langue / datatype / IRI disponibles pour toute annotation
+    // Défaut pour toute nouvelle ligne (label/comment ET « other ») : langue préférée.
+    const kind  = 'lang';
+    const vlang = Settings.defaultLang;
+    const vdt   = '';
     const tr = document.createElement('tr');
     tr.className = 'anno-row';
     tr.dataset.type = type;
     if (type === 'other' && propId) tr.dataset.prop = propId;
+    tr.dataset.vkind = kind; tr.dataset.vlang = vlang; tr.dataset.vdatatype = vdt;
     tr.innerHTML = `
         <td class="anno-prop">${propLabel}</td>
-        <td class="anno-val"><input type="text" class="anno-value" placeholder="" ${ac}></td>
-        <td class="anno-lang-cell">${langHtml}</td>
+        <td class="anno-val">${_annoValueCellHtml('', kind, ac)}</td>
+        <td class="anno-lang-cell">${_annoTypeCellHtml(kind, vlang, vdt, allowIri)}</td>
         <td><button class="btn-frame-del" onclick="${editor}.removeAnnotRow(this)">✕</button></td>`;
     return tr;
 }
@@ -3071,13 +3203,20 @@ function _togglePicker(id) {
 /** Collects annotations from a tbody (label, comment, and others) */
 function _collectAnnotations(tbodyId) {
     const labels = [], comments = [], other = [];
+    // Type de valeur d'une ligne → champs {lang} | {datatype} | {is_iri}.
+    const valueType = (row) => {
+        const kind = row.dataset.vkind || 'lang';
+        if (kind === 'iri')      return { is_iri: true };
+        if (kind === 'datatype') return { datatype: row.dataset.vdatatype || 'xsd:string' };
+        return { lang: row.dataset.vlang || '' };   // lang vide → xsd:string côté backend
+    };
     document.querySelectorAll(`#${tbodyId} .anno-row`).forEach(row => {
         const value = row.querySelector('.anno-value')?.value.trim() || '';
-        const lang  = row.querySelector('.anno-lang-inp')?.value.trim() || Settings.defaultLang;
         if (!value) return;
-        if (row.dataset.type === 'label')   labels.push({ value, lang });
-        if (row.dataset.type === 'comment') comments.push({ value, lang });
-        if (row.dataset.type === 'other')   other.push({ property: row.dataset.prop, value });
+        const vt = valueType(row);
+        if (row.dataset.type === 'label')   labels.push({ value, ...vt });
+        if (row.dataset.type === 'comment') comments.push({ value, ...vt });
+        if (row.dataset.type === 'other')   other.push({ property: row.dataset.prop, value, ...vt });
     });
     return { labels, comments, other };
 }
@@ -3839,9 +3978,9 @@ const OPEditor = {
 
         // Annotations
         const annoRows = [
-            ...(p.annotations?.labels   || []).map(l  => _annoRow('label',   l.value,  l.lang  || Settings.defaultLang, 'OPEditor', ac)),
-            ...(p.annotations?.comments || []).map(cm => _annoRow('comment', cm.value, cm.lang || Settings.defaultLang, 'OPEditor', ac)),
-            ...(p.annotations?.other    || []).map(a  => _annoRow('other',   a.value,  '',             'OPEditor', ac, a.property)),
+            ...(p.annotations?.labels   || []).map(l  => _annoRow('label',   l.value,  l.lang || '', 'OPEditor', ac, null, false, l.datatype)),
+            ...(p.annotations?.comments || []).map(cm => _annoRow('comment', cm.value, cm.lang || '', 'OPEditor', ac, null, false, cm.datatype)),
+            ...(p.annotations?.other    || []).map(a  => _annoRow('other',   a.value,  a.lang || '',             'OPEditor', ac, a.property, a.is_iri, a.datatype)),
         ].join('');
 
         // Domain / Range
@@ -4774,9 +4913,9 @@ const DPEditor = {
 
         // Annotations
         const annoRows = [
-            ...(p.annotations?.labels   || []).map(l  => _annoRow('label',   l.value,  l.lang  || Settings.defaultLang, 'DPEditor', ac)),
-            ...(p.annotations?.comments || []).map(cm => _annoRow('comment', cm.value, cm.lang || Settings.defaultLang, 'DPEditor', ac)),
-            ...(p.annotations?.other    || []).map(a  => _annoRow('other',   a.value,  '',             'DPEditor', ac, a.property)),
+            ...(p.annotations?.labels   || []).map(l  => _annoRow('label',   l.value,  l.lang || '', 'DPEditor', ac, null, false, l.datatype)),
+            ...(p.annotations?.comments || []).map(cm => _annoRow('comment', cm.value, cm.lang || '', 'DPEditor', ac, null, false, cm.datatype)),
+            ...(p.annotations?.other    || []).map(a  => _annoRow('other',   a.value,  a.lang || '',             'DPEditor', ac, a.property, a.is_iri, a.datatype)),
         ].join('');
 
         // Domain
@@ -5597,7 +5736,7 @@ const IndividualEditor = {
             if (e.target.closest('.tree-item[data-id]')) return;
             if (e.target.closest('#ind-detail'))         return;  // property panels, navigation links…
             if (e.target.closest('.ind-picker-overlay')) return;  // picker modal + display modals
-            if (e.target.closest('#lang-dropdown'))      return;  // language picker (appended to body)
+            if (e.target.closest('#lang-dropdown') || e.target.closest('#anno-type-dropdown')) return;  // language / value-type picker (body)
             if (e.target.closest('#ind-ctx-menu'))       return;
             if (e.target.closest('.btn-icon, .btn-sm, .btn-tool')) return;
             // Tout autre clic → désélectionner
@@ -5997,9 +6136,9 @@ const IndividualEditor = {
 
         // Annotations
         const annoRows = [
-            ...(i.annotations?.labels   || []).map(l  => _annoRow('label',   l.value, l.lang  || Settings.defaultLang, 'IndividualEditor', ac)),
-            ...(i.annotations?.comments || []).map(cm => _annoRow('comment', cm.value, cm.lang || Settings.defaultLang, 'IndividualEditor', ac)),
-            ...(i.annotations?.other    || []).map(a  => _annoRow('other',   a.value,  '',             'IndividualEditor', ac, a.property)),
+            ...(i.annotations?.labels   || []).map(l  => _annoRow('label',   l.value, l.lang || '', 'IndividualEditor', ac, null, false, l.datatype)),
+            ...(i.annotations?.comments || []).map(cm => _annoRow('comment', cm.value, cm.lang || '', 'IndividualEditor', ac, null, false, cm.datatype)),
+            ...(i.annotations?.other    || []).map(a  => _annoRow('other',   a.value,  a.lang || '',             'IndividualEditor', ac, a.property, a.is_iri, a.datatype)),
         ].join('');
 
         // Types
@@ -7551,9 +7690,9 @@ const APEditor = {
         const ico = `<svg width="9" height="9" viewBox="0 0 9 9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><line x1="4.5" y1=".5" x2="4.5" y2="8.5"/><line x1=".5" y1="4.5" x2="8.5" y2="4.5"/></svg>`;
 
         const annoRows = [
-            ...(p.annotations?.labels   || []).map(l  => _annoRow('label',   l.value, l.lang || Settings.defaultLang, 'APEditor', ac)),
-            ...(p.annotations?.comments || []).map(cm => _annoRow('comment', cm.value, cm.lang || Settings.defaultLang, 'APEditor', ac)),
-            ...(p.annotations?.other    || []).map(a  => _annoRow('other',   a.value, '', 'APEditor', ac, a.property)),
+            ...(p.annotations?.labels   || []).map(l  => _annoRow('label',   l.value, l.lang || '', 'APEditor', ac, null, false, l.datatype)),
+            ...(p.annotations?.comments || []).map(cm => _annoRow('comment', cm.value, cm.lang || '', 'APEditor', ac, null, false, cm.datatype)),
+            ...(p.annotations?.other    || []).map(a  => _annoRow('other',   a.value, a.lang || '', 'APEditor', ac, a.property, a.is_iri, a.datatype)),
         ].join('');
 
         return `
