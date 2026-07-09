@@ -3971,6 +3971,8 @@ const OPEditor = {
             domain: [], range: [], subPropertyOf: [], inverseOf: null,
             characteristics: {}, propertyChainAxiom: [] };
         const chars = p.characteristics || {};
+        // Property chains : état JS local (tableau de tableaux d'ids d'OP), rendu dans #op-chains-body.
+        this._chains = (p.propertyChainAxiom || []).map(a => [...(a.chain || [])]);
         const ac    = isNew ? 'onblur="if(this.value.trim()) OPEditor.save(true)"'
                            : 'onchange="OPEditor.autoSave()"';
         const baseIri = (APP.state.ontology?.id || '').replace(/[#/]+$/, '');
@@ -4094,6 +4096,18 @@ const OPEditor = {
                 </div>
             </div>
 
+            <div class="h-resizer"></div>
+
+            <div class="cls-frame">
+                <div class="cls-frame-bar">
+                    <span class="cls-frame-tag">Property Chains</span>
+                    <button class="btn-ftool" onclick="OPEditor.addChain()" title="Add a property chain (p₁ ∘ p₂ … ⟹ this property)">${ico}&thinsp;Chain</button>
+                </div>
+                <div class="cls-frame-body" id="op-chains-body">
+                    ${this._renderChains()}
+                </div>
+            </div>
+
             ${_whereUsedFrame(r => _ruleUsesProperty(r, p.id))}
             ${_whereExtractedFrame('op', p.id)}
         </div>`;
@@ -4176,6 +4190,56 @@ const OPEditor = {
         } catch (e) { /* silent */ }
     },
 
+    // ── Property Chains ──────────────────────────────────────────
+    // Une chaîne p₁ ∘ p₂ … ∘ pₙ ⟹ (cette propriété). État JS : this._chains = [[id,…],…].
+
+    _renderChains() {
+        const target = this._editingId ? _displayRefId(this._editingId) : 'this property';
+        const rows = (this._chains || []).map((chain, ci) => {
+            const links = chain.map((op, li) => `
+                <span style="display:inline-flex;align-items:center;gap:3px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;padding:1px 3px 1px 6px">
+                    <span class="op-prop-dot"></span><span style="font-size:12px">${_displayRefId(op)}</span>
+                    <button class="btn-frame-del" style="font-size:10px" onclick="OPEditor.removeChainLink(${ci},${li})" title="Remove">✕</button>
+                </span>`).join('<span style="color:var(--text-dim);margin:0 1px">∘</span>');
+            return `<div class="op-chain-row" style="display:flex;align-items:center;flex-wrap:wrap;gap:4px;padding:5px 6px;border-bottom:1px solid var(--border)">
+                ${links || '<span style="color:var(--text-faint);font-size:11px">empty — add properties →</span>'}
+                <button class="btn-ftool" style="padding:1px 6px" onclick="OPEditor.openChainPicker(${ci}, this)" title="Append a property">＋</button>
+                <span style="color:var(--text-dim);margin:0 4px">⟹</span>
+                <span style="display:inline-flex;align-items:center;gap:3px"><span class="op-prop-dot"></span><span style="font-size:12px">${target}</span></span>
+                <button class="btn-frame-del" style="margin-left:auto" onclick="OPEditor.removeChain(${ci})" title="Delete chain">✕</button>
+            </div>`;
+        }).join('');
+        return (rows || '<div class="cls-list-empty">— none —</div>')
+             + `<div id="op-chain-picker" class="cls-tree-picker" style="display:none;margin:4px">${_opTreePickerItems('OPEditor.addChainLink(this.dataset.id)')}</div>`;
+    },
+    _refreshChains() {
+        const body = document.getElementById('op-chains-body');
+        if (body) body.innerHTML = this._renderChains();
+    },
+    addChain() { (this._chains = this._chains || []).push([]); this._refreshChains(); },
+    openChainPicker(ci, btn) {
+        this._chainPickIdx = ci;
+        const el = document.getElementById('op-chain-picker');
+        if (el) _openPicker(el, { anchor: btn });
+    },
+    addChainLink(id) {
+        if (this._chainPickIdx == null || !this._chains[this._chainPickIdx]) return;
+        this._chains[this._chainPickIdx].push(id);
+        document.getElementById('op-chain-picker')?.style.setProperty('display', 'none');
+        this._refreshChains();
+        if (this._editingId !== null) this._silentSave();
+    },
+    removeChainLink(ci, li) {
+        this._chains[ci]?.splice(li, 1);
+        this._refreshChains();
+        if (this._editingId !== null) this._silentSave();
+    },
+    removeChain(ci) {
+        this._chains.splice(ci, 1);
+        this._refreshChains();
+        if (this._editingId !== null) this._silentSave();
+    },
+
     // ── Sauvegarde ───────────────────────────────────────────────
 
     autoSave() {
@@ -4195,9 +4259,14 @@ const OPEditor = {
         const chars = {};
         ['functional','inverseFunctional','transitive','symmetric','asymmetric','reflexive','irreflexive']
             .forEach(k => { chars[k] = document.getElementById(`op-${k}`)?.checked || false; });
+        // Chaînes valides = ≥ 2 propriétés (les chaînes en cours de construction sont ignorées à la persistance).
+        const propertyChainAxiom = (this._chains || [])
+            .map(c => c.filter(Boolean))
+            .filter(c => c.length >= 2)
+            .map(chain => ({ chain }));
         return { id, annotations: { labels, comments, other },
             domain, range, subPropertyOf, inverseOf: inverseOf || null,
-            characteristics: chars, propertyChainAxiom: [] };
+            characteristics: chars, propertyChainAxiom };
     },
 
     /** Silent save: persists the current DOM state without re-rendering or global refresh */
@@ -6043,7 +6112,7 @@ const IndividualEditor = {
                         // Inféré par owl:inverseOf → ✕ qui supprime DIRECTEMENT l'assertion source
                         ? `<button class="btn-frame-del" title="Inferred via owl:inverseOf — deletes its source assertion" onclick="IndividualEditor.retractInverse('${(ind?.id||'').replace(/'/g,"\\'")}','${propId}','${_tEsc}')">⊢✕</button>`
                         // Inféré par rdfs:subPropertyOf → badge lecture seule (inchangé)
-                        : `<span class="ind-derived-badge" title="Inferred (rdfs:subPropertyOf). To remove it, delete the source assertion." style="flex-shrink:0;font-size:10px;font-weight:600;color:#fff;background:var(--accent,#5f8dd3);border:1px solid var(--accent,#5f8dd3);border-radius:4px;padding:1px 6px;letter-spacing:.02em">⊢ inferred</span>`);
+                        : `<span class="ind-derived-badge" title="Inferred assertion (rdfs:subPropertyOf or owl:propertyChainAxiom). To remove it, delete the source assertion(s)." style="flex-shrink:0;font-size:10px;font-weight:600;color:#fff;background:var(--accent,#5f8dd3);border:1px solid var(--accent,#5f8dd3);border-radius:4px;padding:1px 6px;letter-spacing:.02em">⊢ inferred</span>`);
                 return `
                 <div class="ind-prop-row${a.derived ? ' ind-derived-row' : ''}"${a.derived ? ' data-derived="1"' : ''} data-id="${a.target}" style="display:flex;align-items:center;gap:4px;padding:2px 4px${a.derived ? ';opacity:0.7' : ''}">
                     <span class="xsd-dot" style="flex-shrink:0;margin:0"></span>
@@ -6067,7 +6136,7 @@ const IndividualEditor = {
                           title="Open URL" onclick="event.stopPropagation()">🔗</a>`
                     : '';
                 const derivedBadge = a.derived
-                    ? `<span class="ind-derived-badge" title="Inferred assertion (rdfs:subPropertyOf). To remove it, delete the source assertion." style="flex-shrink:0;font-size:10px;font-weight:600;color:#fff;background:var(--accent,#5f8dd3);border:1px solid var(--accent,#5f8dd3);border-radius:4px;padding:1px 6px;letter-spacing:.02em">⊢ inferred</span>`
+                    ? `<span class="ind-derived-badge" title="Inferred assertion (rdfs:subPropertyOf or owl:propertyChainAxiom). To remove it, delete the source assertion(s)." style="flex-shrink:0;font-size:10px;font-weight:600;color:#fff;background:var(--accent,#5f8dd3);border:1px solid var(--accent,#5f8dd3);border-radius:4px;padding:1px 6px;letter-spacing:.02em">⊢ inferred</span>`
                     : `<button class="btn-frame-del" onclick="${delOnclick}">✕</button>`;
                 if (a.derived) {
                     // Valeur inférée : span compact + badge JUSTE APRÈS la valeur (pas en fin de ligne)
@@ -6470,10 +6539,16 @@ const IndividualEditor = {
         const matchTxt = (x) => x.id.toLowerCase().includes(q)
             || (this._resolveDisplayLabel(x, null) || '').toLowerCase().includes(q);
 
+        // Tri alphabétique par Display Name (fallback id) — cohérent avec la liste principale.
+        const byLabel = (ctx) => (a, b) =>
+            (this._resolveDisplayLabel(a, ctx) || a.id).toLowerCase()
+                .localeCompare((this._resolveDisplayLabel(b, ctx) || b.id).toLowerCase());
+
         let html, eligible = true;
         if (q) {
             // Recherche globale parmi tous les individus dont la classe est autorisée
-            const found = allInds.filter(x => (x.types || []).some(t => clsIds.has(t)) && matchTxt(x));
+            const found = allInds.filter(x => (x.types || []).some(t => clsIds.has(t)) && matchTxt(x))
+                                 .sort(byLabel(null));
             html = found.length
                 ? found.map(x => this._pickerIndRow(x, null, true)).join('')
                 : '<div class="cls-list-empty" style="padding:8px;font-style:italic">No matching individual</div>';
@@ -6482,7 +6557,8 @@ const IndividualEditor = {
             const accepted = new Set();
             const addDesc = (id) => { accepted.add(id); (childrenOf[id]||[]).forEach(c => { if(!accepted.has(c)) addDesc(c); }); };
             addDesc(selClass);
-            const found = allInds.filter(x => (x.types || []).some(t => accepted.has(t)));
+            const found = allInds.filter(x => (x.types || []).some(t => accepted.has(t)))
+                                 .sort(byLabel(selClass));
             html = found.length
                 ? found.map(x => this._pickerIndRow(x, selClass, false)).join('')
                 : '<div class="cls-list-empty" style="padding:8px;font-style:italic">No individuals</div>';

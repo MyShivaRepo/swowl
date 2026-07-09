@@ -12,6 +12,7 @@ from typing import Optional
 
 from rdflib import Graph, Namespace, RDF, RDFS, OWL, XSD, Literal, URIRef, BNode
 from rdflib.namespace import SKOS
+from rdflib.collection import Collection
 
 # Namespaces additionnels (métadonnées d'ontologie fréquentes — disponibles sans import).
 DCTERMS = Namespace("http://purl.org/dc/terms/")
@@ -21,7 +22,7 @@ VANN    = Namespace("http://purl.org/vocab/vann/")
 from owl_model import (
     OWLOntology, OWLClass, OWLObjectProperty, OWLDatatypeProperty,
     OWLIndividual, ObjectPropertyAssertion, DataPropertyAssertion,
-    OtherAnnotation,
+    OtherAnnotation, PropertyChainAxiom,
     SomeValuesFrom, AllValuesFrom, HasValue,
     ExactCardinality, MinCardinality, MaxCardinality,
     UnionOf, IntersectionOf, ComplementOf,
@@ -711,6 +712,19 @@ class TripleStore:
             prop.characteristics.asymmetric        = OWL.AsymmetricProperty        in prop_types
             prop.characteristics.reflexive         = OWL.ReflexiveProperty         in prop_types
             prop.characteristics.irreflexive       = OWL.IrreflexiveProperty       in prop_types
+            # Property chains : owl:propertyChainAxiom → liste RDF ordonnée de propriétés
+            for chain_head in g.objects(prop_uri, OWL.propertyChainAxiom):
+                members = []
+                try:
+                    for m in Collection(g, chain_head):
+                        if isinstance(m, URIRef):
+                            ml = _lid(str(m))
+                            if ml:
+                                members.append(ml)
+                except Exception:
+                    members = []
+                if len(members) >= 2:
+                    prop.propertyChainAxiom.append(PropertyChainAxiom(chain=members))
             onto.object_properties.append(prop)
 
         # ── Datatype Properties: owl:DatatypeProperty ────────────
@@ -1129,6 +1143,8 @@ class TripleStore:
             if ch.reflexive:         g.add((uri_, RDF.type, OWL.ReflexiveProperty))
             if ch.irreflexive:       g.add((uri_, RDF.type, OWL.IrreflexiveProperty))
             for chain in prop.propertyChainAxiom:
+                if len(chain.chain or []) < 2:   # une chaîne OWL valide a ≥ 2 propriétés
+                    continue
                 lst = _rdf_list(g, [iri(p) for p in chain.chain])
                 g.add((uri_, OWL.propertyChainAxiom, lst))
 

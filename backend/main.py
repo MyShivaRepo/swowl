@@ -2166,6 +2166,13 @@ def _materialize_inferences(onto: OWLOntology) -> None:
         if getattr(p, 'inverseOf', None):
             inverse.setdefault(p.id, p.inverseOf)
             inverse.setdefault(p.inverseOf, p.id)
+    # Chaînes de propriétés : {prop_id: [[c1, c2, …], …]} (≥ 2 maillons)
+    chains_of: dict = {}
+    for p in all_ops:
+        valid = [list(ax.chain) for ax in (getattr(p, 'propertyChainAxiom', None) or [])
+                 if len(getattr(ax, 'chain', []) or []) >= 2]
+        if valid:
+            chains_of[p.id] = valid
     ind_by_id = {i.id: i for i in onto.individuals}
 
     # 3. Clôture jusqu'à point fixe
@@ -2193,6 +2200,25 @@ def _materialize_inferences(onto: OWLOntology) -> None:
                 if not any(x.property == inv and x.target == ind.id for x in tgt.objectAssertions):
                     tgt.objectAssertions.append(ObjectPropertyAssertion(property=inv, target=ind.id, derived=True, derived_via='inverse'))
                     changed = True
+            # property chains : a -c1-> … -cn-> z  ⟹  a -p-> z
+            for p_id, chains in chains_of.items():
+                for chain in chains:
+                    current = {ind.id}
+                    for cp in chain:
+                        nxt = set()
+                        for node in current:
+                            ni = ind_by_id.get(node)
+                            if ni:
+                                for a in ni.objectAssertions:
+                                    if a.property == cp:
+                                        nxt.add(a.target)
+                        current = nxt
+                        if not current:
+                            break
+                    for z in current:
+                        if (p_id, z) not in obj_keys:
+                            ind.objectAssertions.append(ObjectPropertyAssertion(property=p_id, target=z, derived=True, derived_via='propertyChain'))
+                            obj_keys.add((p_id, z)); changed = True
             # subPropertyOf (data) sur le même individu
             data_keys = {(a.property, a.value, a.datatype) for a in ind.dataAssertions}
             for a in list(ind.dataAssertions):
