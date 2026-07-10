@@ -308,7 +308,12 @@ const APP = {
 
         const onto = this.state.ontology;
         if (onto && onto.name) {
-            const display = onto.prefix && onto.name ? `${onto.prefix}:${onto.name}` : onto.name || onto.prefix;
+            // Ontologie system (readonly) → juste le nom (pas de « owl:owl »), comme les
+            // ontologies user (préfixe vide). Repli : préfixe redondant (prefix === name).
+            const isSystem = !!(this._ontoList || []).find(o => o.name === onto.name)?.readonly;
+            const display = (isSystem || !onto.prefix || onto.prefix === onto.name)
+                ? onto.name
+                : `${onto.prefix}:${onto.name}`;
             label.textContent = display;
             wrap.style.display = '';
             if (sep) sep.style.display = '';
