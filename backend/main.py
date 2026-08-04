@@ -878,9 +878,8 @@ _cc_lock = _threading_mod.Lock()
 from pathlib import Path as _AnalPath
 import json as _json_analysis
 
-_ANALYSIS_DIR = _AnalPath(
-    __import__("os").environ.get("SWOWL_DIR", "/host/home/.swowl")
-) / "analysis"
+from triple_store import SWOWL_DIR as _SWOWL_DIR   # natif ou Docker, déjà résolu
+_ANALYSIS_DIR = _AnalPath(str(_SWOWL_DIR)) / "analysis"
 _ANALYSIS_DIR.mkdir(parents=True, exist_ok=True)
 
 
@@ -2826,3 +2825,17 @@ def health():
         "ontology_loaded": onto is not None,
         "ontology_id": onto.id if onto else None,
     }
+
+
+# ── Mode NATIF (venv, sans Docker) : FastAPI sert aussi le frontend statique ──
+# Doit être monté APRÈS toutes les routes /api (le mount "/" est un catch-all).
+# En Docker, le frontend est servi par nginx et n'est pas présent ici → mount ignoré.
+import os as _os
+from pathlib import Path as _PPath
+from fastapi.staticfiles import StaticFiles as _StaticFiles
+_FRONTEND_DIR = _os.environ.get(
+    "SWOWL_FRONTEND",
+    str(_PPath(__file__).resolve().parent.parent / "frontend"),
+)
+if _os.path.isdir(_FRONTEND_DIR):
+    app.mount("/", _StaticFiles(directory=_FRONTEND_DIR, html=True), name="frontend")

@@ -123,11 +123,14 @@ def _anno_object(value, lang=None, datatype=None, is_iri=False):
     return Literal(value)   # xsd:string par défaut (littéral nu)
 
 # Préfixe pour traduire les chemins hôte ↔ conteneur.
-#   - HOST_PREFIX_CONTAINER : emplacement FIXE où le home est monté (cf. docker-compose).
-#   - HOST_PREFIX_HOST      : chemin hôte réel de ce home (HOST_HOME), ex. /Users/thomas
+#   - HOST_PREFIX_HOST      : chemin hôte réel du home (HOST_HOME), ex. /Users/thomas
 #                             ou /home/thomas. Repli sur le home du process si non fourni.
-HOST_PREFIX_CONTAINER = "/host/home"
-HOST_PREFIX_HOST      = (os.environ.get("HOST_HOME") or str(Path.home())).rstrip("/\\")
+#   - HOST_PREFIX_CONTAINER : où ce home est monté DANS le conteneur (/host/home).
+# Mode NATIF (venv, sans Docker) : /host/home n'existe pas → la traduction devient
+# l'identité (le backend voit directement le vrai système de fichiers).
+HOST_PREFIX_HOST = (os.environ.get("HOST_HOME") or str(Path.home())).rstrip("/\\")
+_CONTAINER_HOME  = "/host/home"
+HOST_PREFIX_CONTAINER = _CONTAINER_HOME if os.path.isdir(_CONTAINER_HOME) else HOST_PREFIX_HOST
 
 # Répertoire de configuration utilisateur (persistant, indépendant du volume projet)
 SWOWL_DIR = Path(os.environ.get("SWOWL_DIR", HOST_PREFIX_CONTAINER + "/.swowl"))

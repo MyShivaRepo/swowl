@@ -11,9 +11,12 @@ GUI for visual **SPARQL** queries.
 
 ### Prerequisites
 
-- Docker Desktop (Docker Compose included)
+- **Option A** — Docker Desktop (Docker Compose included), **or**
+- **Option B** — Python 3.11+ (no Docker needed)
 
 ### Installation
+
+#### Option A — Docker
 
 ```bash
 git clone https://github.com/MyShivaRepo/swowl.git
@@ -21,12 +24,35 @@ cd swowl
 docker compose up --build
 ```
 
-### Access
-
 | Service        | URL                          |
 |----------------|------------------------------|
 | Interface      | http://localhost:12345       |
 | API (Swagger)  | http://localhost:8001/docs   |
+
+#### Option B — Native (Python venv, no Docker)
+
+Runs the whole app in a single Python process — FastAPI serves both the API and the
+static frontend, so **nginx and Docker are not required** (handy where Docker Desktop
+is not allowed).
+
+```bash
+git clone https://github.com/MyShivaRepo/swowl.git
+cd swowl
+python3 -m venv .venv
+source .venv/bin/activate          # Windows: .venv\Scripts\activate
+pip install -r backend/requirements.txt
+cd backend
+uvicorn main:app --host 127.0.0.1 --port 8000
+```
+
+| Service        | URL                          |
+|----------------|------------------------------|
+| Interface      | http://localhost:8000        |
+| API (Swagger)  | http://localhost:8000/docs   |
+
+In native mode the app reads/writes your **real filesystem** directly; its config and
+registry live under `~/.swowl`. Override with the `SWOWL_DIR` environment variable if
+needed.
 
 ### First steps
 
