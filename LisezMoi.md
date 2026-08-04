@@ -47,8 +47,8 @@ uvicorn main:app --host 127.0.0.1 --port 8000
 
 | Service        | URL                          |
 |----------------|------------------------------|
-| Interface      | http://localhost:8000        |
-| API (Swagger)  | http://localhost:8000/docs   |
+| Interface      | http://127.0.0.1:8000        |
+| API (Swagger)  | http://127.0.0.1:8000/docs   |
 
 En mode natif, l'application lit/écrit directement votre **vrai système de fichiers** ;
 sa configuration et son registre sont stockés sous `~/.swowl`. Surchargez ce dossier
