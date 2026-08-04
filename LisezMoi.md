@@ -11,9 +11,12 @@ IHM pour les requêtes **SPARQL** visuelles.
 
 ### Pré-requis
 
-- Docker Desktop (Docker Compose inclus)
+- **Option A** — Docker Desktop (Docker Compose inclus), **ou**
+- **Option B** — Python 3.11+ (sans Docker)
 
 ### Installation
+
+#### Option A — Docker
 
 ```bash
 git clone https://github.com/MyShivaRepo/swowl.git
@@ -21,12 +24,35 @@ cd swowl
 docker compose up --build
 ```
 
-### Connexion
-
 | Service        | URL                          |
 |----------------|------------------------------|
 | Interface      | http://localhost:12345       |
 | API (Swagger)  | http://localhost:8001/docs   |
+
+#### Option B — Natif (venv Python, sans Docker)
+
+Lance toute l'application dans un seul processus Python — FastAPI sert à la fois l'API
+et le frontend statique, donc **ni nginx ni Docker ne sont requis** (pratique là où
+Docker Desktop est interdit).
+
+```bash
+git clone https://github.com/MyShivaRepo/swowl.git
+cd swowl
+python3 -m venv .venv
+source .venv/bin/activate          # Windows : .venv\Scripts\activate
+pip install -r backend/requirements.txt
+cd backend
+uvicorn main:app --host 127.0.0.1 --port 8000
+```
+
+| Service        | URL                          |
+|----------------|------------------------------|
+| Interface      | http://localhost:8000        |
+| API (Swagger)  | http://localhost:8000/docs   |
+
+En mode natif, l'application lit/écrit directement votre **vrai système de fichiers** ;
+sa configuration et son registre sont stockés sous `~/.swowl`. Surchargez ce dossier
+via la variable d'environnement `SWOWL_DIR` si besoin.
 
 ### Premiers pas
 
