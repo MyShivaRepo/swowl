@@ -5648,9 +5648,11 @@ APP._renderAnalysis = function () {
             </tr>`;
         }
         const ids = c.ids || {};
+        // Boîte de texte en position:absolute → épouse toute la hauteur de la ligne
+        // (pilotée par la colonne des éléments) sans jamais l'allonger ; scroll interne.
         const textHtml = c.text
-            ? `<div style="font-size:11px;line-height:1.5;color:var(--text-dim);max-height:140px;overflow:auto;white-space:normal">${this._highlightTerms(c.text, ids)}</div>`
-            : `<span style="color:var(--text-faint);font-size:11px">—</span>`;
+            ? `<div style="position:absolute;inset:0;overflow:auto;padding:8px 10px;font-size:11px;line-height:1.5;color:var(--text-dim);white-space:normal">${this._highlightTerms(c.text, ids)}</div>`
+            : `<span style="color:var(--text-faint);font-size:11px;padding:8px 10px;display:inline-block">—</span>`;
         const chips = Object.entries(ids).flatMap(([kind, list]) =>
             (list || []).map(raw => {
                 const item = APP._ccResolveItem(raw);
@@ -5669,7 +5671,7 @@ APP._renderAnalysis = function () {
         const elemHtml = chips || `<span style="color:var(--text-faint);font-size:11px">—</span>`;
         return `<tr data-chunk-ref="${refKey}">
             <td style="padding:8px 8px;border-bottom:1px solid var(--border);vertical-align:top">${chunkCell}</td>
-            <td style="padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:top">${textHtml}</td>
+            <td style="border-bottom:1px solid var(--border);vertical-align:top;position:relative;padding:0;height:140px">${textHtml}</td>
             <td style="padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:top;line-height:1.8">${elemHtml}</td>
         </tr>`;
     };
