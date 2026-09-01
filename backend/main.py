@@ -957,14 +957,15 @@ def _cc_resolve_item(raw) -> tuple[str, dict]:
 
 
 def _cc_anno(data: dict) -> dict:
-    """Construit les annotations rdfs:label / rdfs:comment depuis un dict enrichi."""
-    annos = {}
+    """Construit les annotations (rdfs:label / rdfs:comment) depuis un dict enrichi,
+    au format attendu par EntityAnnotations : {labels:[{value,lang}], comments:[...], other:[]}."""
+    annos = {"labels": [], "comments": [], "other": []}
     label = (data.get("label") or "").strip()
     comment = (data.get("comment") or "").strip()
     if label:
-        annos["rdfs:label"] = [{"type": "literal", "value": label, "lang": "en"}]
+        annos["labels"].append({"value": label, "lang": "en"})
     if comment:
-        annos["rdfs:comment"] = [{"type": "literal", "value": comment, "lang": "en"}]
+        annos["comments"].append({"value": comment, "lang": "en"})
     return annos
 
 
