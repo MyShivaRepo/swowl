@@ -5312,6 +5312,46 @@ APP._goToAnalysisChunk = function (ref) {
 };
 
 // Chunks (vue document-centrée) : [{ref, text, ids, error}]
+// Largeurs des colonnes de l'onglet Analysis — préférence UI globale (persistée),
+// redimensionnable à la souris via les poignées d'en-tête.
+APP._loadAnalysisColW = function () {
+    try {
+        const o = JSON.parse(localStorage.getItem('swowl::analysisColW') || '{}');
+        return { chunk: +o.chunk || 120, elements: +o.elements || 240 };
+    } catch { return { chunk: 120, elements: 240 }; }
+};
+APP._saveAnalysisColW = function (o) {
+    try { localStorage.setItem('swowl::analysisColW', JSON.stringify(o)); } catch {}
+};
+APP._resetAnalysisColW = function () {
+    try { localStorage.removeItem('swowl::analysisColW'); } catch {}
+    this.renderSection('sources');
+};
+// Démarre un glissement de redimensionnement. `col` = "chunk" | "elements",
+// `sign` = +1 si tirer vers la droite élargit la colonne, -1 sinon.
+APP._startColResize = function (e, col, sign) {
+    e.preventDefault(); e.stopPropagation();
+    const table = e.target.closest('table');
+    const colEl = table && table.querySelector(`col[data-col="${col}"]`);
+    if (!colEl) return;
+    const startX = e.clientX;
+    const startVal = this._loadAnalysisColW()[col];
+    let latest = startVal;
+    const onMove = (ev) => {
+        latest = Math.max(70, Math.round(startVal + sign * (ev.clientX - startX)));
+        colEl.style.width = latest + 'px';
+    };
+    const onUp = () => {
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+        document.body.style.userSelect = '';
+        const cur = APP._loadAnalysisColW(); cur[col] = latest; APP._saveAnalysisColW(cur);
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+    document.body.style.userSelect = 'none';
+};
+
 APP._analysisChunks = function () {
     const k = this._analysisKey();
     if (!k) return [];
@@ -5615,8 +5655,13 @@ APP._renderAnalysis = function () {
         </tr>`;
     };
 
-    const th = (l, ex = '') => `<th style="text-align:left;padding:7px 10px;border-bottom:2px solid var(--border);color:var(--text-dim);font-size:11px;text-transform:uppercase;letter-spacing:.04em;${ex}">${l}</th>`;
-    const tableHead = `<thead><tr>${th('Chunk', 'width:120px')}${th('Text extract')}${th('Extracted elements', 'width:240px')}</tr></thead>`;
+    const cw = this._loadAnalysisColW();
+    // Poignée de redimensionnement sur le bord droit d'un en-tête (barre d'accent discrète)
+    const rz = (col, sign) => `<span onmousedown="APP._startColResize(event,'${col}',${sign})" title="Glisser pour redimensionner" style="position:absolute;top:0;right:-1px;width:9px;height:100%;cursor:col-resize;z-index:2"><span style="position:absolute;right:3px;top:20%;height:60%;border-right:2px solid var(--accent);opacity:.4"></span></span>`;
+    const th = (l, ex = '', handle = '') => `<th style="text-align:left;padding:7px 10px;border-bottom:2px solid var(--border);color:var(--text-dim);font-size:11px;text-transform:uppercase;letter-spacing:.04em;position:relative;${ex}">${l}${handle}</th>`;
+    const colgroup = `<colgroup><col data-col="chunk" style="width:${cw.chunk}px"><col><col data-col="elements" style="width:${cw.elements}px"></colgroup>`;
+    // Poignée sur Chunk (droite = plus large) et sur Text extract (= bord Text|Elements, droite = Elements plus étroit)
+    const tableHead = `${colgroup}<thead><tr>${th('Chunk', '', rz('chunk', 1))}${th('Text extract', '', rz('elements', -1))}${th('Extracted elements')}</tr></thead>`;
 
     // Un chunk est "vide" s'il n'a ni erreur ni aucun élément extrait → on le masque
     // Gère les deux formats : string et objet enrichi
@@ -5700,8 +5745,12 @@ APP._renderAnalysis = function () {
                 For each chunk: its <b style="color:var(--text1)">source</b> (document — chapter / page),
                 the <b style="color:var(--text1)">text extract</b> with candidate terms highlighted, and the
                 <b style="color:var(--text1)">extracted elements</b> (navigable).
+                <span style="color:var(--text-faint)"> — glissez les bords d'en-tête <span style="border-right:2px solid var(--accent);opacity:.5;padding-left:2px"></span> pour redimensionner les colonnes.</span>
             </p>
-            <button class="btn-sm" onclick="APP._ccSyncFromBackend(true)" title="Re-fetch chunks from the backend (overwrites the local cache)" style="white-space:nowrap;flex-shrink:0">↻ Reload from backend</button>
+            <div style="display:flex;gap:6px;flex-shrink:0">
+                <button class="btn-sm" onclick="APP._resetAnalysisColW()" title="Réinitialiser la largeur des colonnes" style="white-space:nowrap">↔ Reset columns</button>
+                <button class="btn-sm" onclick="APP._ccSyncFromBackend(true)" title="Re-fetch chunks from the backend (overwrites the local cache)" style="white-space:nowrap">↻ Reload from backend</button>
+            </div>
         </div>
         <table style="width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed">${tableHead}
             <tbody>${rows}</tbody>
