@@ -67,6 +67,37 @@ for i, page in enumerate(reader.pages):
 print(f"{len(pages)} pages extraites sur {len(reader.pages)}")
 ```
 
+#### PDF en colonnes (Journal Officiel UE, normes, revues…) — OBLIGATOIRE si multi-colonnes
+
+`page.extract_text()` **entremêle les colonnes** (une ligne de la colonne gauche puis
+la même ligne de la colonne droite) → le texte devient inexploitable et le découpage
+par section échoue. Détecter ce cas (mots collés hors contexte, titres coupés) et
+extraire **colonne par colonne** avec `pdfplumber` :
+
+```python
+import pdfplumber, re
+
+out = []
+with pdfplumber.open("/chemin/vers/document.pdf") as pdf:
+    for p in pdf.pages:
+        w = p.width
+        left  = p.crop((0,     0, w/2, p.height)).extract_text() or ""
+        right = p.crop((w/2,   0, w,   p.height)).extract_text() or ""
+        out.append(left + "\n" + right)     # gauche entière puis droite entière
+full = "\n".join(out)
+
+# Nettoyer les en-têtes / pieds de page récurrents (dates JO, numéros de page…)
+def clean(t):
+    return "\n".join(ln for ln in t.splitlines()
+                     if not re.match(r'\s*\d+\.\d+\.\d+\s+EN\s+Official Journal', ln)
+                     and not re.match(r'\s*L \d+/\d+\b', ln)).strip()
+```
+
+> ⚠️ Les **annexes** utilisent souvent des tableaux / pleine largeur que le crop 2-colonnes
+> casse aussi. Si l'extraction d'une annexe est illisible, saisir son contenu **fidèlement
+> à la main** (listes de catégories, de substances, de seuils…) plutôt que de pousser du
+> texte corrompu.
+
 ### Autres formats
 - `.txt` / `.md` : lire directement (`Path(loc).read_text()`)
 - `.docx` : utiliser `python-docx` (`doc.paragraphs`)
@@ -102,6 +133,23 @@ Cette passe prend 30 secondes et évite les incohérences de nommage entre les c
 - Conserver le **titre de section** comme `chapter` dans la référence
 - Les pages de garde, tables des matières, bibliographies → ignorer ou chunk séparé sans entités
 
+> ### 🚫 Règle absolue : découper par SECTION, jamais par TYPE d'entité
+> Un chunk correspond à **une section du document source** (un article, une annexe…),
+> et contient **tous les types d'entités mélangés** qui apparaissent dans cette section
+> (classes **et** object/datatype properties **et** individus **et** règles).
+>
+> ❌ **INTERDIT** : « un chunk = toutes les classes », « un chunk = toutes les propriétés »,
+> « un chunk = tous les individus ». Ce regroupement par type détruit la traçabilité
+> (on ne sait plus *d'où* vient chaque entité) et rend l'onglet Analysis inutilisable.
+
+> ### 📄 Couverture COMPLÈTE du document (traçabilité)
+> Émettre **un chunk par section sur l'intégralité du document** — chaque article **et**
+> chaque annexe, dans l'ordre — pas seulement les 3-4 sections « riches ».
+> Les sections purement procédurales (comitologie, transposition, pénalités…) produisent
+> un chunk avec `ids` **vide** : c'est **voulu**. L'onglet Analysis les masque
+> automatiquement mais compte le nombre de sections vides balayées → l'utilisateur voit
+> que **tout** le document a été analysé, pas seulement un extrait.
+
 **Exemples de découpages adaptés :**
 
 | Type de document | Stratégie |
@@ -125,6 +173,27 @@ Cette passe prend 30 secondes et évite les incohérences de nommage entre les c
 - **Singulier** : IDs toujours au singulier (`ElectricalDevice`, pas `ElectricalDevices`)
 - **CamelCase anglais** : IDs en anglais CamelCase, labels/comments dans la langue du document
 - **Traçabilité** : chaque entité doit apparaître dans au moins un chunk
+
+### ⚠️ Contrat de la référence `ref` — champs EXACTS
+
+L'onglet Analysis lit **exactement** ces trois champs. Tout autre nom de champ
+(`name`, `source`, `part`, `section`…) est **ignoré** → le chunk s'affiche « **?** ».
+
+| Champ | Contenu | Obligatoire |
+|---|---|---|
+| `doc` | **Nom de fichier** du document (`"CELEX_32011L0065_EN_TXT.pdf"`) | ✅ oui |
+| `chapter` | **Titre de la section** (`"Article 3 — Definitions"`, `"Annex II — …"`) | ✅ oui |
+| `page` | Numéro de page (entier) si connu | optionnel |
+
+```json
+"ref": {"doc": "CELEX_32011L0065_EN_TXT.pdf", "chapter": "Article 3 — Definitions", "page": 4}
+```
+
+### `text` — extrait fidèle de la section
+
+Toujours renseigner `text` avec le **vrai texte de la section** (fidèle au document,
+~300 mots max). Il alimente la colonne *Text extract* de l'onglet Analysis et le
+**surlignage** des termes extraits. Ne jamais laisser `text` vide quand la section a du contenu.
 
 ### Format enrichi des `ids` (à utiliser systématiquement)
 
@@ -405,3 +474,8 @@ CONSEILS
 | Patcher les relations via `PUT` après `done` | Encoder les relations dans les chunks (format enrichi) |
 | Concept multi-mots → un ID par mot (`Hazardous` + `Substance`) | Un ID CamelCase (`HazardousSubstance`) → surlignage d'un seul trait |
 | Ne pas renseigner `label` quand le texte utilise un acronyme | `"label": "EEE"` pour que `ElectricalElectronicEquipment` trouve "EEE" dans le texte |
+| Chunk regroupé par **type** (toutes les classes ensemble, etc.) | Un chunk = une **section source**, tous types d'entités mélangés |
+| `ref` avec `name`/`source`/`part` → chunk affiché « ? » | `ref` avec `doc` + `chapter` (+ `page`) |
+| N'émettre que les 3-4 sections « riches » | Un chunk **par section** sur tout le document (vides inclus, masqués) |
+| `text` vide alors que la section a du contenu | `text` = extrait fidèle de la section (~300 mots) |
+| PDF multi-colonnes extrait avec `extract_text()` naïf | Extraction **colonne par colonne** (crop `pdfplumber`) |
