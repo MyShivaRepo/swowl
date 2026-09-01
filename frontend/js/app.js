@@ -5610,13 +5610,13 @@ APP._renderAnalysis = function () {
         const elemHtml = chips || `<span style="color:var(--text-faint);font-size:11px">—</span>`;
         return `<tr data-chunk-ref="${refKey}">
             <td style="padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:top;white-space:nowrap">${chunkCell}</td>
-            <td style="padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:top;max-width:380px">${textHtml}</td>
+            <td style="padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:top;width:55%;min-width:360px">${textHtml}</td>
             <td style="padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:top;line-height:1.8">${elemHtml}</td>
         </tr>`;
     };
 
     const th = (l, ex = '') => `<th style="text-align:left;padding:7px 10px;border-bottom:2px solid var(--border);color:var(--text-dim);font-size:11px;text-transform:uppercase;letter-spacing:.04em;${ex}">${l}</th>`;
-    const tableHead = `<thead><tr>${th('Chunk', 'width:170px')}${th('Text extract')}${th('Extracted elements', 'width:300px')}</tr></thead>`;
+    const tableHead = `<thead><tr>${th('Chunk', 'width:160px')}${th('Text extract', 'width:55%')}${th('Extracted elements', 'width:260px')}</tr></thead>`;
 
     // Un chunk est "vide" s'il n'a ni erreur ni aucun élément extrait → on le masque
     // Gère les deux formats : string et objet enrichi
