@@ -5277,11 +5277,10 @@ APP._ccSyncFromBackend = async function (force = false) {
         const res = await API.getAnalysisChunks();
         const serverChunks = res.chunks || [];
         if (serverChunks.length > 0) {
-            // Conserve un extrait de texte tronqué (~600 car.) — assez pour la colonne
-            // « Text extract » sans saturer le quota localStorage.
+            // Conserve le texte COMPLET (surlignage fidèle sur toute la section).
+            // _analysisSaveChunks tronque automatiquement si le quota localStorage explose.
             const lean = serverChunks.map(c => ({
-                ref: c.ref, ids: c.ids, error: c.error,
-                text: (c.text || '').slice(0, 600)
+                ref: c.ref, ids: c.ids, error: c.error, text: c.text || ''
             }));
             this._analysisSaveChunks(lean);
             this._analysisSave(this._ccBuildProv(lean), []);
@@ -5356,9 +5355,18 @@ APP._analysisChunks = function () {
 };
 APP._analysisSaveChunks = function (chunks) {
     const k = this._analysisKey();
-    if (k) {
-        try { localStorage.setItem(k + '::chunks', JSON.stringify(chunks || [])); }
-        catch (e) { /* quota dépassé : on ignore, le tableau chunk sera juste vide */ }
+    if (!k) return;
+    // Essaie le texte complet (surlignage fidèle) ; en cas de dépassement du quota
+    // localStorage, tronque progressivement le `text` jusqu'à ce que ça rentre.
+    const caps = [null, 4000, 1500, 600, 0];
+    for (const cap of caps) {
+        try {
+            const data = (cap == null)
+                ? (chunks || [])
+                : (chunks || []).map(c => ({ ...c, text: (c.text || '').slice(0, cap) }));
+            localStorage.setItem(k + '::chunks', JSON.stringify(data));
+            return;
+        } catch (e) { /* quota : on réessaie avec un texte plus court */ }
     }
 };
 // Surligne dans `text` les termes candidats extraits — travaille sur le texte brut,
