@@ -5323,10 +5323,6 @@ APP._loadAnalysisColW = function () {
 APP._saveAnalysisColW = function (o) {
     try { localStorage.setItem('swowl::analysisColW', JSON.stringify(o)); } catch {}
 };
-APP._resetAnalysisColW = function () {
-    try { localStorage.removeItem('swowl::analysisColW'); } catch {}
-    this.renderSection('sources');
-};
 // Démarre un glissement de redimensionnement. `col` = "chunk" | "elements",
 // `sign` = +1 si tirer vers la droite élargit la colonne, -1 sinon.
 APP._startColResize = function (e, col, sign) {
@@ -5630,7 +5626,7 @@ APP._renderAnalysis = function () {
         }
         const ids = c.ids || {};
         const textHtml = c.text
-            ? `<div style="font-size:11px;line-height:1.5;color:var(--text-dim);max-height:140px;overflow:auto;white-space:pre-wrap">${this._highlightTerms(c.text, ids)}</div>`
+            ? `<div style="font-size:11px;line-height:1.5;color:var(--text-dim);max-height:140px;overflow:auto;white-space:normal">${this._highlightTerms(c.text, ids)}</div>`
             : `<span style="color:var(--text-faint);font-size:11px">—</span>`;
         const chips = Object.entries(ids).flatMap(([kind, list]) =>
             (list || []).map(raw => {
@@ -5747,10 +5743,7 @@ APP._renderAnalysis = function () {
                 <b style="color:var(--text1)">extracted elements</b> (navigable).
                 <span style="color:var(--text-faint)"> — glissez les bords d'en-tête <span style="border-right:2px solid var(--accent);opacity:.5;padding-left:2px"></span> pour redimensionner les colonnes.</span>
             </p>
-            <div style="display:flex;gap:6px;flex-shrink:0">
-                <button class="btn-sm" onclick="APP._resetAnalysisColW()" title="Réinitialiser la largeur des colonnes" style="white-space:nowrap">↔ Reset columns</button>
-                <button class="btn-sm" onclick="APP._ccSyncFromBackend(true)" title="Re-fetch chunks from the backend (overwrites the local cache)" style="white-space:nowrap">↻ Reload from backend</button>
-            </div>
+            <button class="btn-sm" onclick="APP._ccSyncFromBackend(true)" title="Re-fetch chunks from the backend (overwrites the local cache)" style="white-space:nowrap;flex-shrink:0">↻ Reload from backend</button>
         </div>
         <table style="width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed">${tableHead}
             <tbody>${rows}</tbody>
