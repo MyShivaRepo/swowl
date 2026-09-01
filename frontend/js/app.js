@@ -5616,7 +5616,7 @@ APP._renderAnalysis = function () {
     };
 
     const th = (l, ex = '') => `<th style="text-align:left;padding:7px 10px;border-bottom:2px solid var(--border);color:var(--text-dim);font-size:11px;text-transform:uppercase;letter-spacing:.04em;${ex}">${l}</th>`;
-    const tableHead = `<thead><tr>${th('Chunk', 'width:90px')}${th('Text extract', 'width:62%')}${th('Extracted elements', 'width:260px')}</tr></thead>`;
+    const tableHead = `<thead><tr>${th('Chunk', 'width:120px')}${th('Text extract', 'width:60%')}${th('Extracted elements', 'width:260px')}</tr></thead>`;
 
     // Un chunk est "vide" s'il n'a ni erreur ni aucun élément extrait → on le masque
     // Gère les deux formats : string et objet enrichi
