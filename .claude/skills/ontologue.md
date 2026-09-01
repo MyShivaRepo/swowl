@@ -379,21 +379,42 @@ Créer une règle SWRL **uniquement** si le texte source contient une contrainte
 
 Opérateurs equality_atom : `=`, `!=`, `>`, `>=`, `<`, `<=`
 
-### Exemple : contrainte de seuil
-Texte source : *"The concentration of Lead shall not exceed 0.1% by weight"*
+> **Le moteur résout `value` contre les bindings** : `value` peut être **une variable**,
+> pas seulement une constante → comparaison **variable ↔ variable** possible. La comparaison
+> est **numérique** dès que les deux côtés sont des nombres. La tête (`head`) ne doit contenir
+> que des `type_atom` / `property_atom` (un `equality_atom` en tête **ne produit aucun fait**).
+
+### Patterns clés
+
+**1. Réification pour une relation quantifiée (n-aire).** Une valeur qui dépend d'un
+**couple** (ex. la concentration d'une substance *dans* un matériau) ne peut pas être une
+simple datatype property sur la substance seule → créer une classe de **réification**
+(ex. `SubstanceContent` : `hasSubstanceContent`, `contentOfSubstance`, `concentrationValue`).
+
+**2. Un seul seuil générique, pas un par valeur.** Comme le seuil est une propriété de la
+substance (`maxConcentrationValue`) et que le moteur compare variable↔variable, **une seule
+règle** couvre toutes les substances — inutile d'écrire une règle par valeur.
+
+### Exemple : seuil de concentration (réifié, générique) — validé
+Texte source : *"EEE shall not contain restricted substances above the maximum concentration values tolerated by weight in homogeneous materials (Annex II)."*
 
 ```json
 {
-  "id": "rule_lead_max_concentration",
-  "label": "Lead max concentration 0.1%",
-  "comment": "Article 4 + Annex II: Lead restricted to 0.1% by weight in homogeneous material",
+  "id": "rule_restricted_substance_over_threshold",
+  "label": "Restricted substance over Annex II threshold ⇒ NonCompliantEEE",
+  "comment": "Article 4 + Annex II: EEE non-compliant if a homogeneous material contains a restricted substance above that substance's own max concentration value.",
   "body": [
-    {"type": "type_atom",     "var": "?mat",  "class_id": "HomogeneousMaterial"},
-    {"type": "property_atom", "subject": "?mat", "property_id": "containsSubstance", "object": "?sub"},
-    {"type": "equality_atom", "var": "?sub",  "operator": "=", "value": "Lead"}
+    {"type": "type_atom",     "var": "?e",  "class_id": "EEE"},
+    {"type": "property_atom", "subject": "?e",  "property_id": "madeOf", "object": "?m"},
+    {"type": "property_atom", "subject": "?m",  "property_id": "hasSubstanceContent", "object": "?sc"},
+    {"type": "property_atom", "subject": "?sc", "property_id": "contentOfSubstance", "object": "?s"},
+    {"type": "type_atom",     "var": "?s",  "class_id": "RestrictedSubstance"},
+    {"type": "property_atom", "subject": "?sc", "property_id": "concentrationValue", "object": "?actual"},
+    {"type": "property_atom", "subject": "?s",  "property_id": "maxConcentrationValue", "object": "?limit"},
+    {"type": "equality_atom", "var": "?actual", "operator": ">", "value": "?limit"}
   ],
   "head": [
-    {"type": "equality_atom", "var": "?mat", "operator": "<=", "value": "0.001"}
+    {"type": "type_atom", "var": "?e", "class_id": "NonCompliantEEE"}
   ]
 }
 ```
@@ -479,3 +500,6 @@ CONSEILS
 | N'émettre que les 3-4 sections « riches » | Un chunk **par section** sur tout le document (vides inclus, masqués) |
 | `text` vide alors que la section a du contenu | `text` = extrait fidèle de la section (~300 mots) |
 | PDF multi-colonnes extrait avec `extract_text()` naïf | Extraction **colonne par colonne** (crop `pdfplumber`) |
+| **Omettre les règles SWRL** alors que le texte pose des contraintes (seuils, « est considéré comme », « si… alors ») | Extraire les règles → `ids.swrl_rules` du chunk concerné |
+| Une règle par valeur numérique (seuil codé en dur) | **Une règle générique** : seuil porté par l'entité + comparaison `?actual > ?limit` (var↔var) |
+| Valeur dépendant d'un couple mise en datatype property simple | **Réifier** (classe `…Content` avec ses liens + la valeur) |
