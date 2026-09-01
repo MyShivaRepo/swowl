@@ -5578,7 +5578,7 @@ APP._renderAnalysis = function () {
     const chunkRow = (c) => {
         const ref = c.ref || {};
         const refKey = this._escAttr(JSON.stringify({doc: ref.doc, chapter: ref.chapter, page: ref.page}));
-        const chunkCell = `<div style="font-size:12px;font-weight:600;color:var(--text1)">${this._esc(ref.doc || '?')}</div>
+        const chunkCell = `<div style="font-size:11px;font-weight:600;color:var(--text1);word-break:break-word;line-height:1.25">${this._esc(ref.doc || '?')}</div>
             ${ref.chapter ? `<div style="font-size:11px;color:var(--accent);margin-top:2px">${this._esc(ref.chapter)}</div>` : ''}
             ${ref.page != null ? `<div style="font-size:10px;color:var(--text-faint);margin-top:1px">p.${ref.page}</div>` : ''}`;
 
@@ -5609,14 +5609,14 @@ APP._renderAnalysis = function () {
         ).join('');
         const elemHtml = chips || `<span style="color:var(--text-faint);font-size:11px">—</span>`;
         return `<tr data-chunk-ref="${refKey}">
-            <td style="padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:top;white-space:nowrap">${chunkCell}</td>
-            <td style="padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:top;width:55%;min-width:360px">${textHtml}</td>
+            <td style="padding:8px 8px;border-bottom:1px solid var(--border);vertical-align:top">${chunkCell}</td>
+            <td style="padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:top;width:62%;min-width:380px">${textHtml}</td>
             <td style="padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:top;line-height:1.8">${elemHtml}</td>
         </tr>`;
     };
 
     const th = (l, ex = '') => `<th style="text-align:left;padding:7px 10px;border-bottom:2px solid var(--border);color:var(--text-dim);font-size:11px;text-transform:uppercase;letter-spacing:.04em;${ex}">${l}</th>`;
-    const tableHead = `<thead><tr>${th('Chunk', 'width:160px')}${th('Text extract', 'width:55%')}${th('Extracted elements', 'width:260px')}</tr></thead>`;
+    const tableHead = `<thead><tr>${th('Chunk', 'width:90px')}${th('Text extract', 'width:62%')}${th('Extracted elements', 'width:260px')}</tr></thead>`;
 
     // Un chunk est "vide" s'il n'a ni erreur ni aucun élément extrait → on le masque
     // Gère les deux formats : string et objet enrichi
