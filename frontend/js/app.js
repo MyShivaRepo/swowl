@@ -5578,7 +5578,7 @@ APP._renderAnalysis = function () {
     const chunkRow = (c) => {
         const ref = c.ref || {};
         const refKey = this._escAttr(JSON.stringify({doc: ref.doc, chapter: ref.chapter, page: ref.page}));
-        const chunkCell = `<div style="font-size:11px;font-weight:600;color:var(--text1);word-break:break-word;line-height:1.25">${this._esc(ref.doc || '?')}</div>
+        const chunkCell = `<div title="${this._escAttr(ref.doc || '')}" style="font-size:11px;font-weight:600;color:var(--text1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.25">${this._esc(ref.doc || '?')}</div>
             ${ref.chapter ? `<div style="font-size:11px;color:var(--accent);margin-top:2px">${this._esc(ref.chapter)}</div>` : ''}
             ${ref.page != null ? `<div style="font-size:10px;color:var(--text-faint);margin-top:1px">p.${ref.page}</div>` : ''}`;
 
