@@ -666,6 +666,7 @@ const APP = {
                 break;
             case 'sources':
                 main.innerHTML = this.renderSources();
+                if (this._sourcesTab === 'analysis') setTimeout(() => APP._scrollAnalysisHighlights(), 60);
                 break;
             case 'ontologies':
                 this.renderOntologies();
@@ -5440,6 +5441,20 @@ APP._highlightTerms = function (text, ids) {
     result += this._esc(plain.slice(pos));
     return result;
 };
+// Auto-scroll chaque zone de texte (140px, overflow:auto) vers son 1er surlignage,
+// pour que les termes extraits — souvent situés plus bas dans la section — soient
+// visibles immédiatement sans scroller à la main.
+APP._scrollAnalysisHighlights = function () {
+    document.querySelectorAll('tr[data-chunk-ref] td:nth-child(2) > div').forEach(box => {
+        const mark = box.querySelector('mark');
+        if (!mark) return;
+        const bt = box.getBoundingClientRect().top;
+        const mt = mark.getBoundingClientRect().top;
+        const target = box.scrollTop + (mt - bt) - box.clientHeight / 2 + mark.offsetHeight;
+        if (target > 2) box.scrollTop = target;
+    });
+};
+
 APP._analysisInProgress = null;  // {total, done, chunks: [{ref, added, error}]}
 
 APP._corpusAnalyse = async function () {
