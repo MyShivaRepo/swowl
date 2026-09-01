@@ -1108,16 +1108,23 @@ def analysis_done():
         dp_index  = {p.id: p for p in onto.datatype_properties}
         ind_index = {i.id: i for i in onto.individuals}
 
+        # Ajoute des ids (string) à une liste pouvant déjà contenir des objets restriction
+        # (non hashables) : on ne dédoublonne que les strings, on préserve le reste.
+        def _add_string_ids(existing, new_ids):
+            existing = list(existing or [])
+            present = {x for x in existing if isinstance(x, str)}
+            return existing + [s for s in new_ids if s not in present]
+
         for cid, data in pending_cls.items():
             c = cls_index.get(cid)
             if not c:
                 continue
             sub = [s for s in _cc_ids(data.get("subClassOf")) if s in cset]
             if sub:
-                c.subClassOf = list(dict.fromkeys(list(c.subClassOf or []) + sub))
+                c.subClassOf = _add_string_ids(c.subClassOf, sub)
             disjoint = [s for s in _cc_ids(data.get("disjointWith")) if s in cset]
             if disjoint:
-                c.disjointWith = list(dict.fromkeys(list(c.disjointWith or []) + disjoint))
+                c.disjointWith = _add_string_ids(c.disjointWith, disjoint)
 
         for pid, data in pending_ops.items():
             p = op_index.get(pid)

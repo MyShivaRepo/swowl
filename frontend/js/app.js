@@ -5277,8 +5277,12 @@ APP._ccSyncFromBackend = async function (force = false) {
         const res = await API.getAnalysisChunks();
         const serverChunks = res.chunks || [];
         if (serverChunks.length > 0) {
-            // Sauvegarde sans le texte brut pour éviter le dépassement du quota localStorage
-            const lean = serverChunks.map(c => ({ ref: c.ref, ids: c.ids, error: c.error }));
+            // Conserve un extrait de texte tronqué (~600 car.) — assez pour la colonne
+            // « Text extract » sans saturer le quota localStorage.
+            const lean = serverChunks.map(c => ({
+                ref: c.ref, ids: c.ids, error: c.error,
+                text: (c.text || '').slice(0, 600)
+            }));
             this._analysisSaveChunks(lean);
             this._analysisSave(this._ccBuildProv(lean), []);
             await this.refresh();
@@ -5690,12 +5694,15 @@ APP._renderAnalysis = function () {
            </div>`
         : '';
     return errBlock + `<div style="padding:20px;max-width:1100px">
-        <p style="margin:0 0 16px;font-size:13px;color:var(--text-dim);line-height:1.6">
-            Corpus chunks analysed for <b style="color:var(--text1)">${this._esc(onto.name || '')}</b>.
-            For each chunk: its <b style="color:var(--text1)">source</b> (document — chapter / page),
-            the <b style="color:var(--text1)">text extract</b> with candidate terms highlighted, and the
-            <b style="color:var(--text1)">extracted elements</b> (navigable).
-        </p>
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin:0 0 16px">
+            <p style="margin:0;font-size:13px;color:var(--text-dim);line-height:1.6">
+                Corpus chunks analysed for <b style="color:var(--text1)">${this._esc(onto.name || '')}</b>.
+                For each chunk: its <b style="color:var(--text1)">source</b> (document — chapter / page),
+                the <b style="color:var(--text1)">text extract</b> with candidate terms highlighted, and the
+                <b style="color:var(--text1)">extracted elements</b> (navigable).
+            </p>
+            <button class="btn-sm" onclick="APP._ccSyncFromBackend(true)" title="Re-fetch chunks from the backend (overwrites the local cache)" style="white-space:nowrap;flex-shrink:0">↻ Reload from backend</button>
+        </div>
         <table style="width:100%;border-collapse:collapse;font-size:13px">${tableHead}
             <tbody>${rows}</tbody>
         </table>
