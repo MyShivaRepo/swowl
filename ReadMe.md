@@ -1,11 +1,11 @@
 # 🦉 SWOWL — OWL/SWRL Editor
 
-![version](https://img.shields.io/badge/version-1.1.0-blue)
+![version](https://img.shields.io/badge/version-1.1.1-blue)
 
 Web editor for **OWL** ontologies : classes, properties, individuals & **SWRL** rules.
 GUI for visual **SPARQL** queries.
 
-> **Current version: 1.1.0** — see the [CHANGELOG](CHANGELOG.md) for the full feature list.
+> **Current version: 1.1.1** — see the [CHANGELOG](CHANGELOG.md) for the full feature list.
 
 ## Getting started
 
