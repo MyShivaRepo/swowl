@@ -20,6 +20,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - **Analysis tab**: mouse-resizable columns (persisted), reflowed *Text extract*
   filling the full column width and row height, auto-scroll to the first highlight,
   and an always-available *Reload from backend*.
+- **Centralized version**: single source of truth in `backend/version.py`,
+  exposed via `GET /api/version`; the app badge reads the API and the README
+  badge reads the latest git tag; `scripts/release.sh` bumps and tags in one command.
 
 ### Fixed
 - **Import**: `owl:unionOf` / `owl:intersectionOf` class expressions in a property

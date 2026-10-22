@@ -20,6 +20,9 @@ et le projet suit le [versionnage sémantique](https://semver.org/).
 - **Onglet Analysis** : colonnes redimensionnables à la souris (mémorisées), *Text
   extract* refluant sur toute la largeur et toute la hauteur de ligne, auto-scroll
   vers le premier surlignage, et bouton *Reload from backend* toujours disponible.
+- **Version centralisée** : source unique dans `backend/version.py`, exposée via
+  `GET /api/version` ; le badge de l'app lit l'API et le badge README lit le
+  dernier tag git ; `scripts/release.sh` incrémente et tague en une commande.
 
 ### Corrigé
 - **Import** : les expressions `owl:unionOf` / `owl:intersectionOf` dans le `domain`
