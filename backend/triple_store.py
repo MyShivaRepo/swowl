@@ -674,6 +674,24 @@ class TripleStore:
                             owl_cls.equivalentClass.append(restr)
                 onto.classes.append(owl_cls)
 
+        # Ids locaux d'un noeud domain/range : classe nommee, ou membres d'une
+        # expression owl:unionOf / owl:intersectionOf (noeud blanc), recursif.
+        def _class_ids(node):
+            if isinstance(node, URIRef):
+                cid = _lid(str(node))
+                return [cid] if cid else []
+            out = []
+            for coll_pred in (OWL.unionOf, OWL.intersectionOf):
+                head = g.value(node, coll_pred)
+                if head is not None:
+                    try:
+                        for m in Collection(g, head):
+                            out.extend(_class_ids(m))
+                    except Exception:
+                        pass
+                    break
+            return out
+
         # ── Object Properties: owl:ObjectProperty ───────────────
         seen_op = set()
         for prop_uri in g.subjects(RDF.type, OWL.ObjectProperty):
@@ -689,13 +707,11 @@ class TripleStore:
             prop.annotations.comments = comments
             prop.annotations.other    = _collect_other(prop_uri)
             for d in g.objects(prop_uri, RDFS.domain):
-                if isinstance(d, URIRef):
-                    dl = _lid(str(d))
-                    if dl: prop.domain.append(dl)
+                for dl in _class_ids(d):
+                    if dl not in prop.domain: prop.domain.append(dl)
             for r in g.objects(prop_uri, RDFS.range):
-                if isinstance(r, URIRef):
-                    rl = _lid(str(r))
-                    if rl: prop.range.append(rl)
+                for rl in _class_ids(r):
+                    if rl not in prop.range: prop.range.append(rl)
             for sp in g.objects(prop_uri, RDFS.subPropertyOf):
                 if isinstance(sp, URIRef):
                     sl = _lid(str(sp))
@@ -745,13 +761,11 @@ class TripleStore:
             prop.annotations.comments = comments
             prop.annotations.other    = _collect_other(prop_uri)
             for d in g.objects(prop_uri, RDFS.domain):
-                if isinstance(d, URIRef):
-                    dl = _lid(str(d))
-                    if dl: prop.domain.append(dl)
+                for dl in _class_ids(d):
+                    if dl not in prop.domain: prop.domain.append(dl)
             for r in g.objects(prop_uri, RDFS.range):
-                if isinstance(r, URIRef):
-                    rl = _lid(str(r))
-                    if rl: prop.range.append(rl)
+                for rl in _class_ids(r):
+                    if rl not in prop.range: prop.range.append(rl)
                 # else : owl:DataRange/oneOf (datatype énuméré) — non modélisé,
                 #        on ignore le nœud anonyme (évitait un id illisible 'Nxxxx')
             for sp in g.objects(prop_uri, RDFS.subPropertyOf):
@@ -779,9 +793,8 @@ class TripleStore:
                 prop.annotations.comments = comments
                 prop.annotations.other    = _collect_other(prop_uri)
                 for d in g.objects(prop_uri, RDFS.domain):
-                    if isinstance(d, URIRef):
-                        dl = _lid(str(d))
-                        if dl: prop.domain.append(dl)
+                    for dl in _class_ids(d):
+                        if dl not in prop.domain: prop.domain.append(dl)
                 for r in ranges:
                     rl = str(r).replace(str(XSD), "xsd:") if isinstance(r, URIRef) else ""
                     if rl: prop.range.append(rl)
@@ -796,13 +809,11 @@ class TripleStore:
                 prop.annotations.comments = comments
                 prop.annotations.other    = _collect_other(prop_uri)
                 for d in g.objects(prop_uri, RDFS.domain):
-                    if isinstance(d, URIRef):
-                        dl = _lid(str(d))
-                        if dl: prop.domain.append(dl)
+                    for dl in _class_ids(d):
+                        if dl not in prop.domain: prop.domain.append(dl)
                 for r in ranges:
-                    if isinstance(r, URIRef):
-                        rl = _lid(str(r))
-                        if rl: prop.range.append(rl)
+                    for rl in _class_ids(r):
+                        if rl not in prop.range: prop.range.append(rl)
                 for sp in g.objects(prop_uri, RDFS.subPropertyOf):
                     if isinstance(sp, URIRef):
                         sl = _lid(str(sp))
