@@ -2858,6 +2858,12 @@ const FsBrowser = {
 window.addEventListener('DOMContentLoaded', () => {
     APP.init();
 
+    // Badge de version : source unique = backend/version.py via GET /api/version
+    fetch('/api/version').then(r => r.json()).then(d => {
+        const el = document.getElementById('app-version');
+        if (el && d && d.version) el.textContent = 'v' + d.version;
+    }).catch(() => {});
+
     // Délégation de clic pour les liens internes (domain/range/used-in-rules)
     document.getElementById('main-content').addEventListener('click', e => {
         const a = e.target.closest('a[data-nav-sec]');

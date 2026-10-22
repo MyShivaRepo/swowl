@@ -1,11 +1,11 @@
 # 🦉 SWOWL — OWL/SWRL Editor
 
-![version](https://img.shields.io/badge/version-1.1.1-blue)
+![version](https://img.shields.io/github/v/tag/MyShivaRepo/swowl?label=version&color=blue&sort=semver)
 
 Éditeur web d'ontologies **OWL** : classes, propriétés, individus & règles **SWRL**.
 IHM pour les requêtes **SPARQL** visuelles.
 
-> **Version actuelle : 1.1.1** — voir le [CHANGELOG](CHANGELOG.fr.md) pour la liste complète des fonctionnalités.
+> Voir le [CHANGELOG](CHANGELOG.fr.md) pour la liste complète des fonctionnalités — le badge de version ci-dessus reflète le dernier tag git.
 
 ## Démarrage
 

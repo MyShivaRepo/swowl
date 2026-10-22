@@ -37,10 +37,15 @@ async def lifespan(app: FastAPI):
     yield
 
 
+try:
+    from version import VERSION
+except Exception:
+    VERSION = "0.0.0"
+
 app = FastAPI(
     title="OWL/SWRL Editor API",
     description="API REST pour créer et éditer des ontologies OWL 2 avec règles SWRL",
-    version="1.1.0",
+    version=VERSION,
     lifespan=lifespan,
 )
 
@@ -50,6 +55,12 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.get("/api/version", tags=["Système"])
+def get_version():
+    """Version courante de SWOWL (source : backend/version.py)."""
+    return {"version": VERSION}
 
 
 # ── Helpers ──────────────────────────────────────────────────
