@@ -6,6 +6,34 @@ et le projet suit le [versionnage sémantique](https://semver.org/).
 
 > 🇬🇧 An English version of this file is available: [CHANGELOG.md](CHANGELOG.md).
 
+## [1.1.1] — 2026-10-22
+
+### Ajouté
+- **Chaînes de propriétés** pour les object properties : éditeur, aller-retour RDF
+  `owl:propertyChainAxiom`, et matérialisation par inférence.
+- **Mode natif Python (venv)** — toute l'application tourne dans un seul processus
+  FastAPI (API + frontend statique) ; ni Docker ni nginx requis.
+- Onglet d'annotations **owl:Ontology** dans Settings, synchronisé avec le registre système.
+- **Type de valeur d'annotation unifié** — sélecteur langue / datatype / IRI (issues #6 & #8).
+- **Analyse de corpus (Agent interfacé)** : découpage par section, entités enrichies
+  portant leurs relations, et règles SWRL fusionnées en une seule passe.
+- **Onglet Analysis** : colonnes redimensionnables à la souris (mémorisées), *Text
+  extract* refluant sur toute la largeur et toute la hauteur de ligne, auto-scroll
+  vers le premier surlignage, et bouton *Reload from backend* toujours disponible.
+
+### Corrigé
+- **Import** : les expressions `owl:unionOf` / `owl:intersectionOf` dans le `domain`
+  / `range` d'une propriété sont désormais dépliées — les propriétés à domaine-union
+  étaient auparavant perdues (domaine vide) et disparaissaient des arbres de classes.
+- **Analysis** : forme correcte du `ref` de chunk (`doc` / `chapter`) ; labels et
+  commentaires n'étaient plus perdus au merge agent ; texte complet du chunk mis en
+  cache pour un surlignage sur toute la section ; re-merge robuste (marqueurs de
+  restriction non hashables).
+- **Barre du haut** : les ontologies système n'affichent que leur nom ; le sélecteur
+  liste les registres User + System et ne plante plus sans ontologie utilisateur.
+- **Portabilité** : chemins home indépendants de l'utilisateur, conteneur non-root ;
+  URL du mode natif documentée en `127.0.0.1:8000`.
+
 ## [1.1.0] — 2026-06-19
 
 ### Sources (nouvel onglet, amovible)

@@ -6,6 +6,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 > 🇫🇷 Une version française de ce fichier est disponible : [CHANGELOG.fr.md](CHANGELOG.fr.md).
 
+## [1.1.1] — 2026-10-22
+
+### Added
+- **Property chains** for object properties: editor UI, `owl:propertyChainAxiom`
+  RDF round-trip, and inference materialization.
+- **Native Python (venv) run mode** — the whole app runs in a single FastAPI
+  process (serving the API and the static frontend); no Docker or nginx required.
+- **owl:Ontology** annotations tab in Settings, kept in sync with the System Registry.
+- **Unified annotation value type** — language / datatype / IRI selector (issues #6 & #8).
+- **Corpus analysis (Interfaced Agent)**: per-section chunking, enriched entities
+  carrying their relations, and SWRL rules merged in a single pass.
+- **Analysis tab**: mouse-resizable columns (persisted), reflowed *Text extract*
+  filling the full column width and row height, auto-scroll to the first highlight,
+  and an always-available *Reload from backend*.
+
+### Fixed
+- **Import**: `owl:unionOf` / `owl:intersectionOf` class expressions in a property
+  `domain` / `range` are now expanded — union-domain properties were previously
+  dropped (empty domain) and vanished from the class trees.
+- **Analysis**: correct chunk `ref` shape (`doc` / `chapter`); labels and comments
+  no longer lost on agent merge; full chunk text cached so highlighting covers the
+  whole section; robust re-merge (non-hashable restriction markers).
+- **Topbar**: system ontologies show their name only; the ontology switcher lists
+  User + System registries and no longer fails when there is no user ontology.
+- **Portability**: user-agnostic home paths, non-root container; native-mode URL
+  documented as `127.0.0.1:8000`.
+
 ## [1.1.0] — 2026-06-19
 
 ### Sources (new, hideable tab)
