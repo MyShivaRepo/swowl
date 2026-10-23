@@ -6,6 +6,33 @@ et le projet suit le [versionnage sémantique](https://semver.org/).
 
 > 🇬🇧 An English version of this file is available: [CHANGELOG.md](CHANGELOG.md).
 
+## [1.2.0] — 2026-10-23
+
+### Corrigé
+- **Domaines et portées en union** (#10) : un domaine `owl:unionOf` est conservé comme
+  union et exporté en un seul `rdfs:domain [ owl:unionOf … ]`. La 1.1.1 le dépliait en
+  plusieurs triplets `rdfs:domain`, qu'OWL lit comme une **intersection** — le sens était
+  inversé. Plusieurs classes simples gardent le sens d'intersection (défaut OWL) ; un
+  **sélecteur ∩ / ∪** dans l'éditeur de propriété permet de choisir.
+- **Contenus de restriction qui sont des expressions** (#15) : `∀ relatesTo.(Alpha ⊔ Beta)`
+  n'est plus vidé en une restriction vraie pour n'importe quoi.
+- **Équivalences construites par expression** (#9) : `Artefact ≡ Pair ⊓ ∃outputOf.Activity`
+  est importée, affichée et exportée ; une classe nommée définie directement par
+  `owl:unionOf` devient une équivalence.
+- **Axiomes posés sur une classe importée** (#14) : conservés sous leur vrai IRI, y compris
+  sous la forme `<rdf:Description>` produite par Protégé.
+- **Éditeur de classe** : les expressions complexes sont affichées en lecture seule et
+  **conservées à la sauvegarde** (l'autosave effaçait les expressions et les restrictions
+  d'équivalence importées).
+- **Inférence** : aucun type n'est inféré d'un domaine en union ; une violation de domaine
+  n'est levée que si l'individu ne relève d'aucune classe de l'union.
+
+### Ajouté
+- **Avertissements d'import** : les constructions non représentables sont signalées
+  (champ `import_warnings` de l'API, affiché après l'import) au lieu d'être réécrites ou
+  ignorées en silence.
+- Cas de non-régression E (équivalence par intersection contenant une restriction).
+
 ## [1.1.2] — 2026-10-23
 
 ### Sécurité

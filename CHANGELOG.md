@@ -6,6 +6,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 > 🇫🇷 Une version française de ce fichier est disponible : [CHANGELOG.fr.md](CHANGELOG.fr.md).
 
+## [1.2.0] — 2026-10-23
+
+### Fixed
+- **Union domains and ranges** (#10): an `owl:unionOf` domain is kept as a union and
+  exported as a single `rdfs:domain [ owl:unionOf … ]`. 1.1.1 flattened it into several
+  `rdfs:domain` triples, which OWL reads as an **intersection** — the meaning was inverted.
+  Several plain domain classes still mean intersection (OWL default); a **∩ / ∪ selector**
+  in the property editor lets you choose.
+- **Restriction contents that are class expressions** (#15): `∀ relatesTo.(Alpha ⊔ Beta)`
+  is no longer emptied into a restriction that holds for anything.
+- **Equivalences built from expressions** (#9): `Artefact ≡ Pair ⊓ ∃outputOf.Activity` is
+  imported, displayed and exported; a named class defined directly by `owl:unionOf`
+  becomes an equivalence.
+- **Axioms on imported classes** (#14): kept under their real IRI, including the
+  `<rdf:Description>` form produced by Protégé.
+- **Class editor**: complex expressions are shown read-only and **preserved on save**
+  (autosave used to wipe expressions and imported equivalence restrictions).
+- **Inference**: no type is inferred from a union domain; a domain violation is raised
+  only when the individual matches none of the union members.
+
+### Added
+- **Import warnings**: constructs that cannot be represented are reported (API field
+  `import_warnings`, shown after import) instead of being rewritten or dropped silently.
+- Regression case E (equivalence with an intersection containing a restriction).
+
 ## [1.1.2] — 2026-10-23
 
 ### Security
