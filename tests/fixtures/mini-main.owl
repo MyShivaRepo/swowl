@@ -1,5 +1,5 @@
 <?xml version="1.0"?>
-<!-- Cas de test minimal fourni par Cyril (issues #10, #12, #14, #15) + cas E (#9). -->
+<!-- Cas de test minimal fourni par Cyril (issues #10, #12, #14, #15) + cas E (#9), F-H (#18). -->
 <rdf:RDF
     xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
     xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
@@ -78,6 +78,31 @@
         </owl:intersectionOf>
       </owl:Class>
     </owl:equivalentClass>
+  </owl:Class>
+
+  <!-- CAS F, G, H (#18) : cardinalités qualifiées (classe / donnée) et non qualifiée. -->
+  <owl:DatatypeProperty rdf:ID="code"/>
+  <owl:Class rdf:about="#Gamma">
+    <rdfs:subClassOf>
+      <owl:Restriction>
+        <owl:onProperty rdf:resource="#hasPart"/>
+        <owl:qualifiedCardinality rdf:datatype="http://www.w3.org/2001/XMLSchema#nonNegativeInteger">2</owl:qualifiedCardinality>
+        <owl:onClass rdf:resource="#Beta"/>
+      </owl:Restriction>
+    </rdfs:subClassOf>
+    <rdfs:subClassOf>
+      <owl:Restriction>
+        <owl:onProperty rdf:resource="#code"/>
+        <owl:maxQualifiedCardinality rdf:datatype="http://www.w3.org/2001/XMLSchema#nonNegativeInteger">1</owl:maxQualifiedCardinality>
+        <owl:onDataRange rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+      </owl:Restriction>
+    </rdfs:subClassOf>
+    <rdfs:subClassOf>
+      <owl:Restriction>
+        <owl:onProperty rdf:resource="#measuredIn"/>
+        <owl:minCardinality rdf:datatype="http://www.w3.org/2001/XMLSchema#nonNegativeInteger">1</owl:minCardinality>
+      </owl:Restriction>
+    </rdfs:subClassOf>
   </owl:Class>
 
 </rdf:RDF>

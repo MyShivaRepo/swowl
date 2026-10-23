@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Test de non-régression aller-retour import → export (cas A à D de Cyril + cas E).
+"""Test de non-régression aller-retour import → export (cas A à D de Cyril + cas E à H).
 
 Usage (instance SWOWL lancée) :
     python tests/roundtrip_cyril.py [http://localhost:8001]
@@ -88,6 +88,25 @@ def main():
                    and (rs[0], OWL.someValuesFrom, URIRef(MM + "Beta")) in g)
         checks.append(("E  Gamma ≡ Alpha ⊓ ∃hasPart.Beta  [#9]", okE,
                        list(g.objects(URIRef(MM + "Gamma"), OWL.equivalentClass))))
+        # F, G, H — cardinalités (#18)
+        XSDNS = "http://www.w3.org/2001/XMLSchema#"
+        rF = restriction(URIRef(MM + "Gamma"), URIRef(MM + "hasPart"))
+        okF = (rF is not None and g.value(rF, OWL.qualifiedCardinality) is not None
+               and g.value(rF, OWL.onClass) == URIRef(MM + "Beta")
+               and g.value(rF, OWL.cardinality) is None)
+        checks.append(("F  =2 hasPart.Beta → qualifiedCardinality + onClass  [#18]", okF,
+                       list(g.predicate_objects(rF)) if rF is not None else None))
+        rG = restriction(URIRef(MM + "Gamma"), URIRef(MM + "code"))
+        okG = (rG is not None and g.value(rG, OWL.maxQualifiedCardinality) is not None
+               and g.value(rG, OWL.onDataRange) == URIRef(XSDNS + "string")
+               and g.value(rG, OWL.onClass) is None)
+        checks.append(("G  ≤1 code.xsd:string → maxQualifiedCardinality + onDataRange  [#18]", okG,
+                       list(g.predicate_objects(rG)) if rG is not None else None))
+        rH = restriction(URIRef(MM + "Gamma"), URIRef(MM + "measuredIn"))
+        okH = (rH is not None and g.value(rH, OWL.minCardinality) is not None
+               and g.value(rH, OWL.onClass) is None and g.value(rH, OWL.minQualifiedCardinality) is None)
+        checks.append(("H  ≥1 measuredIn (non qualifiée) reste non qualifiée  [#18]", okH,
+                       list(g.predicate_objects(rH)) if rH is not None else None))
         # Aucun IRI à préfixe concaténé (#12)
         bad = sorted({str(t) for tr in g for t in tr if isinstance(t, URIRef) and "#mi:" in str(t)})
         checks.append(("   aucun IRI « …#mi:… »  [#12]", not bad, bad))

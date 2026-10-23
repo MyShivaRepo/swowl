@@ -633,7 +633,8 @@ class TripleStore:
             for card_pred in (OWL.cardinality, OWL.qualifiedCardinality):
                 cv = next(g.objects(node, card_pred), None)
                 if cv is not None:
-                    filler_node = next(g.objects(node, OWL.onClass), None)
+                    filler_node = (next(g.objects(node, OWL.onClass), None)
+                                   or next(g.objects(node, OWL.onDataRange), None))
                     return ExactCardinality(property=prop_id, cardinality=int(cv),
                                            filler=_filler(filler_node))
 
@@ -641,7 +642,8 @@ class TripleStore:
             for card_pred in (OWL.minCardinality, OWL.minQualifiedCardinality):
                 cv = next(g.objects(node, card_pred), None)
                 if cv is not None:
-                    filler_node = next(g.objects(node, OWL.onClass), None)
+                    filler_node = (next(g.objects(node, OWL.onClass), None)
+                                   or next(g.objects(node, OWL.onDataRange), None))
                     return MinCardinality(property=prop_id, cardinality=int(cv),
                                          filler=_filler(filler_node))
 
@@ -649,7 +651,8 @@ class TripleStore:
             for card_pred in (OWL.maxCardinality, OWL.maxQualifiedCardinality):
                 cv = next(g.objects(node, card_pred), None)
                 if cv is not None:
-                    filler_node = next(g.objects(node, OWL.onClass), None)
+                    filler_node = (next(g.objects(node, OWL.onClass), None)
+                                   or next(g.objects(node, OWL.onDataRange), None))
                     return MaxCardinality(property=prop_id, cardinality=int(cv),
                                          filler=_filler(filler_node))
 
@@ -1193,6 +1196,12 @@ class TripleStore:
                                        datatype=getattr(a, "datatype", None), is_iri=getattr(a, "is_iri", False))
                     g.add((subject, pred, obj))
 
+        _dp_ids = {p.id for p in onto.datatype_properties}
+
+        def _is_data_prop(pid, filler) -> bool:
+            """Restriction sur une DatatypeProperty (locale, ou filler de type xsd:…)."""
+            return pid in _dp_ids or (isinstance(filler, str) and filler.startswith("xsd:"))
+
         def class_expr_node(expr) -> URIRef | BNode:
             if isinstance(expr, str):
                 return iri(expr)
@@ -1225,18 +1234,23 @@ class TripleStore:
             elif isinstance(expr, HasValue):
                 if expr.value:
                     g.add((bn, OWL.hasValue, iri(expr.value)))
-            elif isinstance(expr, ExactCardinality):
-                g.add((bn, OWL.cardinality, Literal(expr.cardinality, datatype=XSD.nonNegativeInteger)))
+            elif isinstance(expr, (ExactCardinality, MinCardinality, MaxCardinality)):
+                # #18 — avec filler : prédicat QUALIFIÉ + owl:onClass (owl:onDataRange pour
+                # une DatatypeProperty) ; sans filler : prédicat non qualifié seul.
+                # (owl:cardinality + owl:onClass n'est pas une restriction OWL 2 valide.)
+                plain, qual = {ExactCardinality: ("cardinality", "qualifiedCardinality"),
+                               MinCardinality:   ("minCardinality", "minQualifiedCardinality"),
+                               MaxCardinality:   ("maxCardinality", "maxQualifiedCardinality")}[type(expr)]
+                n = Literal(expr.cardinality, datatype=XSD.nonNegativeInteger)
                 if expr.filler:
-                    g.add((bn, OWL.onClass, class_expr_node(expr.filler)))
-            elif isinstance(expr, MinCardinality):
-                g.add((bn, OWL.minCardinality, Literal(expr.cardinality, datatype=XSD.nonNegativeInteger)))
-                if expr.filler:
-                    g.add((bn, OWL.onClass, class_expr_node(expr.filler)))
-            elif isinstance(expr, MaxCardinality):
-                g.add((bn, OWL.maxCardinality, Literal(expr.cardinality, datatype=XSD.nonNegativeInteger)))
-                if expr.filler:
-                    g.add((bn, OWL.onClass, class_expr_node(expr.filler)))
+                    g.add((bn, getattr(OWL, qual), n))
+                    if _is_data_prop(expr.property, expr.filler):
+                        g.add((bn, OWL.onDataRange, dt_iri(expr.filler) if isinstance(expr.filler, str)
+                                                    else class_expr_node(expr.filler)))
+                    else:
+                        g.add((bn, OWL.onClass, class_expr_node(expr.filler)))
+                else:
+                    g.add((bn, getattr(OWL, plain), n))
             return bn
 
         def add_dom_rng(subj, pred, ids, is_union, to_node):
