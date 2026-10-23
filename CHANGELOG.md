@@ -6,6 +6,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 > 🇫🇷 Une version française de ce fichier est disponible : [CHANGELOG.fr.md](CHANGELOG.fr.md).
 
+## [1.2.2] — 2026-10-23
+
+### Fixed
+- **Qualified cardinalities** (#18): a cardinality restriction with a filler is exported
+  with `owl:qualifiedCardinality` / `owl:minQualifiedCardinality` /
+  `owl:maxQualifiedCardinality` + `owl:onClass` — or `owl:onDataRange` for a
+  DatatypeProperty — instead of `owl:cardinality` + `owl:onClass`, which is not valid
+  OWL 2. Without a filler, the plain predicate is kept. Import now also reads
+  `owl:onDataRange`. Regression cases F, G, H.
+
 ## [1.2.1] — 2026-10-23
 
 ### Fixed

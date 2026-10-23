@@ -6,6 +6,16 @@ et le projet suit le [versionnage sémantique](https://semver.org/).
 
 > 🇬🇧 An English version of this file is available: [CHANGELOG.md](CHANGELOG.md).
 
+## [1.2.2] — 2026-10-23
+
+### Corrigé
+- **Cardinalités qualifiées** (#18) : une restriction de cardinalité avec filler est
+  exportée en `owl:qualifiedCardinality` / `owl:minQualifiedCardinality` /
+  `owl:maxQualifiedCardinality` + `owl:onClass` — ou `owl:onDataRange` pour une
+  DatatypeProperty — au lieu de `owl:cardinality` + `owl:onClass`, non valide en OWL 2.
+  Sans filler, le prédicat non qualifié est conservé. L'import lit désormais aussi
+  `owl:onDataRange`. Cas de non-régression F, G, H.
+
 ## [1.2.1] — 2026-10-23
 
 ### Corrigé
