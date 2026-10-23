@@ -6,6 +6,25 @@ et le projet suit le [versionnage sémantique](https://semver.org/).
 
 > 🇬🇧 An English version of this file is available: [CHANGELOG.md](CHANGELOG.md).
 
+## [1.2.1] — 2026-10-23
+
+### Corrigé
+- **Espaces de noms en « / »** (#11) : le séparateur réellement utilisé par les entités
+  (`…/onto#Pair` ou `…/onto/Pair`) est détecté à l'import et conservé — avec l'IRI exacte
+  de `owl:Ontology` — au lieu d'imposer `#`, ce qui réécrivait tous les IRI après un
+  aller-retour. L'export, les références aux entités importées et l'*IRI complète*
+  affichée dans les éditeurs en tiennent compte. Les ontologies à IRI en « / » importées
+  avant la 1.2.1 doivent être ré-importées.
+- **Chaînes de propriétés dans `/api/inferences`** (#13) : les chaînes sont évaluées sur
+  une base de faits saturée (inverses, symétrie, sous-propriétés, transitivité et
+  chaînes, jusqu'au point fixe) ; une chaîne peut donc passer par un fait inféré — par
+  exemple l'inverse d'une propriété assertée — comme le faisait déjà la fiche individu.
+  Les faits assertés ne sont plus rapportés comme inférés.
+
+### Ajouté
+- Tests `tests/roundtrip_namespace.py` (espace de noms en « / ») et
+  `tests/test_inference_chains.py` (en mémoire, sans serveur).
+
 ## [1.2.0] — 2026-10-23
 
 ### Corrigé

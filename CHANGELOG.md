@@ -6,6 +6,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 > 🇫🇷 Une version française de ce fichier est disponible : [CHANGELOG.fr.md](CHANGELOG.fr.md).
 
+## [1.2.1] — 2026-10-23
+
+### Fixed
+- **"/" namespaces** (#11): the namespace separator actually used by the entities
+  (`…/onto#Pair` or `…/onto/Pair`) is detected at import and kept — together with the
+  exact `owl:Ontology` IRI — instead of forcing `#`, which rewrote every IRI after a
+  round-trip. Export, references to imported entities and the *Full IRI* shown in the
+  editors follow it. Ontologies imported before 1.2.1 with "/" IRIs must be re-imported.
+- **Property chains in `/api/inferences`** (#13): chains are evaluated over a saturated
+  fact base (inverse, symmetric, sub-property, transitive and chain inferences, to a
+  fixed point), so a chain can go through an inferred fact — e.g. the inverse of an
+  asserted property — as the individual form already did. Asserted facts are no longer
+  reported as inferred.
+
+### Added
+- Tests `tests/roundtrip_namespace.py` (slash namespace) and
+  `tests/test_inference_chains.py` (in-memory, no server needed).
+
 ## [1.2.0] — 2026-10-23
 
 ### Fixed
