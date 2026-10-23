@@ -361,6 +361,7 @@ class TripleStore:
                     "name":                 imp_entry.name,
                     "prefix":               imp_entry.prefix,
                     "uri":                  imp_entry.uri,
+                    "ns_sep":               data.get("ns_sep") or "#",
                     "classes":              data.get("classes", []),
                     "object_properties":    data.get("object_properties", []),
                     "datatype_properties":  data.get("datatype_properties", []),
@@ -458,18 +459,30 @@ class TripleStore:
         """Détecte la base IRI réelle de l'ontologie depuis le graphe RDF.
         Essaie d'abord le namespace déclaré dans owl:Ontology, puis cherche
         le préfixe commun aux entités, et retombe sur l'URI fournie par l'utilisateur."""
-        from rdflib import OWL as _OWL, RDF as _RDF, URIRef as _URIRef
-        # 1. Chercher owl:Ontology rdf:about
+        from rdflib import OWL as _OWL, RDF as _RDF, RDFS as _RDFS, URIRef as _URIRef
+        from collections import Counter as _Counter
+        decl = [str(s) for t in (_OWL.Class, _RDFS.Class, _OWL.ObjectProperty,
+                                 _OWL.DatatypeProperty, _OWL.AnnotationProperty,
+                                 _OWL.NamedIndividual, _RDF.Property)
+                for s in g.subjects(_RDF.type, t) if isinstance(s, _URIRef)]
+
+        def _sep_for(root):
+            """Séparateur réellement utilisé par les entités sous `root` (#11) :
+            « …/onto#Pair » → « # », « …/onto/Pair » → « / », aucune → None."""
+            h  = sum(1 for i in decl if i.startswith(root + "#"))
+            sl = sum(1 for i in decl if i.startswith(root + "/"))
+            return "/" if sl > h else "#" if h > sl else None
+
+        # 1. owl:Ontology rdf:about — séparateur déduit des entités, sinon de l'IRI
         for s in g.subjects(_RDF.type, _OWL.Ontology):
             if isinstance(s, _URIRef) and str(s).startswith("http"):
-                return str(s).rstrip("#/") + "#"
-        # 2. Chercher le préfixe commun des classes/propriétés
-        iris = [str(s) for s in g.subjects(_RDF.type, _OWL.Class)
-                if isinstance(s, _URIRef)]
-        iris += [str(s) for s in g.subjects(_RDF.type, _OWL.ObjectProperty)
-                 if isinstance(s, _URIRef)]
-        if iris and "#" in iris[0]:
-            return iris[0].rsplit("#", 1)[0] + "#"
+                raw = str(s); root = raw.rstrip("#/")
+                return root + (_sep_for(root) or ("/" if raw.endswith("/") else "#"))
+        # 2. Espace de noms le plus fréquent parmi les entités déclarées
+        ns = _Counter(i[:max(i.rfind("#"), i.rfind("/")) + 1] for i in decl
+                      if max(i.rfind("#"), i.rfind("/")) > len("https://"))
+        if ns:
+            return ns.most_common(1)[0][0]
         # 3. Retomber sur l'URI fournie
         return user_uri.rstrip("#/") + "#"
 
@@ -504,6 +517,9 @@ class TripleStore:
         onto_id = base.rstrip("#/")
 
         onto = OWLOntology(id=onto_id, name=name, prefix=prefix, ns_prefixes=ns_prefixes or [])
+        onto.ns_sep = base[-1] if base[-1:] in ("#", "/") else "#"
+        onto.ontology_iri = next((str(s) for s in g.subjects(RDF.type, OWL.Ontology)
+                                  if isinstance(s, URIRef)), "")
 
         # ── Helper: collect labels & comments for any URI ───────
         def _lit_dict(lit):
@@ -1057,7 +1073,7 @@ class TripleStore:
         if not onto:
             raise ValueError("No ontology loaded")
 
-        base = onto.id.rstrip("#/") + "#"
+        base = onto.id.rstrip("#/") + (getattr(onto, "ns_sep", "#") or "#")
         NS = Namespace(base)
         g = Graph()
         g.bind(onto.prefix, NS)
@@ -1066,7 +1082,9 @@ class TripleStore:
         g.bind("rdfs", RDFS)
         g.bind("xsd", XSD)
 
-        onto_uri = URIRef(onto.id)
+        _oiri = getattr(onto, "ontology_iri", "") or ""
+        # IRI exacte du fichier source, tant qu'elle désigne toujours la même ontologie
+        onto_uri = URIRef(_oiri if _oiri and _oiri.rstrip("#/") == onto.id.rstrip("#/") else onto.id)
         g.add((onto_uri, RDF.type, OWL.Ontology))
         # owl:imports — ontologies importées (avec binding de préfixe pour la lisibilité)
         for imp_uri in (onto.imports or []):
@@ -1095,11 +1113,15 @@ class TripleStore:
         # appartiennent au namespace de l'ontologie SOURCE, pas à celui des données.
         # Sans cela, l'export crée des classes/propriétés fantômes dans le namespace local.
         imported_ns: dict = {}
+        _sep_by_uri: dict = {}   # uri d'ontologie importée → séparateur (#11)
         try:
             conn_name = next((k for k, e in self._registry.items() if e.connected), None)
             if conn_name:
                 for imp in self.load_imported_entities(conn_name):
-                    ns_i = (imp.get("uri") or "").rstrip("#/") + "#"
+                    ns_i = (imp.get("uri") or "").rstrip("#/") + (imp.get("ns_sep") or "#")
+                    _sep_by_uri[(imp.get("uri") or "").rstrip("#/")] = imp.get("ns_sep") or "#"
+                    if imp.get("prefix"):
+                        g.bind(imp["prefix"], Namespace(ns_i))
                     for key in ("classes", "object_properties",
                                 "datatype_properties", "individuals"):
                         for ent in (imp.get(key) or []):
@@ -1125,7 +1147,8 @@ class TripleStore:
                 _pfx_ns[p] = imp_uri
         for p, n in _pfx_ns.items():
             if p and p != onto.prefix:
-                g.bind(p, Namespace(n if n.endswith(("#", "/")) else n + "#"))
+                g.bind(p, Namespace(n if n.endswith(("#", "/"))
+                                    else n + _sep_by_uri.get(n.rstrip("#/"), "#")))
 
         def iri(local_id: str) -> URIRef:
             if local_id.startswith("http"):
@@ -1139,7 +1162,9 @@ class TripleStore:
                 pfx, _, rest = local_id.partition(":")
                 ns = _pfx_ns.get(pfx)
                 if ns and rest:
-                    return URIRef(ns + rest) if ns.endswith(("#", "/")) else URIRef(ns + "#" + rest)
+                    if ns.endswith(("#", "/")):
+                        return URIRef(ns + rest)
+                    return URIRef(ns + _sep_by_uri.get(ns.rstrip("#/"), "#") + rest)
             # Entité importée → namespace du schéma source (et non celui des données).
             if local_id in imported_ns:
                 return URIRef(imported_ns[local_id] + local_id)

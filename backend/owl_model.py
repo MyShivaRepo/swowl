@@ -297,6 +297,11 @@ class OWLOntology(BaseModel):
     prefix: str = "onto"       # préfixe local
     imports: List[str] = []    # URIs des ontologies importées (owl:imports) — voyage avec le fichier
     import_warnings: List[str] = Field(default_factory=list)  # constructions non importées (dernier import)
+    # Séparateur entre l'espace de noms et les noms locaux : « # » (…/onto#Pair) ou
+    # « / » (…/onto/Pair). Détecté à l'import, utilisé à l'export (#11).
+    ns_sep: str = "#"
+    # IRI exacte de owl:Ontology dans le fichier source (vide = id) — réécrite telle quelle.
+    ontology_iri: str = ""
     import_labels: dict = Field(default_factory=dict)  # {uri: {"prefix", "name"}} instantané à la déclaration
     ns_prefixes: list = Field(default_factory=list)     # [{prefix, namespace}] préfixes des namespaces référencés/importés
     annotations: EntityAnnotations = Field(default_factory=EntityAnnotations)

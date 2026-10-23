@@ -245,35 +245,89 @@ class InferenceEngine:
 
     # ── 7. Chaînes de propriétés ─────────────────────────────
 
-    def compute_chain_assertions(self) -> List[dict]:
-        result = []
-        # Index (prop, src) → targets
-        prop_pairs: Dict[str, List[Tuple[str, str]]] = defaultdict(list)
-        for ind_id, ind in self.ind_index.items():
-            for prop_id, target in ind["obj"]:
-                prop_pairs[prop_id].append((ind_id, target))
+    def _saturated_obj_facts(self) -> Set[Tuple[str, str, str]]:
+        """Fermeture des assertions objet (s, p, o) par inverseOf, symétrie,
+        subPropertyOf, transitivité et chaînes, jusqu'au point fixe (#13).
+        Les chaînes peuvent ainsi passer par un fait lui-même inféré (ex. l'inverse
+        d'une propriété assertée), comme le fait la fiche individu."""
+        if getattr(self, "_sat_facts", None) is not None:
+            return self._sat_facts
+        facts = {(s, p, o) for s, ind in self.ind_index.items() for p, o in ind["obj"]}
+        inv: Dict[str, Set[str]] = defaultdict(set)
+        for p, info in self.op_index.items():
+            if info["inverse"]:
+                inv[p].add(info["inverse"]); inv[info["inverse"]].add(p)
+        sym    = {p for p, i in self.op_index.items() if i["chars"].symmetric}
+        trans  = {p for p, i in self.op_index.items() if i["chars"].transitive}
+        supers = {p: set(i["subPropertyOf"]) for p, i in self.op_index.items()}
+        chains = [(p, list(c.chain)) for p, i in self.op_index.items()
+                  for c in i["chains"] if len(c.chain) >= 2]
+        while True:
+            by_p: Dict[str, Dict[str, Set[str]]] = defaultdict(lambda: defaultdict(set))
+            for s, p, o in facts:
+                by_p[p][s].add(o)
+            new: Set[Tuple[str, str, str]] = set()
+            for s, p, o in facts:
+                for q in inv.get(p, ()):
+                    new.add((o, q, s))
+                if p in sym:
+                    new.add((o, p, s))
+                for q in supers.get(p, ()):
+                    new.add((s, q, o))
+            for p in trans:
+                g = by_p.get(p, {})
+                for s, objs in g.items():
+                    for o in objs:
+                        for o2 in g.get(o, ()):
+                            new.add((s, p, o2))
+            for p, c in chains:
+                for s in list(by_p.get(c[0], {}).keys()):
+                    cur = {s}
+                    for cp in c:
+                        nxt: Set[str] = set()
+                        for x in cur:
+                            nxt |= by_p.get(cp, {}).get(x, set())
+                        cur = nxt
+                        if not cur:
+                            break
+                    for o in cur:
+                        new.add((s, p, o))
+            new -= facts
+            if not new:
+                break
+            facts |= new
+        self._sat_facts = facts
+        return facts
 
+    def compute_chain_assertions(self) -> List[dict]:
+        """Faits produits par une chaîne de propriétés, évaluée sur la base de faits
+        saturée (#13). Les faits déjà assertés ne sont pas rapportés comme inférés."""
+        result = []
+        facts = self._saturated_obj_facts()
+        asserted = {(s, p, o) for s, ind in self.ind_index.items() for p, o in ind["obj"]}
+        by_p: Dict[str, Dict[str, Set[str]]] = defaultdict(lambda: defaultdict(set))
+        for s, p, o in facts:
+            by_p[p][s].add(o)
+        seen: Set[Tuple[str, str, str]] = set()
         for prop_id, info in self.op_index.items():
             for chain in info["chains"]:
                 c = chain.chain
                 if len(c) < 2:
                     continue
-                # Pour une chaîne [p1, p2] : p1(a,b) ∧ p2(b,c) → prop(a,c)
-                # On généralise pour chaînes de longueur arbitraire
-                def follow_chain(chain_props: List[str], start: str) -> Set[str]:
-                    current = {start}
-                    for cp in chain_props:
-                        next_set = set()
-                        for src in current:
-                            for s, t in prop_pairs.get(cp, []):
-                                if s == src:
-                                    next_set.add(t)
-                        current = next_set
-                    return current
-
-                for ind_id in self.ind_index:
-                    targets = follow_chain(c, ind_id)
-                    for t in targets:
+                for ind_id in list(by_p.get(c[0], {}).keys()):
+                    cur = {ind_id}
+                    for cp in c:
+                        nxt: Set[str] = set()
+                        for x in cur:
+                            nxt |= by_p.get(cp, {}).get(x, set())
+                        cur = nxt
+                        if not cur:
+                            break
+                    for t in sorted(cur):
+                        key = (ind_id, prop_id, t)
+                        if key in asserted or key in seen:
+                            continue
+                        seen.add(key)
                         result.append({
                             "individual": ind_id,
                             "property": prop_id,

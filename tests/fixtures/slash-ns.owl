@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<!-- Ontologie dont les entités utilisent le séparateur « / » (issue #11). -->
+<rdf:RDF
+    xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+    xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
+    xmlns:owl="http://www.w3.org/2002/07/owl#">
+  <owl:Ontology rdf:about="https://example.org/slash"/>
+  <owl:Class rdf:about="https://example.org/slash/Pair"/>
+  <owl:Class rdf:about="https://example.org/slash/Outcome">
+    <rdfs:subClassOf rdf:resource="https://example.org/slash/Pair"/>
+  </owl:Class>
+  <owl:ObjectProperty rdf:about="https://example.org/slash/evaluates">
+    <rdfs:domain rdf:resource="https://example.org/slash/Pair"/>
+    <rdfs:range rdf:resource="https://example.org/slash/Outcome"/>
+  </owl:ObjectProperty>
+  <owl:NamedIndividual rdf:about="https://example.org/slash/p1">
+    <rdf:type rdf:resource="https://example.org/slash/Pair"/>
+    <rdfs:label xml:lang="en">P1</rdfs:label>
+  </owl:NamedIndividual>
+</rdf:RDF>
