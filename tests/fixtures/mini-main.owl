@@ -1,5 +1,5 @@
 <?xml version="1.0"?>
-<!-- Cas de test minimal fourni par Cyril (issues #10, #12, #14, #15). -->
+<!-- Cas de test minimal fourni par Cyril (issues #10, #12, #14, #15) + cas E (#9). -->
 <rdf:RDF
     xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
     xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
@@ -63,6 +63,21 @@
         </owl:allValuesFrom>
       </owl:Restriction>
     </rdfs:subClassOf>
+  </owl:Class>
+
+  <!-- CAS E (#9) : équivalence définie par une intersection contenant une restriction. -->
+  <owl:Class rdf:ID="Gamma">
+    <owl:equivalentClass>
+      <owl:Class>
+        <owl:intersectionOf rdf:parseType="Collection">
+          <owl:Class rdf:about="#Alpha"/>
+          <owl:Restriction>
+            <owl:onProperty rdf:resource="#hasPart"/>
+            <owl:someValuesFrom rdf:resource="#Beta"/>
+          </owl:Restriction>
+        </owl:intersectionOf>
+      </owl:Class>
+    </owl:equivalentClass>
   </owl:Class>
 
 </rdf:RDF>

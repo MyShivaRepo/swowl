@@ -41,13 +41,13 @@ class EntityAnnotations(BaseModel):
 class SomeValuesFrom(BaseModel):
     type: Literal["someValuesFrom"] = "someValuesFrom"
     property: str
-    filler: Optional[str] = None  # None = restriction incomplète (en cours de définition)
+    filler: Optional[ClassExpression] = None  # classe nommée ou expression ; None = incomplète
 
 
 class AllValuesFrom(BaseModel):
     type: Literal["allValuesFrom"] = "allValuesFrom"
     property: str
-    filler: Optional[str] = None
+    filler: Optional[ClassExpression] = None
 
 
 class HasValue(BaseModel):
@@ -60,21 +60,21 @@ class ExactCardinality(BaseModel):
     type: Literal["exactCardinality"] = "exactCardinality"
     property: str
     cardinality: int
-    filler: Optional[str] = None
+    filler: Optional[ClassExpression] = None
 
 
 class MinCardinality(BaseModel):
     type: Literal["minCardinality"] = "minCardinality"
     property: str
     cardinality: int
-    filler: Optional[str] = None
+    filler: Optional[ClassExpression] = None
 
 
 class MaxCardinality(BaseModel):
     type: Literal["maxCardinality"] = "maxCardinality"
     property: str
     cardinality: int
-    filler: Optional[str] = None
+    filler: Optional[ClassExpression] = None
 
 
 class PropertyPresence(BaseModel):
@@ -95,20 +95,25 @@ Restriction = Union[
 
 class UnionOf(BaseModel):
     type: Literal["unionOf"] = "unionOf"
-    operands: List[str]  # IRIs de classes
+    operands: List[ClassExpression]  # classes nommées ou expressions (récursif)
 
 
 class IntersectionOf(BaseModel):
     type: Literal["intersectionOf"] = "intersectionOf"
-    operands: List[str]
+    operands: List[ClassExpression]
 
 
 class ComplementOf(BaseModel):
     type: Literal["complementOf"] = "complementOf"
-    operand: str
+    operand: ClassExpression
 
 
 ClassExpression = Union[str, UnionOf, IntersectionOf, ComplementOf, Restriction]
+
+# Références récursives (filler / opérandes) : résolues une fois ClassExpression défini.
+for _m in (SomeValuesFrom, AllValuesFrom, ExactCardinality, MinCardinality,
+           MaxCardinality, UnionOf, IntersectionOf, ComplementOf):
+    _m.model_rebuild()
 
 
 # ── Classe OWL ───────────────────────────────────────────────
@@ -142,6 +147,10 @@ class OWLObjectProperty(BaseModel):
     annotations: EntityAnnotations = Field(default_factory=EntityAnnotations)
     domain: List[str] = []                     # IRIs de classes
     range: List[str] = []                      # IRIs de classes
+    # Plusieurs classes en domaine/portée : intersection par défaut (sémantique OWL
+    # de plusieurs rdfs:domain) ; True = union (un seul rdfs:domain owl:unionOf).
+    domainUnion: bool = False
+    rangeUnion: bool = False
     subPropertyOf: List[str] = []
     inverseOf: Optional[str] = None
     characteristics: ObjectPropertyCharacteristics = Field(
@@ -162,6 +171,7 @@ class OWLDatatypeProperty(BaseModel):
     annotations: EntityAnnotations = Field(default_factory=EntityAnnotations)
     domain: List[str] = []
     range: List[str] = []                      # types XSD
+    domainUnion: bool = False                  # True = domaine en union (owl:unionOf)
     subPropertyOf: List[str] = []
     functional: bool = False
 
@@ -286,6 +296,7 @@ class OWLOntology(BaseModel):
     name: str = ""             # Nom lisible choisi par l'utilisateur
     prefix: str = "onto"       # préfixe local
     imports: List[str] = []    # URIs des ontologies importées (owl:imports) — voyage avec le fichier
+    import_warnings: List[str] = Field(default_factory=list)  # constructions non importées (dernier import)
     import_labels: dict = Field(default_factory=dict)  # {uri: {"prefix", "name"}} instantané à la déclaration
     ns_prefixes: list = Field(default_factory=list)     # [{prefix, namespace}] préfixes des namespaces référencés/importés
     annotations: EntityAnnotations = Field(default_factory=EntityAnnotations)

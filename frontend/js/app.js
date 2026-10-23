@@ -1268,9 +1268,17 @@ const APP = {
         const savePath = dir.replace(/\/$/, '') + '/' + name + '.json';
         const ns_prefixes = this._wizImpCollectNs();
         try {
-            await API.importFromPath({ name, owl_path: src, save_path: savePath, uri, prefix, ns_prefixes });
+            const res = await API.importFromPath({ name, owl_path: src, save_path: savePath, uri, prefix, ns_prefixes });
             if (!conn) await API.disconnectOntology();
-            UI.success(`Ontology "${name}" imported & registered.`);
+            // Constructions OWL non représentables : signalées plutôt qu'ignorées en silence
+            const warns = (res && res.import_warnings) || [];
+            if (warns.length) {
+                warns.forEach(w => console.warn('[SWOWL import]', w));
+                UI.warn(`Ontology "${name}" imported with ${warns.length} warning(s): `
+                    + warns.slice(0, 3).join(' · ') + (warns.length > 3 ? ' … (see console)' : ''));
+            } else {
+                UI.success(`Ontology "${name}" imported & registered.`);
+            }
             this._closeWizard();
             await this.refresh();
             this.renderOntologies();
@@ -1702,15 +1710,17 @@ const APP = {
         const refs = (arr, link = true) => (arr || []).filter(x => typeof x === 'string').length
             ? (arr || []).filter(x => typeof x === 'string').map(x => link ? ref(x) : disp(x)).join(', ') : '';
 
+        // Filler = classe nommée (lien) ou expression (union, restriction imbriquée…)
+        const rf = x => (x && typeof x === 'object') ? esc(_exprText(x)) : ref(x);
         const restrText = (r) => {
             const p = ref(r.property);
             switch (r.type) {
-                case 'someValuesFrom': return `∃ ${p} . ${ref(r.filler)}`;
-                case 'allValuesFrom':  return `∀ ${p} . ${ref(r.filler)}`;
+                case 'someValuesFrom': return `∃ ${p} . ${rf(r.filler)}`;
+                case 'allValuesFrom':  return `∀ ${p} . ${rf(r.filler)}`;
                 case 'hasValue':       return `${p} ∋ ${esc(r.value)}`;
-                case 'exactCardinality': return `${p} = ${r.cardinality}${r.filler ? ' ' + ref(r.filler) : ''}`;
-                case 'minCardinality':   return `${p} ≥ ${r.cardinality}${r.filler ? ' ' + ref(r.filler) : ''}`;
-                case 'maxCardinality':   return `${p} ≤ ${r.cardinality}${r.filler ? ' ' + ref(r.filler) : ''}`;
+                case 'exactCardinality': return `${p} = ${r.cardinality}${r.filler ? ' ' + rf(r.filler) : ''}`;
+                case 'minCardinality':   return `${p} ≥ ${r.cardinality}${r.filler ? ' ' + rf(r.filler) : ''}`;
+                case 'maxCardinality':   return `${p} ≤ ${r.cardinality}${r.filler ? ' ' + rf(r.filler) : ''}`;
                 default: return r.type === '_marker' ? p : esc(JSON.stringify(r));
             }
         };
@@ -1909,7 +1919,7 @@ const APP = {
                 xrefFrame('Individuals', indTypes[c.id], 'ind'),
                 usedByClass(c.id),
             ].join('');
-            const stxt = [...supers, ...(c.disjointWith || []), ...restr.map(r => r.property + ' ' + (r.filler || r.value || '')), annoTxt(c.annotations)].join(' ');
+            const stxt = [...supers, ...(c.disjointWith || []), ...restr.map(r => r.property + ' ' + (r.filler && typeof r.filler === 'object' ? _exprText(r.filler) : (r.filler || r.value || ''))), annoTxt(c.annotations)].join(' ');
             return { id: c.id, imported: !!c._imported, html: card(c.id, stxt, body, null, '(owl:Class)') };
         }) });
 

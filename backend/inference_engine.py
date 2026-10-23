@@ -72,6 +72,8 @@ class InferenceEngine:
             self.op_index[prop.id] = {
                 "domain": set(prop.domain),
                 "range":  set(prop.range),
+                "domain_union": bool(getattr(prop, "domainUnion", False)) and len(set(prop.domain)) > 1,
+                "range_union":  bool(getattr(prop, "rangeUnion", False)) and len(set(prop.range)) > 1,
                 "chars":  prop.characteristics,
                 "inverse": prop.inverseOf,
                 "chains": prop.propertyChainAxiom,
@@ -144,8 +146,9 @@ class InferenceEngine:
             for prop_id, target in ind["obj"]:
                 if prop_id in self.op_index:
                     info = self.op_index[prop_id]
-                    # domain → sujet est instance du domaine
-                    for d in info["domain"]:
+                    # domain → sujet est instance du domaine. Domaine en union :
+                    # on sait seulement qu'il appartient à l'une des classes → rien à inférer.
+                    for d in ([] if info["domain_union"] else info["domain"]):
                         if d not in ind["types"]:
                             result.append(InferredType(
                                 individual_id=ind_id,
@@ -154,7 +157,7 @@ class InferenceEngine:
                             ))
                     # range → objet est instance du range
                     if target in self.ind_index:
-                        for r in info["range"]:
+                        for r in ([] if info["range_union"] else info["range"]):
                             if r not in self.ind_index[target]["types"]:
                                 result.append(InferredType(
                                     individual_id=target,
@@ -325,11 +328,16 @@ class InferenceEngine:
                 for pid, target in ind["obj"]:
                     if pid != prop_id:
                         continue
-                    # Vérifier domaine
-                    for d in info["domain"]:
-                        ind_types_and_ancestors = ind["types"] | {
-                            a for t in ind["types"] for a in closure.get(t, set())
-                        }
+                    # Vérifier domaine (union : violation seulement si aucune classe ne convient)
+                    ind_types_and_ancestors = ind["types"] | {
+                        a for t in ind["types"] for a in closure.get(t, set())
+                    }
+                    doms = info["domain"]
+                    if info["domain_union"] and (doms & ind_types_and_ancestors or "owl:Thing" in doms):
+                        doms = set()
+                    elif info["domain_union"]:
+                        doms = {" ⊔ ".join(sorted(doms))}
+                    for d in doms:
                         if d not in ind_types_and_ancestors and d != "owl:Thing":
                             violations.append(OWLViolation(
                                 severity="warning",
@@ -418,6 +426,8 @@ class InferenceEngine:
                     continue
                 prop   = expr.property
                 filler = expr.filler
+                if not isinstance(filler, str):   # expression anonyme : pas de classe cible nommée
+                    continue
                 if not filler or not prop or prop not in inverse_map:
                     continue
                 inv_prop = inverse_map[prop]

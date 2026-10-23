@@ -499,6 +499,61 @@ function _displayRefId(id) {
     return p ? `${p}:${id}` : id;
 }
 
+/** Expression de classe non éditable dans l'IHM : union / intersection / complément,
+ *  ou restriction dont le contenu est lui-même une expression (#9, #10, #15).
+ *  Affichée en lecture seule et conservée telle quelle à la sauvegarde. */
+function _isComplexExpr(e) {
+    return !!e && typeof e === 'object'
+        && (!e.property || (e.filler != null && typeof e.filler === 'object'));
+}
+
+/** Texte lisible (non échappé) d'une expression de classe : « ∀ p.(A ⊔ B) ». */
+function _exprText(e) {
+    if (e == null) return '';
+    if (typeof e === 'string') return _displayRefId(e);
+    const t = x => (x && typeof x === 'object' && (x.type === 'unionOf' || x.type === 'intersectionOf'))
+        ? `(${_exprText(x)})` : _exprText(x);
+    const p = e.property ? _displayRefId(e.property) : '';
+    const q = e.filler ? `.${t(e.filler)}` : '';
+    switch (e.type) {
+        case 'unionOf':          return (e.operands || []).map(t).join(' ⊔ ');
+        case 'intersectionOf':   return (e.operands || []).map(t).join(' ⊓ ');
+        case 'complementOf':     return `¬${t(e.operand)}`;
+        case 'someValuesFrom':   return `∃ ${p}${q}`;
+        case 'allValuesFrom':    return `∀ ${p}${q}`;
+        case 'hasValue':         return `${p} ∋ ${e.value ?? ''}`;
+        case 'exactCardinality': return `= ${e.cardinality} ${p}${q}`;
+        case 'minCardinality':   return `≥ ${e.cardinality} ${p}${q}`;
+        case 'maxCardinality':   return `≤ ${e.cardinality} ${p}${q}`;
+        default:                 return e.type || '';
+    }
+}
+
+/** Expressions complexes déjà portées par une classe : à ré-injecter à la sauvegarde,
+ *  car l'éditeur ne reconstruit subClassOf / equivalentClass qu'à partir du DOM. */
+function _keptComplex(id) {
+    const orig = id == null ? null : (APP.state.classes || []).find(c => c.id === id);
+    return {
+        sub: (orig?.subClassOf || []).filter(_isComplexExpr),
+        eq:  (orig?.equivalentClass || []).filter(e => e && typeof e === 'object'),
+    };
+}
+
+/** Sélecteur ∩ / ∪ pour une propriété à plusieurs classes de domaine / portée (#10). */
+function _domModeSel(id, isUnion, editor) {
+    return `<select id="${id}" title="Plusieurs classes — ∩ : toutes à la fois (intersection, sémantique OWL de plusieurs rdfs:domain) · ∪ : l'une d'entre elles (owl:unionOf)"
+        onchange="if(${editor}._editingId!==null)${editor}.autoSave()"
+        style="margin-left:auto;margin-right:4px;font-size:11px;height:20px;padding:0 2px;width:auto;flex:0 0 auto">
+        <option value="inter"${isUnion ? '' : ' selected'}>∩ all</option>
+        <option value="union"${isUnion ? ' selected' : ''}>∪ any</option></select>`;
+}
+/** Valeur du sélecteur ; undefined s'il est absent (le champ est alors omis du PUT
+ *  et le backend conserve la valeur existante). */
+function _modeSel(id) {
+    const el = document.getElementById(id);
+    return el ? el.value === 'union' : undefined;
+}
+
 /** True if the entity with this id in APP.state[stateKey] is imported. */
 function _isImportedId(stateKey, id) {
     return !!(APP.state[stateKey] || []).find(e => e.id === id)?._imported;
@@ -983,8 +1038,17 @@ const ClassEditor = {
             return chainHtml;
         }).join('');
 
+        // Super-classes exprimées par une expression (union, restriction à filler
+        // complexe…) : lecture seule, conservées à l'enregistrement (#10, #15)
+        const complexRows = (cls.subClassOf || []).filter(_isComplexExpr).map(e => `
+            <div class="cls-list-item cls-expr-item" style="padding-left:6px" title="Expression OWL — lecture seule, conservée à l'enregistrement">
+                <span style="opacity:.6;font-family:monospace;margin-right:4px">⊑</span>
+                <span class="cls-list-lbl" style="font-family:monospace">${_escapeHtml(_exprText(e))}</span>
+            </div>`).join('');
+
         panel.innerHTML = `
             ${superRows || '<div class="cls-list-item cls-ancestor" style="opacity:0.55;font-style:italic"><span class="cls-dot tree-cls-dot tree-thing-dot"></span><span class="cls-list-lbl">owl:Thing</span></div>'}
+            ${complexRows}
             ${isImp ? '' : `<div id="cls-super-picker" class="cls-tree-picker" style="display:none">
                 ${_classTreePickerItems('ClassEditor.addSuperClass', [cls.id, ...superClasses])}
             </div>`}`;
@@ -1502,7 +1566,15 @@ const ClassEditor = {
         const ac = isNew ? '' : 'onchange="ClassEditor.autoSave()"';
 
         const superClasses = (c.subClassOf || []).filter(s => typeof s === 'string');
-        const restrictions = (c.subClassOf || []).filter(s => typeof s === 'object');
+        // Expressions non éditables (union, filler complexe…) : lecture seule, hors panneau
+        const restrictions  = (c.subClassOf || []).filter(s => typeof s === 'object' && !_isComplexExpr(s));
+        const complexSupers = (c.subClassOf || []).filter(_isComplexExpr);
+        const complexEquivs = (c.equivalentClass || []).filter(e => e && typeof e === 'object');
+        const _exprRow = (e, sym) => `
+            <div class="cls-list-item cls-expr-item" title="Expression OWL — lecture seule, conservée à l'enregistrement">
+                <span style="opacity:.6;font-family:monospace;margin-right:4px">${sym}</span>
+                <span class="cls-list-lbl" style="font-family:monospace">${_escapeHtml(_exprText(e))}</span>
+            </div>`;
         const labels   = c.annotations?.labels   || [];
         const comments = c.annotations?.comments || [];
 
@@ -1518,25 +1590,27 @@ const ClassEditor = {
         ].join('');
 
         // ── Superclass list ──
-        const superRows = superClasses.map(s => `
+        let superRows = superClasses.map(s => `
             <div class="cls-list-item" data-id="${s}">
                 <span class="cls-dot"></span>
                 <span class="cls-list-lbl" style="cursor:pointer"
                       onclick="APP.navigateTo('classes','${s}')">${_displayRefId(s)}</span>
                 <button class="btn-frame-del" onclick="ClassEditor.removeSuperClass('${s}')">✕</button>
             </div>`).join('');
+        superRows += complexSupers.map(e => _exprRow(e, '⊑')).join('');
         const availSupers = (APP.state.classes || [])
             .filter(c2 => c2.id !== c.id && !superClasses.includes(c2.id))
             .map(c2 => `<option value="${c2.id}">${c2.id}</option>`).join('');
 
         // ── Equivalent list ──
-        const equivRows = (c.equivalentClass || []).filter(e => typeof e === 'string').map(e => `
+        let equivRows = (c.equivalentClass || []).filter(e => typeof e === 'string').map(e => `
             <div class="cls-list-item" data-id="${e}">
                 <span class="cls-dot"></span>
                 <span class="cls-list-lbl" style="cursor:pointer"
                       onclick="APP.navigateTo('classes','${e}')">${_displayRefId(e)}</span>
                 <button class="btn-frame-del" onclick="ClassEditor.removeEquivalent('${e}')">✕</button>
             </div>`).join('');
+        equivRows += complexEquivs.map(e => _exprRow(e, '≡')).join('');
 
         // ── Disjoint list ──
         const disjRows = (c.disjointWith || []).map(d => `
@@ -1772,8 +1846,8 @@ const ClassEditor = {
         const cls = {
             id,
             annotations: { labels, comments, other },
-            subClassOf:  [...supers, ...restrictions],
-            equivalentClass: equiv,
+            subClassOf:  [...supers, ...restrictions, ..._keptComplex(originalId).sub],
+            equivalentClass: [...equiv, ..._keptComplex(originalId).eq],
             disjointWith: disj,
         };
         try {
@@ -1813,8 +1887,8 @@ const ClassEditor = {
         const cls = {
             id,
             annotations: { labels, comments, other },
-            subClassOf:  [...supers, ...restrictions],
-            equivalentClass: equiv,
+            subClassOf:  [...supers, ...restrictions, ..._keptComplex(originalId).sub],
+            equivalentClass: [...equiv, ..._keptComplex(originalId).eq],
             disjointWith: disj,
         };
 
@@ -2198,7 +2272,9 @@ const RestrictionEditor = {
                                  font-size:12px;color:var(--text)">${r.cardinality ?? ''}</span>`;
             } else {
                 const fv = r.filler || r.value || '';
-                if (fv) {
+                if (fv && typeof fv === 'object') {
+                    valueHtml = `<span style="color:var(--text);font-family:monospace">${_escapeHtml(_exprText(fv))}</span>`;
+                } else if (fv) {
                     const isFillerClass = (APP.state.classes     || []).some(c => c.id === fv);
                     const isFillerInd   = !isFillerClass && (APP.state.individuals || []).some(i => i.id === fv);
                     const fillerSection = isFillerClass ? 'classes' : isFillerInd ? 'individuals' : null;
@@ -2270,7 +2346,7 @@ const RestrictionEditor = {
 
     _desc(r) {
         let d = r.type || '';
-        if (r.filler)   d += ` ${_displayRefId(r.filler)}`;
+        if (r.filler)   d += ` ${_exprText(r.filler)}`;
         if (r.value  !== undefined) d += ` ${r.value}`;
         if (r.cardinality !== undefined) d += ` ${r.cardinality}`;
         return d;
@@ -4039,6 +4115,7 @@ const OPEditor = {
                 <div class="cls-frame cls-frame-half">
                     <div class="cls-frame-bar">
                         <span class="cls-frame-tag">Domain(s)</span>
+                        ${_domModeSel('op-domain-mode', !!p.domainUnion, 'OPEditor')}
                         <button class="btn-ftool" onclick="OPEditor.showPicker('op-domain-picker')" title="Add domain">${ico}</button>
                     </div>
                     <div class="cls-frame-body" id="op-domain-list">
@@ -4051,6 +4128,7 @@ const OPEditor = {
                 <div class="cls-frame cls-frame-half">
                     <div class="cls-frame-bar">
                         <span class="cls-frame-tag">Range(s)</span>
+                        ${_domModeSel('op-range-mode', !!p.rangeUnion, 'OPEditor')}
                         <button class="btn-ftool" onclick="OPEditor.showPicker('op-range-picker')" title="Add range">${ico}</button>
                     </div>
                     <div class="cls-frame-body" id="op-range-list">
@@ -4265,7 +4343,8 @@ const OPEditor = {
             .filter(c => c.length >= 2)
             .map(chain => ({ chain }));
         return { id, annotations: { labels, comments, other },
-            domain, range, subPropertyOf, inverseOf: inverseOf || null,
+            domain, range, domainUnion: _modeSel('op-domain-mode'), rangeUnion: _modeSel('op-range-mode'),
+            subPropertyOf, inverseOf: inverseOf || null,
             characteristics: chars, propertyChainAxiom };
     },
 
@@ -5036,6 +5115,7 @@ const DPEditor = {
                 <div class="cls-frame cls-frame-half">
                     <div class="cls-frame-bar">
                         <span class="cls-frame-tag">Domain(s)</span>
+                        ${_domModeSel('dp-domain-mode', !!p.domainUnion, 'DPEditor')}
                         <button class="btn-ftool" onclick="DPEditor.showPicker('dp-domain-picker')" title="Add domain">${ico}</button>
                     </div>
                     <div class="cls-frame-body" id="dp-domain-list">
@@ -5141,7 +5221,7 @@ const DPEditor = {
         const range   = _collectList('dp-range-list');
         const subPropertyOf = _collectList('dp-sub-list');
         return { id, annotations: { labels, comments, other },
-            domain, range, subPropertyOf,
+            domain, range, domainUnion: _modeSel('dp-domain-mode'), subPropertyOf,
             functional: document.getElementById('dp-functional')?.checked || false };
     },
 
@@ -5980,7 +6060,7 @@ const IndividualEditor = {
                 const kind = (APP.state.object_properties || []).some(p => p.id === r.property) ? 'op' : 'dp';
                 map.set(r.property, { kind, fillers: new Set(), _fromClass: fromClass || null });
             }
-            if (r.filler && (r.type === 'someValuesFrom' || r.type === 'allValuesFrom'))
+            if (typeof r.filler === 'string' && (r.type === 'someValuesFrom' || r.type === 'allValuesFrom'))
                 map.get(r.property).fillers.add(r.filler);
         };
 

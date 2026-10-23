@@ -571,6 +571,8 @@ class TripleStore:
             # 4. Repli : extraction du nom local
             return self._local_name(uri_str_val, base)
 
+        import_warnings: list = []
+
         # ── Helper: parse an owl:Restriction BNode → Restriction object ──
         def _parse_restriction(node):
             """Parse a BNode that is an owl:Restriction into a Restriction model object.
@@ -586,10 +588,14 @@ class TripleStore:
                 return None
 
             def _filler(rdf_node):
-                """Resolve a filler node to a local id string (URIRef only)."""
-                if isinstance(rdf_node, URIRef):
-                    return _lid(str(rdf_node))
-                return None
+                """Filler : classe nommée (id) ou expression de classe anonyme (#15)."""
+                if rdf_node is None:
+                    return None
+                f = _parse_class_expr(rdf_node)
+                if f is None:
+                    import_warnings.append(
+                        f"Restriction sur « {prop_id} » : contenu non pris en charge, ignoré.")
+                return f
 
             # someValuesFrom
             sv = next(g.objects(node, OWL.someValuesFrom), None)
@@ -633,6 +639,64 @@ class TripleStore:
 
             return None
 
+        # ── Expressions de classe (récursif) : union / intersection / complément /
+        #    restriction. None = non représentable (signalé par l'appelant).
+        def _bool_expr(subject):
+            for pred, cls_ in ((OWL.unionOf, UnionOf), (OWL.intersectionOf, IntersectionOf)):
+                head = g.value(subject, pred)
+                if head is not None:
+                    try:
+                        ops = [_parse_class_expr(m) for m in Collection(g, head)]
+                    except Exception:
+                        return None
+                    if not ops or any(o is None for o in ops):
+                        return None
+                    return cls_(operands=ops)
+            comp = g.value(subject, OWL.complementOf)
+            if comp is not None:
+                op = _parse_class_expr(comp)
+                return ComplementOf(operand=op) if op is not None else None
+            return None
+
+        def _parse_class_expr(node):
+            if isinstance(node, URIRef):
+                return _lid(str(node)) or None
+            if not isinstance(node, BNode):
+                return None
+            e = _bool_expr(node)
+            return e if e is not None else _parse_restriction(node)
+
+        def _build_class(cls_uri, local):
+            labels, comments = _collect_labels(cls_uri)
+            owl_cls = OWLClass(id=local)
+            owl_cls.annotations.labels   = labels
+            owl_cls.annotations.comments = comments
+            owl_cls.annotations.other    = _collect_other(cls_uri)
+            for pred, target in ((RDFS.subClassOf, owl_cls.subClassOf),
+                                 (OWL.equivalentClass, owl_cls.equivalentClass)):
+                for node in g.objects(cls_uri, pred):
+                    e = _parse_class_expr(node)
+                    if e is None:
+                        import_warnings.append(
+                            f"Classe « {local} » : expression de classe non prise en charge, ignorée.")
+                    else:
+                        target.append(e)
+            # Classe nommée définie directement par union/intersection/complément :
+            # X owl:unionOf L  ≡  X owl:equivalentClass [ owl:unionOf L ]
+            e = _bool_expr(cls_uri)
+            if e is not None:
+                owl_cls.equivalentClass.append(e)
+            elif any(g.value(cls_uri, p) is not None
+                     for p in (OWL.unionOf, OWL.intersectionOf, OWL.complementOf)):
+                import_warnings.append(
+                    f"Classe « {local} » : définition booléenne non prise en charge, ignorée.")
+            for dj in g.objects(cls_uri, OWL.disjointWith):
+                if isinstance(dj, URIRef):
+                    dj_local = _lid(str(dj))
+                    if dj_local:
+                        owl_cls.disjointWith.append(dj_local)
+            onto.classes.append(owl_cls)
+
         # ── Classes: owl:Class + rdfs:Class ─────────────────────
         seen_cls = set()
         for cls_type in (OWL.Class, RDFS.Class):
@@ -643,54 +707,54 @@ class TripleStore:
                 if not local:
                     continue
                 seen_cls.add(str(cls_uri))
-                labels, comments = _collect_labels(cls_uri)
-                owl_cls = OWLClass(id=local)
-                owl_cls.annotations.labels   = labels
-                owl_cls.annotations.comments = comments
-                owl_cls.annotations.other    = _collect_other(cls_uri)
-                for sup in g.objects(cls_uri, RDFS.subClassOf):
-                    if isinstance(sup, URIRef):
-                        sup_local = _lid(str(sup))
-                        if sup_local:
-                            owl_cls.subClassOf.append(sup_local)
-                    elif isinstance(sup, BNode):
-                        restr = _parse_restriction(sup)
-                        if restr is not None:
-                            owl_cls.subClassOf.append(restr)
-                for dj in g.objects(cls_uri, OWL.disjointWith):
-                    if isinstance(dj, URIRef):
-                        dj_local = _lid(str(dj))
-                        if dj_local:
-                            owl_cls.disjointWith.append(dj_local)
-                # equivalentClass : classe nommée OU restriction anonyme (ex. ≡ ∃hasPart.Part)
-                for eq in g.objects(cls_uri, OWL.equivalentClass):
-                    if isinstance(eq, URIRef):
-                        eq_local = _lid(str(eq))
-                        if eq_local:
-                            owl_cls.equivalentClass.append(eq_local)
-                    elif isinstance(eq, BNode):
-                        restr = _parse_restriction(eq)
-                        if restr is not None:
-                            owl_cls.equivalentClass.append(restr)
-                onto.classes.append(owl_cls)
+                _build_class(cls_uri, local)
 
-        # Ids locaux d'un noeud domain/range : classe nommee, ou membres d'une
-        # expression owl:unionOf / owl:intersectionOf (noeud blanc), recursif.
-        def _class_ids(node):
-            if isinstance(node, URIRef):
-                cid = _lid(str(node))
-                return [cid] if cid else []
-            out = []
-            for coll_pred in (OWL.unionOf, OWL.intersectionOf):
-                head = g.value(node, coll_pred)
-                if head is not None:
-                    try:
-                        for m in Collection(g, head):
-                            out.extend(_class_ids(m))
-                    except Exception:
-                        pass
-                    break
-            return out
+        # #14 — classe non déclarée ici mais porteuse d'axiomes (ex. classe d'une
+        # ontologie importée reprise en <rdf:Description>, forme produite par Protégé).
+        _non_class = {OWL.ObjectProperty, OWL.DatatypeProperty, OWL.AnnotationProperty,
+                      RDF.Property, OWL.NamedIndividual, OWL.Ontology}
+        for pred in (RDFS.subClassOf, OWL.equivalentClass, OWL.disjointWith,
+                     OWL.unionOf, OWL.intersectionOf, OWL.complementOf):
+            for cls_uri in list(g.subjects(pred, None)):
+                if not isinstance(cls_uri, URIRef) or str(cls_uri) in seen_cls:
+                    continue
+                if set(g.objects(cls_uri, RDF.type)) & _non_class:
+                    continue
+                local = _lid(str(cls_uri))
+                if not local:
+                    continue
+                seen_cls.add(str(cls_uri))
+                _build_class(cls_uri, local)
+
+        # Domaine / portée (#10) : plusieurs rdfs:domain = intersection (sémantique OWL) ;
+        # un seul rdfs:domain owl:unionOf de classes nommées → union. Ce qui n'est pas
+        # représentable est signalé et ignoré : une perte visible plutôt qu'un domaine faux.
+        def _read_dom_rng(prop_uri, pred, what):
+            pid = _lid(str(prop_uri))
+            parsed = []
+            for node in g.objects(prop_uri, pred):
+                e = _parse_class_expr(node)
+                if isinstance(e, str):
+                    parsed.append(("named", [e]))
+                elif (isinstance(e, (UnionOf, IntersectionOf))
+                      and all(isinstance(o, str) for o in e.operands)):
+                    parsed.append(("union" if isinstance(e, UnionOf) else "inter", list(e.operands)))
+                else:
+                    import_warnings.append(
+                        f"Propriété « {pid} » : {what} exprimé par une expression non prise en charge, ignoré.")
+            unions = [m for k, m in parsed if k == "union"]
+            if len(parsed) == 1 and unions:
+                return list(dict.fromkeys(unions[0])), True
+            if unions:
+                import_warnings.append(
+                    f"Propriété « {pid} » : {what} en union combiné à d'autres {what}s, union ignorée.")
+            ids = []
+            for k, members in parsed:
+                if k != "union":
+                    for m in members:
+                        if m not in ids:
+                            ids.append(m)
+            return ids, False
 
         # ── Object Properties: owl:ObjectProperty ───────────────
         seen_op = set()
@@ -706,12 +770,8 @@ class TripleStore:
             prop.annotations.labels   = labels
             prop.annotations.comments = comments
             prop.annotations.other    = _collect_other(prop_uri)
-            for d in g.objects(prop_uri, RDFS.domain):
-                for dl in _class_ids(d):
-                    if dl not in prop.domain: prop.domain.append(dl)
-            for r in g.objects(prop_uri, RDFS.range):
-                for rl in _class_ids(r):
-                    if rl not in prop.range: prop.range.append(rl)
+            prop.domain, prop.domainUnion = _read_dom_rng(prop_uri, RDFS.domain, "domaine")
+            prop.range,  prop.rangeUnion  = _read_dom_rng(prop_uri, RDFS.range,  "portée")
             for sp in g.objects(prop_uri, RDFS.subPropertyOf):
                 if isinstance(sp, URIRef):
                     sl = _lid(str(sp))
@@ -760,12 +820,11 @@ class TripleStore:
             prop.annotations.labels   = labels
             prop.annotations.comments = comments
             prop.annotations.other    = _collect_other(prop_uri)
-            for d in g.objects(prop_uri, RDFS.domain):
-                for dl in _class_ids(d):
-                    if dl not in prop.domain: prop.domain.append(dl)
+            prop.domain, prop.domainUnion = _read_dom_rng(prop_uri, RDFS.domain, "domaine")
             for r in g.objects(prop_uri, RDFS.range):
-                for rl in _class_ids(r):
-                    if rl not in prop.range: prop.range.append(rl)
+                if isinstance(r, URIRef):
+                    rl = _lid(str(r))
+                    if rl and rl not in prop.range: prop.range.append(rl)
                 # else : owl:DataRange/oneOf (datatype énuméré) — non modélisé,
                 #        on ignore le nœud anonyme (évitait un id illisible 'Nxxxx')
             for sp in g.objects(prop_uri, RDFS.subPropertyOf):
@@ -792,9 +851,7 @@ class TripleStore:
                 prop.annotations.labels   = labels
                 prop.annotations.comments = comments
                 prop.annotations.other    = _collect_other(prop_uri)
-                for d in g.objects(prop_uri, RDFS.domain):
-                    for dl in _class_ids(d):
-                        if dl not in prop.domain: prop.domain.append(dl)
+                prop.domain, prop.domainUnion = _read_dom_rng(prop_uri, RDFS.domain, "domaine")
                 for r in ranges:
                     rl = str(r).replace(str(XSD), "xsd:") if isinstance(r, URIRef) else ""
                     if rl: prop.range.append(rl)
@@ -808,12 +865,8 @@ class TripleStore:
                 prop.annotations.labels   = labels
                 prop.annotations.comments = comments
                 prop.annotations.other    = _collect_other(prop_uri)
-                for d in g.objects(prop_uri, RDFS.domain):
-                    for dl in _class_ids(d):
-                        if dl not in prop.domain: prop.domain.append(dl)
-                for r in ranges:
-                    for rl in _class_ids(r):
-                        if rl not in prop.range: prop.range.append(rl)
+                prop.domain, prop.domainUnion = _read_dom_rng(prop_uri, RDFS.domain, "domaine")
+                prop.range,  prop.rangeUnion  = _read_dom_rng(prop_uri, RDFS.range,  "portée")
                 for sp in g.objects(prop_uri, RDFS.subPropertyOf):
                     if isinstance(sp, URIRef):
                         sl = _lid(str(sp))
@@ -956,6 +1009,21 @@ class TripleStore:
                     imp_uris.append(u)
         onto.imports = imp_uris
 
+        # Expressions de classe anonymes orphelines (aucun lien entrant, aucun axiome) :
+        # vides de sens (aucune inférence), non conservées — mais signalées.
+        _orph = 0
+        for pred in (OWL.unionOf, OWL.intersectionOf, OWL.complementOf):
+            for bn in g.subjects(pred, None):
+                if (isinstance(bn, BNode) and next(g.subject_predicates(bn), None) is None
+                        and not ({p for p, _ in g.predicate_objects(bn)} - {RDF.type, pred})):
+                    _orph += 1
+        if _orph:
+            import_warnings.append(
+                f"{_orph} expression(s) de classe anonyme(s) orpheline(s) (aucun axiome) "
+                f"ignorée(s) — sans effet sémantique.")
+        onto.import_warnings = list(dict.fromkeys(import_warnings))
+        for w in onto.import_warnings:
+            print(f"[import] {w}", flush=True)
         self._ontology = onto
         # Enregistrer dans le registre et sauver le fichier
         self.register(name, host_path, uri, prefix)
@@ -1125,26 +1193,36 @@ class TripleStore:
             g.add((bn, OWL.onProperty, iri(expr.property)))
             if isinstance(expr, SomeValuesFrom):
                 if expr.filler:
-                    g.add((bn, OWL.someValuesFrom, iri(expr.filler)))
+                    g.add((bn, OWL.someValuesFrom, class_expr_node(expr.filler)))
             elif isinstance(expr, AllValuesFrom):
                 if expr.filler:
-                    g.add((bn, OWL.allValuesFrom, iri(expr.filler)))
+                    g.add((bn, OWL.allValuesFrom, class_expr_node(expr.filler)))
             elif isinstance(expr, HasValue):
                 if expr.value:
                     g.add((bn, OWL.hasValue, iri(expr.value)))
             elif isinstance(expr, ExactCardinality):
                 g.add((bn, OWL.cardinality, Literal(expr.cardinality, datatype=XSD.nonNegativeInteger)))
                 if expr.filler:
-                    g.add((bn, OWL.onClass, iri(expr.filler)))
+                    g.add((bn, OWL.onClass, class_expr_node(expr.filler)))
             elif isinstance(expr, MinCardinality):
                 g.add((bn, OWL.minCardinality, Literal(expr.cardinality, datatype=XSD.nonNegativeInteger)))
                 if expr.filler:
-                    g.add((bn, OWL.onClass, iri(expr.filler)))
+                    g.add((bn, OWL.onClass, class_expr_node(expr.filler)))
             elif isinstance(expr, MaxCardinality):
                 g.add((bn, OWL.maxCardinality, Literal(expr.cardinality, datatype=XSD.nonNegativeInteger)))
                 if expr.filler:
-                    g.add((bn, OWL.onClass, iri(expr.filler)))
+                    g.add((bn, OWL.onClass, class_expr_node(expr.filler)))
             return bn
+
+        def add_dom_rng(subj, pred, ids, is_union, to_node):
+            """Plusieurs classes : intersection (un triplet par classe, sémantique OWL)
+            ou, si is_union, un seul nœud owl:unionOf (#10)."""
+            ids = [i for i in (ids or []) if i]
+            if is_union and len(ids) > 1:
+                g.add((subj, pred, class_expr_node(UnionOf(operands=ids))))
+            else:
+                for i in ids:
+                    g.add((subj, pred, to_node(i)))
 
         for cls in onto.classes:
             uri_ = iri(cls.id)
@@ -1163,10 +1241,8 @@ class TripleStore:
             uri_ = iri(prop.id)
             g.add((uri_, RDF.type, OWL.ObjectProperty))
             add_anns(uri_, prop.annotations)
-            for d in prop.domain:
-                g.add((uri_, RDFS.domain, iri(d)))
-            for r in prop.range:
-                g.add((uri_, RDFS.range, iri(r)))
+            add_dom_rng(uri_, RDFS.domain, prop.domain, getattr(prop, "domainUnion", False), iri)
+            add_dom_rng(uri_, RDFS.range, prop.range, getattr(prop, "rangeUnion", False), iri)
             for sp in prop.subPropertyOf:
                 g.add((uri_, RDFS.subPropertyOf, iri(sp)))
             if prop.inverseOf:
@@ -1189,8 +1265,7 @@ class TripleStore:
             uri_ = iri(prop.id)
             g.add((uri_, RDF.type, OWL.DatatypeProperty))
             add_anns(uri_, prop.annotations)
-            for d in prop.domain:
-                g.add((uri_, RDFS.domain, iri(d)))
+            add_dom_rng(uri_, RDFS.domain, prop.domain, getattr(prop, "domainUnion", False), iri)
             for r in prop.range:
                 g.add((uri_, RDFS.range, dt_iri(r)))
             for sp in prop.subPropertyOf:

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Test de non-régression aller-retour import → export (cas A à D de Cyril).
+"""Test de non-régression aller-retour import → export (cas A à D de Cyril + cas E).
 
 Usage (instance SWOWL lancée) :
     python tests/roundtrip_cyril.py [http://localhost:8001]
@@ -78,6 +78,16 @@ def main():
         okD = (isinstance(fD, BNode) and members(g, fD, OWL.unionOf)
                == {URIRef(MM + "Alpha"), URIRef(MM + "Beta")})
         checks.append(("D  allValuesFrom union(Alpha, Beta)  [#15]", okD, fD))
+        # E — équivalence = intersection contenant une restriction (#9)
+        okE = False
+        for eq in g.objects(URIRef(MM + "Gamma"), OWL.equivalentClass):
+            ops = members(g, eq, OWL.intersectionOf) if isinstance(eq, BNode) else set()
+            rs = [o for o in ops if isinstance(o, BNode)]
+            okE = (URIRef(MM + "Alpha") in ops and len(rs) == 1
+                   and (rs[0], OWL.onProperty, URIRef(MM + "hasPart")) in g
+                   and (rs[0], OWL.someValuesFrom, URIRef(MM + "Beta")) in g)
+        checks.append(("E  Gamma ≡ Alpha ⊓ ∃hasPart.Beta  [#9]", okE,
+                       list(g.objects(URIRef(MM + "Gamma"), OWL.equivalentClass))))
         # Aucun IRI à préfixe concaténé (#12)
         bad = sorted({str(t) for tr in g for t in tr if isinstance(t, URIRef) and "#mi:" in str(t)})
         checks.append(("   aucun IRI « …#mi:… »  [#12]", not bad, bad))

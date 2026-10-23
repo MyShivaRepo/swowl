@@ -130,15 +130,13 @@ def _cascade_rename_class(onto: OWLOntology, old_id: str, new_id: str) -> None:
     def rename_expr(expr):
         if isinstance(expr, str):
             return new_id if expr == old_id else expr
-        # Restrictions avec filler (SomeValuesFrom, AllValuesFrom, cardinalités)
-        if hasattr(expr, 'filler') and expr.filler == old_id:
-            expr.filler = new_id
-        # Expressions booléennes (UnionOf, IntersectionOf) avec opérands
+        # Récursif : fillers et opérandes peuvent être des expressions imbriquées
+        if getattr(expr, 'filler', None) is not None:
+            expr.filler = rename_expr(expr.filler)
         if hasattr(expr, 'operands'):
-            expr.operands = [new_id if op == old_id else op for op in expr.operands]
-        # ComplementOf
-        if hasattr(expr, 'operand') and expr.operand == old_id:
-            expr.operand = new_id
+            expr.operands = [rename_expr(op) for op in expr.operands]
+        if getattr(expr, 'operand', None) is not None:
+            expr.operand = rename_expr(expr.operand)
         return expr
 
     for cls in onto.classes:
@@ -166,8 +164,16 @@ def _cascade_rename_property(onto: OWLOntology, old_id: str, new_id: str) -> Non
 
     # Restrictions dans les classes
     def rename_in_expr(expr):
+        if isinstance(expr, str):
+            return expr
         if hasattr(expr, 'property') and expr.property == old_id:
             expr.property = new_id
+        if getattr(expr, 'filler', None) is not None:
+            expr.filler = rename_in_expr(expr.filler)
+        if hasattr(expr, 'operands'):
+            expr.operands = [rename_in_expr(op) for op in expr.operands]
+        if getattr(expr, 'operand', None) is not None:
+            expr.operand = rename_in_expr(expr.operand)
         return expr
 
     for cls in onto.classes:
@@ -266,6 +272,9 @@ def _purge_orphan_restrictions(onto: OWLOntology) -> bool:
             r for r in (c.subClassOf or [])
             if isinstance(r, str) or getattr(r, 'property', None) is None
             or getattr(r, 'property', None) in known
+            # « pfx:local » = propriété d'un vocabulaire externe/importé (un id local
+            # est un NCName sans « : ») → jamais orpheline (#14)
+            or ":" in (getattr(r, 'property', None) or "")
         ]
         if len(kept) != len(c.subClassOf or []):
             removed = True
@@ -1885,6 +1894,11 @@ def update_object_property(prop_id: str, prop: OWLObjectProperty):
     idx = next((i for i, p in enumerate(onto.object_properties) if p.id == prop_id), None)
     if idx is None:
         raise HTTPException(404, f"ObjectProperty '{prop_id}' not found")
+    # domainUnion / rangeUnion absents de la requête (ancienne IHM, agent…) :
+    # conserver la valeur existante plutôt que de retomber silencieusement sur False.
+    for _f in ("domainUnion", "rangeUnion"):
+        if _f not in prop.model_fields_set:
+            setattr(prop, _f, getattr(onto.object_properties[idx], _f, False))
     if prop.id != prop_id:
         if any(p.id == prop.id for i2, p in enumerate(onto.object_properties) if i2 != idx):
             raise HTTPException(409, f"ObjectProperty '{prop.id}' already exists")
@@ -1979,6 +1993,11 @@ def update_datatype_property(prop_id: str, prop: OWLDatatypeProperty):
     idx = next((i for i, p in enumerate(onto.datatype_properties) if p.id == prop_id), None)
     if idx is None:
         raise HTTPException(404, f"DatatypeProperty '{prop_id}' not found")
+    # domainUnion / rangeUnion absents de la requête (ancienne IHM, agent…) :
+    # conserver la valeur existante plutôt que de retomber silencieusement sur False.
+    for _f in ("domainUnion",):
+        if _f not in prop.model_fields_set:
+            setattr(prop, _f, getattr(onto.datatype_properties[idx], _f, False))
     if prop.id != prop_id:
         if any(p.id == prop.id for i2, p in enumerate(onto.datatype_properties) if i2 != idx):
             raise HTTPException(409, f"DatatypeProperty '{prop.id}' already exists")
