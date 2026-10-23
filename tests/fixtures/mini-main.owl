@@ -1,0 +1,68 @@
+<?xml version="1.0"?>
+<!-- Cas de test minimal fourni par Cyril (issues #10, #12, #14, #15). -->
+<rdf:RDF
+    xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+    xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
+    xmlns:owl="http://www.w3.org/2002/07/owl#"
+    xmlns:mi="http://example.org/mini-imported#"
+    xml:base="http://example.org/mini-main">
+
+  <owl:Ontology rdf:about="http://example.org/mini-main">
+    <owl:imports rdf:resource="http://example.org/mini-imported"/>
+  </owl:Ontology>
+
+  <owl:Class rdf:ID="Alpha"/>
+  <owl:Class rdf:ID="Beta"/>
+
+  <!-- CAS A : domaine exprime par une union. Attendu : Alpha ou Beta. -->
+  <owl:ObjectProperty rdf:ID="hasPart">
+    <rdfs:domain>
+      <owl:Class>
+        <owl:unionOf rdf:parseType="Collection">
+          <owl:Class rdf:about="#Alpha"/>
+          <owl:Class rdf:about="#Beta"/>
+        </owl:unionOf>
+      </owl:Class>
+    </rdfs:domain>
+  </owl:ObjectProperty>
+
+  <!-- CAS B : restriction renvoyant vers une classe de l ontologie importee. -->
+  <owl:ObjectProperty rdf:ID="measuredIn"/>
+  <owl:Class rdf:about="#Alpha">
+    <rdfs:subClassOf>
+      <owl:Restriction>
+        <owl:onProperty rdf:resource="#measuredIn"/>
+        <owl:allValuesFrom rdf:resource="http://example.org/mini-imported#Unit"/>
+      </owl:Restriction>
+    </rdfs:subClassOf>
+  </owl:Class>
+
+  <!-- CAS C : axiome pose sur une classe de l ontologie importee (forme Protege). -->
+  <rdf:Description rdf:about="http://example.org/mini-imported#Quantity">
+    <rdfs:subClassOf>
+      <owl:Restriction>
+        <owl:onProperty rdf:resource="http://example.org/mini-imported#quantityOf"/>
+        <owl:allValuesFrom rdf:resource="http://example.org/mini-imported#QuantitativeCharacteristic"/>
+      </owl:Restriction>
+    </rdfs:subClassOf>
+  </rdf:Description>
+
+  <!-- CAS D : restriction dont le contenu est une union. -->
+  <owl:ObjectProperty rdf:ID="relatesTo"/>
+  <owl:Class rdf:about="#Beta">
+    <rdfs:subClassOf>
+      <owl:Restriction>
+        <owl:onProperty rdf:resource="#relatesTo"/>
+        <owl:allValuesFrom>
+          <owl:Class>
+            <owl:unionOf rdf:parseType="Collection">
+              <owl:Class rdf:about="#Alpha"/>
+              <owl:Class rdf:about="#Beta"/>
+            </owl:unionOf>
+          </owl:Class>
+        </owl:allValuesFrom>
+      </owl:Restriction>
+    </rdfs:subClassOf>
+  </owl:Class>
+
+</rdf:RDF>

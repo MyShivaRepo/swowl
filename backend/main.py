@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 import logging
 from contextlib import asynccontextmanager
-from typing import Optional
+from typing import Literal, Optional
 
 from fastapi import FastAPI, HTTPException, UploadFile, File, Query, Request, Body
 from fastapi.middleware.cors import CORSMiddleware
@@ -51,7 +51,9 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    # Origines locales uniquement (#17) : l'API expose /api/fs/browse, il ne faut pas
+    # qu'une page web tierce ouverte dans le navigateur puisse l'interroger.
+    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$",
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -1597,7 +1599,7 @@ def import_from_path(req: ImportFromPathRequest):
 # ── Export ───────────────────────────────────────────────────
 
 @app.get("/api/ontologies/{name}/export", tags=["Ontologie"])
-def export_ontology_by_name(name: str, fmt: str = Query("owl", enum=["owl", "ttl", "jsonld", "swrl", "sword"])):
+def export_ontology_by_name(name: str, fmt: Literal["owl", "ttl", "jsonld", "swrl", "sword"] = Query("owl")):
     """Exporte une ontologie enregistrée par son nom, sans modifier l'état connecté."""
     current = store.get()
     entry = store._registry.get(name)
@@ -1645,7 +1647,7 @@ def export_ontology_by_name(name: str, fmt: str = Query("owl", enum=["owl", "ttl
 
 
 @app.get("/api/ontologies/export", tags=["Ontologie"])
-def export_ontology(fmt: str = Query("owl", enum=["owl", "ttl", "jsonld"])):
+def export_ontology(fmt: Literal["owl", "ttl", "jsonld"] = Query("owl")):
     require_onto()
     if fmt == "owl":
         data = export_owl_xml(store)

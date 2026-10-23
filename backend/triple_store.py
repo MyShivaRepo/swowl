@@ -1041,6 +1041,24 @@ class TripleStore:
         except Exception:
             imported_ns = {}
 
+        # Préfixes déclarés (#12) : un id « pfx:local » produit à l'import (_lid, étape 3)
+        # doit être re-développé vers le vrai IRI, et non concaténé au namespace local
+        # (« …#mi:Unit », « …#dcterms:isPartOf »).
+        _pfx_ns: dict = {"dcterms": str(DCTERMS), "dc": str(DC),
+                         "vann": str(VANN), "skos": str(SKOS)}
+        for d in (getattr(onto, "ns_prefixes", None) or []):
+            p = (d.get("prefix") if isinstance(d, dict) else getattr(d, "prefix", "")) or ""
+            n = (d.get("namespace") if isinstance(d, dict) else getattr(d, "namespace", "")) or ""
+            if p.strip() and n.strip():
+                _pfx_ns[p.strip()] = n.strip()
+        for imp_uri, lab in (onto.import_labels or {}).items():
+            p = (lab or {}).get("prefix")
+            if p and p not in _pfx_ns:
+                _pfx_ns[p] = imp_uri
+        for p, n in _pfx_ns.items():
+            if p and p != onto.prefix:
+                g.bind(p, Namespace(n if n.endswith(("#", "/")) else n + "#"))
+
         def iri(local_id: str) -> URIRef:
             if local_id.startswith("http"):
                 return URIRef(local_id)
@@ -1049,6 +1067,11 @@ class TripleStore:
             for pfx, ns in _EXT_PREFIX_NS.items():
                 if local_id.startswith(pfx):
                     return ns[local_id[len(pfx):]]
+            if ":" in local_id:
+                pfx, _, rest = local_id.partition(":")
+                ns = _pfx_ns.get(pfx)
+                if ns and rest:
+                    return URIRef(ns + rest) if ns.endswith(("#", "/")) else URIRef(ns + "#" + rest)
             # Entité importée → namespace du schéma source (et non celui des données).
             if local_id in imported_ns:
                 return URIRef(imported_ns[local_id] + local_id)
