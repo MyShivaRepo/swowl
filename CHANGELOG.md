@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [1.2.2] — 2026-10-23
 
 ### Fixed
-- **Qualified cardinalities** (#18): a cardinality restriction with a filler is exported
+- **Qualified cardinalities** ([#18](https://github.com/MyShivaRepo/swowl/issues/18)): a cardinality restriction with a filler is exported
   with `owl:qualifiedCardinality` / `owl:minQualifiedCardinality` /
   `owl:maxQualifiedCardinality` + `owl:onClass` — or `owl:onDataRange` for a
   DatatypeProperty — instead of `owl:cardinality` + `owl:onClass`, which is not valid
@@ -19,12 +19,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [1.2.1] — 2026-10-23
 
 ### Fixed
-- **"/" namespaces** (#11): the namespace separator actually used by the entities
+- **"/" namespaces** ([#11](https://github.com/MyShivaRepo/swowl/issues/11)): the namespace separator actually used by the entities
   (`…/onto#Pair` or `…/onto/Pair`) is detected at import and kept — together with the
   exact `owl:Ontology` IRI — instead of forcing `#`, which rewrote every IRI after a
   round-trip. Export, references to imported entities and the *Full IRI* shown in the
   editors follow it. Ontologies imported before 1.2.1 with "/" IRIs must be re-imported.
-- **Property chains in `/api/inferences`** (#13): chains are evaluated over a saturated
+- **Property chains in `/api/inferences`** ([#13](https://github.com/MyShivaRepo/swowl/issues/13)): chains are evaluated over a saturated
   fact base (inverse, symmetric, sub-property, transitive and chain inferences, to a
   fixed point), so a chain can go through an inferred fact — e.g. the inverse of an
   asserted property — as the individual form already did. Asserted facts are no longer
@@ -37,17 +37,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [1.2.0] — 2026-10-23
 
 ### Fixed
-- **Union domains and ranges** (#10): an `owl:unionOf` domain is kept as a union and
+- **Union domains and ranges** ([#10](https://github.com/MyShivaRepo/swowl/issues/10)): an `owl:unionOf` domain is kept as a union and
   exported as a single `rdfs:domain [ owl:unionOf … ]`. 1.1.1 flattened it into several
   `rdfs:domain` triples, which OWL reads as an **intersection** — the meaning was inverted.
   Several plain domain classes still mean intersection (OWL default); a **∩ / ∪ selector**
   in the property editor lets you choose.
-- **Restriction contents that are class expressions** (#15): `∀ relatesTo.(Alpha ⊔ Beta)`
+- **Restriction contents that are class expressions** ([#15](https://github.com/MyShivaRepo/swowl/issues/15)): `∀ relatesTo.(Alpha ⊔ Beta)`
   is no longer emptied into a restriction that holds for anything.
-- **Equivalences built from expressions** (#9): `Artefact ≡ Pair ⊓ ∃outputOf.Activity` is
+- **Equivalences built from expressions** ([#9](https://github.com/MyShivaRepo/swowl/issues/9)): `Artefact ≡ Pair ⊓ ∃outputOf.Activity` is
   imported, displayed and exported; a named class defined directly by `owl:unionOf`
   becomes an equivalence.
-- **Axioms on imported classes** (#14): kept under their real IRI, including the
+- **Axioms on imported classes** ([#14](https://github.com/MyShivaRepo/swowl/issues/14)): kept under their real IRI, including the
   `<rdf:Description>` form produced by Protégé.
 - **Class editor**: complex expressions are shown read-only and **preserved on save**
   (autosave used to wipe expressions and imported equivalence restrictions).
@@ -64,15 +64,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Security
 - **CORS restricted to local origins** (`localhost`, `127.0.0.1`, `[::1]`): the API
   exposes `/api/fs/browse`, which any web page open in the browser could previously
-  query to list the local file system (#17).
+  query to list the local file system ([#17](https://github.com/MyShivaRepo/swowl/issues/17)).
 
 ### Fixed
 - **Installation on Python 3.13 / 3.14**: dependencies moved to modern lower bounds
   capped at major versions (pydantic ≥ 2.12 ships wheels up to 3.14); `Query(enum=…)`,
-  removed in FastAPI 0.155, replaced by `Literal[…]` (#16).
+  removed in FastAPI 0.155, replaced by `Literal[…]` ([#16](https://github.com/MyShivaRepo/swowl/issues/16)).
 - **Export of prefixed identifiers**: references to imported or external vocabularies
   (`mi:Unit`, `dcterms:isPartOf`) are expanded back to their real IRI instead of being
-  glued to the ontology namespace (`…#mi:Unit`) (#12).
+  glued to the ontology namespace (`…#mi:Unit`) ([#12](https://github.com/MyShivaRepo/swowl/issues/12)).
 
 ### Added
 - `tests/`: minimal round-trip fixtures (contributed by Cyril) and a regression script
@@ -80,8 +80,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Known issues
 - Union domains / ranges are still written as several `rdfs:domain` triples, which OWL
-  reads as an **intersection** (#10); restriction fillers that are class expressions are
-  emptied (#15); axioms on imported classes may be lost (#14). Planned for **1.2.0**.
+  reads as an **intersection** ([#10](https://github.com/MyShivaRepo/swowl/issues/10)); restriction fillers that are class expressions are
+  emptied ([#15](https://github.com/MyShivaRepo/swowl/issues/15)); axioms on imported classes may be lost ([#14](https://github.com/MyShivaRepo/swowl/issues/14)). Planned for **1.2.0**.
 
 ## [1.1.1] — 2026-10-22
 
@@ -90,8 +90,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   RDF round-trip, and inference materialization.
 - **Native Python (venv) run mode** — the whole app runs in a single FastAPI
   process (serving the API and the static frontend); no Docker or nginx required.
-- **owl:Ontology** annotations tab in Settings, kept in sync with the System Registry.
-- **Unified annotation value type** — language / datatype / IRI selector (issues #6 & #8).
+- **Fetch Ontologies**: more vocabularies (VANN, CIDOC-CRM, RiC-O…), selectable
+  download, *Transversal* / *Vertical* sections; system ontologies can be removed
+  from the registry ([#2](https://github.com/MyShivaRepo/swowl/issues/2), [#7](https://github.com/MyShivaRepo/swowl/issues/7)).
+- **owl:Ontology** annotations tab in Settings, kept in sync with the System Registry ([#5](https://github.com/MyShivaRepo/swowl/issues/5)).
+- **Unified annotation value type** — language / datatype / IRI selector ([#6](https://github.com/MyShivaRepo/swowl/issues/6), [#8](https://github.com/MyShivaRepo/swowl/issues/8)).
 - **Corpus analysis (Interfaced Agent)**: per-section chunking, enriched entities
   carrying their relations, and SWRL rules merged in a single pass.
 - **Analysis tab**: mouse-resizable columns (persisted), reflowed *Text extract*
@@ -104,14 +107,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Fixed
 - **Import**: `owl:unionOf` / `owl:intersectionOf` class expressions in a property
   `domain` / `range` are now expanded — union-domain properties were previously
-  dropped (empty domain) and vanished from the class trees.
+  dropped (empty domain) and vanished from the class trees. ⚠️ This expansion wrote
+  the union as an intersection — fixed properly in 1.2.0 ([#10](https://github.com/MyShivaRepo/swowl/issues/10)).
 - **Analysis**: correct chunk `ref` shape (`doc` / `chapter`); labels and comments
   no longer lost on agent merge; full chunk text cached so highlighting covers the
   whole section; robust re-merge (non-hashable restriction markers).
 - **Topbar**: system ontologies show their name only; the ontology switcher lists
-  User + System registries and no longer fails when there is no user ontology.
+  User + System registries and no longer fails when there is no user ontology ([#4](https://github.com/MyShivaRepo/swowl/issues/4)).
 - **Portability**: user-agnostic home paths, non-root container; native-mode URL
-  documented as `127.0.0.1:8000`.
+  documented as `127.0.0.1:8000` ([#1](https://github.com/MyShivaRepo/swowl/issues/1), [#3](https://github.com/MyShivaRepo/swowl/issues/3)).
 
 ## [1.1.0] — 2026-06-19
 
