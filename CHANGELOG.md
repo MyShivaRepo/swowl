@@ -6,6 +6,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 > 🇫🇷 Une version française de ce fichier est disponible : [CHANGELOG.fr.md](CHANGELOG.fr.md).
 
+## [1.1.2] — 2026-10-23
+
+### Security
+- **CORS restricted to local origins** (`localhost`, `127.0.0.1`, `[::1]`): the API
+  exposes `/api/fs/browse`, which any web page open in the browser could previously
+  query to list the local file system (#17).
+
+### Fixed
+- **Installation on Python 3.13 / 3.14**: dependencies moved to modern lower bounds
+  capped at major versions (pydantic ≥ 2.12 ships wheels up to 3.14); `Query(enum=…)`,
+  removed in FastAPI 0.155, replaced by `Literal[…]` (#16).
+- **Export of prefixed identifiers**: references to imported or external vocabularies
+  (`mi:Unit`, `dcterms:isPartOf`) are expanded back to their real IRI instead of being
+  glued to the ontology namespace (`…#mi:Unit`) (#12).
+
+### Added
+- `tests/`: minimal round-trip fixtures (contributed by Cyril) and a regression script
+  `tests/roundtrip_cyril.py` covering cases A–D.
+
+### Known issues
+- Union domains / ranges are still written as several `rdfs:domain` triples, which OWL
+  reads as an **intersection** (#10); restriction fillers that are class expressions are
+  emptied (#15); axioms on imported classes may be lost (#14). Planned for **1.2.0**.
+
 ## [1.1.1] — 2026-10-22
 
 ### Added

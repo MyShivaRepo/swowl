@@ -6,6 +6,31 @@ et le projet suit le [versionnage sémantique](https://semver.org/).
 
 > 🇬🇧 An English version of this file is available: [CHANGELOG.md](CHANGELOG.md).
 
+## [1.1.2] — 2026-10-23
+
+### Sécurité
+- **CORS limité aux origines locales** (`localhost`, `127.0.0.1`, `[::1]`) : l'API expose
+  `/api/fs/browse`, qu'une page web quelconque ouverte dans le navigateur pouvait jusque-là
+  interroger pour lister le disque (#17).
+
+### Corrigé
+- **Installation sous Python 3.13 / 3.14** : dépendances passées à des bornes basses
+  récentes, plafonnées à la version majeure (pydantic ≥ 2.12 fournit des roues jusqu'à 3.14) ;
+  `Query(enum=…)`, retiré de FastAPI 0.155, remplacé par `Literal[…]` (#16).
+- **Export des identifiants préfixés** : les références vers des vocabulaires importés ou
+  externes (`mi:Unit`, `dcterms:isPartOf`) sont re-développées vers leur vrai IRI au lieu
+  d'être collées à l'espace de noms de l'ontologie (`…#mi:Unit`) (#12).
+
+### Ajouté
+- `tests/` : fixtures minimales d'aller-retour (fournies par Cyril) et script de
+  non-régression `tests/roundtrip_cyril.py` couvrant les cas A à D.
+
+### Problèmes connus
+- Les domaines / portées en union sont encore écrits en plusieurs triplets `rdfs:domain`,
+  qu'OWL lit comme une **intersection** (#10) ; les contenus de restriction qui sont des
+  expressions de classe sont vidés (#15) ; les axiomes posés sur une classe importée peuvent
+  être perdus (#14). Prévu pour la **1.2.0**.
+
 ## [1.1.1] — 2026-10-22
 
 ### Ajouté
