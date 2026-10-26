@@ -745,6 +745,17 @@ class TripleStore:
                 seen_cls.add(str(cls_uri))
                 _build_class(cls_uri, local)
 
+        def _dp_characteristics(prop, prop_uri):
+            """Caractéristiques d'une DatatypeProperty (#19) : owl:FunctionalProperty.
+            owl:InverseFunctionalProperty est interdit sur une propriété de données en
+            OWL 2 et non représentable → signalé plutôt que perdu en silence."""
+            types = set(g.objects(prop_uri, RDF.type))
+            prop.functional = OWL.FunctionalProperty in types
+            if OWL.InverseFunctionalProperty in types:
+                import_warnings.append(
+                    f"Propriété de données « {prop.id} » : owl:InverseFunctionalProperty "
+                    f"(interdit en OWL 2 pour une propriété de données) ignoré.")
+
         # Domaine / portée (#10) : plusieurs rdfs:domain = intersection (sémantique OWL) ;
         # un seul rdfs:domain owl:unionOf de classes nommées → union. Ce qui n'est pas
         # représentable est signalé et ignoré : une perte visible plutôt qu'un domaine faux.
@@ -840,6 +851,7 @@ class TripleStore:
             prop.annotations.comments = comments
             prop.annotations.other    = _collect_other(prop_uri)
             prop.domain, prop.domainUnion = _read_dom_rng(prop_uri, RDFS.domain, "domaine")
+            _dp_characteristics(prop, prop_uri)
             for r in g.objects(prop_uri, RDFS.range):
                 if isinstance(r, URIRef):
                     rl = _lid(str(r))
@@ -871,6 +883,7 @@ class TripleStore:
                 prop.annotations.comments = comments
                 prop.annotations.other    = _collect_other(prop_uri)
                 prop.domain, prop.domainUnion = _read_dom_rng(prop_uri, RDFS.domain, "domaine")
+                _dp_characteristics(prop, prop_uri)
                 for r in ranges:
                     rl = str(r).replace(str(XSD), "xsd:") if isinstance(r, URIRef) else ""
                     if rl: prop.range.append(rl)

@@ -1,0 +1,41 @@
+<?xml version="1.0"?>
+<!-- Cas de test minimal fourni par Cyril (issue #19) : caractéristiques des propriétés. -->
+<rdf:RDF
+    xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+    xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
+    xmlns:owl="http://www.w3.org/2002/07/owl#"
+    xmlns:xsd="http://www.w3.org/2001/XMLSchema#"
+    xml:base="http://example.org/mini-functional">
+
+  <owl:Ontology rdf:about="http://example.org/mini-functional"/>
+
+  <owl:Class rdf:ID="Gamma"/>
+  <owl:Class rdf:ID="Delta"/>
+
+  <!-- Temoin : ObjectProperty fonctionnelle. Conservee. -->
+  <owl:ObjectProperty rdf:ID="hasOwner">
+    <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#FunctionalProperty"/>
+    <rdfs:domain rdf:resource="#Gamma"/>
+    <rdfs:range rdf:resource="#Delta"/>
+  </owl:ObjectProperty>
+
+  <!-- Temoin : ObjectProperty inverse fonctionnelle. Conservee. -->
+  <owl:ObjectProperty rdf:ID="ownerOf">
+    <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#InverseFunctionalProperty"/>
+    <owl:inverseOf rdf:resource="#hasOwner"/>
+  </owl:ObjectProperty>
+
+  <!-- Cas a reproduire : DatatypeProperty fonctionnelle. Perdue avant 1.2.3. -->
+  <owl:DatatypeProperty rdf:ID="serialNumber">
+    <rdf:type rdf:resource="http://www.w3.org/2002/07/owl#FunctionalProperty"/>
+    <rdfs:domain rdf:resource="#Gamma"/>
+    <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+  </owl:DatatypeProperty>
+
+  <!-- Temoin : DatatypeProperty ordinaire. -->
+  <owl:DatatypeProperty rdf:ID="comment">
+    <rdfs:domain rdf:resource="#Gamma"/>
+    <rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/>
+  </owl:DatatypeProperty>
+
+</rdf:RDF>
