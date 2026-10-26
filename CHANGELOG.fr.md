@@ -6,6 +6,23 @@ et le projet suit le [versionnage sémantique](https://semver.org/).
 
 > 🇬🇧 An English version of this file is available: [CHANGELOG.md](CHANGELOG.md).
 
+## [1.2.4] — 2026-10-26
+
+### Corrigé
+- **Homonymes entre une ontologie et ce qu'elle importe** ([#20](https://github.com/MyShivaRepo/swowl/issues/20)) : une entité locale
+  portant le même nom qu'une entité d'une ontologie importée était exportée sous l'IRI de
+  l'ontologie importée (ex. le `definedBy` d'OSE ressortait comme celui de Q2U). Une IRI
+  étrangère n'est plus réduite à un nom local nu : sans `ns_prefixes` (import par l'API),
+  le serveur déduit les mêmes préfixes que l'assistant d'import (`xmlns` / `@prefix` +
+  `owl:imports`), et tout autre espace de noms étranger reçoit un préfixe généré (`ns1`,
+  `ns2`…), sans être confondu avec les `owl:imports`. À l'export, une entité déclarée dans
+  l'ontologie garde son propre espace de noms. Les ontologies importées par l'API sans
+  `ns_prefixes` sont à ré-importer.
+
+### Ajouté
+- Fixtures « homonymes » dans le test d'aller-retour « aucune perte », importées par l'API
+  sans `ns_prefixes`.
+
 ## [1.2.3] — 2026-10-26
 
 ### Corrigé

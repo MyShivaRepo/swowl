@@ -6,6 +6,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 > 🇫🇷 Une version française de ce fichier est disponible : [CHANGELOG.fr.md](CHANGELOG.fr.md).
 
+## [1.2.4] — 2026-10-26
+
+### Fixed
+- **Homonyms between an ontology and what it imports** ([#20](https://github.com/MyShivaRepo/swowl/issues/20)): a local entity
+  with the same name as an entity of an imported ontology was exported under the
+  imported ontology's IRI (e.g. OSE's `definedBy` came out as Q2U's). A foreign IRI is
+  no longer reduced to a bare local name: without `ns_prefixes` (API import), the server
+  derives the same prefixes as the import wizard (`xmlns` / `@prefix` + `owl:imports`),
+  and any other foreign namespace gets a generated prefix (`ns1`, `ns2`…). These are kept
+  apart from `owl:imports`. On export, an entity declared in the ontology keeps its own
+  namespace. Ontologies imported through the API without `ns_prefixes` should be
+  re-imported.
+
+### Added
+- Homonym fixtures in the "no loss" round-trip test, imported through the API without
+  `ns_prefixes`.
+
 ## [1.2.3] — 2026-10-26
 
 ### Fixed
