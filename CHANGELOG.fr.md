@@ -6,6 +6,20 @@ et le projet suit le [versionnage sémantique](https://semver.org/).
 
 > 🇬🇧 An English version of this file is available: [CHANGELOG.md](CHANGELOG.md).
 
+## [1.2.3] — 2026-10-26
+
+### Corrigé
+- **`owl:FunctionalProperty` sur les propriétés de données** ([#19](https://github.com/MyShivaRepo/swowl/issues/19)) : la
+  caractéristique est désormais lue à l'import (elle ne l'était que pour les propriétés
+  objet, et se perdait donc toujours alors que l'export et l'éditeur la géraient).
+  `owl:InverseFunctionalProperty` sur une propriété de données — interdit en OWL 2 — est
+  signalé par un avertissement d'import.
+
+### Ajouté
+- `tests/roundtrip_lossless.py` : test générique « aucune perte » sur toutes les fixtures —
+  chaque triplet source sans nœud anonyme doit figurer dans l'export (on compare les
+  triplets, pas leur nombre). Fixture `mini-functional.owl` fournie par Cyril.
+
 ## [1.2.2] — 2026-10-23
 
 ### Corrigé

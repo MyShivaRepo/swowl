@@ -6,6 +6,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 > 🇫🇷 Une version française de ce fichier est disponible : [CHANGELOG.fr.md](CHANGELOG.fr.md).
 
+## [1.2.3] — 2026-10-26
+
+### Fixed
+- **`owl:FunctionalProperty` on datatype properties** ([#19](https://github.com/MyShivaRepo/swowl/issues/19)): the characteristic is
+  now read at import (it was only read for object properties, so it was always lost
+  although export and editor supported it). `owl:InverseFunctionalProperty` on a datatype
+  property — not allowed in OWL 2 — is reported as an import warning.
+
+### Added
+- `tests/roundtrip_lossless.py`: generic "no loss" round-trip over every fixture — each
+  source triple without blank node must appear in the export (triples are compared, not
+  counted). Fixture `mini-functional.owl` contributed by Cyril.
+
 ## [1.2.2] — 2026-10-23
 
 ### Fixed
