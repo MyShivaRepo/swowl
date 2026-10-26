@@ -1,0 +1,29 @@
+<?xml version="1.0"?>
+<!-- Homonymes entre une ontologie et ce qu'elle importe (issue #20).
+     À importer par l'API SANS ns_prefixes. -->
+<rdf:RDF
+    xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+    xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
+    xmlns:owl="http://www.w3.org/2002/07/owl#"
+    xmlns:hi="http://example.org/hom-imported#"
+    xml:base="http://example.org/hom-main">
+
+  <owl:Ontology rdf:about="http://example.org/hom-main">
+    <owl:imports rdf:resource="http://example.org/hom-imported"/>
+  </owl:Ontology>
+
+  <!-- Propriété LOCALE, homonyme d'une propriété de l'ontologie importée. -->
+  <owl:ObjectProperty rdf:ID="definedBy">
+    <rdfs:label xml:lang="en">defined by (local)</rdfs:label>
+  </owl:ObjectProperty>
+
+  <!-- Référence à la propriété IMPORTÉE homonyme. -->
+  <owl:ObjectProperty rdf:ID="specifiedBy">
+    <rdfs:subPropertyOf rdf:resource="http://example.org/hom-imported#definedBy"/>
+  </owl:ObjectProperty>
+
+  <!-- Référence à un vocabulaire ni déclaré (xmlns) ni importé. -->
+  <owl:Class rdf:ID="Plan">
+    <rdfs:subClassOf rdf:resource="http://example.org/elsewhere#Document"/>
+  </owl:Class>
+</rdf:RDF>

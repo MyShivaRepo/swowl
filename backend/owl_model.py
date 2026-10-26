@@ -302,6 +302,9 @@ class OWLOntology(BaseModel):
     ns_sep: str = "#"
     # IRI exacte de owl:Ontology dans le fichier source (vide = id) — réécrite telle quelle.
     ontology_iri: str = ""
+    # Préfixes servant à compacter des IRI étrangères à l'import (« q2u:Unit ») puis à les
+    # restituer à l'export (#20). Ce ne sont PAS des owl:imports (≠ ns_prefixes).
+    ns_bindings: List[dict] = Field(default_factory=list)
     import_labels: dict = Field(default_factory=dict)  # {uri: {"prefix", "name"}} instantané à la déclaration
     ns_prefixes: list = Field(default_factory=list)     # [{prefix, namespace}] préfixes des namespaces référencés/importés
     annotations: EntityAnnotations = Field(default_factory=EntityAnnotations)

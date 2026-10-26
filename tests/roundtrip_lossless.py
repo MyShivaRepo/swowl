@@ -24,6 +24,9 @@ CASES = [
         [{"prefix": "mi", "namespace": "http://example.org/mini-imported"}]),
     ("slash_ns",        "slash-ns.owl",        "https://example.org/slash",          "sl", []),
     ("mini_functional", "mini-functional.owl", "http://example.org/mini-functional", "mf", []),
+    # #20 — homonymes, importés par l'API sans ns_prefixes (dépendance d'abord)
+    ("hom_imported",    "homonym-imported.owl", "http://example.org/hom-imported",   "hi", []),
+    ("hom_main",        "homonym-main.owl",     "http://example.org/hom-main",       "hm", []),
 ]
 
 def call(method, path, payload=None, raw=False):

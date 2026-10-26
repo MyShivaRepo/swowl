@@ -487,6 +487,45 @@ class TripleStore:
         return user_uri.rstrip("#/") + "#"
 
     @staticmethod
+    def declared_namespaces(g: "Graph", base_norm: str) -> list:
+        """Espaces de noms déclarés par le fichier (xmlns / @prefix) et owl:imports,
+        hors standards et hors base de l'ontologie → [{prefix, namespace}].
+        Partagé par l'assistant d'import (peek) et l'import par l'API (#20)."""
+        from rdflib import OWL as _OWL, RDF as _RDF
+        SKIP_NS = {"owl", "rdf", "rdfs", "xsd", "xml"}
+        by_norm: dict = {}
+
+        def _add(pfx, ns):
+            norm = ns.rstrip("#/")
+            if not norm or (base_norm and norm == base_norm):
+                return
+            ex = by_norm.get(norm)
+            if ex is None:
+                by_norm[norm] = {"prefix": pfx, "namespace": ns}
+                return
+            if ns.endswith(("#", "/")) and not ex["namespace"].endswith(("#", "/")):
+                ex["namespace"] = ns
+            if not ex["prefix"] and pfx:
+                ex["prefix"] = pfx
+
+        for pfx, ns in g.namespaces():
+            p, n = str(pfx), str(ns)
+            if p and p not in SKIP_NS:
+                _add(p, n)
+        for s in g.subjects(_RDF.type, _OWL.Ontology):
+            for o in g.objects(s, _OWL.imports):
+                iu, pfx_i = str(o), None
+                for p2, ns2 in g.namespaces():
+                    if str(p2) and str(ns2).rstrip("#/") == iu.rstrip("#/"):
+                        pfx_i = str(p2)
+                        break
+                if not pfx_i:
+                    seg = iu.rstrip("#/").rsplit("/", 1)[-1].rsplit("#", 1)[-1]
+                    pfx_i = ("".join(c for c in seg if c.isalnum() or c == "_")[:12].lower()) or "imp"
+                _add(pfx_i, iu)
+        return list(by_norm.values())
+
+    @staticmethod
     def _local_name(uri_str: str, base: str) -> str:
         """Extrait le nom local en retirant la base ; si échec, utilise le fragment ou le dernier segment."""
         local = uri_str.replace(base, "")
@@ -502,7 +541,10 @@ class TripleStore:
         return segment if segment else ""
 
     def import_from_rdf(self, content: bytes, fmt: str, name: str, host_path: str, uri: str, prefix: str = "onto", ns_prefixes=None) -> OWLOntology:
-        g = Graph()
+        try:
+            g = Graph(bind_namespaces="none")   # seuls les préfixes déclarés par le fichier
+        except TypeError:
+            g = Graph()
         g.parse(data=content, format=fmt)
 
         base = self._detect_base(g, uri)
@@ -514,6 +556,32 @@ class TripleStore:
              if isinstance(d, dict) and d.get("namespace") and d.get("prefix")],
             key=lambda t: len(t[0]), reverse=True,
         )
+        # #20 — mêmes préfixes que l'assistant d'import (xmlns / @prefix + owl:imports)
+        # pour les espaces de noms que l'appelant n'a pas déclarés (import par l'API).
+        _given_norm = {n.rstrip("#/") for n, _ in _user_ns}
+        _taken_pfx = {p for _, p in _user_ns}
+        _auto_pfx: set = set()
+        for d in self.declared_namespaces(g, base.rstrip("#/")):
+            n_, p_ = d["namespace"], d["prefix"]
+            if not p_ or n_.rstrip("#/") in _given_norm or p_ in _taken_pfx:
+                continue
+            _user_ns.append((n_, p_)); _taken_pfx.add(p_); _auto_pfx.add(p_)
+        _user_ns.sort(key=lambda t: len(t[0]), reverse=True)
+        _bindings: dict = {}   # préfixe automatique/généré effectivement utilisé → namespace
+
+        def _gen_prefix(ns_full):
+            """Préfixe pour un espace de noms étranger non déclaré : ns1, ns2…"""
+            for n_, p_ in _user_ns:
+                if n_.rstrip("#/") == ns_full.rstrip("#/"):
+                    return p_
+            k = 1
+            while f"ns{k}" in _taken_pfx:
+                k += 1
+            p_ = f"ns{k}"
+            _taken_pfx.add(p_); _auto_pfx.add(p_)
+            _user_ns.append((ns_full, p_))
+            _user_ns.sort(key=lambda t: len(t[0]), reverse=True)
+            return p_
         onto_id = base.rstrip("#/")
 
         onto = OWLOntology(id=onto_id, name=name, prefix=prefix, ns_prefixes=ns_prefixes or [])
@@ -583,8 +651,19 @@ class TripleStore:
             #    'http://ex.org/plm' vs entité 'http://ex.org/plm#Article').
             for ns_uri, ns_prefix in _user_ns:
                 if ns_uri != base and uri_str_val.startswith(ns_uri):
+                    if ns_prefix in _auto_pfx:
+                        _bindings[ns_prefix] = ns_uri
                     return ns_prefix + ":" + uri_str_val[len(ns_uri):].lstrip("#/")
-            # 4. Repli : extraction du nom local
+            # 4. Espace de noms étranger sans préfixe connu (#20) : préfixe généré, pour ne
+            #    jamais réduire une IRI étrangère à un nom nu (homonymes, IRI perdue).
+            cut = max(uri_str_val.rfind("#"), uri_str_val.rfind("/"))
+            if (cut > len("https://") and uri_str_val[cut + 1:]
+                    and not (base and uri_str_val[:cut] == base.rstrip("#/"))):
+                ns_new = uri_str_val[:cut + 1]
+                p_ = _gen_prefix(ns_new)
+                _bindings[p_] = next(n_ for n_, q_ in _user_ns if q_ == p_)
+                return f"{p_}:{uri_str_val[cut + 1:]}"
+            # 5. Repli : extraction du nom local
             return self._local_name(uri_str_val, base)
 
         import_warnings: list = []
@@ -1053,6 +1132,7 @@ class TripleStore:
             import_warnings.append(
                 f"{_orph} expression(s) de classe anonyme(s) orpheline(s) (aucun axiome) "
                 f"ignorée(s) — sans effet sémantique.")
+        onto.ns_bindings = [{"prefix": p_, "namespace": n_} for p_, n_ in sorted(_bindings.items())]
         onto.import_warnings = list(dict.fromkeys(import_warnings))
         for w in onto.import_warnings:
             print(f"[import] {w}", flush=True)
@@ -1130,6 +1210,10 @@ class TripleStore:
         # Sans cela, l'export crée des classes/propriétés fantômes dans le namespace local.
         imported_ns: dict = {}
         _sep_by_uri: dict = {}   # uri d'ontologie importée → séparateur (#11)
+        _local_ids = ({c.id for c in onto.classes} | {p.id for p in onto.object_properties}
+                      | {p.id for p in onto.datatype_properties}
+                      | {p.id for p in (onto.annotation_properties or [])}
+                      | {i.id for i in onto.individuals})
         try:
             conn_name = next((k for k, e in self._registry.items() if e.connected), None)
             if conn_name:
@@ -1157,6 +1241,10 @@ class TripleStore:
             n = (d.get("namespace") if isinstance(d, dict) else getattr(d, "namespace", "")) or ""
             if p.strip() and n.strip():
                 _pfx_ns[p.strip()] = n.strip()
+        for d in (getattr(onto, "ns_bindings", None) or []):
+            p, n = (d.get("prefix") or "").strip(), (d.get("namespace") or "").strip()
+            if p and n and p not in _pfx_ns:
+                _pfx_ns[p] = n
         for imp_uri, lab in (onto.import_labels or {}).items():
             p = (lab or {}).get("prefix")
             if p and p not in _pfx_ns:
@@ -1182,7 +1270,9 @@ class TripleStore:
                         return URIRef(ns + rest)
                     return URIRef(ns + _sep_by_uri.get(ns.rstrip("#/"), "#") + rest)
             # Entité importée → namespace du schéma source (et non celui des données).
-            if local_id in imported_ns:
+            # Une entité DÉCLARÉE dans cette ontologie lui appartient, même si une
+            # ontologie importée a un homonyme (#20).
+            if local_id in imported_ns and local_id not in _local_ids:
                 return URIRef(imported_ns[local_id] + local_id)
             return NS[local_id]
 
